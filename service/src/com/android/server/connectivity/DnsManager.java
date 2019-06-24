@@ -23,8 +23,10 @@ import static android.net.ConnectivitySettingsManager.DNS_RESOLVER_SUCCESS_THRES
 import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_DEFAULT_MODE;
 import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_MODE;
 import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_MODE_OFF;
+import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_MODE_CLOUDFLARE;
 import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME;
 import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_SPECIFIER;
+import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_SPECIFIER_CLOUDFLARE;
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.VALIDATION_RESULT_FAILURE;
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.VALIDATION_RESULT_SUCCESS;
 
@@ -139,6 +141,10 @@ public class DnsManager {
             final String specifier = getStringSetting(context.getContentResolver(),
                     PRIVATE_DNS_SPECIFIER);
             return new PrivateDnsConfig(specifier, null);
+        }
+
+        if (PRIVATE_DNS_MODE_CLOUDFLARE == mode) {
+            return new PrivateDnsConfig(PRIVATE_DNS_SPECIFIER_CLOUDFLARE, null);
         }
 
         return new PrivateDnsConfig(useTls);
