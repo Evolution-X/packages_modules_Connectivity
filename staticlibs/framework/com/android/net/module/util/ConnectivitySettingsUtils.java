@@ -33,10 +33,36 @@ public class ConnectivitySettingsUtils {
     public static final int PRIVATE_DNS_MODE_OFF = 1;
     public static final int PRIVATE_DNS_MODE_OPPORTUNISTIC = 2;
     public static final int PRIVATE_DNS_MODE_PROVIDER_HOSTNAME = 3;
+    public static final int PRIVATE_DNS_MODE_ADGUARD = 4;
+    public static final int PRIVATE_DNS_MODE_APPLIEDPRIVACY = 5;
+    public static final int PRIVATE_DNS_MODE_CLEANBROWSING = 6;
+    public static final int PRIVATE_DNS_MODE_CIRA = 7;
+    public static final int PRIVATE_DNS_MODE_CZNIC = 8;
+    public static final int PRIVATE_DNS_MODE_CLOUDFLARE = 9;
+    public static final int PRIVATE_DNS_MODE_GOOGLE = 10;
+    public static final int PRIVATE_DNS_MODE_MULLVAD = 11;
+    public static final int PRIVATE_DNS_MODE_QUADNINE = 12;
+    public static final int PRIVATE_DNS_MODE_RESTENA = 13;
+    public static final int PRIVATE_DNS_MODE_SWITCH = 14;
+    public static final int PRIVATE_DNS_MODE_TWNIC = 15;
+    public static final int PRIVATE_DNS_MODE_UNCENSOREDDNS = 16;
 
     public static final String PRIVATE_DNS_DEFAULT_MODE = "private_dns_default_mode";
     public static final String PRIVATE_DNS_MODE = "private_dns_mode";
     public static final String PRIVATE_DNS_MODE_OFF_STRING = "off";
+    public static final String PRIVATE_DNS_MODE_ADGUARD_STRING = "adguard";
+    public static final String PRIVATE_DNS_MODE_APPLIEDPRIVACY_STRING = "appliedprivacy";
+    public static final String PRIVATE_DNS_MODE_CLEANBROWSING_STRING = "cleanbrowsing";
+    public static final String PRIVATE_DNS_MODE_CIRA_STRING = "cira";
+    public static final String PRIVATE_DNS_MODE_CZNIC_STRING = "cznic";
+    public static final String PRIVATE_DNS_MODE_CLOUDFLARE_STRING = "cloudflare";
+    public static final String PRIVATE_DNS_MODE_GOOGLE_STRING = "google";
+    public static final String PRIVATE_DNS_MODE_MULLVAD_STRING = "mullvad";
+    public static final String PRIVATE_DNS_MODE_QUADNINE_STRING = "quadnine";
+    public static final String PRIVATE_DNS_MODE_RESTENA_STRING = "restena";
+    public static final String PRIVATE_DNS_MODE_SWITCH_STRING = "switch";
+    public static final String PRIVATE_DNS_MODE_TWNIC_STRING = "twnic";
+    public static final String PRIVATE_DNS_MODE_UNCENSOREDDNS_STRING = "uncensoreddns";
     public static final String PRIVATE_DNS_MODE_OPPORTUNISTIC_STRING = "opportunistic";
     public static final String PRIVATE_DNS_MODE_PROVIDER_HOSTNAME_STRING = "hostname";
     public static final String PRIVATE_DNS_SPECIFIER = "private_dns_specifier";
@@ -55,6 +81,32 @@ public class ConnectivitySettingsUtils {
         switch (mode) {
             case PRIVATE_DNS_MODE_OFF:
                 return PRIVATE_DNS_MODE_OFF_STRING;
+            case PRIVATE_DNS_MODE_ADGUARD:
+                return PRIVATE_DNS_MODE_ADGUARD_STRING;
+            case PRIVATE_DNS_MODE_APPLIEDPRIVACY:
+                return PRIVATE_DNS_MODE_APPLIEDPRIVACY_STRING;
+            case PRIVATE_DNS_MODE_CLEANBROWSING:
+                return PRIVATE_DNS_MODE_CLEANBROWSING_STRING;
+            case PRIVATE_DNS_MODE_CIRA:
+                return PRIVATE_DNS_MODE_CIRA_STRING;
+            case PRIVATE_DNS_MODE_CZNIC:
+                return PRIVATE_DNS_MODE_CZNIC_STRING;
+            case PRIVATE_DNS_MODE_CLOUDFLARE:
+                return PRIVATE_DNS_MODE_CLOUDFLARE_STRING;
+            case PRIVATE_DNS_MODE_GOOGLE:
+                return PRIVATE_DNS_MODE_GOOGLE_STRING;
+            case PRIVATE_DNS_MODE_MULLVAD:
+                return PRIVATE_DNS_MODE_MULLVAD_STRING;
+            case PRIVATE_DNS_MODE_QUADNINE:
+                return PRIVATE_DNS_MODE_QUADNINE_STRING;
+            case PRIVATE_DNS_MODE_RESTENA:
+                return PRIVATE_DNS_MODE_RESTENA_STRING;
+            case PRIVATE_DNS_MODE_SWITCH:
+                return PRIVATE_DNS_MODE_SWITCH_STRING;
+            case PRIVATE_DNS_MODE_TWNIC:
+                return PRIVATE_DNS_MODE_TWNIC_STRING;
+            case PRIVATE_DNS_MODE_UNCENSOREDDNS:
+                return PRIVATE_DNS_MODE_UNCENSOREDDNS_STRING;
             case PRIVATE_DNS_MODE_OPPORTUNISTIC:
                 return PRIVATE_DNS_MODE_OPPORTUNISTIC_STRING;
             case PRIVATE_DNS_MODE_PROVIDER_HOSTNAME:
@@ -72,6 +124,32 @@ public class ConnectivitySettingsUtils {
         switch (mode) {
             case "off":
                 return PRIVATE_DNS_MODE_OFF;
+            case "adguard":
+                return PRIVATE_DNS_MODE_ADGUARD;
+            case "appliedprivacy":
+                return PRIVATE_DNS_MODE_APPLIEDPRIVACY;
+            case "cleanbrowsing":
+                return PRIVATE_DNS_MODE_CLEANBROWSING;
+            case "cira":
+                return PRIVATE_DNS_MODE_CIRA;
+            case "cznic":
+                return PRIVATE_DNS_MODE_CZNIC;
+            case "cloudflare":
+                return PRIVATE_DNS_MODE_CLOUDFLARE;
+            case "google":
+                return PRIVATE_DNS_MODE_GOOGLE;
+            case "mullvad":
+                return PRIVATE_DNS_MODE_MULLVAD;
+            case "quadnine":
+                return PRIVATE_DNS_MODE_QUADNINE;
+            case "restena":
+                return PRIVATE_DNS_MODE_RESTENA;
+            case "switch":
+                return PRIVATE_DNS_MODE_SWITCH;
+            case "twnic":
+                return PRIVATE_DNS_MODE_TWNIC;
+            case "uncensoreddns":
+                return PRIVATE_DNS_MODE_UNCENSOREDDNS;
             case "hostname":
                 return PRIVATE_DNS_MODE_PROVIDER_HOSTNAME;
             case "opportunistic":
@@ -122,6 +200,19 @@ public class ConnectivitySettingsUtils {
      */
     public static void setPrivateDnsMode(@NonNull Context context, int mode) {
         if (!(mode == PRIVATE_DNS_MODE_OFF
+                || mode == PRIVATE_DNS_MODE_ADGUARD
+                || mode == PRIVATE_DNS_MODE_APPLIEDPRIVACY
+                || mode == PRIVATE_DNS_MODE_CLEANBROWSING
+                || mode == PRIVATE_DNS_MODE_CIRA
+                || mode == PRIVATE_DNS_MODE_CZNIC
+                || mode == PRIVATE_DNS_MODE_CLOUDFLARE
+                || mode == PRIVATE_DNS_MODE_GOOGLE
+                || mode == PRIVATE_DNS_MODE_MULLVAD
+                || mode == PRIVATE_DNS_MODE_QUADNINE
+                || mode == PRIVATE_DNS_MODE_RESTENA
+                || mode == PRIVATE_DNS_MODE_SWITCH
+                || mode == PRIVATE_DNS_MODE_TWNIC
+                || mode == PRIVATE_DNS_MODE_UNCENSOREDDNS
                 || mode == PRIVATE_DNS_MODE_OPPORTUNISTIC
                 || mode == PRIVATE_DNS_MODE_PROVIDER_HOSTNAME)) {
             throw new IllegalArgumentException("Invalid private dns mode: " + mode);

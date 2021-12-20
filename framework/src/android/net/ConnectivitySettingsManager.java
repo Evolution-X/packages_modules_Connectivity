@@ -417,6 +417,84 @@ public class ConnectivitySettingsManager {
     public static final int PRIVATE_DNS_MODE_OFF = ConnectivitySettingsUtils.PRIVATE_DNS_MODE_OFF;
 
     /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_ADGUARD =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_ADGUARD;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_APPLIEDPRIVACY =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_APPLIEDPRIVACY;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_CLEANBROWSING =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_CLEANBROWSING;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_CIRA =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_CIRA;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_CZNIC =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_CZNIC;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_CLOUDFLARE =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_CLOUDFLARE;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_GOOGLE =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_GOOGLE;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_MULLVAD =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_MULLVAD;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_QUADNINE =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_QUADNINE;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_RESTENA =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_RESTENA;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_SWITCH =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_SWITCH;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_TWNIC =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_TWNIC;
+
+    /**
+     * @hide
+     */
+    public static final int PRIVATE_DNS_MODE_UNCENSOREDDNS =
+            ConnectivitySettingsUtils.PRIVATE_DNS_MODE_UNCENSOREDDNS;
+
+    /**
      * One of the private DNS modes that indicates the private DNS mode is automatic, which
      * will try to use the current DNS as private DNS.
      */
@@ -431,10 +509,89 @@ public class ConnectivitySettingsManager {
     public static final int PRIVATE_DNS_MODE_PROVIDER_HOSTNAME =
             ConnectivitySettingsUtils.PRIVATE_DNS_MODE_PROVIDER_HOSTNAME;
 
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_ADGUARD = "dns.adguard.com";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_APPLIEDPRIVACY = "dot1.applied-privacy.net";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_CIRA = "protected.canadianshield.cira.ca";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_CZNIC = "odvr.nic.cz";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_CLEANBROWSING = "security-filter-dns.cleanbrowsing.org";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_CLOUDFLARE = "security.cloudflare-dns.com";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_GOOGLE = "dns.google";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_MULLVAD = "adblock.doh.mullvad.net";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_QUADNINE = "dns.quad9.net";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_RESTENA = "kaitain.restena.lu";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_SWITCH = "dns.switch.ch";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_TWNIC = "101.101.101.101";
+
+    /**
+     * @hide
+     */
+    public static final String PRIVATE_DNS_SPECIFIER_UNCENSOREDDNS = "unicast.censurfridns.dk";
+
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(value = {
             PRIVATE_DNS_MODE_OFF,
+            PRIVATE_DNS_MODE_ADGUARD,
+            PRIVATE_DNS_MODE_APPLIEDPRIVACY,
+            PRIVATE_DNS_MODE_CLEANBROWSING,
+            PRIVATE_DNS_MODE_CIRA,
+            PRIVATE_DNS_MODE_CZNIC,
+            PRIVATE_DNS_MODE_CLOUDFLARE,
+            PRIVATE_DNS_MODE_GOOGLE,
+            PRIVATE_DNS_MODE_MULLVAD,
+            PRIVATE_DNS_MODE_QUADNINE,
+            PRIVATE_DNS_MODE_RESTENA,
+            PRIVATE_DNS_MODE_SWITCH,
+            PRIVATE_DNS_MODE_TWNIC,
+            PRIVATE_DNS_MODE_UNCENSOREDDNS,
             PRIVATE_DNS_MODE_OPPORTUNISTIC,
             PRIVATE_DNS_MODE_PROVIDER_HOSTNAME,
     })
@@ -889,6 +1046,19 @@ public class ConnectivitySettingsManager {
     public static void setPrivateDnsDefaultMode(@NonNull Context context,
             @NonNull @PrivateDnsMode int mode) {
         if (!(mode == PRIVATE_DNS_MODE_OFF
+                || mode == PRIVATE_DNS_MODE_ADGUARD
+                || mode == PRIVATE_DNS_MODE_APPLIEDPRIVACY
+                || mode == PRIVATE_DNS_MODE_CLEANBROWSING
+                || mode == PRIVATE_DNS_MODE_CIRA
+                || mode == PRIVATE_DNS_MODE_CZNIC
+                || mode == PRIVATE_DNS_MODE_CLOUDFLARE
+                || mode == PRIVATE_DNS_MODE_GOOGLE
+                || mode == PRIVATE_DNS_MODE_MULLVAD
+                || mode == PRIVATE_DNS_MODE_QUADNINE
+                || mode == PRIVATE_DNS_MODE_RESTENA
+                || mode == PRIVATE_DNS_MODE_SWITCH
+                || mode == PRIVATE_DNS_MODE_TWNIC
+                || mode == PRIVATE_DNS_MODE_UNCENSOREDDNS
                 || mode == PRIVATE_DNS_MODE_OPPORTUNISTIC
                 || mode == PRIVATE_DNS_MODE_PROVIDER_HOSTNAME)) {
             throw new IllegalArgumentException("Invalid private dns mode");
