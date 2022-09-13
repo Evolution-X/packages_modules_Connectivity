@@ -417,7 +417,7 @@ public class TrafficStats {
     private static class SocketTagger extends dalvik.system.SocketTagger {
 
         // Enable log with `setprop log.tag.TrafficStats DEBUG` and restart the module.
-        private static final boolean LOGD = Log.isLoggable(TAG, Log.DEBUG);
+        private static final boolean LOGD = false;
 
         SocketTagger() {
         }
