@@ -386,6 +386,12 @@ public class IpServer extends StateMachineShim {
         return mLastIPv6UpstreamIfindex;
     }
 
+    /** The IPv6 upstream interface prefixes */
+    @NonNull
+    public Set<IpPrefix> getIpv6UpstreamPrefixes() {
+        return Collections.unmodifiableSet(mLastIPv6UpstreamPrefixes);
+    }
+
     /** The interface parameters which IpServer is using */
     public InterfaceParams getInterfaceParams() {
         return mInterfaceParams;
@@ -796,8 +802,12 @@ public class IpServer extends StateMachineShim {
         // Not support BPF on virtual upstream interface
         final boolean upstreamSupportsBpf = upstreamIface != null && !isVcnInterface(upstreamIface);
         final Set<IpPrefix> upstreamPrefixes = params != null ? params.prefixes : Set.of();
-        updateIpv6ForwardingRules(mLastIPv6UpstreamIfindex, mLastIPv6UpstreamPrefixes,
-                upstreamIfIndex, upstreamPrefixes, upstreamSupportsBpf);
+        // mBpfCoordinator#updateIpv6UpstreamInterface must be called before updating
+        // mLastIPv6UpstreamIfindex and mLastIPv6UpstreamPrefixes because BpfCoordinator will call
+        // IpServer#getIpv6UpstreamIfindex and IpServer#getIpv6UpstreamPrefixes to retrieve current
+        // upstream interface index and prefixes when handling upstream changes.
+        mBpfCoordinator.updateIpv6UpstreamInterface(this, upstreamIfIndex, upstreamPrefixes,
+                upstreamSupportsBpf);
         mLastIPv6LinkProperties = v6only;
         mLastIPv6UpstreamIfindex = upstreamIfIndex;
         mLastIPv6UpstreamPrefixes = upstreamPrefixes;
@@ -942,24 +952,6 @@ public class IpServer extends StateMachineShim {
         } catch (ServiceSpecificException | RemoteException e) {
             mLog.e("Failed to update local DNS caching server");
             if (newDnses != null) newDnses.clear();
-        }
-    }
-
-    private int getInterfaceIndexForRule(int ifindex, boolean supportsBpf) {
-        return supportsBpf ? ifindex : NO_UPSTREAM;
-    }
-
-    // Handles updates to IPv6 forwarding rules if the upstream or its prefixes change.
-    private void updateIpv6ForwardingRules(int prevUpstreamIfindex,
-            @NonNull Set<IpPrefix> prevUpstreamPrefixes, int upstreamIfindex,
-            @NonNull Set<IpPrefix> upstreamPrefixes, boolean upstreamSupportsBpf) {
-        // If the upstream interface has changed, remove all rules and re-add them with the new
-        // upstream interface. If upstream is a virtual network, treated as no upstream.
-        if (prevUpstreamIfindex != upstreamIfindex
-                || !prevUpstreamPrefixes.equals(upstreamPrefixes)) {
-            mBpfCoordinator.updateAllIpv6Rules(this, this.mInterfaceParams,
-                    getInterfaceIndexForRule(upstreamIfindex, upstreamSupportsBpf),
-                    upstreamPrefixes);
         }
     }
 
@@ -1316,8 +1308,8 @@ public class IpServer extends StateMachineShim {
 
             for (String ifname : mUpstreamIfaceSet.ifnames) cleanupUpstreamInterface(ifname);
             mUpstreamIfaceSet = null;
-            mBpfCoordinator.updateAllIpv6Rules(
-                    IpServer.this, IpServer.this.mInterfaceParams, NO_UPSTREAM, Set.of());
+            mBpfCoordinator.updateIpv6UpstreamInterface(IpServer.this, NO_UPSTREAM,
+                    Collections.emptySet(), false /* upstreamSupportsBpf */);
         }
 
         private void cleanupUpstreamInterface(String upstreamIface) {

@@ -731,9 +731,8 @@ public class BpfCoordinator {
     /**
      * Delete all upstream and downstream rules for the passed-in IpServer, and if the new upstream
      * is nonzero, reapply them to the new upstream.
-     * Note that this can be only called on handler thread.
      */
-    public void updateAllIpv6Rules(@NonNull final IpServer ipServer,
+    private void updateAllIpv6Rules(@NonNull final IpServer ipServer,
             final InterfaceParams interfaceParams, int newUpstreamIfindex,
             @NonNull final Set<IpPrefix> newUpstreamPrefixes) {
         if (!isUsingBpf()) return;
@@ -895,6 +894,27 @@ public class BpfCoordinator {
             stopConntrackMonitoring();
             mIpNeighborMonitor.stop();
             mLog.i("Neighbor monitoring stopped.");
+        }
+    }
+
+    /**
+     * Update upstream interface and its prefixes.
+     * Note that this can be only called on handler thread.
+     */
+    public void updateIpv6UpstreamInterface(@NonNull final IpServer ipServer, int upstreamIfindex,
+            @NonNull Set<IpPrefix> upstreamPrefixes, boolean upstreamSupportsBpf) {
+        if (!isUsingBpf()) return;
+
+        // If the upstream interface has changed, remove all rules and re-add them with the new
+        // upstream interface. If upstream is a virtual network, treated as no upstream.
+        final int prevUpstreamIfindex = ipServer.getIpv6UpstreamIfindex();
+        final InterfaceParams interfaceParams = ipServer.getInterfaceParams();
+        final Set<IpPrefix> prevUpstreamPrefixes = ipServer.getIpv6UpstreamPrefixes();
+        if (prevUpstreamIfindex != upstreamIfindex
+                || !prevUpstreamPrefixes.equals(upstreamPrefixes)) {
+            updateAllIpv6Rules(ipServer, interfaceParams,
+                    getInterfaceIndexForRule(upstreamIfindex, upstreamSupportsBpf),
+                    upstreamPrefixes);
         }
     }
 

@@ -245,8 +245,12 @@ public class IpServerTest {
             lp.setLinkAddresses(upstreamAddresses);
             dispatchTetherConnectionChanged(upstreamIface, lp, 0);
             Set<IpPrefix> upstreamPrefixes = getTetherableIpv6Prefixes(lp.getLinkAddresses());
-            verify(mBpfCoordinator).updateAllIpv6Rules(
-                    mIpServer, TEST_IFACE_PARAMS, interfaceParams.index, upstreamPrefixes);
+            // One is called when handling CMD_TETHER_CONNECTION_CHANGED and the other one is called
+            // when upstream's LinkProperties is updated (updateUpstreamIPv6LinkProperties)
+            verify(mBpfCoordinator, times(2)).maybeAddUpstreamToLookupTable(
+                    interfaceParams.index, upstreamIface);
+            verify(mBpfCoordinator).updateIpv6UpstreamInterface(mIpServer, interfaceParams.index,
+                    upstreamPrefixes, true /* upstreamSupportsBpf */);
         }
         reset(mNetd, mBpfCoordinator, mCallback, mAddressCoordinator);
         when(mAddressCoordinator.requestDownstreamAddress(any(), anyInt(),
@@ -550,8 +554,8 @@ public class IpServerTest {
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
         inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
         inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        inOrder.verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES, false /* upstreamSupportsBpf */);
         // When tethering stops, upstream interface is set to zero and thus clearing all upstream
         // rules. Downstream rules are needed to be cleared explicitly by calling
         // BpfCoordinator#clearAllIpv6Rules in TetheredState#exit.
@@ -758,8 +762,8 @@ public class IpServerTest {
         lp.setInterfaceName(UPSTREAM_IFACE2);
         lp.setLinkAddresses(UPSTREAM_ADDRESSES);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES, true /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // Upstream link addresses change result in updating the rules.
@@ -767,8 +771,8 @@ public class IpServerTest {
         lp2.setInterfaceName(UPSTREAM_IFACE2);
         lp2.setLinkAddresses(UPSTREAM_ADDRESSES2);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2, lp2, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES2);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES2, true /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // When the upstream is lost, rules are removed.
@@ -777,42 +781,43 @@ public class IpServerTest {
         // - processMessage CMD_TETHER_CONNECTION_CHANGED for the upstream is lost.
         // - processMessage CMD_IPV6_TETHER_UPDATE for the IPv6 upstream is lost.
         // See dispatchTetherConnectionChanged.
-        verify(mBpfCoordinator, times(2)).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator, times(2)).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES, false /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // If the upstream is IPv4-only, no rules are added.
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
-        verify(mBpfCoordinator, never()).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator, never()).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES, false /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // Rules are added again once upstream IPv6 connectivity is available.
         lp.setInterfaceName(UPSTREAM_IFACE);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES, true /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // If upstream IPv6 connectivity is lost, rules are removed.
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, null, 0);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES, false /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // When upstream IPv6 connectivity comes back, rules are added.
         lp.setInterfaceName(UPSTREAM_IFACE);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES, true /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
 
         // When the downstream interface goes down, rules are removed.
         mIpServer.stop();
         mLooper.dispatchAll();
         verify(mBpfCoordinator).clearAllIpv6Rules(mIpServer);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator).removeIpServer(mIpServer);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES, false /* upstreamSupportsBpf */);
         reset(mBpfCoordinator);
     }
 
