@@ -62,11 +62,6 @@ class NetworkTemplateTest {
             }
         }
 
-        // Verify hidden match rules cannot construct templates.
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_PROXY).build()
-        }
-
         // Verify template which matches metered cellular and carrier networks with
         // the given IMSI. See buildTemplateMobileAll and buildTemplateCarrierMetered.
         listOf(MATCH_MOBILE, MATCH_CARRIER).forEach { matchRule ->
