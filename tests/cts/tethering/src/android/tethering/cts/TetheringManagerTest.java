@@ -22,6 +22,9 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_DUN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
+import static android.net.TetheringManager.TETHERING_BLUETOOTH;
+import static android.net.TetheringManager.TETHERING_ETHERNET;
+import static android.net.TetheringManager.TETHERING_NCM;
 import static android.net.TetheringManager.TETHERING_USB;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHERING_WIFI_P2P;
@@ -34,6 +37,7 @@ import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -60,7 +64,9 @@ import android.net.cts.util.CtsNetUtils.TestNetworkCallback;
 import android.net.cts.util.CtsTetheringUtils;
 import android.net.cts.util.CtsTetheringUtils.StartTetheringCallback;
 import android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
+import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiSsid;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.os.ResultReceiver;
@@ -71,6 +77,7 @@ import android.telephony.TelephonyManager;
 import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.modules.utils.build.SdkLevel;
 import com.android.testutils.ParcelUtils;
 
 import org.junit.After;
@@ -78,6 +85,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -216,12 +224,26 @@ public class TetheringManagerTest {
 
     @Test
     public void testTetheringRequest() {
-        final TetheringRequest tr = new TetheringRequest.Builder(TETHERING_WIFI).build();
+        SoftApConfiguration softApConfiguration;
+        if (SdkLevel.isAtLeastT()) {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes(
+                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
+                    .build();
+        } else {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setSsid("This is an SSID!")
+                    .build();
+        }
+        final TetheringRequest tr = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfiguration)
+                .build();
         assertEquals(TETHERING_WIFI, tr.getTetheringType());
         assertNull(tr.getLocalIpv4Address());
         assertNull(tr.getClientStaticIpv4Address());
         assertFalse(tr.isExemptFromEntitlementCheck());
         assertTrue(tr.getShouldShowEntitlementUi());
+        assertEquals(softApConfiguration, tr.getSoftApConfiguration());
 
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
@@ -244,15 +266,57 @@ public class TetheringManagerTest {
     }
 
     @Test
+    public void testTetheringRequestSetSoftApConfigurationFailsWhenNotWifi() {
+        final SoftApConfiguration softApConfiguration;
+        if (SdkLevel.isAtLeastT()) {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes(
+                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
+                    .build();
+        } else {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setSsid("This is an SSID!")
+                    .build();
+        }
+        for (int type : List.of(TETHERING_USB, TETHERING_BLUETOOTH, TETHERING_WIFI_P2P,
+                TETHERING_NCM, TETHERING_ETHERNET)) {
+            try {
+                new TetheringRequest.Builder(type).setSoftApConfiguration(softApConfiguration);
+                fail("Was able to set SoftApConfiguration for tethering type " + type);
+            } catch (IllegalArgumentException e) {
+                // Success
+            }
+        }
+    }
+
+    @Test
     public void testTetheringRequestParcelable() {
+        final SoftApConfiguration softApConfiguration;
+        if (SdkLevel.isAtLeastT()) {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes(
+                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
+                    .build();
+        } else {
+            softApConfiguration = new SoftApConfiguration.Builder()
+                    .setSsid("This is an SSID!")
+                    .build();
+        }
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
-        final TetheringRequest unparceled = new TetheringRequest.Builder(TETHERING_USB)
+        final TetheringRequest withConfig = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfiguration)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false).build();
-        final TetheringRequest parceled = ParcelUtils.parcelingRoundTrip(unparceled);
-        assertEquals(unparceled, parceled);
+        final TetheringRequest withoutConfig = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setStaticIpv4Addresses(localAddr, clientAddr)
+                .setExemptFromEntitlementCheck(true)
+                .setShouldShowEntitlementUi(false).build();
+        assertEquals(withConfig, ParcelUtils.parcelingRoundTrip(withConfig));
+        assertEquals(withoutConfig, ParcelUtils.parcelingRoundTrip(withoutConfig));
+        assertNotEquals(withConfig, ParcelUtils.parcelingRoundTrip(withoutConfig));
+        assertNotEquals(withoutConfig, ParcelUtils.parcelingRoundTrip(withConfig));
     }
 
     @Test
