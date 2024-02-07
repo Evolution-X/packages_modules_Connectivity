@@ -69,8 +69,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.MessageUtils;
 import com.android.internal.util.State;
 import com.android.modules.utils.build.SdkLevel;
-import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.IIpv4PrefixRequest;
+import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
@@ -293,6 +293,9 @@ public class IpServer extends StateMachineShim {
 
     private LinkAddress mIpv4Address;
 
+    @Nullable
+    private TetheringRequest mTetheringRequest;
+
     private final TetheringMetrics mTetheringMetrics;
     private final Handler mHandler;
 
@@ -404,6 +407,12 @@ public class IpServer extends StateMachineShim {
     @VisibleForTesting
     public IIpv4PrefixRequest getIpv4PrefixRequest() {
         return mIpv4PrefixRequest;
+    }
+
+    /** The TetheringRequest the IpServer started with. */
+    @Nullable
+    public TetheringRequest getTetheringRequest() {
+        return mTetheringRequest;
     }
 
     /**
@@ -1033,6 +1042,7 @@ public class IpServer extends StateMachineShim {
             switch (message.what) {
                 case CMD_TETHER_REQUESTED:
                     mLastError = TETHER_ERROR_NO_ERROR;
+                    mTetheringRequest = (TetheringRequest) message.obj;
                     switch (message.arg1) {
                         case STATE_LOCAL_ONLY:
                             maybeConfigureStaticIp((TetheringRequest) message.obj);

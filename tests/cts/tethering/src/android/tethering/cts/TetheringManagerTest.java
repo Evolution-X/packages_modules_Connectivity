@@ -340,10 +340,14 @@ public class TetheringManagerTest {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
             tetherEventCallback.expectNoTetheringActive();
 
+            SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes("This is an SSID!"
+                            .getBytes(StandardCharsets.UTF_8))).build();
             final TetheringInterface tetheredIface =
-                    mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
+                    mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
 
             assertNotNull(tetheredIface);
+            assertEquals(softApConfig, tetheredIface.getSoftApConfiguration());
             final String wifiTetheringIface = tetheredIface.getInterface();
 
             mCtsTetheringUtils.stopWifiTethering(tetherEventCallback);
