@@ -86,16 +86,6 @@ static Status initPrograms(const char* cg2_path) {
         return Status("U+ platform with cg2_path != /sys/fs/cgroup is unsupported");
     }
 
-    // V bumps the kernel requirement up to 4.19
-    if (isAtLeastV && !isAtLeastKernelVersion(4, 19, 0)) {
-        return Status("V+ platform with kernel version < 4.19.0 is unsupported");
-    }
-
-    // 25Q2 bumps the kernel requirement up to 5.4
-    if (isAtLeast25Q2 && !isAtLeastKernelVersion(5, 4, 0)) {
-        return Status("25Q2+ platform with kernel version < 5.4.0 is unsupported");
-    }
-
     unique_fd cg_fd(open(cg2_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC));
     if (!cg_fd.ok()) return statusFromErrno(errno, "Opening cgroup dir failed");
 
