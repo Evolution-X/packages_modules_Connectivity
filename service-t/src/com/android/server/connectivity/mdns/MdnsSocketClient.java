@@ -28,7 +28,9 @@ import android.text.format.DateUtils;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.SharedLog;
+import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -247,6 +249,12 @@ public class MdnsSocketClient implements MdnsSocketClientBase {
         }
         if (packets.isEmpty()) {
             Log.wtf(TAG, "No mDns packets to send");
+            return;
+        }
+        // Check all packets with the same address
+        if (!MdnsUtils.checkAllPacketsWithSameAddress(packets)) {
+            Log.wtf(TAG, "Some mDNS packets have a different target address. addresses="
+                    + CollectionUtils.map(packets, DatagramPacket::getSocketAddress));
             return;
         }
 
