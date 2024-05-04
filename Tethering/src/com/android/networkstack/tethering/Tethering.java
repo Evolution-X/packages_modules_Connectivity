@@ -104,7 +104,9 @@ import android.net.IpPrefix;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
+import android.net.NetworkRequest;
 import android.net.TetherStatesParcel;
 import android.net.TetheredClient;
 import android.net.TetheringCallbackStartedParcel;
@@ -522,6 +524,24 @@ public class Tethering {
         };
         mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
                 TETHERING_ALLOW_VPN_UPSTREAMS), false, vpnSettingObserver);
+
+        NetworkRequest networkRequest = new NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build();
+        ConnectivityManager.NetworkCallback vpnConnectionObserver =
+                new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onCapabilitiesChanged(Network network,
+                    NetworkCapabilities networkCapabilities) {
+                super.onCapabilitiesChanged(network, networkCapabilities);
+                // Reconsider tethering upstream
+                mTetherMainSM.sendMessage(TetherMainSM.CMD_UPSTREAM_CHANGED);
+            }
+        };
+        final ConnectivityManager connMgr = (ConnectivityManager) mContext.getSystemService(
+                    Context.CONNECTIVITY_SERVICE);
+        connMgr.registerNetworkCallback(networkRequest, vpnConnectionObserver);
     }
 
     private class TetheringThreadExecutor implements Executor {
