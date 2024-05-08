@@ -160,6 +160,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.MessageQueue;
@@ -178,10 +179,11 @@ import android.util.ArraySet;
 import android.util.Log;
 import android.util.Range;
 
-import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.RequiresDevice;
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.compatibility.common.util.DynamicConfigDeviceSide;
 import com.android.internal.util.ArrayUtils;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.CollectionUtils;
@@ -230,6 +232,7 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -313,6 +316,11 @@ public class ConnectivityManagerTest {
     private static final String TEST_HTTPS_URL_PATH = "/https_path";
     private static final String TEST_HTTP_URL_PATH = "/http_path";
     private static final String LOCALHOST_HOSTNAME = "localhost";
+    private static final String TEST_MODULE_NAME_OPTION = "test-module-name";
+    private static final String IP_ADDRESS_ECHO_URL_KEY = "IP_ADDRESS_ECHO_URL";
+    private static final List<String> ALLOWED_IP_ADDRESS_ECHO_URLS = Arrays.asList(
+            "https://google-ipv6test.appspot.com/ip.js?fmt=text",
+            "https://ipv6test.googleapis-cn.com/ip.js?fmt=text");
     // Re-connecting to the AP, obtaining an IP address, revalidating can take a long time
     private static final long WIFI_CONNECT_TIMEOUT_MS = 60_000L;
 
@@ -842,7 +850,7 @@ public class ConnectivityManagerTest {
      * Tests that connections can be opened on WiFi and cellphone networks,
      * and that they are made from different IP addresses.
      */
-    @AppModeFull(reason = "Cannot get WifiManager in instant app mode")
+    @AppModeFull(reason = "Cannot get WifiManager or access the SD card in instant app mode")
     @Test
     @RequiresDevice // Virtual devices use a single internet connection for all networks
     public void testOpenConnection() throws Exception {
@@ -852,7 +860,8 @@ public class ConnectivityManagerTest {
         Network wifiNetwork = mCtsNetUtils.connectToWifi();
         Network cellNetwork = mCtsNetUtils.connectToCell();
         // This server returns the requestor's IP address as the response body.
-        URL url = new URL("http://google-ipv6test.appspot.com/ip.js?fmt=text");
+        String ipAddressEchoUrl = getIpAddressEchoUrlFromConfig();
+        URL url = new URL(ipAddressEchoUrl);
         String wifiAddressString = httpGet(wifiNetwork, url);
         String cellAddressString = httpGet(cellNetwork, url);
 
@@ -866,6 +875,19 @@ public class ConnectivityManagerTest {
         assertOnNetwork(cellAddressString, cellNetwork);
 
         assertFalse("Unexpectedly equal: " + wifiNetwork, wifiNetwork.equals(cellNetwork));
+    }
+
+    /**
+     * Gets IP address echo url from dynamic config.
+     */
+    private static String getIpAddressEchoUrlFromConfig() throws Exception {
+        Bundle instrumentationArgs = InstrumentationRegistry.getArguments();
+        String testModuleName = instrumentationArgs.getString(TEST_MODULE_NAME_OPTION);
+        // Get the DynamicConfig.xml contents and extract the ipv6 test URL.
+        DynamicConfigDeviceSide dynamicConfig = new DynamicConfigDeviceSide(testModuleName);
+        String ipAddressEchoUrl = dynamicConfig.getValue(IP_ADDRESS_ECHO_URL_KEY);
+        assertContains(ALLOWED_IP_ADDRESS_ECHO_URLS, ipAddressEchoUrl);
+        return ipAddressEchoUrl;
     }
 
     /**
