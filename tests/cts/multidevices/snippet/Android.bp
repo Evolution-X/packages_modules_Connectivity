@@ -25,6 +25,7 @@ android_test_helper_app {
     ],
     srcs: [
         "ConnectivityMultiDevicesSnippet.kt",
+        "MdnsMultiDevicesSnippet.kt",
     ],
     manifest: "AndroidManifest.xml",
     static_libs: [
