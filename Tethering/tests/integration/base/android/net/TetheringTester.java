@@ -27,6 +27,7 @@ import static android.system.OsConstants.IPPROTO_IP;
 import static android.system.OsConstants.IPPROTO_IPV6;
 import static android.system.OsConstants.IPPROTO_TCP;
 import static android.system.OsConstants.IPPROTO_UDP;
+
 import static com.android.net.module.util.DnsPacket.ANSECTION;
 import static com.android.net.module.util.DnsPacket.DnsHeader;
 import static com.android.net.module.util.DnsPacket.DnsRecord;
@@ -53,6 +54,7 @@ import static com.android.net.module.util.NetworkStackConstants.IPV6_ADDR_ALL_NO
 import static com.android.net.module.util.NetworkStackConstants.NEIGHBOR_ADVERTISEMENT_FLAG_OVERRIDE;
 import static com.android.net.module.util.NetworkStackConstants.NEIGHBOR_ADVERTISEMENT_FLAG_SOLICITED;
 import static com.android.net.module.util.NetworkStackConstants.TCPHDR_SYN;
+
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
@@ -91,6 +93,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
@@ -497,6 +500,51 @@ public final class TetheringTester {
         });
     }
 
+    /**
+     * Checks if the given raw packet data represents an expected fragmented IP packet.
+     *
+     * @param rawPacket the raw packet data to check.
+     * @param id the identification field of the fragmented IP packet.
+     * @param expectedPayloads a map of fragment offsets to their corresponding payload data.
+     * @return true if the packet is a valid fragmented IP packet with matching payload fragments;
+     *         false otherwise.
+     */
+    public static boolean isExpectedFragmentIpPacket(@NonNull final byte[] rawPacket, int id,
+            @NonNull final Map<Short, ByteBuffer> expectedPayloads) {
+        final ByteBuffer buf = ByteBuffer.wrap(rawPacket);
+        try {
+            // Validate Ethernet header and IPv4 header.
+            if (!hasExpectedEtherHeader(buf, true /* isIpv4 */)) return false;
+            final Ipv4Header ipv4Header = Struct.parse(Ipv4Header.class, buf);
+            if (ipv4Header.protocol != (byte) IPPROTO_UDP) return false;
+            if (ipv4Header.id != id) return false;
+            // Validate payload data which expected at a specific fragment offset.
+            final ByteBuffer expectedPayload =
+                    expectedPayloads.get(ipv4Header.flagsAndFragmentOffset);
+            if (expectedPayload == null) return false;
+            if (buf.remaining() != expectedPayload.limit()) return false;
+            // Validate UDP header (which located in the 1st fragment).
+            // TODO: Validate the checksum field in UDP header. Currently, it'll be altered by NAT.
+            if ((ipv4Header.flagsAndFragmentOffset & 0x1FFF) == 0) {
+                final UdpHeader receivedUdpHeader = Struct.parse(UdpHeader.class, buf);
+                final UdpHeader expectedUdpHeader = Struct.parse(UdpHeader.class, expectedPayload);
+                if (receivedUdpHeader == null || expectedUdpHeader == null) return false;
+                if (receivedUdpHeader.srcPort != expectedUdpHeader.srcPort
+                        || receivedUdpHeader.dstPort != expectedUdpHeader.dstPort
+                        || receivedUdpHeader.length != expectedUdpHeader.length) {
+                    return false;
+                }
+                return true;
+            }
+            // Check the contents of the remaining payload.
+            return Arrays.equals(getRemaining(buf),
+                    getRemaining(expectedPayload.asReadOnlyBuffer()));
+        } catch (Exception e) {
+            // A failed packet parsing indicates that the packet is not a fragmented IPv4 packet.
+            return false;
+        }
+    }
+
     // |expectedPayload| is copied as read-only because the caller may reuse it.
     // See hasExpectedDnsMessage.
     public static boolean isExpectedUdpDnsPacket(@NonNull final byte[] rawPacket, boolean hasEth,
@@ -683,10 +731,10 @@ public final class TetheringTester {
     }
 
     @NonNull
-    public static ByteBuffer buildUdpPacket(
+    public static List<ByteBuffer> buildUdpPackets(
             @Nullable final MacAddress srcMac, @Nullable final MacAddress dstMac,
             @NonNull final InetAddress srcIp, @NonNull final InetAddress dstIp,
-            short srcPort, short dstPort, @Nullable final ByteBuffer payload)
+            short srcPort, short dstPort, @Nullable final ByteBuffer payload, int l2mtu)
             throws Exception {
         final int ipProto = getIpProto(srcIp, dstIp);
         final boolean hasEther = (srcMac != null && dstMac != null);
@@ -720,7 +768,30 @@ public final class TetheringTester {
             payload.clear();
         }
 
-        return packetBuilder.finalizePacket();
+        return l2mtu == 0
+                ? Arrays.asList(packetBuilder.finalizePacket())
+                : packetBuilder.finalizePacket(l2mtu);
+    }
+
+    /**
+     * Builds a UDP packet.
+     *
+     * @param srcMac the source MAC address.
+     * @param dstMac the destination MAC address.
+     * @param srcIp the source IP address.
+     * @param dstIp the destination IP address.
+     * @param srcPort the source port number.
+     * @param dstPort the destination port number.
+     * @param payload the optional payload data to be included in the packet.
+     * @return a ByteBuffer containing the constructed UDP packet.
+     */
+    @NonNull
+    public static ByteBuffer buildUdpPacket(
+            @Nullable final MacAddress srcMac, @Nullable final MacAddress dstMac,
+            @NonNull final InetAddress srcIp, @NonNull final InetAddress dstIp,
+            short srcPort, short dstPort, @Nullable final ByteBuffer payload)
+            throws Exception {
+        return buildUdpPackets(srcMac, dstMac, srcIp, dstIp, srcPort, dstPort, payload, 0).get(0);
     }
 
     @NonNull
@@ -992,6 +1063,28 @@ public final class TetheringTester {
         sendDownloadPacket(packet);
 
         return verifyPacketNotNull("Download fail", getDownloadPacket(filter));
+    }
+
+    /**
+     * Sends a batch of download packets and verifies against a specified filtering condition.
+     *
+     * This method is designed for testing fragmented packets. All packets are sent before
+     * verification because the kernel buffers fragments until the last one is received.
+     * Captured packets are then verified against the provided filter.
+     *
+     * @param packets the list of ByteBuffers containing the packets to send.
+     * @param filter a Predicate that defines the filtering condition to apply to each received
+     *               packet. If the filter returns true for a packet's data, it is considered to
+     *               meet the verification criteria.
+     */
+    public void verifyDownloadBatch(final List<ByteBuffer> packets, final Predicate<byte[]> filter)
+            throws Exception {
+        for (ByteBuffer packet : packets) {
+            sendDownloadPacket(packet);
+        }
+        for (int i = 0; i < packets.size(); ++i) {
+            verifyPacketNotNull("Download fail", getDownloadPacket(filter));
+        }
     }
 
     // Send DHCPDISCOVER to DHCP server to see if DHCP server is still alive to handle
