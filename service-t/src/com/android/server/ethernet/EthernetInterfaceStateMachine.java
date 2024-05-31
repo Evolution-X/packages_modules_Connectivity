@@ -16,7 +16,16 @@
 
 package com.android.server.ethernet;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.net.NetworkCapabilities;
+import android.net.NetworkProvider;
+import android.net.NetworkProvider.NetworkOfferCallback;
+import android.net.NetworkRequest;
+import android.net.NetworkScore;
 import android.os.Handler;
+import android.util.ArraySet;
+import android.util.Log;
 
 import com.android.internal.util.State;
 import com.android.net.module.util.SyncStateMachine;
@@ -24,8 +33,44 @@ import com.android.net.module.util.SyncStateMachine.StateInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 class EthernetInterfaceStateMachine extends SyncStateMachine {
+    private static final String TAG = EthernetInterfaceStateMachine.class.getSimpleName();
+
+    private class EthernetNetworkOfferCallback implements NetworkOfferCallback {
+        private final Set<Integer> mRequestIds = new ArraySet<>();
+
+        @Override
+        public void onNetworkNeeded(@NonNull NetworkRequest request) {
+            if (this != mNetworkOfferCallback) {
+                return;
+            }
+
+            mRequestIds.add(request.requestId);
+            // TODO: send ON_NETWORK_NEEDED message if requestIds.size() == 1
+        }
+
+        @Override
+        public void onNetworkUnneeded(@NonNull NetworkRequest request) {
+            if (this != mNetworkOfferCallback) {
+                return;
+            }
+
+            if (!mRequestIds.remove(request.requestId)) {
+                // This can only happen if onNetworkNeeded was not called for a request or if
+                // the requestId changed. Both should *never* happen.
+                Log.wtf(TAG, "onNetworkUnneeded called for unknown request");
+            }
+            // TODO: send ON_NETWORK_UNNEEDED message if requestIds.isEmpty()
+        }
+    }
+
+    private @Nullable EthernetNetworkOfferCallback mNetworkOfferCallback;
+    private final Handler mHandler;
+    private final NetworkCapabilities mCapabilities;
+    private final NetworkProvider mNetworkProvider;
+
     /** Interface is in tethering mode. */
     private class TetheringState extends State {
 
@@ -38,7 +83,25 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
 
     /** Parent states of all states that do not cause a NetworkOffer to be extended. */
     private class NetworkOfferExtendedState extends State {
+        @Override
+        public void enter() {
+            if (mNetworkOfferCallback != null) {
+                // This should never happen. If it happens anyway, log and move on.
+                Log.wtf(TAG, "Previous NetworkOffer was never retracted");
+            }
 
+            mNetworkOfferCallback = new EthernetNetworkOfferCallback();
+            final NetworkScore defaultScore = new NetworkScore.Builder().build();
+            mNetworkProvider.registerNetworkOffer(defaultScore,
+                    new NetworkCapabilities(mCapabilities), cmd -> mHandler.post(cmd),
+                    mNetworkOfferCallback);
+        }
+
+        @Override
+        public void exit() {
+            mNetworkProvider.unregisterNetworkOffer(mNetworkOfferCallback);
+            mNetworkOfferCallback = null;
+        }
     }
 
     /** Link is up, network offer is extended */
@@ -62,9 +125,13 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private final ProvisioningState mProvisioningState = new ProvisioningState();
     private final RunningState mRunningState = new RunningState();
 
-    public EthernetInterfaceStateMachine(String iface, Handler handler) {
+    public EthernetInterfaceStateMachine(String iface, Handler handler, NetworkCapabilities capabilities, NetworkProvider provider) {
         super(EthernetInterfaceStateMachine.class.getSimpleName() + "." + iface,
                 handler.getLooper().getThread());
+
+        mHandler = handler;
+        mCapabilities = capabilities;
+        mNetworkProvider = provider;
 
         // Tethering mode is special as the interface is configured by Tethering, rather than the
         // ethernet module.
