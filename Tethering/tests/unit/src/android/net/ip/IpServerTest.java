@@ -53,7 +53,6 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -94,7 +93,6 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
-import com.android.net.module.util.ip.IpNeighborMonitor;
 import com.android.networkstack.tethering.BpfCoordinator;
 import com.android.networkstack.tethering.PrivateAddressCoordinator;
 import com.android.networkstack.tethering.TetheringConfiguration;
@@ -174,7 +172,6 @@ public class IpServerTest {
     @Mock private IDhcpServer mDhcpServer;
     @Mock private DadProxy mDadProxy;
     @Mock private RouterAdvertisementDaemon mRaDaemon;
-    @Mock private IpNeighborMonitor mIpNeighborMonitor;
     @Mock private IpServer.Dependencies mDependencies;
     @Mock private PrivateAddressCoordinator mAddressCoordinator;
     private final LateSdk<RoutingCoordinatorManager> mRoutingCoordinatorManager =
@@ -213,20 +210,17 @@ public class IpServerTest {
             mInterfaceConfiguration.prefixLength = BLUETOOTH_DHCP_PREFIX_LENGTH;
         }
 
-        doReturn(mIpNeighborMonitor).when(mDependencies).getIpNeighborMonitor(any(), any(), any());
-
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(usingBpfOffload);
         when(mTetherConfig.useLegacyDhcpServer()).thenReturn(usingLegacyDhcp);
         when(mTetherConfig.getP2pLeasesSubnetPrefixLength()).thenReturn(P2P_SUBNET_PREFIX_LENGTH);
         when(mBpfCoordinator.isUsingBpfOffload()).thenReturn(usingBpfOffload);
         mIpServer = createIpServer(interfaceType);
-        verify(mIpNeighborMonitor).start();
         mIpServer.start();
 
         // Starting the state machine always puts us in a consistent state and notifies
         // the rest of the world that we've changed from an unknown to available state.
         mLooper.dispatchAll();
-        reset(mNetd, mCallback, mIpNeighborMonitor);
+        reset(mNetd, mCallback);
 
         when(mRaDaemon.start()).thenReturn(true);
     }
@@ -315,8 +309,6 @@ public class IpServerTest {
 
     @Test
     public void startsOutAvailable() throws Exception {
-        when(mDependencies.getIpNeighborMonitor(any(), any(), any()))
-                .thenReturn(mIpNeighborMonitor);
         mIpServer = createIpServer(TETHERING_BLUETOOTH);
         mIpServer.start();
         mLooper.dispatchAll();
@@ -825,13 +817,13 @@ public class IpServerTest {
     }
 
     @Test
-    public void stopNeighborMonitoringWhenInterfaceDown() throws Exception {
+    public void removeIpServerWhenInterfaceDown() throws Exception {
         initTetheredStateMachine(TETHERING_WIFI, UPSTREAM_IFACE, UPSTREAM_ADDRESSES,
                 false /* usingLegacyDhcp */, DEFAULT_USING_BPF_OFFLOAD);
 
         mIpServer.stop();
         mLooper.dispatchAll();
-        verify(mIpNeighborMonitor).stop();
+        verify(mBpfCoordinator).removeIpServer(mIpServer);
     }
 
     private LinkProperties buildIpv6OnlyLinkProperties(final String iface) {
