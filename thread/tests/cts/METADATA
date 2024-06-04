@@ -1,0 +1,17 @@
+name: "CtsThreadNetworkTestCases"
+description: "Prebuilt of CtsThreadNetworkTestCases"
+third_party {
+  identifier {
+    type: "Git"
+    value: "https://android.googlesource.com/platform/packages/modules/Connectivity/"
+    version: "frc_350712000"
+  }
+  version: "15"
+  license_type: NOTICE
+  license_note: "None"
+  last_upgrade_date {
+    year: 2024
+    month: 5
+    day: 25
+  }
+}
