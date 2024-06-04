@@ -664,6 +664,11 @@ public class BpfCoordinatorTest {
 
     @NonNull
     private BpfCoordinator makeBpfCoordinator() throws Exception {
+        return makeBpfCoordinator(true /* addDefaultIpServer */);
+    }
+
+    @NonNull
+    private BpfCoordinator makeBpfCoordinator(boolean addDefaultIpServer) throws Exception {
         // mStatsManager will be invoked twice if BpfCoordinator is created the second time.
         clearInvocations(mStatsManager);
         final BpfCoordinator coordinator = new BpfCoordinator(mDeps);
@@ -680,6 +685,10 @@ public class BpfCoordinatorTest {
         assertNotNull(mTetherStatsProvider);
         mTetherStatsProviderCb = new TestableNetworkStatsProviderCbBinder();
         mTetherStatsProvider.setProviderCallbackBinder(mTetherStatsProviderCb);
+
+        if (addDefaultIpServer) {
+            coordinator.addIpServer(mIpServer);
+        }
 
         return coordinator;
     }
@@ -1056,7 +1065,6 @@ public class BpfCoordinatorTest {
 
         doReturn(usingApiS).when(mDeps).isAtLeastS();
         final BpfCoordinator coordinator = makeBpfCoordinator();
-        coordinator.startPolling();
 
         final String mobileIface = "rmnet_data0";
         final Integer mobileIfIndex = 100;
@@ -1092,7 +1100,6 @@ public class BpfCoordinatorTest {
         setupFunctioningNetdInterface();
 
         final BpfCoordinator coordinator = makeBpfCoordinator();
-        coordinator.startPolling();
 
         final String wlanIface = "wlan0";
         final Integer wlanIfIndex = 100;
@@ -1148,7 +1155,7 @@ public class BpfCoordinatorTest {
         // [3] Stop coordinator.
         // Shutdown the coordinator and clear the invocation history, especially the
         // tetherOffloadGetStats() calls.
-        coordinator.stopPolling();
+        coordinator.removeIpServer(mIpServer);
         clearStatsInvocations();
 
         // Verify the polling update thread stopped.
@@ -1162,7 +1169,6 @@ public class BpfCoordinatorTest {
         setupFunctioningNetdInterface();
 
         final BpfCoordinator coordinator = makeBpfCoordinator();
-        coordinator.startPolling();
 
         final String mobileIface = "rmnet_data0";
         final Integer mobileIfIndex = 100;
@@ -1532,7 +1538,6 @@ public class BpfCoordinatorTest {
         // #makeBpfCoordinator for testing.
         // See #testBpfDisabledbyNoBpfDownstream6Map.
         final BpfCoordinator coordinator = makeBpfCoordinator();
-        coordinator.startPolling();
 
         // The tether stats polling task should not be scheduled.
         mTestLooper.moveTimeForward(DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS);
@@ -1753,18 +1758,14 @@ public class BpfCoordinatorTest {
         final BpfCoordinator coordinator = makeBpfCoordinator();
 
         // [1] The default polling interval.
-        coordinator.startPolling();
         assertEquals(DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS, coordinator.getPollingInterval());
-        coordinator.stopPolling();
 
         // [2] Expect the invalid polling interval isn't applied. The valid range of interval is
         // DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS..max_long.
         for (final int interval
                 : new int[] {0, 100, DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS - 1}) {
             when(mTetherConfig.getOffloadPollInterval()).thenReturn(interval);
-            coordinator.startPolling();
             assertEquals(DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS, coordinator.getPollingInterval());
-            coordinator.stopPolling();
         }
 
         // [3] Set a specific polling interval which is larger than default value.
@@ -1772,7 +1773,6 @@ public class BpfCoordinatorTest {
         // approximation is used to verify the scheduled time of the polling thread.
         final int pollingInterval = 100_000;
         when(mTetherConfig.getOffloadPollInterval()).thenReturn(pollingInterval);
-        coordinator.startPolling();
 
         // Expect the specific polling interval to be applied.
         assertEquals(pollingInterval, coordinator.getPollingInterval());
@@ -1800,19 +1800,19 @@ public class BpfCoordinatorTest {
     public void testStartStopConntrackMonitoring() throws Exception {
         setupFunctioningNetdInterface();
 
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
 
         // [1] Don't stop monitoring if it has never started.
-        coordinator.stopMonitoring(mIpServer);
+        coordinator.removeIpServer(mIpServer);
         verify(mConntrackMonitor, never()).stop();
 
         // [2] Start monitoring.
-        coordinator.startMonitoring(mIpServer);
+        coordinator.addIpServer(mIpServer);
         verify(mConntrackMonitor).start();
         clearInvocations(mConntrackMonitor);
 
         // [3] Stop monitoring.
-        coordinator.stopMonitoring(mIpServer);
+        coordinator.removeIpServer(mIpServer);
         verify(mConntrackMonitor).stop();
     }
 
@@ -1823,12 +1823,12 @@ public class BpfCoordinatorTest {
     public void testStartStopConntrackMonitoring_R() throws Exception {
         setupFunctioningNetdInterface();
 
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
 
-        coordinator.startMonitoring(mIpServer);
+        coordinator.addIpServer(mIpServer);
         verify(mConntrackMonitor, never()).start();
 
-        coordinator.stopMonitoring(mIpServer);
+        coordinator.removeIpServer(mIpServer);
         verify(mConntrackMonitor, never()).stop();
     }
 
@@ -1837,23 +1837,23 @@ public class BpfCoordinatorTest {
     public void testStartStopConntrackMonitoringWithTwoDownstreamIfaces() throws Exception {
         setupFunctioningNetdInterface();
 
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
 
         // [1] Start monitoring at the first IpServer adding.
-        coordinator.startMonitoring(mIpServer);
+        coordinator.addIpServer(mIpServer);
         verify(mConntrackMonitor).start();
         clearInvocations(mConntrackMonitor);
 
         // [2] Don't start monitoring at the second IpServer adding.
-        coordinator.startMonitoring(mIpServer2);
+        coordinator.addIpServer(mIpServer2);
         verify(mConntrackMonitor, never()).start();
 
         // [3] Don't stop monitoring if any downstream interface exists.
-        coordinator.stopMonitoring(mIpServer2);
+        coordinator.removeIpServer(mIpServer2);
         verify(mConntrackMonitor, never()).stop();
 
         // [4] Stop monitoring if no downstream exists.
-        coordinator.stopMonitoring(mIpServer);
+        coordinator.removeIpServer(mIpServer);
         verify(mConntrackMonitor).stop();
     }
 
@@ -2087,7 +2087,6 @@ public class BpfCoordinatorTest {
                 .startMocking();
         try {
             final BpfCoordinator coordinator = makeBpfCoordinator();
-            coordinator.startPolling();
             bpfMap.insertEntry(tcpKey, tcpValue);
             bpfMap.insertEntry(udpKey, udpValue);
 
@@ -2116,7 +2115,7 @@ public class BpfCoordinatorTest {
             ExtendedMockito.clearInvocations(staticMockMarker(NetlinkUtils.class));
 
             // [3] Don't refresh conntrack timeout if polling stopped.
-            coordinator.stopPolling();
+            coordinator.removeIpServer(mIpServer);
             mTestLooper.moveTimeForward(CONNTRACK_TIMEOUT_UPDATE_INTERVAL_MS);
             waitForIdle();
             ExtendedMockito.verifyNoMoreInteractions(staticMockMarker(NetlinkUtils.class));
@@ -2854,7 +2853,7 @@ public class BpfCoordinatorTest {
     public void addRemoveIpv6ForwardingRules() throws Exception {
         final int myIfindex = DOWNSTREAM_IFINDEX;
         final int notMyIfindex = myIfindex - 1;
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator);
 
         resetNetdAndBpfMaps();
@@ -3003,7 +3002,7 @@ public class BpfCoordinatorTest {
 
         // [1] Enable BPF offload.
         // A neighbor that is added or deleted causes the rule to be added or removed.
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator);
         resetNetdAndBpfMaps();
 
@@ -3029,7 +3028,7 @@ public class BpfCoordinatorTest {
         // [2] Disable BPF offload.
         // A neighbor that is added or deleted doesn’t cause the rule to be added or removed.
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(false);
-        final BpfCoordinator coordinator2 = makeBpfCoordinator();
+        final BpfCoordinator coordinator2 = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer2 = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator2);
         verifyNoUpstreamIpv6ForwardingChange(null);
         resetNetdAndBpfMaps();
@@ -3052,7 +3051,7 @@ public class BpfCoordinatorTest {
     @Test
     public void doesNotStartIpNeighborMonitorIfBpfOffloadDisabled() throws Exception {
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(false);
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator);
 
         // IP neighbor monitor doesn't start if BPF offload is disabled.
@@ -3061,7 +3060,7 @@ public class BpfCoordinatorTest {
 
     @Test
     public void testSkipVirtualNetworkInBpf() throws Exception {
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator);
         final LinkProperties v6Only = new LinkProperties();
         v6Only.setInterfaceName(IPSEC_IFACE);
@@ -3079,7 +3078,7 @@ public class BpfCoordinatorTest {
 
     @Test
     public void addRemoveTetherClient() throws Exception {
-        final BpfCoordinator coordinator = makeBpfCoordinator();
+        final BpfCoordinator coordinator = makeBpfCoordinator(false /* addDefaultIpServer */);
         final IpServer ipServer = makeAndStartIpServer(DOWNSTREAM_IFACE, coordinator);
         final int myIfindex = DOWNSTREAM_IFINDEX;
         final int notMyIfindex = myIfindex - 1;

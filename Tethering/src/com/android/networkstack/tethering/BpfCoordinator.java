@@ -189,14 +189,6 @@ public class BpfCoordinator {
     // to make it simpler. See also TetheringConfiguration.
     private final boolean mIsBpfEnabled;
 
-    // Tracks whether BPF tethering is started or not. This is set by tethering before it
-    // starts the first IpServer and is cleared by tethering shortly before the last IpServer
-    // is stopped. Note that rule updates (especially deletions, but sometimes additions as
-    // well) may arrive when this is false. If they do, they must be communicated to netd.
-    // Changes in data limits may also arrive when this is false, and if they do, they must
-    // also be communicated to netd.
-    private boolean mPollingStarted = false;
-
     // Tracking remaining alert quota. Unlike limit quota is subject to interface, the alert
     // quota is interface independent and global for tether offload.
     private long mRemainingAlertQuota = QUOTA_UNLIMITED;
@@ -279,9 +271,6 @@ public class BpfCoordinator {
     private final HashMap<IpServer, HashMap<Inet4Address, ClientInfo>>
             mTetherClients = new HashMap<>();
 
-    // Set for which downstream is monitoring the conntrack netlink message.
-    private final Set<IpServer> mMonitoringIpServers = new HashSet<>();
-
     // Map of upstream interface IPv4 address to interface index.
     // TODO: consider making the key to be unique because the upstream address is not unique. It
     // is okay for now because there have only one upstream generally.
@@ -303,16 +292,19 @@ public class BpfCoordinator {
     @Nullable
     private UpstreamInfo mIpv4UpstreamInfo = null;
 
+    // The IpServers that are currently served by BpfCoordinator.
+    private final ArraySet<IpServer> mServedIpServers = new ArraySet<>();
+
     // Runnable that used by scheduling next polling of stats.
     private final Runnable mScheduledPollingStats = () -> {
         updateForwardedStats();
-        maybeSchedulePollingStats();
+        schedulePollingStats();
     };
 
     // Runnable that used by scheduling next refreshing of conntrack timeout.
     private final Runnable mScheduledConntrackTimeoutUpdate = () -> {
         refreshAllConntrackTimeouts();
-        maybeScheduleConntrackTimeoutUpdate();
+        scheduleConntrackTimeoutUpdate();
     };
 
     // TODO: add BpfMap<TetherDownstream64Key, TetherDownstream64Value> retrieving function.
@@ -504,37 +496,25 @@ public class BpfCoordinator {
     }
 
     /**
-     * Start BPF tethering offload stats polling when the first upstream is started.
+     * Start BPF tethering offload stats and conntrack timeout polling.
      * Note that this can be only called on handler thread.
-     * TODO: Perhaps check BPF support before starting.
-     * TODO: Start the stats polling only if there is any client on the downstream.
      */
-    public void startPolling() {
-        if (mPollingStarted) return;
+    private void startStatsAndConntrackTimeoutPolling() {
+        schedulePollingStats();
+        scheduleConntrackTimeoutUpdate();
 
-        if (!isUsingBpf()) {
-            mLog.i("BPF is not using");
-            return;
-        }
-
-        mPollingStarted = true;
-        maybeSchedulePollingStats();
-        maybeScheduleConntrackTimeoutUpdate();
-
-        mLog.i("Polling started");
+        mLog.i("Polling started.");
     }
 
     /**
-     * Stop BPF tethering offload stats polling.
+     * Stop BPF tethering offload stats and conntrack timeout polling.
      * The data limit cleanup and the tether stats maps cleanup are not implemented here.
      * These cleanups rely on all IpServers calling #removeIpv6DownstreamRule. After the
      * last rule is removed from the upstream, #removeIpv6DownstreamRule does the cleanup
      * functionality.
      * Note that this can be only called on handler thread.
      */
-    public void stopPolling() {
-        if (!mPollingStarted) return;
-
+    private void stopStatsAndConntrackTimeoutPolling() {
         // Stop scheduled polling conntrack timeout.
         if (mHandler.hasCallbacks(mScheduledConntrackTimeoutUpdate)) {
             mHandler.removeCallbacks(mScheduledConntrackTimeoutUpdate);
@@ -544,9 +524,8 @@ public class BpfCoordinator {
             mHandler.removeCallbacks(mScheduledPollingStats);
         }
         updateForwardedStats();
-        mPollingStarted = false;
 
-        mLog.i("Polling stopped");
+        mLog.i("Polling stopped.");
     }
 
     /**
@@ -567,7 +546,6 @@ public class BpfCoordinator {
 
     /**
      * Start conntrack message monitoring.
-     * Note that this can be only called on handler thread.
      *
      * TODO: figure out a better logging for non-interesting conntrack message.
      * For example, the following logging is an IPCTNL_MSG_CT_GET message but looks scary.
@@ -587,45 +565,23 @@ public class BpfCoordinator {
      * +------------------+--------------------------------------------------------+
      * See NetlinkMonitor#handlePacket, NetlinkMessage#parseNfMessage.
      */
-    public void startMonitoring(@NonNull final IpServer ipServer) {
+    private void startConntrackMonitoring() {
         // TODO: Wrap conntrackMonitor starting function into mBpfCoordinatorShim.
-        if (!isUsingBpf() || !mDeps.isAtLeastS()) return;
+        if (!mDeps.isAtLeastS()) return;
 
-        if (mMonitoringIpServers.contains(ipServer)) {
-            Log.wtf(TAG, "The same downstream " + ipServer.interfaceName()
-                    + " should not start monitoring twice.");
-            return;
-        }
-
-        if (mMonitoringIpServers.isEmpty()) {
-            mConntrackMonitor.start();
-            mLog.i("Monitoring started");
-        }
-
-        mMonitoringIpServers.add(ipServer);
+        mConntrackMonitor.start();
+        mLog.i("Conntrack monitoring started.");
     }
 
     /**
      * Stop conntrack event monitoring.
-     * Note that this can be only called on handler thread.
      */
-    public void stopMonitoring(@NonNull final IpServer ipServer) {
+    private void stopConntrackMonitoring() {
         // TODO: Wrap conntrackMonitor stopping function into mBpfCoordinatorShim.
-        if (!isUsingBpf() || !mDeps.isAtLeastS()) return;
-
-        // Ignore stopping monitoring if the monitor has never started for a given IpServer.
-        if (!mMonitoringIpServers.contains(ipServer)) {
-            mLog.e("Ignore stopping monitoring because monitoring has never started for "
-                    + ipServer.interfaceName());
-            return;
-        }
-
-        mMonitoringIpServers.remove(ipServer);
-
-        if (!mMonitoringIpServers.isEmpty()) return;
+        if (!mDeps.isAtLeastS()) return;
 
         mConntrackMonitor.stop();
-        mLog.i("Monitoring stopped");
+        mLog.i("Conntrack monitoring stopped.");
     }
 
     /**
@@ -886,6 +842,46 @@ public class BpfCoordinator {
     }
 
     /**
+     * Register an IpServer (downstream).
+     * Note that this can be only called on handler thread.
+     */
+    public void addIpServer(@NonNull final IpServer ipServer) {
+        if (!isUsingBpf()) return;
+        if (mServedIpServers.contains(ipServer)) {
+            Log.wtf(TAG, "The same downstream " + ipServer.interfaceName()
+                    + " should not add twice.");
+            return;
+        }
+
+        // Start monitoring and polling when the first IpServer is added.
+        if (mServedIpServers.isEmpty()) {
+            startStatsAndConntrackTimeoutPolling();
+            startConntrackMonitoring();
+        }
+        mServedIpServers.add(ipServer);
+    }
+
+    /**
+     * Unregister an IpServer (downstream).
+     * Note that this can be only called on handler thread.
+     */
+    public void removeIpServer(@NonNull final IpServer ipServer) {
+        if (!isUsingBpf()) return;
+        if (!mServedIpServers.contains(ipServer)) {
+            mLog.e("Ignore removing because IpServer has never started for "
+                    + ipServer.interfaceName());
+            return;
+        }
+        mServedIpServers.remove(ipServer);
+
+        // Stop monitoring and polling when the last IpServer is removed.
+        if (mServedIpServers.isEmpty()) {
+            stopStatsAndConntrackTimeoutPolling();
+            stopConntrackMonitoring();
+        }
+    }
+
+    /**
      * Clear all forwarding IPv4 rules for a given client.
      * Note that this can be only called on handler thread.
      */
@@ -1136,7 +1132,7 @@ public class BpfCoordinator {
         // Note that EthernetTetheringTest#isTetherConfigBpfOffloadEnabled relies on
         // "mIsBpfEnabled" to check tethering config via dumpsys. Beware of the change if any.
         pw.println("mIsBpfEnabled: " + mIsBpfEnabled);
-        pw.println("Polling " + (mPollingStarted ? "started" : "not started"));
+        pw.println("Polling " + (mServedIpServers.isEmpty() ? "not started" : "started"));
         pw.println("Stats provider " + (mStatsProvider != null
                 ? "registered" : "not registered"));
         pw.println("Upstream quota: " + mInterfaceQuotas.toString());
@@ -2365,9 +2361,7 @@ public class BpfCoordinator {
         });
     }
 
-    private void maybeSchedulePollingStats() {
-        if (!mPollingStarted) return;
-
+    private void schedulePollingStats() {
         if (mHandler.hasCallbacks(mScheduledPollingStats)) {
             mHandler.removeCallbacks(mScheduledPollingStats);
         }
@@ -2375,9 +2369,7 @@ public class BpfCoordinator {
         mHandler.postDelayed(mScheduledPollingStats, getPollingInterval());
     }
 
-    private void maybeScheduleConntrackTimeoutUpdate() {
-        if (!mPollingStarted) return;
-
+    private void scheduleConntrackTimeoutUpdate() {
         if (mHandler.hasCallbacks(mScheduledConntrackTimeoutUpdate)) {
             mHandler.removeCallbacks(mScheduledConntrackTimeoutUpdate);
         }

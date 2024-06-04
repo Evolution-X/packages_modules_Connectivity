@@ -242,6 +242,7 @@ public class IpServerTest {
             throws Exception {
         initStateMachine(interfaceType, usingLegacyDhcp, usingBpfOffload);
         dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        verify(mBpfCoordinator).addIpServer(mIpServer);
         if (upstreamIface != null) {
             InterfaceParams interfaceParams = mDependencies.getInterfaceParams(upstreamIface);
             assertNotNull("missing upstream interface: " + upstreamIface, interfaceParams);
@@ -570,7 +571,7 @@ public class IpServerTest {
                 argThat(cfg -> IFACE_NAME.equals(cfg.ifName)));
         inOrder.verify(mAddressCoordinator).releaseDownstream(any());
         inOrder.verify(mBpfCoordinator).tetherOffloadClientClear(mIpServer);
-        inOrder.verify(mBpfCoordinator).stopMonitoring(mIpServer);
+        inOrder.verify(mBpfCoordinator).removeIpServer(mIpServer);
         inOrder.verify(mCallback).updateInterfaceState(
                 mIpServer, STATE_AVAILABLE, TETHER_ERROR_NO_ERROR);
         inOrder.verify(mCallback).updateLinkProperties(
