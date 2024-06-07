@@ -59,7 +59,7 @@ import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.NetworkStackModuleTest;
 import com.android.testutils.TapPacketReader;
 
-import org.junit.BeforeClass;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -75,8 +75,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @RunWith(AndroidJUnit4.class)
@@ -151,33 +149,14 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
             (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04  /* Address: 1.2.3.4 */
     };
 
-    /** Enable/disable tethering once before running the tests. */
-    @BeforeClass
-    public static void setUpOnce() throws Exception {
-        // The first test case may experience tethering restart with IP conflict handling.
-        // Tethering would cache the last upstreams so that the next enabled tethering avoids
-        // picking up the address that is in conflict with the upstreams. To protect subsequent
-        // tests, turn tethering on and off before running them.
-        MyTetheringEventCallback callback = null;
-        TestNetworkInterface testIface = null;
-        assumeTrue(sEm != null);
-        try {
-            // If the physical ethernet interface is available, do nothing.
-            if (isInterfaceForTetheringAvailable()) return;
-
-            testIface = createTestInterface();
-            setIncludeTestInterfaces(true);
-
-            callback = enableEthernetTethering(testIface.getInterfaceName(), null);
-            callback.awaitUpstreamChanged(true /* throwTimeoutException */);
-        } catch (TimeoutException e) {
-            Log.d(TAG, "WARNNING " + e);
-        } finally {
-            maybeCloseTestInterface(testIface);
-            maybeUnregisterTetheringEventCallback(callback);
-
-            setIncludeTestInterfaces(false);
-        }
+    @After
+    public void tearDown() throws Exception {
+        super.tearDown();
+        // TODO: See b/318121782#comment4. Register an ethernet InterfaceStateListener, and wait for
+        // the callback to report client mode. This happens as soon as both
+        // TetheredInterfaceRequester and the tethering code itself have released the interface,
+        // i.e. after stopTethering() has completed.
+        Thread.sleep(3000);
     }
 
     @Test
@@ -201,7 +180,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
             Log.d(TAG, "Including test interfaces");
             setIncludeTestInterfaces(true);
 
-            final String iface = getTetheredInterface();
+            final String iface = mTetheredInterfaceRequester.getInterface();
             assertEquals("TetheredInterfaceCallback for unexpected interface",
                     downstreamIface.getInterfaceName(), iface);
 
@@ -223,8 +202,6 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         // This test requires manipulating packets. Skip if there is a physical Ethernet connected.
         assumeFalse(isInterfaceForTetheringAvailable());
 
-        CompletableFuture<String> futureIface = requestTetheredInterface();
-
         setIncludeTestInterfaces(true);
 
         TestNetworkInterface downstreamIface = null;
@@ -234,7 +211,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         try {
             downstreamIface = createTestInterface();
 
-            final String iface = futureIface.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            final String iface = mTetheredInterfaceRequester.getInterface();
             assertEquals("TetheredInterfaceCallback for unexpected interface",
                     downstreamIface.getInterfaceName(), iface);
 
@@ -264,7 +241,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         try {
             downstreamIface = createTestInterface();
 
-            final String iface = getTetheredInterface();
+            final String iface = mTetheredInterfaceRequester.getInterface();
             assertEquals("TetheredInterfaceCallback for unexpected interface",
                     downstreamIface.getInterfaceName(), iface);
 
@@ -338,7 +315,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         try {
             downstreamIface = createTestInterface();
 
-            final String iface = getTetheredInterface();
+            final String iface = mTetheredInterfaceRequester.getInterface();
             assertEquals("TetheredInterfaceCallback for unexpected interface",
                     downstreamIface.getInterfaceName(), iface);
 
@@ -388,7 +365,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         MyTetheringEventCallback tetheringEventCallback = null;
         try {
             // Get an interface to use.
-            final String iface = getTetheredInterface();
+            final String iface = mTetheredInterfaceRequester.getInterface();
 
             // Enable Ethernet tethering and check that it starts.
             tetheringEventCallback = enableEthernetTethering(iface, null /* any upstream */);
