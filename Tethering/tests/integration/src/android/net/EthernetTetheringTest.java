@@ -486,17 +486,23 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         // TODO: test BPF offload maps {rule, stats}.
     }
 
-    // Test network topology:
-    //
-    //         public network (rawip)                 private network
-    //                   |                 UE                |
-    // +------------+    V    +------------+------------+    V    +------------+
-    // |   Sever    +---------+  Upstream  | Downstream +---------+   Client   |
-    // +------------+         +------------+------------+         +------------+
-    // remote ip              public ip                           private ip
-    // 8.8.8.8:443            <Upstream ip>:9876                  <TetheredDevice ip>:9876
-    //
-    private void runUdp4Test() throws Exception {
+
+    /**
+     * Basic IPv4 UDP tethering test. Verify that UDP tethered packets are transferred no matter
+     * using which data path.
+     */
+    @Test
+    public void testTetherUdpV4() throws Exception {
+        // Test network topology:
+        //
+        //         public network (rawip)                 private network
+        //                   |                 UE                |
+        // +------------+    V    +------------+------------+    V    +------------+
+        // |   Sever    +---------+  Upstream  | Downstream +---------+   Client   |
+        // +------------+         +------------+------------+         +------------+
+        // remote ip              public ip                           private ip
+        // 8.8.8.8:443            <Upstream ip>:9876                  <TetheredDevice ip>:9876
+        //
         final TetheringTester tester = initTetheringTester(toList(TEST_IP4_ADDR),
                 toList(TEST_IP4_DNS));
         final TetheredDevice tethered = tester.createTetheredDevice(TEST_MAC, false /* hasIpv6 */);
@@ -516,15 +522,6 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         final InetAddress clientIp = tethered.ipv4Addr;
         sendUploadPacketUdp(srcMac, dstMac, clientIp, remoteIp, tester, false /* is4To6 */);
         sendDownloadPacketUdp(remoteIp, tetheringUpstreamIp, tester, false /* is6To4 */);
-    }
-
-    /**
-     * Basic IPv4 UDP tethering test. Verify that UDP tethered packets are transferred no matter
-     * using which data path.
-     */
-    @Test
-    public void testTetherUdpV4() throws Exception {
-        runUdp4Test();
     }
 
     // Test network topology:
@@ -576,7 +573,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         final TetheredDevice tethered = tester.createTetheredDevice(TEST_MAC, false /* hasIpv6 */);
 
         // TODO: remove the connectivity verification for upstream connected notification race.
-        // See the same reason in runUdp4Test().
+        // See the same reason in testTetherUdp4().
         probeV4TetheringConnectivity(tester, tethered, false /* is4To6 */);
 
         final ByteBuffer request = buildIcmpEchoPacketV4(tethered.macAddr /* srcMac */,
@@ -684,7 +681,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         final TetheredDevice tethered = tester.createTetheredDevice(TEST_MAC, false /* hasIpv6 */);
 
         // TODO: remove the connectivity verification for upstream connected notification race.
-        // See the same reason in runUdp4Test().
+        // See the same reason in testTetherUdp4().
         probeV4TetheringConnectivity(tester, tethered, false /* is4To6 */);
 
         // [1] Send DNS query.
@@ -728,7 +725,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         final TetheredDevice tethered = tester.createTetheredDevice(TEST_MAC, false /* hasIpv6 */);
 
         // TODO: remove the connectivity verification for upstream connected notification race.
-        // See the same reason in runUdp4Test().
+        // See the same reason in testTetherUdp4().
         probeV4TetheringConnectivity(tester, tethered, false /* is4To6 */);
 
         runTcpTest(tethered.macAddr /* uploadSrcMac */, tethered.routerMacAddr /* uploadDstMac */,
