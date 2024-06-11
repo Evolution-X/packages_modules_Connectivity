@@ -17,8 +17,11 @@
 package com.android.server.connectivityservice
 
 import android.net.ConnectivityManager
+import android.net.ConnectivityManager.CALLBACK_AVAILABLE
+import android.net.ConnectivityManager.CALLBACK_BLK_CHANGED
 import android.net.ConnectivityManager.CALLBACK_CAP_CHANGED
 import android.net.ConnectivityManager.CALLBACK_IP_CHANGED
+import android.net.ConnectivityManager.CALLBACK_LOCAL_NETWORK_INFO_CHANGED
 import android.net.ConnectivityManager.CALLBACK_LOST
 import android.net.ConnectivityManager.NetworkCallback.DECLARED_METHODS_ALL
 import android.net.LinkAddress
@@ -35,7 +38,9 @@ import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.tryTest
+import java.lang.reflect.Modifier
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -128,6 +133,32 @@ class CSDeclaredMethodsForCallbacksTest : CSTest() {
 
         listenCb.expect<CallbackEntry.CapabilitiesChanged>()
         listenCb.assertNoCallback(timeoutMs = 0L)
+    }
+
+    @Test
+    fun testDeclaredMethodsFlagsToString() {
+        assertEquals("NONE", ConnectivityService.declaredMethodsFlagsToString(0))
+        assertEquals("ALL", ConnectivityService.declaredMethodsFlagsToString(0.inv()))
+        assertEquals("AVAIL|NC|LP|BLK|LOCALINF", ConnectivityService.declaredMethodsFlagsToString(
+            (1 shl CALLBACK_AVAILABLE) or
+            (1 shl CALLBACK_CAP_CHANGED) or
+            (1 shl CALLBACK_IP_CHANGED) or
+            (1 shl CALLBACK_BLK_CHANGED) or
+            (1 shl CALLBACK_LOCAL_NETWORK_INFO_CHANGED)
+        ))
+
+        // EXPIRE_LEGACY_REQUEST (=8) is only used in ConnectivityManager and not included.
+        // CALLBACK_TRANSITIVE_CALLS_ONLY (=0) is not a callback so not included either.
+        assertEquals(
+            "PRECHK|AVAIL|LOSING|LOST|UNAVAIL|NC|LP|SUSP|RESUME|BLK|LOCALINF|0x7fffe101",
+            ConnectivityService.declaredMethodsFlagsToString(0x7fff_ffff)
+        )
+        // The toString method and the assertion above need to be updated if constants are added
+        val constants = ConnectivityManager::class.java.declaredFields.filter {
+            Modifier.isStatic(it.modifiers) && Modifier.isFinal(it.modifiers) &&
+                    it.name.startsWith("CALLBACK_")
+        }
+        assertEquals(12, constants.size)
     }
 }
 
