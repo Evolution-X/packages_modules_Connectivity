@@ -101,7 +101,6 @@ apex {
         "block.o",
         "clatd.o",
         "dscpPolicy.o",
-        "gentle.o",
         "netd.o",
         "offload.o",
         "offload@mainline.o",
