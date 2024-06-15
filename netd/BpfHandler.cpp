@@ -215,7 +215,7 @@ Status BpfHandler::init(const char* cg2_path) {
         android::bpf::waitForProgsLoaded();
     }
 
-    if (false && !mainlineNetBpfLoadDone()) {
+    if (!mainlineNetBpfLoadDone()) {
         // We're on < U QPR3 & it's the first time netd is starting up (unless crashlooping)
         //
         // On U QPR3+ netbpfload is guaranteed to run before the platform bpfloader,
