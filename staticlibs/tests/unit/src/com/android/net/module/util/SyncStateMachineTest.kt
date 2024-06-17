@@ -45,7 +45,7 @@ private const val ARG_2 = 200
 
 @RunWith(AndroidJUnit4::class)
 @SmallTest
-class SynStateMachineTest {
+class SyncStateMachineTest {
     private val mState1 = spy(object : TestState(MSG_1) {})
     private val mState2 = spy(object : TestState(MSG_2) {})
     private val mState3 = spy(object : TestState(MSG_3) {})
