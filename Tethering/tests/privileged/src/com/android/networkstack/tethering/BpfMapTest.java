@@ -22,19 +22,24 @@ import static com.android.networkstack.tethering.util.TetheringUtils.getTetherin
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 
 import android.net.MacAddress;
 import android.os.Build;
+import android.os.SystemClock;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
 import android.util.ArrayMap;
 
 import com.android.net.module.util.BpfMap;
+import com.android.net.module.util.SingleWriterBpfMap;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DevSdkIgnoreRunner;
 
@@ -42,10 +47,18 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.NoSuchElementException;
+import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -56,10 +69,25 @@ public final class BpfMapTest {
     private static final int TEST_MAP_SIZE = 16;
     private static final String TETHER_DOWNSTREAM6_FS_PATH =
             "/sys/fs/bpf/tethering/map_test_tether_downstream6_map";
+    private static final String TETHER2_DOWNSTREAM6_FS_PATH =
+            "/sys/fs/bpf/tethering/map_test_tether2_downstream6_map";
+    private static final String TETHER3_DOWNSTREAM6_FS_PATH =
+            "/sys/fs/bpf/tethering/map_test_tether3_downstream6_map";
 
     private ArrayMap<TetherDownstream6Key, Tether6Value> mTestData;
 
     private BpfMap<TetherDownstream6Key, Tether6Value> mTestMap;
+
+    private final boolean mShouldTestSingleWriterMap;
+
+    @Parameterized.Parameters
+    public static Collection<Boolean> shouldTestSingleWriterMap() {
+        return Arrays.asList(true, false);
+    }
+
+    public BpfMapTest(boolean shouldTestSingleWriterMap) {
+        mShouldTestSingleWriterMap = shouldTestSingleWriterMap;
+    }
 
     @BeforeClass
     public static void setupOnce() {
@@ -82,11 +110,16 @@ public final class BpfMapTest {
         initTestMap();
     }
 
-    private void initTestMap() throws Exception {
-        mTestMap = new BpfMap<>(
-                TETHER_DOWNSTREAM6_FS_PATH,
-                TetherDownstream6Key.class, Tether6Value.class);
+    private BpfMap<TetherDownstream6Key, Tether6Value> openTestMap() throws Exception {
+        return mShouldTestSingleWriterMap
+                ? SingleWriterBpfMap.getSingleton(TETHER2_DOWNSTREAM6_FS_PATH,
+                        TetherDownstream6Key.class, Tether6Value.class)
+                : new BpfMap<>(TETHER_DOWNSTREAM6_FS_PATH, TetherDownstream6Key.class,
+                        Tether6Value.class);
+    }
 
+    private void initTestMap() throws Exception {
+        mTestMap = openTestMap();
         mTestMap.forEach((key, value) -> {
             try {
                 assertTrue(mTestMap.deleteEntry(key));
@@ -125,7 +158,7 @@ public final class BpfMapTest {
                 assertEquals(OsConstants.EPERM, expected.errno);
             }
         }
-        try (BpfMap writeOnlyMap = new BpfMap<>(TETHER_DOWNSTREAM6_FS_PATH, BpfMap.BPF_F_WRONLY,
+        try (BpfMap writeOnlyMap = new BpfMap<>(TETHER3_DOWNSTREAM6_FS_PATH, BpfMap.BPF_F_WRONLY,
                 TetherDownstream6Key.class, Tether6Value.class)) {
             assertNotNull(writeOnlyMap);
             try {
@@ -357,6 +390,25 @@ public final class BpfMapTest {
     }
 
     @Test
+    public void testMapContentsCorrectOnOpen() throws Exception {
+        final BpfMap<TetherDownstream6Key, Tether6Value> map1, map2;
+
+        map1 = openTestMap();
+        map1.clear();
+        for (int i = 0; i < mTestData.size(); i++) {
+            map1.insertEntry(mTestData.keyAt(i), mTestData.valueAt(i));
+        }
+
+        // We can't close and reopen map1, because close does nothing. Open another map instead.
+        map2 = openTestMap();
+        for (int i = 0; i < mTestData.size(); i++) {
+            assertEquals(mTestData.valueAt(i), map2.getValue(mTestData.keyAt(i)));
+        }
+
+        map1.clear();
+    }
+
+    @Test
     public void testInsertOverflow() throws Exception {
         final ArrayMap<TetherDownstream6Key, Tether6Value> testData =
                 new ArrayMap<>();
@@ -396,8 +448,18 @@ public final class BpfMapTest {
         }
     }
 
-    private static int getNumOpenFds() {
-        return new File("/proc/" + Os.getpid() + "/fd").listFiles().length;
+    private static int getNumOpenBpfMapFds() throws Exception {
+        int numFds = 0;
+        File[] openFiles = new File("/proc/self/fd").listFiles();
+        for (int i = 0; i < openFiles.length; i++) {
+            final Path path = openFiles[i].toPath();
+            if (!Files.isSymbolicLink(path)) continue;
+            if ("anon_inode:bpf-map".equals(Files.readSymbolicLink(path).toString())) {
+                numFds++;
+            }
+        }
+        assertNotEquals("Couldn't find any BPF map fds opened by this process", 0, numFds);
+        return numFds;
     }
 
     @Test
@@ -406,7 +468,7 @@ public final class BpfMapTest {
         // cache, expect that the fd amount is not increased in the iterations.
         // See the comment of BpfMap#close.
         final int iterations = 1000;
-        final int before = getNumOpenFds();
+        final int before = getNumOpenBpfMapFds();
         for (int i = 0; i < iterations; i++) {
             try (BpfMap<TetherDownstream6Key, Tether6Value> map = new BpfMap<>(
                     TETHER_DOWNSTREAM6_FS_PATH,
@@ -414,15 +476,74 @@ public final class BpfMapTest {
                 // do nothing
             }
         }
-        final int after = getNumOpenFds();
+        final int after = getNumOpenBpfMapFds();
 
         // Check that the number of open fds is the same as before.
-        // If this exact match becomes flaky, we probably need to distinguish that fd is belong
-        // to "bpf-map".
-        // ex:
-        // $ adb shell ls -all /proc/16196/fd
-        // [..] network_stack 64 2022-07-26 22:01:02.300002956 +0800 749 -> anon_inode:bpf-map
-        // [..] network_stack 64 2022-07-26 22:01:02.188002956 +0800 75 -> anon_inode:[eventfd]
         assertEquals("Fd leak after " + iterations + " iterations: ", before, after);
+    }
+
+    @Test
+    public void testNullKey() {
+        assertThrows(NullPointerException.class, () ->
+                mTestMap.insertOrReplaceEntry(null, mTestData.valueAt(0)));
+    }
+
+    private void runBenchmarkThread(BpfMap<TetherDownstream6Key, Tether6Value> map,
+            CompletableFuture<Integer> future, int runtimeMs) {
+        int numReads = 0;
+        final Random r = new Random();
+        final long start = SystemClock.elapsedRealtime();
+        final long stop = start + runtimeMs;
+        while (SystemClock.elapsedRealtime() < stop) {
+            try {
+                final Tether6Value v = map.getValue(mTestData.keyAt(r.nextInt(mTestData.size())));
+                assertNotNull(v);
+                numReads++;
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+                return;
+            }
+        }
+        future.complete(numReads);
+    }
+
+    @Test
+    public void testSingleWriterCacheEffectiveness() throws Exception {
+        assumeTrue(mShouldTestSingleWriterMap);
+        // Benchmark parameters.
+        final int timeoutMs = 5_000;  // Only hit if threads don't complete.
+        final int benchmarkTimeMs = 2_000;
+        final int minReads = 50;
+        // Local testing on cuttlefish suggests that caching is ~10x faster.
+        // Only require 3x to reduce test flakiness.
+        final int expectedSpeedup = 3;
+
+        final BpfMap cachedMap = SingleWriterBpfMap.getSingleton(TETHER2_DOWNSTREAM6_FS_PATH,
+                TetherDownstream6Key.class, Tether6Value.class);
+        final BpfMap uncachedMap = new BpfMap(TETHER_DOWNSTREAM6_FS_PATH,
+                TetherDownstream6Key.class, Tether6Value.class);
+
+        // Ensure the maps are not empty.
+        for (int i = 0; i < mTestData.size(); i++) {
+            cachedMap.insertEntry(mTestData.keyAt(i), mTestData.valueAt(i));
+            uncachedMap.insertEntry(mTestData.keyAt(i), mTestData.valueAt(i));
+        }
+
+        final CompletableFuture<Integer> cachedResult = new CompletableFuture<>();
+        final CompletableFuture<Integer> uncachedResult = new CompletableFuture<>();
+
+        new Thread(() -> runBenchmarkThread(uncachedMap, uncachedResult, benchmarkTimeMs)).start();
+        new Thread(() -> runBenchmarkThread(cachedMap, cachedResult, benchmarkTimeMs)).start();
+
+        final int cached = cachedResult.get(timeoutMs, TimeUnit.MILLISECONDS);
+        final int uncached = uncachedResult.get(timeoutMs, TimeUnit.MILLISECONDS);
+
+        // Uncomment to see benchmark results.
+        // fail("Cached " + cached + ", uncached " + uncached + ": " + cached / uncached  +"x");
+
+        assertTrue("Less than " + minReads + "cached reads observed", cached > minReads);
+        assertTrue("Less than " + minReads + "uncached reads observed", uncached > minReads);
+        assertTrue("Cached map not at least " + expectedSpeedup + "x faster",
+                cached > expectedSpeedup * uncached);
     }
 }

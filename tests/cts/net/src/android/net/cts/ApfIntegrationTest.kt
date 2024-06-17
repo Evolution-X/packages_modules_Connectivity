@@ -55,6 +55,7 @@ import com.android.compatibility.common.util.PropertyUtil.getFirstApiLevel
 import com.android.compatibility.common.util.PropertyUtil.getVsrApiLevel
 import com.android.compatibility.common.util.SystemUtil.runShellCommand
 import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
+import com.android.compatibility.common.util.VsrTest
 import com.android.internal.util.HexDump
 import com.android.net.module.util.PacketReader
 import com.android.testutils.DevSdkIgnoreRule
@@ -300,6 +301,10 @@ class ApfIntegrationTest {
         }
     }
 
+    @VsrTest(
+        requirements = ["VSR-5.3.12-001", "VSR-5.3.12-003", "VSR-5.3.12-004", "VSR-5.3.12-009",
+            "VSR-5.3.12-012"]
+    )
     @Test
     fun testApfCapabilities() {
         // APF became mandatory in Android 14 VSR.
@@ -350,10 +355,14 @@ class ApfIntegrationTest {
         return HexDump.hexStringToByteArray(progHexString)
     }
 
+    @VsrTest(
+            requirements = ["VSR-5.3.12-007", "VSR-5.3.12-008", "VSR-5.3.12-010", "VSR-5.3.12-011"]
+    )
     @SkipPresubmit(reason = "This test takes longer than 1 minute, do not run it on presubmit.")
     // APF integration is mostly broken before V, only run the full read / write test on V+.
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    @Test
+    // Increase timeout for test to 15 minutes to accommodate device with large APF RAM.
+    @Test(timeout = 15 * 60 * 1000)
     fun testReadWriteProgram() {
         assumeApfVersionSupportAtLeast(4)
 
@@ -400,6 +409,7 @@ class ApfIntegrationTest {
     }
 
     // APF integration is mostly broken before V
+    @VsrTest(requirements = ["VSR-5.3.12-002", "VSR-5.3.12-005"])
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @Test
     fun testDropPingReply() {
@@ -448,6 +458,7 @@ class ApfIntegrationTest {
     fun clearApfMemory() = installProgram(ByteArray(caps.maximumApfProgramSize))
 
     // APF integration is mostly broken before V
+    @VsrTest(requirements = ["VSR-5.3.12-002", "VSR-5.3.12-005"])
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @Test
     fun testPrefilledMemorySlotsV4() {
@@ -503,6 +514,7 @@ class ApfIntegrationTest {
     }
 
     // APF integration is mostly broken before V
+    @VsrTest(requirements = ["VSR-5.3.12-002", "VSR-5.3.12-005"])
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @Test
     fun testFilterAgeIncreasesBetweenPackets() {

@@ -15,7 +15,7 @@
  */
 
 // The resulting .o needs to load on Android T+
-#define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
+#define BPFLOADER_MIN_VER BPFLOADER_T_VERSION
 
 #include <bpf_helpers.h>
 #include <linux/bpf.h>
@@ -97,19 +97,22 @@ DEFINE_BPF_MAP_RO_NETD(uid_permission_map, HASH, uint32_t, uint8_t, UID_OWNER_MA
 DEFINE_BPF_MAP_NO_NETD(ingress_discard_map, HASH, IngressDiscardKey, IngressDiscardValue,
                        INGRESS_DISCARD_MAP_SIZE)
 
+DEFINE_BPF_MAP_RW_NETD(lock_array_test_map, ARRAY, uint32_t, bool, 1)
+DEFINE_BPF_MAP_RW_NETD(lock_hash_test_map, HASH, uint32_t, bool, 1)
+
 /* never actually used from ebpf */
 DEFINE_BPF_MAP_NO_NETD(iface_index_name_map, HASH, uint32_t, IfaceValue, IFACE_INDEX_NAME_MAP_SIZE)
 
 // A single-element configuration array, packet tracing is enabled when 'true'.
 DEFINE_BPF_MAP_EXT(packet_trace_enabled_map, ARRAY, uint32_t, bool, 1,
                    AID_ROOT, AID_SYSTEM, 0060, "fs_bpf_net_shared", "", PRIVATE,
-                   BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG,
+                   BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG,
                    LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 // A ring buffer on which packet information is pushed.
 DEFINE_BPF_RINGBUF_EXT(packet_trace_ringbuf, PacketTrace, PACKET_TRACE_BUF_SIZE,
                        AID_ROOT, AID_SYSTEM, 0060, "fs_bpf_net_shared", "", PRIVATE,
-                       BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG,
+                       BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG,
                        LOAD_ON_USER, LOAD_ON_USERDEBUG);
 
 DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
@@ -138,6 +141,11 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
 
 #define DEFINE_NETD_BPF_PROG(SECTION_NAME, prog_uid, prog_gid, the_prog) \
     DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, KVER_NONE)
+
+#define DEFINE_NETD_V_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, minKV)            \
+    DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, minKV,                        \
+                        KVER_INF, BPFLOADER_MAINLINE_V_VERSION, BPFLOADER_MAX_VER, MANDATORY,     \
+                        "fs_bpf_netd_readonly", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 // programs that only need to be usable by the system server
 #define DEFINE_SYS_BPF_PROG(SECTION_NAME, prog_uid, prog_gid, the_prog) \
@@ -519,7 +527,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
 // This program is optional, and enables tracing on Android U+, 5.8+ on user builds.
 DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace_user", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_ingress_trace_user, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
+                    BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
                     "fs_bpf_netd_readonly", "",
                     IGNORE_ON_ENG, LOAD_ON_USER, IGNORE_ON_USERDEBUG)
 (struct __sk_buff* skb) {
@@ -529,7 +537,7 @@ DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace_user", AID_ROOT, AID_SYSTEM,
 // This program is required, and enables tracing on Android U+, 5.8+, userdebug/eng.
 DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_ingress_trace, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
+                    BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, IGNORE_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
@@ -551,7 +559,7 @@ DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_SY
 // This program is optional, and enables tracing on Android U+, 5.8+ on user builds.
 DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace_user", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_egress_trace_user, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
+                    BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
                     "fs_bpf_netd_readonly", "",
                     IGNORE_ON_ENG, LOAD_ON_USER, IGNORE_ON_USERDEBUG)
 (struct __sk_buff* skb) {
@@ -561,7 +569,7 @@ DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace_user", AID_ROOT, AID_SYSTEM,
 // This program is required, and enables tracing on Android U+, 5.8+, userdebug/eng.
 DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_egress_trace, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
+                    BPFLOADER_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, IGNORE_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
@@ -666,13 +674,81 @@ static __always_inline inline uint8_t get_app_permissions() {
     return permissions ? *permissions : BPF_PERMISSION_INTERNET;
 }
 
-DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet/create", AID_ROOT, AID_ROOT, inet_socket_create,
+DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", AID_ROOT, AID_ROOT, inet_socket_create,
                           KVER_4_14)
 (struct bpf_sock* sk) {
     // A return value of 1 means allow, everything else means deny.
     return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? 1 : 0;
 }
 
+DEFINE_NETD_V_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT,
+                            inet_socket_release, KVER_5_15)
+(struct bpf_sock* sk) {
+    uint64_t cookie = bpf_get_sk_cookie(sk);
+    if (cookie) bpf_cookie_tag_map_delete_elem(&cookie);
+
+    return 1;
+}
+
+static __always_inline inline int check_localhost(struct bpf_sock_addr *ctx) {
+    // See include/uapi/linux/bpf.h:
+    //
+    // struct bpf_sock_addr {
+    //   __u32 user_family;	//     R: 4 byte
+    //   __u32 user_ip4;	// BE, R: 1,2,4-byte,   W: 4-byte
+    //   __u32 user_ip6[4];	// BE, R: 1,2,4,8-byte, W: 4,8-byte
+    //   __u32 user_port;	// BE, R: 1,2,4-byte,   W: 4-byte
+    //   __u32 family;		//     R: 4 byte
+    //   __u32 type;		//     R: 4 byte
+    //   __u32 protocol;	//     R: 4 byte
+    //   __u32 msg_src_ip4;	// BE, R: 1,2,4-byte,   W: 4-byte
+    //   __u32 msg_src_ip6[4];	// BE, R: 1,2,4,8-byte, W: 4,8-byte
+    //   __bpf_md_ptr(struct bpf_sock *, sk);
+    // };
+    return 1;
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("connect4/inet4_connect", AID_ROOT, AID_ROOT, inet4_connect, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("connect6/inet6_connect", AID_ROOT, AID_ROOT, inet6_connect, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("recvmsg4/udp4_recvmsg", AID_ROOT, AID_ROOT, udp4_recvmsg, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("recvmsg6/udp6_recvmsg", AID_ROOT, AID_ROOT, udp6_recvmsg, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("sendmsg4/udp4_sendmsg", AID_ROOT, AID_ROOT, udp4_sendmsg, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("sendmsg6/udp6_sendmsg", AID_ROOT, AID_ROOT, udp6_sendmsg, KVER_5_15)
+(struct bpf_sock_addr *ctx) {
+    return check_localhost(ctx);
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("getsockopt/prog", AID_ROOT, AID_ROOT, getsockopt_prog, KVER_5_15)
+(struct bpf_sockopt *ctx) {
+    return 1;
+}
+
+DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", AID_ROOT, AID_ROOT, setsockopt_prog, KVER_5_15)
+(struct bpf_sockopt *ctx) {
+    return 1;
+}
+
 LICENSE("Apache 2.0");
 CRITICAL("Connectivity and netd");
 DISABLE_BTF_ON_USER_BUILDS();
+DISABLE_ON_MAINLINE_BEFORE_U_QPR3();

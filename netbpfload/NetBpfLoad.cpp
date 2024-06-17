@@ -224,11 +224,6 @@ static int logTetheringApexVersion(void) {
     return 0;
 }
 
-static bool isGSI() {
-    // From //system/gsid/libgsi.cpp IsGsiRunning()
-    return !access("/metadata/gsi/dsu/booted", F_OK);
-}
-
 static bool hasGSM() {
     static string ph = base::GetProperty("gsm.current.phone-type", "");
     static bool gsm = (ph != "");
@@ -254,19 +249,55 @@ static bool isTV() {
 }
 
 static int doLoad(char** argv, char * const envp[]) {
-    const int device_api_level = android_get_device_api_level();
-    const bool isAtLeastT = (device_api_level >= __ANDROID_API_T__);
-    const bool isAtLeastU = (device_api_level >= __ANDROID_API_U__);
-    const bool isAtLeastV = (device_api_level >= __ANDROID_API_V__);
+    const bool runningAsRoot = !getuid();  // true iff U QPR3 or V+
+
+    // Any released device will have codename REL instead of a 'real' codename.
+    // For safety: default to 'REL' so we default to unreleased=false on failure.
+    const bool unreleased = (base::GetProperty("ro.build.version.codename", "REL") != "REL");
+
+    // goog/main device_api_level is bumped *way* before aosp/main api level
+    // (the latter only gets bumped during the push of goog/main to aosp/main)
+    //
+    // Since we develop in AOSP, we want it to behave as if it was bumped too.
+    //
+    // Note that AOSP doesn't really have a good api level (for example during
+    // early V dev cycle, it would have *all* of T, some but not all of U, and some V).
+    // One could argue that for our purposes AOSP api level should be infinite or 10000.
+    //
+    // This could also cause api to be increased in goog/main or other branches,
+    // but I can't imagine a case where this would be a problem: the problem
+    // is rather a too low api level, rather than some ill defined high value.
+    // For example as I write this aosp is 34/U, and goog is 35/V,
+    // we want to treat both goog & aosp as 35/V, but it's harmless if we
+    // treat goog as 36 because that value isn't yet defined to mean anything,
+    // and we thus never compare against it.
+    //
+    // Also note that 'android_get_device_api_level()' is what the
+    //   //system/core/init/apex_init_util.cpp
+    // apex init .XXrc parsing code uses for XX filtering.
+    //
+    // That code has a hack to bump <35 to 35 (to force aosp/main to parse .35rc),
+    // but could (should?) perhaps be adjusted to match this.
+    const int effective_api_level = android_get_device_api_level() + (int)unreleased;
+    const bool isAtLeastT = (effective_api_level >= __ANDROID_API_T__);
+    const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
+    const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
 
     // last in U QPR2 beta1
     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
     // first in U QPR2 beta~2
     const bool has_platform_netbpfload_rc = exists("/system/etc/init/netbpfload.rc");
 
-    ALOGI("NetBpfLoad (%s) api:%d/%d kver:%07x (%s) rc:%d%d",
-          argv[0], android_get_application_target_sdk_version(), device_api_level,
-          kernelVersion(), describeArch(),
+    // Version of Network BpfLoader depends on the Android OS version
+    unsigned int bpfloader_ver = 42u;    // [42] BPFLOADER_MAINLINE_VERSION
+    if (isAtLeastT) ++bpfloader_ver;     // [43] BPFLOADER_MAINLINE_T_VERSION
+    if (isAtLeastU) ++bpfloader_ver;     // [44] BPFLOADER_MAINLINE_U_VERSION
+    if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
+    if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
+
+    ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
+          bpfloader_ver, argv[0], android_get_device_api_level(), effective_api_level,
+          kernelVersion(), describeArch(), getuid(),
           has_platform_bpfloader_rc, has_platform_netbpfload_rc);
 
     if (!has_platform_bpfloader_rc && !has_platform_netbpfload_rc) {
@@ -286,22 +317,34 @@ static int doLoad(char** argv, char * const envp[]) {
         return 1;
     }
 
+    // both S and T require kernel 4.9 (and eBpf support)
     if (isAtLeastT && !isAtLeastKernelVersion(4, 9, 0)) {
         ALOGE("Android T requires kernel 4.9.");
         return 1;
     }
 
+    // U bumps the kernel requirement up to 4.14
     if (isAtLeastU && !isAtLeastKernelVersion(4, 14, 0)) {
         ALOGE("Android U requires kernel 4.14.");
         return 1;
     }
 
+    // V bumps the kernel requirement up to 4.19
+    // see also: //system/netd/tests/kernel_test.cpp TestKernel419
     if (isAtLeastV && !isAtLeastKernelVersion(4, 19, 0)) {
         ALOGE("Android V requires kernel 4.19.");
         return 1;
     }
 
-    if (isAtLeastV && isX86() && !isKernel64Bit()) {
+    // Technically already required by U, but only enforce on V+
+    // see also: //system/netd/tests/kernel_test.cpp TestKernel64Bit
+    if (isAtLeastV && isKernel32Bit() && isAtLeastKernelVersion(5, 16, 0)) {
+        ALOGE("Android V+ platform with 32 bit kernel version >= 5.16.0 is unsupported");
+        if (!isTV()) return 1;
+    }
+
+    // Various known ABI layout issues, particularly wrt. bpf and ipsec/xfrm.
+    if (isAtLeastV && isKernel32Bit() && isX86()) {
         ALOGE("Android V requires X86 kernel to be 64-bit.");
         if (!isTV()) return 1;
     }
@@ -329,7 +372,7 @@ static int doLoad(char** argv, char * const envp[]) {
 
 #undef REQUIRE
 
-        if (bad && !isGSI()) {
+        if (bad) {
             ALOGE("Unsupported kernel version (%07x).", kernelVersion());
         }
     }
@@ -350,6 +393,10 @@ static int doLoad(char** argv, char * const envp[]) {
          * Some of these have userspace or kernel workarounds/hacks.
          * Some of them don't...
          * We're going to be removing the hacks.
+         * (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
+         * Note: this check/enforcement only applies to *system* userspace code,
+         * it does not affect unprivileged apps, the 32-on-64 compatibility
+         * problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
          *
          * Additionally the 32-bit kernel jit support is poor,
          * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
@@ -365,7 +412,9 @@ static int doLoad(char** argv, char * const envp[]) {
         return 1;
     }
 
-    if (isAtLeastV) {
+    if (runningAsRoot) {
+        // Note: writing this proc file requires being root (always the case on V+)
+
         // Linux 5.16-rc1 changed the default to 2 (disabled but changeable),
         // but we need 0 (enabled)
         // (this writeFile is known to fail on at least 4.19, but always defaults to 0 on
@@ -375,6 +424,11 @@ static int doLoad(char** argv, char * const envp[]) {
     }
 
     if (isAtLeastU) {
+        // Note: writing these proc files requires CAP_NET_ADMIN
+        // and sepolicy which is only present on U+,
+        // on Android T and earlier versions they're written from the 'load_bpf_programs'
+        // trigger (ie. by init itself) instead.
+
         // Enable the eBPF JIT -- but do note that on 64-bit kernels it is likely
         // already force enabled by the kernel config option BPF_JIT_ALWAYS_ON.
         // (Note: this (open) will fail with ENOENT 'No such file or directory' if
@@ -404,12 +458,6 @@ static int doLoad(char** argv, char * const envp[]) {
     // Thus we need to manually create the /sys/fs/bpf/loader subdirectory.
     if (createSysFsBpfSubDir("loader")) return 1;
 
-    // Version of Network BpfLoader depends on the Android OS version
-    unsigned int bpfloader_ver = 42u;  // [42] BPFLOADER_MAINLINE_VERSION
-    if (isAtLeastT) ++bpfloader_ver;   // [43] BPFLOADER_MAINLINE_T_VERSION
-    if (isAtLeastU) ++bpfloader_ver;   // [44] BPFLOADER_MAINLINE_U_VERSION
-    if (isAtLeastV) ++bpfloader_ver;   // [45] BPFLOADER_MAINLINE_V_VERSION
-
     // Load all ELF objects, create programs and maps, and pin them
     for (const auto& location : locations) {
         if (loadAllElfObjects(bpfloader_ver, location) != 0) {
@@ -432,17 +480,25 @@ static int doLoad(char** argv, char * const envp[]) {
         return 1;
     }
 
-    if (isAtLeastV) {
-        ALOGI("done, transferring control to platform bpfloader.");
+    // leave a flag that we're done
+    if (createSysFsBpfSubDir("netd_shared/mainline_done")) return 1;
 
-        const char * args[] = { platformBpfLoader, NULL, };
-        execve(args[0], (char**)args, envp);
-        ALOGE("FATAL: execve('%s'): %d[%s]", platformBpfLoader, errno, strerror(errno));
-        return 1;
+    // platform bpfloader will only succeed when run as root
+    if (!runningAsRoot) {
+        // unreachable on U QPR3+ which always runs netbpfload as root
+
+        ALOGI("mainline done, no need to transfer control to platform bpf loader.");
+        return 0;
     }
 
-    ALOGI("mainline done!");
-    return 0;
+    // unreachable before U QPR3
+    ALOGI("done, transferring control to platform bpfloader.");
+
+    // platform BpfLoader *needs* to run as root
+    const char * args[] = { platformBpfLoader, NULL, };
+    execve(args[0], (char**)args, envp);
+    ALOGE("FATAL: execve('%s'): %d[%s]", platformBpfLoader, errno, strerror(errno));
+    return 1;
 }
 
 }  // namespace bpf

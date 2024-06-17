@@ -39,11 +39,12 @@
 // Android U / 14 (api level 34) - various new program types added
 #define BPFLOADER_U_VERSION 38u
 
-// Android V / 15 (api level 35) - platform only
+// Android U QPR2 / 14 (api level 34) - platform only
 // (note: the platform bpfloader in V isn't really versioned at all,
 //  as there is no need as it can only load objects compiled at the
 //  same time as itself and the rest of the platform)
-#define BPFLOADER_PLATFORM_VERSION 41u
+#define BPFLOADER_U_QPR2_VERSION 41u
+#define BPFLOADER_PLATFORM_VERSION BPFLOADER_U_QPR2_VERSION
 
 // Android Mainline - this bpfloader should eventually go back to T (or even S)
 // Note: this value (and the following +1u's) are hardcoded in NetBpfLoad.cpp
@@ -55,8 +56,11 @@
 // Android Mainline BpfLoader when running on Android U
 #define BPFLOADER_MAINLINE_U_VERSION (BPFLOADER_MAINLINE_T_VERSION + 1u)
 
+// Android Mainline BpfLoader when running on Android U QPR3
+#define BPFLOADER_MAINLINE_U_QPR3_VERSION (BPFLOADER_MAINLINE_U_VERSION + 1u)
+
 // Android Mainline BpfLoader when running on Android V
-#define BPFLOADER_MAINLINE_V_VERSION (BPFLOADER_MAINLINE_U_VERSION + 1u)
+#define BPFLOADER_MAINLINE_V_VERSION (BPFLOADER_MAINLINE_U_QPR3_VERSION + 1u)
 
 /* For mainline module use, you can #define BPFLOADER_{MIN/MAX}_VER
  * before #include "bpf_helpers.h" to change which bpfloaders will
@@ -113,6 +117,9 @@
     unsigned _btf_min_bpfloader_ver SECTION("btf_min_bpfloader_ver") = 39u; \
     unsigned _btf_user_min_bpfloader_ver SECTION("btf_user_min_bpfloader_ver") = 0xFFFFFFFFu
 
+#define DISABLE_ON_MAINLINE_BEFORE_U_QPR3() \
+    unsigned _netbpfload_min_ver SECTION("netbpfload_min_ver") = BPFLOADER_MAINLINE_U_QPR3_VERSION;
+
 /* flag the resulting bpf .o file as critical to system functionality,
  * loading all kernel version appropriate programs in it must succeed
  * for bpfloader success
@@ -133,6 +140,7 @@ struct kver_uint { unsigned int kver; };
 #define KVER_5_4  KVER(5, 4, 0)
 #define KVER_5_8  KVER(5, 8, 0)
 #define KVER_5_9  KVER(5, 9, 0)
+#define KVER_5_10 KVER(5, 10, 0)
 #define KVER_5_15 KVER(5, 15, 0)
 #define KVER_6_1  KVER(6, 1, 0)
 #define KVER_6_6  KVER(6, 6, 0)

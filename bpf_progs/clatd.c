@@ -31,7 +31,7 @@
 #include <linux/udp.h>
 
 // The resulting .o needs to load on Android T+
-#define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
+#define BPFLOADER_MIN_VER BPFLOADER_T_VERSION
 
 #include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
@@ -431,3 +431,4 @@ DEFINE_BPF_PROG("schedcls/egress4/clat_rawip", AID_ROOT, AID_SYSTEM, sched_cls_e
 LICENSE("Apache 2.0");
 CRITICAL("Connectivity");
 DISABLE_BTF_ON_USER_BUILDS();
+DISABLE_ON_MAINLINE_BEFORE_U_QPR3();

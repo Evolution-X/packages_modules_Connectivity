@@ -34,6 +34,7 @@ namespace android {
 namespace net {
 
 using base::unique_fd;
+using base::WaitForProperty;
 using bpf::getSocketCookie;
 using bpf::retrieveProgram;
 using netdutils::Status;
@@ -85,31 +86,6 @@ static Status initPrograms(const char* cg2_path) {
         return Status("U+ platform with kernel version < 4.14.0 is unsupported");
     }
 
-    if (modules::sdklevel::IsAtLeastV()) {
-        // V bumps the kernel requirement up to 4.19
-        // see also: //system/netd/tests/kernel_test.cpp TestKernel419
-        if (!bpf::isAtLeastKernelVersion(4, 19, 0)) {
-            return Status("V+ platform with kernel version < 4.19.0 is unsupported");
-        }
-
-        // Technically already required by U, but only enforce on V+
-        // see also: //system/netd/tests/kernel_test.cpp TestKernel64Bit
-        if (bpf::isKernel32Bit() && bpf::isAtLeastKernelVersion(5, 16, 0)) {
-            return Status("V+ platform with 32 bit kernel, version >= 5.16.0 is unsupported");
-        }
-    }
-
-    // Linux 6.1 is highest version supported by U, starting with V new kernels,
-    // ie. 6.2+ we are dropping various kernel/system userspace 32-on-64 hacks
-    // (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
-    // Note: this check/enforcement only applies to *system* userspace code,
-    // it does not affect unprivileged apps, the 32-on-64 compatibility
-    // problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
-    // see also: //system/bpf/bpfloader/BpfLoader.cpp main()
-    if (bpf::isUserspace32bit() && bpf::isAtLeastKernelVersion(6, 2, 0)) {
-        return Status("32 bit userspace with Kernel version >= 6.2.0 is unsupported");
-    }
-
     // U mandates this mount point (though it should also be the case on T)
     if (modules::sdklevel::IsAtLeastU() && !!strcmp(cg2_path, "/sys/fs/cgroup")) {
         return Status("U+ platform with cg2_path != /sys/fs/cgroup is unsupported");
@@ -134,8 +110,31 @@ static Status initPrograms(const char* cg2_path) {
     // TODO: delete the if statement once all devices should support cgroup
     // socket filter (ie. the minimum kernel version required is 4.14).
     if (bpf::isAtLeastKernelVersion(4, 14, 0)) {
-        RETURN_IF_NOT_OK(
-                attachProgramToCgroup(CGROUP_SOCKET_PROG_PATH, cg_fd, BPF_CGROUP_INET_SOCK_CREATE));
+        RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_INET_CREATE_PROG_PATH,
+                                    cg_fd, BPF_CGROUP_INET_SOCK_CREATE));
+    }
+
+    if (modules::sdklevel::IsAtLeastV()) {
+        if (bpf::isAtLeastKernelVersion(5, 15, 0)) {
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_CONNECT4_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_INET4_CONNECT));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_CONNECT6_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_INET6_CONNECT))    ;
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_UDP4_RECVMSG_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_UDP4_RECVMSG));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_UDP6_RECVMSG_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_UDP6_RECVMSG));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_UDP4_SENDMSG_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_UDP4_SENDMSG));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_UDP6_SENDMSG_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_UDP6_SENDMSG));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_GETSOCKOPT_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_GETSOCKOPT));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_SETSOCKOPT_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_SETSOCKOPT));
+            RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_INET_RELEASE_PROG_PATH,
+                                        cg_fd, BPF_CGROUP_INET_SOCK_RELEASE));
+        }
     }
 
     if (bpf::isAtLeastKernelVersion(4, 19, 0)) {
@@ -155,6 +154,20 @@ static Status initPrograms(const char* cg2_path) {
         if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET6_BIND) <= 0) abort();
     }
 
+    if (modules::sdklevel::IsAtLeastV()) {
+        if (bpf::isAtLeastKernelVersion(5, 15, 0)) {
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET4_CONNECT) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET6_CONNECT) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP4_RECVMSG) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP6_RECVMSG) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP4_SENDMSG) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP6_SENDMSG) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_GETSOCKOPT) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_SETSOCKOPT) <= 0) abort();
+            if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_RELEASE) <= 0) abort();
+        }
+    }
+
     return netdutils::status::ok;
 }
 
@@ -165,39 +178,56 @@ BpfHandler::BpfHandler()
 BpfHandler::BpfHandler(uint32_t perUidLimit, uint32_t totalLimit)
     : mPerUidStatsEntriesLimit(perUidLimit), mTotalUidStatsEntriesLimit(totalLimit) {}
 
+static bool mainlineNetBpfLoadDone() {
+    return !access("/sys/fs/bpf/netd_shared/mainline_done", F_OK);
+}
+
 // copied with minor changes from waitForProgsLoaded()
 // p/m/C's staticlibs/native/bpf_headers/include/bpf/WaitForProgsLoaded.h
 static inline void waitForNetProgsLoaded() {
     // infinite loop until success with 5/10/20/40/60/60/60... delay
     for (int delay = 5;; delay *= 2) {
         if (delay > 60) delay = 60;
-        if (base::WaitForProperty("init.svc.bpfloader", "stopped", std::chrono::seconds(delay))
-            && !access("/sys/fs/bpf/netd_shared", F_OK))
+        if (WaitForProperty("init.svc.mdnsd_netbpfload", "stopped", std::chrono::seconds(delay))
+            && mainlineNetBpfLoadDone())
             return;
-        ALOGW("Waited %ds for init.svc.bpfloader=stopped, still waiting...", delay);
+        ALOGW("Waited %ds for init.svc.mdnsd_netbpfload=stopped, still waiting...", delay);
     }
 }
 
 Status BpfHandler::init(const char* cg2_path) {
+    // Note: netd *can* be restarted, so this might get called a second time after boot is complete
+    // at which point we don't need to (and shouldn't) wait for (more importantly start) loading bpf
+
     if (base::GetProperty("bpf.progs_loaded", "") != "1") {
-        // Make sure BPF programs are loaded before doing anything
-        ALOGI("Waiting for BPF programs");
-
-        // TODO: use !modules::sdklevel::IsAtLeastV() once api finalized
-        if (android_get_device_api_level() < __ANDROID_API_V__) {
-            waitForNetProgsLoaded();
-            ALOGI("Networking BPF programs are loaded");
-
-            if (!base::SetProperty("ctl.start", "mdnsd_loadbpf")) {
-                ALOGE("Failed to set property ctl.start=mdnsd_loadbpf, see dmesg for reason.");
-                abort();
-            }
-
-            ALOGI("Waiting for remaining BPF programs");
-        }
-
+        // AOSP platform netd & mainline don't need this (at least prior to U QPR3),
+        // but there could be platform provided (xt_)bpf programs that oem/vendor
+        // modified netd (which calls us during init) depends on...
+        ALOGI("Waiting for platform BPF programs");
         android::bpf::waitForProgsLoaded();
     }
+
+    if (!mainlineNetBpfLoadDone()) {
+        const bool enforce_mainline = false; // TODO: flip to true
+
+        // We're on < U QPR3 & it's the first time netd is starting up (unless crashlooping)
+        //
+        // On U QPR3+ netbpfload is guaranteed to run before the platform bpfloader,
+        // so waitForProgsLoaded() implies mainlineNetBpfLoadDone().
+        if (!base::SetProperty("ctl.start", "mdnsd_netbpfload")) {
+            ALOGE("Failed to set property ctl.start=mdnsd_netbpfload, see dmesg for reason.");
+            if (enforce_mainline) abort();
+        }
+
+        if (enforce_mainline) {
+            ALOGI("Waiting for Networking BPF programs");
+            waitForNetProgsLoaded();
+            ALOGI("Networking BPF programs are loaded");
+        } else {
+            ALOGI("Started mdnsd_netbpfload asynchronously.");
+        }
+    }
+
     ALOGI("BPF programs are loaded");
 
     RETURN_IF_NOT_OK(initPrograms(cg2_path));
@@ -206,7 +236,30 @@ Status BpfHandler::init(const char* cg2_path) {
     return netdutils::status::ok;
 }
 
+static void mapLockTest(void) {
+    // The maps must be R/W, and as yet unopened (or more specifically not yet lock'ed).
+    const char * const m1 = BPF_NETD_PATH "map_netd_lock_array_test_map";
+    const char * const m2 = BPF_NETD_PATH "map_netd_lock_hash_test_map";
+
+    unique_fd fd0(bpf::mapRetrieveExclusiveRW(m1)); if (!fd0.ok()) abort();  // grabs exclusive lock
+
+    unique_fd fd1(bpf::mapRetrieveExclusiveRW(m2)); if (!fd1.ok()) abort();  // no conflict with fd0
+    unique_fd fd2(bpf::mapRetrieveExclusiveRW(m2)); if ( fd2.ok()) abort();  // busy due to fd1
+    unique_fd fd3(bpf::mapRetrieveRO(m2));          if (!fd3.ok()) abort();  // no lock taken
+    unique_fd fd4(bpf::mapRetrieveRW(m2));          if ( fd4.ok()) abort();  // busy due to fd1
+    fd1.reset();  // releases exclusive lock
+    unique_fd fd5(bpf::mapRetrieveRO(m2));          if (!fd5.ok()) abort();  // no lock taken
+    unique_fd fd6(bpf::mapRetrieveRW(m2));          if (!fd6.ok()) abort();  // now ok
+    unique_fd fd7(bpf::mapRetrieveRO(m2));          if (!fd7.ok()) abort();  // no lock taken
+    unique_fd fd8(bpf::mapRetrieveExclusiveRW(m2)); if ( fd8.ok()) abort();  // busy due to fd6
+
+    fd0.reset();  // releases exclusive lock
+    unique_fd fd9(bpf::mapRetrieveWO(m1));          if (!fd9.ok()) abort();  // grabs exclusive lock
+}
+
 Status BpfHandler::initMaps() {
+    mapLockTest();
+
     RETURN_IF_NOT_OK(mStatsMapA.init(STATS_MAP_A_PATH));
     RETURN_IF_NOT_OK(mStatsMapB.init(STATS_MAP_B_PATH));
     RETURN_IF_NOT_OK(mConfigurationMap.init(CONFIGURATION_MAP_PATH));
