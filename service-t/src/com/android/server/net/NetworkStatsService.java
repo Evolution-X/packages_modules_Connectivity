@@ -1544,7 +1544,11 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     }
 
     @Override
-    public INetworkStatsSession openSessionForUsageStats(int flags, String callingPackage) {
+    public INetworkStatsSession openSessionForUsageStats(
+            int flags, @NonNull String callingPackage) {
+        Objects.requireNonNull(callingPackage);
+        PermissionUtils.enforcePackageNameMatchesUid(
+                mContext, Binder.getCallingUid(), callingPackage);
         return openSessionInternal(flags, callingPackage);
     }
 
@@ -2061,6 +2065,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
 
         final int callingPid = Binder.getCallingPid();
         final int callingUid = Binder.getCallingUid();
+        PermissionUtils.enforcePackageNameMatchesUid(mContext, callingUid, callingPackage);
         @NetworkStatsAccess.Level int accessLevel = checkAccessLevel(callingPackage);
         DataUsageRequest normalizedRequest;
         final long token = Binder.clearCallingIdentity();
