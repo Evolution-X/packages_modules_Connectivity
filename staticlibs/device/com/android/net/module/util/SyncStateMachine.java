@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.networkstack.tethering.util;
+package com.android.net.module.util;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
