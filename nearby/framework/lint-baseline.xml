@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.4.0-alpha08" type="baseline" client="" dependencies="true" name="" variant="all" version="8.4.0-alpha08">
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="529"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="573"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="605"
+            column="17"/>
+    </issue>
+
+</issues>

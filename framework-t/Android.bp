@@ -201,6 +201,9 @@ java_sdk_library {
         "com.android.net.thread.flags-aconfig",
         "nearby_flags",
     ],
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 // This rule is not used anymore(b/268440216).

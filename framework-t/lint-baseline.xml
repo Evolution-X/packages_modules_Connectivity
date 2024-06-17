@@ -1,0 +1,1313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.4.0-alpha08" type="baseline" client="" dependencies="true" name="" variant="all" version="8.4.0-alpha08">
+
+    <issue
+        id="FlaggedApi"
+        message="Field `SERVICE_NAME` is a flagged API and should be inside an `if (ThreadNetworkFlags.threadEnabled())` check (or annotate the surrounding method `registerServiceWrappers` with `@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                ThreadNetworkManager.SERVICE_NAME,"
+        errorLine2="                                     ~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/ConnectivityFrameworkInitializerTiramisu.java"
+            line="101"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Class `ThreadNetworkManager` is a flagged API and should be inside an `if (ThreadNetworkFlags.threadEnabled())` check (or annotate the surrounding method `registerServiceWrappers` with `@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                ThreadNetworkManager.class,"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/ConnectivityFrameworkInitializerTiramisu.java"
+            line="102"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `ThreadNetworkManager()` is a flagged API and should be inside an `if (ThreadNetworkFlags.threadEnabled())` check (or annotate the surrounding method `registerServiceWrappers` with `@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                    return new ThreadNetworkManager(context, managerService);"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/ConnectivityFrameworkInitializerTiramisu.java"
+            line="106"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="87"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="95"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="103"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="529"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="573"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="    @FlaggedApi(&quot;com.android.nearby.flags.powered_off_finding&quot;)"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/nearby/framework/java/android/nearby/NearbyManager.java"
+            line="605"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="This is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `handleMessage` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                    final String s = getNsdServiceInfoType((DiscoveryRequest) obj);"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1076"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `getServiceType()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `getNsdServiceInfoType` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        return r.getServiceType();"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1236"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `Builder()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        DiscoveryRequest request = new DiscoveryRequest.Builder(protocolType, serviceType)"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1477"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `build()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        DiscoveryRequest request = new DiscoveryRequest.Builder(protocolType, serviceType)"
+        errorLine2="                                   ^">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1477"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `setNetwork()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        DiscoveryRequest request = new DiscoveryRequest.Builder(protocolType, serviceType)"
+        errorLine2="                                   ^">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1477"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `discoverServices()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        discoverServices(request, executor, listener);"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1479"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `Builder()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                new DiscoveryRequest.Builder(protocolType, serviceType).build();"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1566"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `build()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `discoverServices` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                new DiscoveryRequest.Builder(protocolType, serviceType).build();"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdManager.java"
+            line="1566"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `getSubtypes()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `NsdServiceInfo` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="        mSubtypes = new ArraySet&lt;>(other.getSubtypes());"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdServiceInfo.java"
+            line="106"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `setSubtypes()` is a flagged API and should be inside an `if (Flags.nsdSubtypesSupportEnabled())` check (or annotate the surrounding method `createFromParcel` with `@FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED) to transfer requirement to caller`)"
+        errorLine1="                info.setSubtypes(new ArraySet&lt;>(in.createStringArrayList()));"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/NsdServiceInfo.java"
+            line="673"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadEngine.java"
+            line="37"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="@FlaggedApi should specify an actual flag constant; raw strings are discouraged (and more importantly, **not enforced**)"
+        errorLine1="@FlaggedApi(&quot;com.android.net.flags.register_nsd_offload_engine_api&quot;)"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework-t/src/android/net/nsd/OffloadServiceInfo.java"
+            line="43"
+            column="13"/>
+    </issue>
+
+</issues>
