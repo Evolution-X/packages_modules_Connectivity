@@ -102,7 +102,9 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         }
 
         public void waitOnQuit() {
-            mOnQuitCv.block(5_000 /* timeoutMs */);
+            if (!mOnQuitCv.block(5_000 /* timeoutMs */)) {
+                Log.wtf(TAG, "Timed out waiting on IpClient to shutdown.");
+            }
         }
 
         @Override
