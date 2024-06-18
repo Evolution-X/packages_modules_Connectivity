@@ -28,6 +28,7 @@ import android.net.ip.IIpClient;
 import android.net.ip.IpClientCallbacks;
 import android.net.ip.IpClientManager;
 import android.net.ip.IpClientUtil;
+import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Message;
 import android.util.ArraySet;
@@ -81,6 +82,8 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     }
 
     private class EthernetIpClientCallback extends IpClientCallbacks {
+        private final ConditionVariable mOnQuitCv = new ConditionVariable(false);
+
         private void safelyPostOnHandler(Runnable r) {
             mHandler.post(() -> {
                 if (this != mIpClientCallback) {
@@ -96,6 +99,15 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
                 // TODO: add a SyncStateMachine#processMessage(cmd, obj) overload.
                 processMessage(CMD_ON_IPCLIENT_CREATED, 0, 0, new IpClientManager(ipClient, TAG));
             });
+        }
+
+        public void waitOnQuit() {
+            mOnQuitCv.block(5_000 /* timeoutMs */);
+        }
+
+        @Override
+        public void onQuit() {
+            mOnQuitCv.open();
         }
     }
 
@@ -186,11 +198,13 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
 
         @Override
         public void exit() {
-            mIpClientCallback = null;
             if (mIpClient != null) {
                 mIpClient.shutdown();
-                // TODO: either wait for shutdown or add an additional StoppingState.
+                // TODO: consider adding a StoppingState and making the shutdown operation
+                // asynchronous.
+                mIpClientCallback.waitOnQuit();
             }
+            mIpClientCallback = null;
         }
     }
 
