@@ -42,6 +42,9 @@ import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.test.TestLooper;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.SmallTest;
+
 import com.android.server.thread.openthread.DnsTxtAttribute;
 import com.android.server.thread.openthread.INsdDiscoverServiceCallback;
 import com.android.server.thread.openthread.INsdResolveHostCallback;
@@ -50,6 +53,7 @@ import com.android.server.thread.openthread.INsdStatusReceiver;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -62,6 +66,8 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 
 /** Unit tests for {@link NsdPublisher}. */
+@SmallTest
+@RunWith(AndroidJUnit4.class)
 public final class NsdPublisherTest {
     private static final DnsTxtAttribute TEST_TXT_ENTRY_1 =
             new DnsTxtAttribute("key1", new byte[] {0x01, 0x02});
