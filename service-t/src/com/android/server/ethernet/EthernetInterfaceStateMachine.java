@@ -77,7 +77,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     }
 
     /** Link is down */
-    private class DisconnectedState extends State {
+    private class LinkDownState extends State {
 
     }
 
@@ -108,21 +108,21 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private class StoppedState extends State {
     }
 
-    /** Network is needed, start provisioning */
-    private class ProvisioningState extends State {
+    /** Network is needed, starts IpClient and manages its lifecycle */
+    private class StartedState extends State {
 
     }
 
-    /** Network is needed */
+    /** IpClient is running, starts provisioning and registers NetworkAgent */
     private class RunningState extends State {
 
     }
 
     private final TetheringState mTetheringState = new TetheringState();
-    private final DisconnectedState mDisconnectedState = new DisconnectedState();
+    private final LinkDownState mLinkDownState = new LinkDownState();
     private final NetworkOfferExtendedState mOfferExtendedState = new NetworkOfferExtendedState();
     private final StoppedState mStoppedState = new StoppedState();
-    private final ProvisioningState mProvisioningState = new ProvisioningState();
+    private final StartedState mStartedState = new StartedState();
     private final RunningState mRunningState = new RunningState();
 
     public EthernetInterfaceStateMachine(String iface, Handler handler, NetworkCapabilities capabilities, NetworkProvider provider) {
@@ -133,6 +133,33 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         mCapabilities = capabilities;
         mNetworkProvider = provider;
 
+        // Interface lifecycle:
+        //           [ LinkDownState ]
+        //                   |
+        //                   v
+        //             *link comes up*
+        //                   |
+        //                   v
+        //            [ StoppedState ]
+        //                   |
+        //                   v
+        //           *network is needed*
+        //                   |
+        //                   v
+        //            [ StartedState ]
+        //                   |
+        //                   v
+        //           *IpClient is created*
+        //                   |
+        //                   v
+        //            [ RunningState ]
+        //                   |
+        //                   v
+        //  *interface is requested for tethering*
+        //                   |
+        //                   v
+        //            [TetheringState]
+        //
         // Tethering mode is special as the interface is configured by Tethering, rather than the
         // ethernet module.
         final List<StateInfo> states = new ArrayList<>();
@@ -140,15 +167,15 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
 
         // CHECKSTYLE:OFF IndentationCheck
         // Initial state
-        states.add(new StateInfo(mDisconnectedState, null));
+        states.add(new StateInfo(mLinkDownState, null));
         states.add(new StateInfo(mOfferExtendedState, null));
             states.add(new StateInfo(mStoppedState, mOfferExtendedState));
-            states.add(new StateInfo(mProvisioningState, mOfferExtendedState));
-            states.add(new StateInfo(mRunningState, mOfferExtendedState));
+            states.add(new StateInfo(mStartedState, mOfferExtendedState));
+                states.add(new StateInfo(mRunningState, mStartedState));
         // CHECKSTYLE:ON IndentationCheck
 
         // TODO: set initial state to TetheringState if a tethering interface has been requested and
         // this is the first interface to be added.
-        start(mDisconnectedState);
+        start(mLinkDownState);
     }
 }
