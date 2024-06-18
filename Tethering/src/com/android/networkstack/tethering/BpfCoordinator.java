@@ -902,7 +902,7 @@ public class BpfCoordinator {
      * Note that this can be only called on handler thread.
      */
     public void updateIpv6UpstreamInterface(@NonNull final IpServer ipServer, int upstreamIfindex,
-            @NonNull Set<IpPrefix> upstreamPrefixes, boolean upstreamSupportsBpf) {
+            @NonNull Set<IpPrefix> upstreamPrefixes) {
         if (!isUsingBpf()) return;
 
         // If the upstream interface has changed, remove all rules and re-add them with the new
@@ -912,6 +912,7 @@ public class BpfCoordinator {
         final Set<IpPrefix> prevUpstreamPrefixes = ipServer.getIpv6UpstreamPrefixes();
         if (prevUpstreamIfindex != upstreamIfindex
                 || !prevUpstreamPrefixes.equals(upstreamPrefixes)) {
+            final boolean upstreamSupportsBpf = checkUpstreamSupportsBpf(upstreamIfindex);
             updateAllIpv6Rules(ipServer, interfaceParams,
                     getInterfaceIndexForRule(upstreamIfindex, upstreamSupportsBpf),
                     upstreamPrefixes);

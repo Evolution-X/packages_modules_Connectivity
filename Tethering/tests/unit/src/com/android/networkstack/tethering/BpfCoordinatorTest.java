@@ -62,7 +62,6 @@ import static com.android.networkstack.tethering.BpfCoordinator.toIpv4MappedAddr
 import static com.android.networkstack.tethering.BpfUtils.DOWNSTREAM;
 import static com.android.networkstack.tethering.BpfUtils.UPSTREAM;
 import static com.android.networkstack.tethering.TetheringConfiguration.DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS;
-import static com.android.networkstack.tethering.UpstreamNetworkState.isVcnInterface;
 import static com.android.testutils.MiscAsserts.assertSameElements;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -650,10 +649,8 @@ public class BpfCoordinatorTest {
 
     private void dispatchIpv6UpstreamChanged(BpfCoordinator bpfCoordinator, IpServer ipServer,
             int upstreamIfindex, String upstreamIface, Set<IpPrefix> upstreamPrefixes) {
-        final boolean upstreamSupportsBpf = upstreamIface != null && !isVcnInterface(upstreamIface);
         bpfCoordinator.maybeAddUpstreamToLookupTable(upstreamIfindex, upstreamIface);
-        bpfCoordinator.updateIpv6UpstreamInterface(ipServer, upstreamIfindex, upstreamPrefixes,
-                upstreamSupportsBpf);
+        bpfCoordinator.updateIpv6UpstreamInterface(ipServer, upstreamIfindex, upstreamPrefixes);
         when(ipServer.getIpv6UpstreamIfindex()).thenReturn(upstreamIfindex);
         when(ipServer.getIpv6UpstreamPrefixes()).thenReturn(upstreamPrefixes);
     }
@@ -1587,7 +1584,7 @@ public class BpfCoordinatorTest {
 
         // The rule can't be updated.
         coordinator.updateIpv6UpstreamInterface(mIpServer, rule.upstreamIfindex + 1 /* new */,
-                UPSTREAM_PREFIXES, true /* upstreamSupportsBpf */);
+                UPSTREAM_PREFIXES);
         verifyNeverRemoveDownstreamRule();
         verifyNeverAddDownstreamRule();
         rules = coordinator.getIpv6DownstreamRulesForTesting().get(mIpServer);

@@ -34,7 +34,6 @@ import static android.system.OsConstants.RT_SCOPE_UNIVERSE;
 import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTH;
 import static com.android.net.module.util.NetworkStackConstants.RFC7421_PREFIX_LENGTH;
 import static com.android.networkstack.tethering.TetheringConfiguration.USE_SYNC_SM;
-import static com.android.networkstack.tethering.UpstreamNetworkState.isVcnInterface;
 import static com.android.networkstack.tethering.util.PrefixUtils.asIpPrefix;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_IPSERVER;
 
@@ -289,7 +288,6 @@ public class IpServer extends StateMachineShim {
     private List<TetheredClient> mDhcpLeases = Collections.emptyList();
 
     private int mLastIPv6UpstreamIfindex = 0;
-    private boolean mUpstreamSupportsBpf = false;
     @NonNull
     private Set<IpPrefix> mLastIPv6UpstreamPrefixes = Collections.emptySet();
 
@@ -800,18 +798,15 @@ public class IpServer extends StateMachineShim {
         setRaParams(params);
 
         // Not support BPF on virtual upstream interface
-        final boolean upstreamSupportsBpf = upstreamIface != null && !isVcnInterface(upstreamIface);
         final Set<IpPrefix> upstreamPrefixes = params != null ? params.prefixes : Set.of();
         // mBpfCoordinator#updateIpv6UpstreamInterface must be called before updating
         // mLastIPv6UpstreamIfindex and mLastIPv6UpstreamPrefixes because BpfCoordinator will call
         // IpServer#getIpv6UpstreamIfindex and IpServer#getIpv6UpstreamPrefixes to retrieve current
         // upstream interface index and prefixes when handling upstream changes.
-        mBpfCoordinator.updateIpv6UpstreamInterface(this, upstreamIfIndex, upstreamPrefixes,
-                upstreamSupportsBpf);
+        mBpfCoordinator.updateIpv6UpstreamInterface(this, upstreamIfIndex, upstreamPrefixes);
         mLastIPv6LinkProperties = v6only;
         mLastIPv6UpstreamIfindex = upstreamIfIndex;
         mLastIPv6UpstreamPrefixes = upstreamPrefixes;
-        mUpstreamSupportsBpf = upstreamSupportsBpf;
         if (mDadProxy != null) {
             mDadProxy.setUpstreamIface(upstreamIfaceParams);
         }
@@ -1309,7 +1304,7 @@ public class IpServer extends StateMachineShim {
             for (String ifname : mUpstreamIfaceSet.ifnames) cleanupUpstreamInterface(ifname);
             mUpstreamIfaceSet = null;
             mBpfCoordinator.updateIpv6UpstreamInterface(IpServer.this, NO_UPSTREAM,
-                    Collections.emptySet(), false /* upstreamSupportsBpf */);
+                    Collections.emptySet());
         }
 
         private void cleanupUpstreamInterface(String upstreamIface) {
