@@ -18,11 +18,16 @@ package com.android.server.ethernet;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.content.Context;
 import android.net.NetworkCapabilities;
 import android.net.NetworkProvider;
 import android.net.NetworkProvider.NetworkOfferCallback;
 import android.net.NetworkRequest;
 import android.net.NetworkScore;
+import android.net.ip.IIpClient;
+import android.net.ip.IpClientCallbacks;
+import android.net.ip.IpClientManager;
+import android.net.ip.IpClientUtil;
 import android.os.Handler;
 import android.os.Message;
 import android.util.ArraySet;
@@ -41,6 +46,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
 
     private static final int CMD_ON_NETWORK_NEEDED   = 1;
     private static final int CMD_ON_NETWORK_UNNEEDED = 2;
+    private static final int CMD_ON_IPCLIENT_CREATED = 3;
 
     private class EthernetNetworkOfferCallback implements NetworkOfferCallback {
         private final Set<Integer> mRequestIds = new ArraySet<>();
@@ -74,8 +80,31 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         }
     }
 
+    private class EthernetIpClientCallback extends IpClientCallbacks {
+        private void safelyPostOnHandler(Runnable r) {
+            mHandler.post(() -> {
+                if (this != mIpClientCallback) {
+                    return;
+                }
+                r.run();
+            });
+        }
+
+        @Override
+        public void onIpClientCreated(IIpClient ipClient) {
+            safelyPostOnHandler(() -> {
+                // TODO: add a SyncStateMachine#processMessage(cmd, obj) overload.
+                processMessage(CMD_ON_IPCLIENT_CREATED, 0, 0, new IpClientManager(ipClient, TAG));
+            });
+        }
+    }
+
     private @Nullable EthernetNetworkOfferCallback mNetworkOfferCallback;
+    private @Nullable EthernetIpClientCallback mIpClientCallback;
+    private @Nullable IpClientManager mIpClient;
+    private final String mIface;
     private final Handler mHandler;
+    private final Context mContext;
     private final NetworkCapabilities mCapabilities;
     private final NetworkProvider mNetworkProvider;
 
@@ -136,13 +165,32 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     /** Network is needed, starts IpClient and manages its lifecycle */
     private class StartedState extends State {
         @Override
+        public void enter() {
+            mIpClientCallback = new EthernetIpClientCallback();
+            IpClientUtil.makeIpClient(mContext, mIface, mIpClientCallback);
+        }
+
+        @Override
         public boolean processMessage(Message msg) {
             switch (msg.what) {
                 case CMD_ON_NETWORK_UNNEEDED:
                     transitionTo(mStoppedState);
                     return HANDLED;
+                case CMD_ON_IPCLIENT_CREATED:
+                    mIpClient = (IpClientManager) msg.obj;
+                    transitionTo(mRunningState);
+                    return HANDLED;
             }
             return NOT_HANDLED;
+        }
+
+        @Override
+        public void exit() {
+            mIpClientCallback = null;
+            if (mIpClient != null) {
+                mIpClient.shutdown();
+                // TODO: either wait for shutdown or add an additional StoppingState.
+            }
         }
     }
 
@@ -158,11 +206,13 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private final StartedState mStartedState = new StartedState();
     private final RunningState mRunningState = new RunningState();
 
-    public EthernetInterfaceStateMachine(String iface, Handler handler, NetworkCapabilities capabilities, NetworkProvider provider) {
-        super(EthernetInterfaceStateMachine.class.getSimpleName() + "." + iface,
-                handler.getLooper().getThread());
+    public EthernetInterfaceStateMachine(String iface, Handler handler, Context context,
+            NetworkCapabilities capabilities, NetworkProvider provider) {
+        super(TAG + "." + iface, handler.getLooper().getThread());
 
+        mIface = iface;
         mHandler = handler;
+        mContext = context;
         mCapabilities = capabilities;
         mNetworkProvider = provider;
 
