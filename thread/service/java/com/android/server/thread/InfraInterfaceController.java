@@ -16,13 +16,29 @@
 
 package com.android.server.thread;
 
-import android.os.ParcelFileDescriptor;
+import static android.system.OsConstants.IPPROTO_IPV6;
+import static android.system.OsConstants.IPPROTO_RAW;
+import static android.system.OsConstants.IPV6_CHECKSUM;
+import static android.system.OsConstants.IPV6_MULTICAST_HOPS;
+import static android.system.OsConstants.IPV6_RECVHOPLIMIT;
+import static android.system.OsConstants.IPV6_RECVPKTINFO;
+import static android.system.OsConstants.IPV6_UNICAST_HOPS;
 
+import android.net.util.SocketUtils;
+import android.os.ParcelFileDescriptor;
+import android.system.ErrnoException;
+import android.system.Os;
+
+import java.io.FileDescriptor;
 import java.io.IOException;
 
 /** Controller for the infrastructure network interface. */
 public class InfraInterfaceController {
     private static final String TAG = "InfraIfController";
+
+    private static final int ENABLE = 1;
+    private static final int IPV6_CHECKSUM_OFFSET = 2;
+    private static final int HOP_LIMIT = 255;
 
     static {
         System.loadLibrary("service-thread-jni");
@@ -37,8 +53,21 @@ public class InfraInterfaceController {
      * @throws IOException when fails to create the socket.
      */
     public ParcelFileDescriptor createIcmp6Socket(String infraInterfaceName) throws IOException {
-        return ParcelFileDescriptor.adoptFd(nativeCreateIcmp6Socket(infraInterfaceName));
+        ParcelFileDescriptor parcelFd =
+                ParcelFileDescriptor.adoptFd(nativeCreateFilteredIcmp6Socket());
+        FileDescriptor fd = parcelFd.getFileDescriptor();
+        try {
+            Os.setsockoptInt(fd, IPPROTO_RAW, IPV6_CHECKSUM, IPV6_CHECKSUM_OFFSET);
+            Os.setsockoptInt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, ENABLE);
+            Os.setsockoptInt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, ENABLE);
+            Os.setsockoptInt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, HOP_LIMIT);
+            Os.setsockoptInt(fd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, HOP_LIMIT);
+            SocketUtils.bindSocketToInterface(fd, infraInterfaceName);
+        } catch (ErrnoException e) {
+            throw new IOException("Failed to setsockopt for the ICMPv6 socket", e);
+        }
+        return parcelFd;
     }
 
-    private static native int nativeCreateIcmp6Socket(String interfaceName) throws IOException;
+    private static native int nativeCreateFilteredIcmp6Socket() throws IOException;
 }
