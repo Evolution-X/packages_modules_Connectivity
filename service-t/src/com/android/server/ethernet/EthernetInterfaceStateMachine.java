@@ -24,6 +24,7 @@ import android.net.NetworkProvider.NetworkOfferCallback;
 import android.net.NetworkRequest;
 import android.net.NetworkScore;
 import android.os.Handler;
+import android.os.Message;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -38,6 +39,9 @@ import java.util.Set;
 class EthernetInterfaceStateMachine extends SyncStateMachine {
     private static final String TAG = EthernetInterfaceStateMachine.class.getSimpleName();
 
+    private static final int CMD_ON_NETWORK_NEEDED   = 1;
+    private static final int CMD_ON_NETWORK_UNNEEDED = 2;
+
     private class EthernetNetworkOfferCallback implements NetworkOfferCallback {
         private final Set<Integer> mRequestIds = new ArraySet<>();
 
@@ -48,7 +52,9 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
             }
 
             mRequestIds.add(request.requestId);
-            // TODO: send ON_NETWORK_NEEDED message if requestIds.size() == 1
+            if (mRequestIds.size() == 1) {
+                processMessage(CMD_ON_NETWORK_NEEDED);
+            }
         }
 
         @Override
@@ -62,7 +68,9 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
                 // the requestId changed. Both should *never* happen.
                 Log.wtf(TAG, "onNetworkUnneeded called for unknown request");
             }
-            // TODO: send ON_NETWORK_UNNEEDED message if requestIds.isEmpty()
+            if (mRequestIds.isEmpty()) {
+                processMessage(CMD_ON_NETWORK_UNNEEDED);
+            }
         }
     }
 
@@ -104,13 +112,38 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         }
     }
 
-    /** Link is up, network offer is extended */
+    /**
+     * Offer is extended but has not been requested.
+     *
+     * StoppedState's sole purpose is to react to a CMD_ON_NETWORK_NEEDED and transition to
+     * StartedState when that happens. Note that StoppedState could be rolled into
+     * NetworkOfferExtendedState. However, keeping the states separate provides some additional
+     * protection by logging a Log.wtf if a CMD_ON_NETWORK_NEEDED is received in an unexpected state
+     * (i.e. StartedState or RunningState). StoppedState is a child of NetworkOfferExtendedState.
+     */
     private class StoppedState extends State {
+        @Override
+        public boolean processMessage(Message msg) {
+            switch (msg.what) {
+                case CMD_ON_NETWORK_NEEDED:
+                    transitionTo(mStartedState);
+                    return HANDLED;
+            }
+            return NOT_HANDLED;
+        }
     }
 
     /** Network is needed, starts IpClient and manages its lifecycle */
     private class StartedState extends State {
-
+        @Override
+        public boolean processMessage(Message msg) {
+            switch (msg.what) {
+                case CMD_ON_NETWORK_UNNEEDED:
+                    transitionTo(mStoppedState);
+                    return HANDLED;
+            }
+            return NOT_HANDLED;
+        }
     }
 
     /** IpClient is running, starts provisioning and registers NetworkAgent */
