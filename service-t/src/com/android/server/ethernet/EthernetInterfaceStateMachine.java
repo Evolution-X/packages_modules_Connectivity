@@ -275,6 +275,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
             states.add(new StateInfo(mStartedState, mOfferExtendedState));
                 states.add(new StateInfo(mRunningState, mStartedState));
         // CHECKSTYLE:ON IndentationCheck
+        addAllStates(states);
 
         // TODO: set initial state to TetheringState if a tethering interface has been requested and
         // this is the first interface to be added.
