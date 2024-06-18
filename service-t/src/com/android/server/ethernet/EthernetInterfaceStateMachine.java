@@ -27,7 +27,6 @@ import android.net.NetworkScore;
 import android.net.ip.IIpClient;
 import android.net.ip.IpClientCallbacks;
 import android.net.ip.IpClientManager;
-import android.net.ip.IpClientUtil;
 import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Message;
@@ -97,7 +96,8 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         public void onIpClientCreated(IIpClient ipClient) {
             safelyPostOnHandler(() -> {
                 // TODO: add a SyncStateMachine#processMessage(cmd, obj) overload.
-                processMessage(CMD_ON_IPCLIENT_CREATED, 0, 0, new IpClientManager(ipClient, TAG));
+                processMessage(CMD_ON_IPCLIENT_CREATED, 0, 0,
+                        mDependencies.makeIpClientManager(ipClient));
             });
         }
 
@@ -121,6 +121,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private final Context mContext;
     private final NetworkCapabilities mCapabilities;
     private final NetworkProvider mNetworkProvider;
+    private final EthernetNetworkFactory.Dependencies mDependencies;
 
     /** Interface is in tethering mode. */
     private class TetheringState extends State {
@@ -181,7 +182,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         @Override
         public void enter() {
             mIpClientCallback = new EthernetIpClientCallback();
-            IpClientUtil.makeIpClient(mContext, mIface, mIpClientCallback);
+            mDependencies.makeIpClient(mContext, mIface, mIpClientCallback);
         }
 
         @Override
@@ -223,7 +224,8 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private final RunningState mRunningState = new RunningState();
 
     public EthernetInterfaceStateMachine(String iface, Handler handler, Context context,
-            NetworkCapabilities capabilities, NetworkProvider provider) {
+            NetworkCapabilities capabilities, NetworkProvider provider,
+            EthernetNetworkFactory.Dependencies deps) {
         super(TAG + "." + iface, handler.getLooper().getThread());
 
         mIface = iface;
@@ -231,6 +233,7 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         mContext = context;
         mCapabilities = capabilities;
         mNetworkProvider = provider;
+        mDependencies = deps;
 
         // Interface lifecycle:
         //           [ LinkDownState ]
