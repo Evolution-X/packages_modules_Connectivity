@@ -115,3 +115,11 @@ flag {
   description: "Flag for NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED API"
   bug: "343823469"
 }
+
+flag {
+  name: "tethering_request_virtual"
+  is_exported: true
+  namespace: "android_core_networking"
+  description: "Flag for introducing TETHERING_VIRTUAL type"
+  bug: "340376953"
+}

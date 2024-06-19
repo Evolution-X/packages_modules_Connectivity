@@ -38,6 +38,7 @@ import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringManager.TETHERING_INVALID;
 import static android.net.TetheringManager.TETHERING_NCM;
 import static android.net.TetheringManager.TETHERING_USB;
+import static android.net.TetheringManager.TETHERING_VIRTUAL;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHERING_WIFI_P2P;
 import static android.net.TetheringManager.TETHERING_WIGIG;
@@ -278,6 +279,7 @@ public class Tethering {
     private TetheredInterfaceRequestShim mBluetoothIfaceRequest;
     private String mConfiguredEthernetIface;
     private String mConfiguredBluetoothIface;
+    private String mConfiguredVirtualIface;
     private EthernetCallback mEthernetCallback;
     private TetheredInterfaceCallbackShim mBluetoothCallback;
     private SettingsObserver mSettingsObserver;
@@ -719,6 +721,9 @@ public class Tethering {
             case TETHERING_ETHERNET:
                 result = setEthernetTethering(enable);
                 break;
+            case TETHERING_VIRTUAL:
+                result = setVirtualMachineTethering(enable);
+                break;
             default:
                 Log.w(TAG, "Invalid tether type.");
                 result = TETHER_ERROR_UNKNOWN_TYPE;
@@ -970,6 +975,21 @@ public class Tethering {
             }
             stopEthernetTethering();
         }
+    }
+
+    private int setVirtualMachineTethering(final boolean enable) {
+        // TODO(340377643): Use bridge ifname when it's introduced, not fixed TAP ifname.
+        if (enable) {
+            mConfiguredVirtualIface = "avf_tap_fixed";
+            enableIpServing(
+                    TETHERING_VIRTUAL,
+                    mConfiguredVirtualIface,
+                    getRequestedState(TETHERING_VIRTUAL));
+        } else if (mConfiguredVirtualIface != null) {
+            ensureIpServerStopped(mConfiguredVirtualIface);
+            mConfiguredVirtualIface = null;
+        }
+        return TETHER_ERROR_NO_ERROR;
     }
 
     void tether(String iface, int requestedState, final IIntResultListener listener) {
