@@ -215,7 +215,6 @@ import com.android.testutils.DeviceConfigRule;
 import com.android.testutils.DeviceInfoUtils;
 import com.android.testutils.DumpTestUtils;
 import com.android.testutils.RecorderCallback.CallbackEntry;
-import com.android.testutils.SkipMainlinePresubmit;
 import com.android.testutils.SkipPresubmit;
 import com.android.testutils.TestHttpServer;
 import com.android.testutils.TestNetworkTracker;
@@ -1054,7 +1053,6 @@ public class ConnectivityManagerTest {
 
     @AppModeFull(reason = "WRITE_SECURE_SETTINGS permission can't be granted to instant apps")
     @Test @IgnoreUpTo(Build.VERSION_CODES.Q)
-    @SkipMainlinePresubmit(reason = "Out of SLO flakiness")
     public void testIsPrivateDnsBroken() throws InterruptedException {
         final String invalidPrivateDnsServer = "invalidhostname.example.com";
         final String goodPrivateDnsServer = "dns.google";
