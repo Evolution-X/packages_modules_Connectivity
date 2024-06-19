@@ -104,7 +104,7 @@ public abstract class EthernetTetheringTestBase {
     // Used to check if any tethering interface is available. Choose 200ms to be request timeout
     // because the average interface requested time on cuttlefish@acloud is around 10ms.
     // See TetheredInterfaceRequester.getInterface, isInterfaceForTetheringAvailable.
-    private static final int SHORT_TIMEOUT_MS = 200;
+    private static final int SHORT_TIMEOUT_MS = 1000;
     private static final int TETHER_REACHABILITY_ATTEMPTS = 20;
     protected static final long WAIT_RA_TIMEOUT_MS = 2000;
 
