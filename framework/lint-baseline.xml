@@ -375,4 +375,279 @@
             column="34"/>
     </issue>
 
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_BACKGROUND` is a flagged API and should be inside an `if (Flags.basicBackgroundRestrictionsEnabled())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.BASIC_BACKGROUND_RESTRICTIONS_ENABLED) to transfer requirement to caller`)"
+        errorLine1="            FIREWALL_CHAIN_BACKGROUND"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsConstants.java"
+            line="115"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_ALLOW` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            FIREWALL_CHAIN_METERED_ALLOW"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsConstants.java"
+            line="137"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_USER` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            FIREWALL_CHAIN_METERED_DENY_USER,"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsConstants.java"
+            line="146"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_ADMIN` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            FIREWALL_CHAIN_METERED_DENY_ADMIN"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsConstants.java"
+            line="147"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_BACKGROUND` is a flagged API and should be inside an `if (Flags.basicBackgroundRestrictionsEnabled())` check (or annotate the surrounding method `getMatchByFirewallChain` with `@FlaggedApi(Flags.BASIC_BACKGROUND_RESTRICTIONS_ENABLED) to transfer requirement to caller`)"
+        errorLine1="            case FIREWALL_CHAIN_BACKGROUND:"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="133"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_ALLOW` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `getMatchByFirewallChain` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            case FIREWALL_CHAIN_METERED_ALLOW:"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="143"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_USER` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `getMatchByFirewallChain` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            case FIREWALL_CHAIN_METERED_DENY_USER:"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="145"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_ADMIN` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `getMatchByFirewallChain` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            case FIREWALL_CHAIN_METERED_DENY_ADMIN:"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="147"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `BLOCKED_REASON_APP_BACKGROUND` is a flagged API and should be inside an `if (Flags.basicBackgroundRestrictionsEnabled())` check (or annotate the surrounding method `getUidNetworkingBlockedReasons` with `@FlaggedApi(Flags.BASIC_BACKGROUND_RESTRICTIONS_ENABLED) to transfer requirement to caller`)"
+        errorLine1="            blockedReasons |= BLOCKED_REASON_APP_BACKGROUND;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="293"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `BLOCKED_REASON_OEM_DENY` is a flagged API and should be inside an `if (Flags.blockedReasonOemDenyChains())` check (or annotate the surrounding method `getUidNetworkingBlockedReasons` with `@FlaggedApi(Flags.BLOCKED_REASON_OEM_DENY_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            blockedReasons |= BLOCKED_REASON_OEM_DENY;"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/BpfNetMapsUtils.java"
+            line="296"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_ALLOW` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `addUidToMeteredNetworkAllowList` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            mService.setUidFirewallRule(FIREWALL_CHAIN_METERED_ALLOW, uid, FIREWALL_RULE_ALLOW);"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/ConnectivityManager.java"
+            line="6191"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_ALLOW` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `removeUidFromMeteredNetworkAllowList` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            mService.setUidFirewallRule(FIREWALL_CHAIN_METERED_ALLOW, uid, FIREWALL_RULE_DENY);"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/ConnectivityManager.java"
+            line="6214"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_USER` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `addUidToMeteredNetworkDenyList` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            mService.setUidFirewallRule(FIREWALL_CHAIN_METERED_DENY_USER, uid, FIREWALL_RULE_DENY);"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/ConnectivityManager.java"
+            line="6243"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `FIREWALL_CHAIN_METERED_DENY_USER` is a flagged API and should be inside an `if (Flags.meteredNetworkFirewallChains())` check (or annotate the surrounding method `removeUidFromMeteredNetworkDenyList` with `@FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS) to transfer requirement to caller`)"
+        errorLine1="            mService.setUidFirewallRule(FIREWALL_CHAIN_METERED_DENY_USER, uid, FIREWALL_RULE_ALLOW);"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/ConnectivityManager.java"
+            line="6273"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED` is a flagged API and should be inside an `if (Flags.netCapabilityNotBandwidthConstrained())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED) to transfer requirement to caller`)"
+        errorLine1="    private static final int MAX_NET_CAPABILITY = NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED;"
+        errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="767"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED` is a flagged API and should be inside an `if (Flags.netCapabilityNotBandwidthConstrained())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED) to transfer requirement to caller`)"
+        errorLine1="            defaultCapabilities |= (1L &lt;&lt; NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED);"
+        errorLine2="                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="818"
+            column="43"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED` is a flagged API and should be inside an `if (Flags.netCapabilityNotBandwidthConstrained())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED) to transfer requirement to caller`)"
+        errorLine1="            (1L &lt;&lt; NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED);"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="849"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `getSubscriptionIds()` is a flagged API and should be inside an `if (Flags.requestRestrictedWifi())` check (or annotate the surrounding method `restrictCapabilitiesForTestNetwork` with `@FlaggedApi(Flags.REQUEST_RESTRICTED_WIFI) to transfer requirement to caller`)"
+        errorLine1="        final Set&lt;Integer> originalSubIds = getSubscriptionIds();"
+        errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="1254"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `TRANSPORT_SATELLITE` is a flagged API and should be inside an `if (Flags.supportTransportSatellite())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.SUPPORT_TRANSPORT_SATELLITE) to transfer requirement to caller`)"
+        errorLine1="    public static final int MAX_TRANSPORT = TRANSPORT_SATELLITE;"
+        errorLine2="                                            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="1383"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `TRANSPORT_SATELLITE` is a flagged API and should be inside an `if (Flags.supportTransportSatellite())` check (or annotate the surrounding method `specifierAcceptableForMultipleTransports` with `@FlaggedApi(Flags.SUPPORT_TRANSPORT_SATELLITE) to transfer requirement to caller`)"
+        errorLine1="                == (1 &lt;&lt; TRANSPORT_CELLULAR | 1 &lt;&lt; TRANSPORT_SATELLITE);"
+        errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="1836"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_LOCAL_NETWORK` is a flagged API and should be inside an `if (Flags.netCapabilityLocalNetwork())` check (or annotate the surrounding method `capabilityNameOf` with `@FlaggedApi(Flags.FLAG_NET_CAPABILITY_LOCAL_NETWORK) to transfer requirement to caller`)"
+        errorLine1="            case NET_CAPABILITY_LOCAL_NETWORK:        return &quot;LOCAL_NETWORK&quot;;"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="2637"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED` is a flagged API and should be inside an `if (Flags.netCapabilityNotBandwidthConstrained())` check (or annotate the surrounding method `capabilityNameOf` with `@FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED) to transfer requirement to caller`)"
+        errorLine1="            case NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED:    return &quot;NOT_BANDWIDTH_CONSTRAINED&quot;;"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkCapabilities.java"
+            line="2638"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `TRANSPORT_SATELLITE` is a flagged API and should be inside an `if (Flags.supportTransportSatellite())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.SUPPORT_TRANSPORT_SATELLITE) to transfer requirement to caller`)"
+        errorLine1="        TRANSPORT_SATELLITE"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/staticlibs/framework/com/android/net/module/util/NetworkCapabilitiesUtils.java"
+            line="80"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Field `NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED` is a flagged API and should be inside an `if (Flags.netCapabilityNotBandwidthConstrained())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED) to transfer requirement to caller`)"
+        errorLine1="                NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkRequest.java"
+            line="291"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `getSubscriptionIds()` is a flagged API and should be inside an `if (Flags.requestRestrictedWifi())` check (or annotate the surrounding method `getSubscriptionIds` with `@FlaggedApi(Flags.REQUEST_RESTRICTED_WIFI) to transfer requirement to caller`)"
+        errorLine1="        return networkCapabilities.getSubscriptionIds();"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/framework/src/android/net/NetworkRequest.java"
+            line="887"
+            column="16"/>
+    </issue>
+
 </issues>
