@@ -449,7 +449,7 @@ public class MdnsAdvertiser {
          * Get the ID of a conflicting registration due to host, or -1 if none.
          *
          * <p>If there's already another registration with the same hostname requested by another
-         * user, this is a conflict.
+         * UID, this is a conflict.
          *
          * <p>If there're two registrations both containing address records using the same hostname,
          * this is a conflict.
