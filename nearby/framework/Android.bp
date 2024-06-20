@@ -58,4 +58,7 @@ java_library {
     visibility: [
         "//packages/modules/Connectivity/nearby/tests:__subpackages__",
     ],
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
