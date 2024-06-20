@@ -40,7 +40,7 @@ import static android.net.thread.ThreadNetworkException.ERROR_RESPONSE_BAD_FORMA
 import static android.net.thread.ThreadNetworkException.ERROR_THREAD_DISABLED;
 import static android.net.thread.ThreadNetworkException.ERROR_TIMEOUT;
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_CHANNEL;
-import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_OPERATION;
+import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 import static android.net.thread.ThreadNetworkManager.DISALLOW_THREAD_NETWORK;
 import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_PRIVILEGED;
 
@@ -1055,7 +1055,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             case OT_ERROR_BUSY:
                 return ERROR_BUSY;
             case OT_ERROR_NOT_IMPLEMENTED:
-                return ERROR_UNSUPPORTED_OPERATION;
+                return ERROR_UNSUPPORTED_FEATURE;
             case OT_ERROR_NO_BUFS:
                 return ERROR_RESOURCE_EXHAUSTED;
             case OT_ERROR_PARSE:
