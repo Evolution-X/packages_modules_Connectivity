@@ -58,6 +58,7 @@ java_sdk_library {
     permitted_packages: ["android.net"],
     lint: {
         strict_updatability_linting: true,
+        baseline_filename: "lint-baseline.xml",
     },
     aconfig_declarations: [
         "com.android.net.flags-aconfig",
