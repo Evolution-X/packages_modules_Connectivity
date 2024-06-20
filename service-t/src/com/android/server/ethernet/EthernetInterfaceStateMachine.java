@@ -44,9 +44,11 @@ import java.util.Set;
 class EthernetInterfaceStateMachine extends SyncStateMachine {
     private static final String TAG = EthernetInterfaceStateMachine.class.getSimpleName();
 
-    private static final int CMD_ON_NETWORK_NEEDED   = 1;
-    private static final int CMD_ON_NETWORK_UNNEEDED = 2;
-    private static final int CMD_ON_IPCLIENT_CREATED = 3;
+    private static final int CMD_ON_LINK_UP          = 1;
+    private static final int CMD_ON_LINK_DOWN        = 2;
+    private static final int CMD_ON_NETWORK_NEEDED   = 3;
+    private static final int CMD_ON_NETWORK_UNNEEDED = 4;
+    private static final int CMD_ON_IPCLIENT_CREATED = 5;
 
     private class EthernetNetworkOfferCallback implements NetworkOfferCallback {
         private final Set<Integer> mRequestIds = new ArraySet<>();
@@ -122,15 +124,36 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
     private final NetworkCapabilities mCapabilities;
     private final NetworkProvider mNetworkProvider;
     private final EthernetNetworkFactory.Dependencies mDependencies;
+    private boolean mLinkUp = false;
 
     /** Interface is in tethering mode. */
     private class TetheringState extends State {
-
+        @Override
+        public boolean processMessage(Message msg) {
+            switch (msg.what) {
+                case CMD_ON_LINK_UP:
+                case CMD_ON_LINK_DOWN:
+                    // TODO: think about what to do here.
+                    return HANDLED;
+            }
+            return NOT_HANDLED;
+        }
     }
 
     /** Link is down */
     private class LinkDownState extends State {
-
+        @Override
+        public boolean processMessage(Message msg) {
+            switch (msg.what) {
+                case CMD_ON_LINK_UP:
+                    transitionTo(mStoppedState);
+                    return HANDLED;
+                case CMD_ON_LINK_DOWN:
+                    // do nothing, already in the correct state.
+                    return HANDLED;
+            }
+            return NOT_HANDLED;
+        }
     }
 
     /** Parent states of all states that do not cause a NetworkOffer to be extended. */
@@ -147,6 +170,19 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
             mNetworkProvider.registerNetworkOffer(defaultScore,
                     new NetworkCapabilities(mCapabilities), cmd -> mHandler.post(cmd),
                     mNetworkOfferCallback);
+        }
+
+        @Override
+        public boolean processMessage(Message msg) {
+            switch (msg.what) {
+                case CMD_ON_LINK_UP:
+                    // do nothing, already in the correct state.
+                    return HANDLED;
+                case CMD_ON_LINK_DOWN:
+                    transitionTo(mLinkDownState);
+                    return HANDLED;
+            }
+            return NOT_HANDLED;
         }
 
         @Override
@@ -280,5 +316,21 @@ class EthernetInterfaceStateMachine extends SyncStateMachine {
         // TODO: set initial state to TetheringState if a tethering interface has been requested and
         // this is the first interface to be added.
         start(mLinkDownState);
+    }
+
+    public boolean updateLinkState(boolean up) {
+        if (mLinkUp == up) {
+            return false;
+        }
+
+        // TODO: consider setting mLinkUp as part of processMessage().
+        mLinkUp = up;
+        if (!up) { // was up, goes down
+            processMessage(CMD_ON_LINK_DOWN);
+        } else { // was down, comes up
+            processMessage(CMD_ON_LINK_UP);
+        }
+
+        return true;
     }
 }
