@@ -12,15 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import unittest
 from unittest.mock import MagicMock, patch
+from absl.testing import parameterized
+from mobly import asserts
+from mobly import base_test
+from mobly import config_parser
 from net_tests_utils.host.python import adb_utils
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError
 
 
-class TestAdbUtils(unittest.TestCase):
+class TestAdbUtils(base_test.BaseTestClass, parameterized.TestCase):
 
-  def setUp(self):
+  def __init__(self, configs: config_parser.TestRunConfig):
+    super().__init__(configs)
+
+  def setup_test(self):
     self.mock_ad = MagicMock()  # Mock Android device object
     self.mock_ad.log = MagicMock()
     self.mock_ad.adb.shell.return_value = b""  # Default empty return for shell
@@ -49,25 +55,21 @@ class TestAdbUtils(unittest.TestCase):
   @patch("net_tests_utils.host.python.adb_utils._get_screen_state")
   def test_set_screen_state_failure(self, mock_get_screen_state):
     mock_get_screen_state.return_value = False  # State doesn't change
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       adb_utils._set_screen_state(self.mock_ad, True)
 
+  @parameterized.parameters(
+      ("Awake", True),
+      ("Asleep", False),
+      ("Dozing", False),
+      ("SomeOtherState", False),
+  )  # Declare inputs for state_str and expected_result.
   @patch("net_tests_utils.host.python.adb_utils.get_value_of_key_from_dumpsys")
-  def test_get_screen_state(self, mock_get_value):
-    # Test cases for different return values of get_value_of_key_from_dumpsys
-    # TODO: Make it parameterized.
-    test_cases = [
-        ("Awake", True),
-        ("Asleep", False),
-        ("Dozing", False),
-        ("SomeOtherState", False),
-    ]
-
-    for state_str, expected_result in test_cases:
-      mock_get_value.return_value = state_str
-      self.assertEqual(
-          adb_utils._get_screen_state(self.mock_ad), expected_result
-      )
+  def test_get_screen_state(self, state_str, expected_result, mock_get_value):
+    mock_get_value.return_value = state_str
+    asserts.assert_equal(
+        adb_utils._get_screen_state(self.mock_ad), expected_result
+    )
 
   def test_get_value_of_key_from_dumpsys(self):
     self.mock_ad.adb.shell.return_value = (
@@ -76,36 +78,34 @@ class TestAdbUtils(unittest.TestCase):
     result = adb_utils.get_value_of_key_from_dumpsys(
         self.mock_ad, "power", "mWakefulness"
     )
-    self.assertEqual(result, "Awake")
+    asserts.assert_equal(result, "Awake")
 
+  @parameterized.parameters(
+      (True, ["true"]),
+      (False, ["false"]),
+      (
+          True,
+          ["false", "true"],
+      ),  # Expect True, get False which is unexpected, then get True
+      (
+          False,
+          ["true", "false"],
+      ),  # Expect False, get True which is unexpected, then get False
+  )  # Declare inputs for expected_state and returned_value
   @patch("net_tests_utils.host.python.adb_utils.get_value_of_key_from_dumpsys")
-  def test_expect_dumpsys_state_with_retry_success(self, mock_get_value):
-    # Test cases for different combinations of expected_state and get_value return value
-    # TODO: Make it parameterized.
-    test_cases = [
-        (True, ["true"]),  # Expect True, get True
-        (False, ["false"]),  # Expect False, get False
-        (
-            True,
-            ["false", "true"],
-        ),  # Expect True, get False which is unexpected, then get True
-        (
-            False,
-            ["true", "false"],
-        ),  # Expect False, get True which is unexpected, then get False
-    ]
-
-    for expected_state, returned_value in test_cases:
-      mock_get_value.side_effect = returned_value
-      # Verify the method returns and does not throw.
-      adb_utils.expect_dumpsys_state_with_retry(
-          self.mock_ad, "service", "key", expected_state, 0
-      )
+  def test_expect_dumpsys_state_with_retry_success(
+      self, expected_state, returned_value, mock_get_value
+  ):
+    mock_get_value.side_effect = returned_value
+    # Verify the method returns and does not throw.
+    adb_utils.expect_dumpsys_state_with_retry(
+        self.mock_ad, "service", "key", expected_state, 0
+    )
 
   @patch("net_tests_utils.host.python.adb_utils.get_value_of_key_from_dumpsys")
   def test_expect_dumpsys_state_with_retry_failure(self, mock_get_value):
     mock_get_value.return_value = "false"
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       adb_utils.expect_dumpsys_state_with_retry(
           self.mock_ad, "service", "key", True, 0
       )
@@ -116,11 +116,7 @@ class TestAdbUtils(unittest.TestCase):
     mock_get_value.return_value = None
 
     # Expect the function to raise UnexpectedBehaviorError due to the exception
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       adb_utils.expect_dumpsys_state_with_retry(
           self.mock_ad, "service", "key", True
       )
-
-
-if __name__ == "__main__":
-  unittest.main()
