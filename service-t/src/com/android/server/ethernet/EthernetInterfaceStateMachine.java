@@ -41,6 +41,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * EthernetInterfaceStateMachine manages the lifecycle of an ethernet-like network interface which
+ * includes managing a NetworkOffer, IpClient, and NetworkAgent as well as making the interface
+ * available as a tethering downstream.
+ *
+ * All methods exposed by this class *must* be called on the Handler thread provided in the
+ * constructor.
+ */
 class EthernetInterfaceStateMachine extends SyncStateMachine {
     private static final String TAG = EthernetInterfaceStateMachine.class.getSimpleName();
 
