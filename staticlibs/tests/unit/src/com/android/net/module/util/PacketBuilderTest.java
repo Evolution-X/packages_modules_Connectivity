@@ -21,9 +21,13 @@ import static android.system.OsConstants.IPPROTO_IPV6;
 import static android.system.OsConstants.IPPROTO_TCP;
 import static android.system.OsConstants.IPPROTO_UDP;
 
+import static com.android.net.module.util.NetworkStackConstants.ETHER_HEADER_LEN;
 import static com.android.net.module.util.NetworkStackConstants.ETHER_TYPE_IPV4;
 import static com.android.net.module.util.NetworkStackConstants.ETHER_TYPE_IPV6;
 import static com.android.net.module.util.NetworkStackConstants.IPV4_HEADER_MIN_LEN;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_FRAGMENT_ID_LEN;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_FRAGMENT_ID_OFFSET;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_HEADER_LEN;
 import static com.android.net.module.util.NetworkStackConstants.TCPHDR_ACK;
 import static com.android.net.module.util.NetworkStackConstants.TCP_HEADER_MIN_LEN;
 import static com.android.net.module.util.NetworkStackConstants.UDP_HEADER_LEN;
@@ -54,6 +58,8 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 
 @RunWith(AndroidJUnit4.class)
 @SmallTest
@@ -489,10 +495,103 @@ public class PacketBuilderTest {
                 (byte) 0xde, (byte) 0xad, (byte) 0xbe, (byte) 0xef
             };
 
+    private static final byte[] TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_NO_FRAG =
+            new byte[] {
+                // packet = Ether(src="11:22:33:44:55:66", dst="aa:bb:cc:dd:ee:ff", type='IPv6')/
+                //          IPv6(src="2001:db8::1", dst="2001:db8::2", tc=0x80, fl=0x515ca,
+                //          hlim=0x40)/UDP(sport=9876, dport=433)/
+                //          Raw([i%256 for i in range(0, 500)]);
+                // Ether header
+                (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
+                (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22,
+                (byte) 0x33, (byte) 0x44, (byte) 0x55, (byte) 0x66,
+                (byte) 0x86, (byte) 0xdd,
+                // IPv6 header
+                (byte) 0x68, (byte) 0x05, (byte) 0x15, (byte) 0xca,
+                (byte) 0x01, (byte) 0xfc, (byte) 0x11, (byte) 0x40,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x02,
+                // UDP header
+                (byte) 0x26, (byte) 0x94, (byte) 0x01, (byte) 0xb1,
+                (byte) 0x01, (byte) 0xfc, (byte) 0xd3, (byte) 0x9e,
+                // Data
+                // 500 bytes of repeated 0x00~0xff
+            };
+
+    private static final byte[] TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG1 =
+            new byte[] {
+                // packet = Ether(src="11:22:33:44:55:66", dst="aa:bb:cc:dd:ee:ff", type='IPv6')/
+                //          IPv6(src="2001:db8::1", dst="2001:db8::2", tc=0x80, fl=0x515ca,
+                //          hlim=0x40)/UDP(sport=9876, dport=433)/
+                //          Raw([i%256 for i in range(0, 500)]);
+                // packets=fragment6(packet, 400);
+                // Ether header
+                (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
+                (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22,
+                (byte) 0x33, (byte) 0x44, (byte) 0x55, (byte) 0x66,
+                (byte) 0x86, (byte) 0xdd,
+                // IPv6 header
+                (byte) 0x68, (byte) 0x05, (byte) 0x15, (byte) 0xca,
+                (byte) 0x01, (byte) 0x58, (byte) 0x2c, (byte) 0x40,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x02,
+                // Fragement Header
+                (byte) 0x11, (byte) 0x00, (byte) 0x00, (byte) 0x01,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                // UDP header
+                (byte) 0x26, (byte) 0x94, (byte) 0x01, (byte) 0xb1,
+                (byte) 0x01, (byte) 0xfc, (byte) 0xd3, (byte) 0x9e,
+                // Data
+                // 328 bytes of repeated 0x00~0xff, start:0x00 end:0x47
+            };
+
+    private static final byte[] TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG2 =
+            new byte[] {
+                // packet = Ether(src="11:22:33:44:55:66", dst="aa:bb:cc:dd:ee:ff", type='IPv6')/
+                //          IPv6(src="2001:db8::1", dst="2001:db8::2", tc=0x80, fl=0x515ca,
+                //          hlim=0x40)/UDP(sport=9876, dport=433)/
+                //          Raw([i%256 for i in range(0, 500)]);
+                // packets=fragment6(packet, 400);
+                // Ether header
+                (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
+                (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22,
+                (byte) 0x33, (byte) 0x44, (byte) 0x55, (byte) 0x66,
+                (byte) 0x86, (byte) 0xdd,
+                // IPv6 header
+                (byte) 0x68, (byte) 0x05, (byte) 0x15, (byte) 0xca,
+                (byte) 0x00, (byte) 0xb4, (byte) 0x2c, (byte) 0x40,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0d, (byte) 0xb8,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x02,
+                // Fragement Header
+                (byte) 0x11, (byte) 0x00, (byte) 0x01, (byte) 0x50,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                // Data
+                // 172 bytes of repeated 0x00~0xff, start:0x48 end:0xf3
+            };
+
     /**
      * Build a packet which has ether header, IP header, TCP/UDP header and data.
      * The ethernet header and data are optional. Note that both source mac address and
-     * destination mac address are required for ethernet header.
+     * destination mac address are required for ethernet header. The packet will be fragmented into
+     * multiple smaller packets if the packet size exceeds L2 mtu.
      *
      * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      * |                Layer 2 header (EthernetHeader)                | (optional)
@@ -511,11 +610,12 @@ public class PacketBuilderTest {
      * @param l4proto the layer 4 protocol. Only {@code IPPROTO_TCP} and {@code IPPROTO_UDP}
      *        currently supported.
      * @param payload the payload.
+     * @param l2mtu the Link MTU. It's the upper bound of each packet size. Zero means no limit.
      */
     @NonNull
-    private ByteBuffer buildPacket(@Nullable final MacAddress srcMac,
+    private List<ByteBuffer> buildPackets(@Nullable final MacAddress srcMac,
             @Nullable final MacAddress dstMac, final int l3proto, final int l4proto,
-            @Nullable final ByteBuffer payload)
+            @Nullable final ByteBuffer payload, int l2mtu)
             throws Exception {
         if (l3proto != IPPROTO_IP && l3proto != IPPROTO_IPV6) {
             fail("Unsupported layer 3 protocol " + l3proto);
@@ -562,7 +662,15 @@ public class PacketBuilderTest {
             payload.clear();
         }
 
-        return packetBuilder.finalizePacket();
+        return packetBuilder.finalizePacket(l2mtu > 0 ? l2mtu : Integer.MAX_VALUE);
+    }
+
+    @NonNull
+    private ByteBuffer buildPacket(@Nullable final MacAddress srcMac,
+            @Nullable final MacAddress dstMac, final int l3proto, final int l4proto,
+            @Nullable final ByteBuffer payload)
+            throws Exception {
+        return buildPackets(srcMac, dstMac, l3proto, l4proto, payload, 0).get(0);
     }
 
     /**
@@ -872,6 +980,66 @@ public class PacketBuilderTest {
                 IPPROTO_IPV6, IPPROTO_UDP, DATA);
         checkUdpPacket(false /* hasEther */, IPPROTO_IPV6, true /* hasData */, packet);
         assertArrayEquals(TEST_PACKET_IPV6HDR_UDPHDR_DATA, packet.array());
+    }
+
+    private void checkIpv6PacketIgnoreFragmentId(byte[] expected, byte[] actual) {
+        final int offset = ETHER_HEADER_LEN + IPV6_HEADER_LEN + IPV6_FRAGMENT_ID_OFFSET;
+        assertArrayEquals(Arrays.copyOf(expected, offset), Arrays.copyOf(actual, offset));
+        assertArrayEquals(
+                Arrays.copyOfRange(expected, offset + IPV6_FRAGMENT_ID_LEN, expected.length),
+                Arrays.copyOfRange(actual, offset + IPV6_FRAGMENT_ID_LEN, actual.length));
+    }
+
+    @Test
+    public void testBuildPacketIPv6FragmentUdpData() throws Exception {
+        // A UDP packet with 500 bytes payload will be fragmented into two UDP packets each carrying
+        // 328 and 172 bytes of payload if the Link MTU is 400. Note that only the first packet
+        // contains the original UDP header.
+        final int payloadLen = 500;
+        final int payloadLen1 = 328;
+        final int payloadLen2 = 172;
+        final int l2mtu = 400;
+        final byte[] payload = new byte[payloadLen];
+        // Initialize the payload with repeated values from 0x00 to 0xff.
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i & 0xff);
+        }
+
+        // Verify original UDP packet.
+        final ByteBuffer packet = buildPacket(SRC_MAC, DST_MAC, IPPROTO_IPV6, IPPROTO_UDP,
+                ByteBuffer.wrap(payload));
+        final int headerLen = TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_NO_FRAG.length;
+        assertArrayEquals(TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_NO_FRAG,
+                Arrays.copyOf(packet.array(), headerLen));
+        assertArrayEquals(payload,
+                Arrays.copyOfRange(packet.array(), headerLen, headerLen + payloadLen));
+
+        // Verify fragments of UDP packet.
+        final List<ByteBuffer> packets = buildPackets(SRC_MAC, DST_MAC, IPPROTO_IPV6, IPPROTO_UDP,
+                ByteBuffer.wrap(payload), l2mtu);
+        assertEquals(2, packets.size());
+
+        // Verify first fragment.
+        int headerLen1 = TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG1.length;
+        // (1) Compare packet content up to the UDP header, excluding the fragment ID as it's a
+        // random value.
+        checkIpv6PacketIgnoreFragmentId(TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG1,
+                Arrays.copyOf(packets.get(0).array(), headerLen1));
+        // (2) Compare UDP payload.
+        assertArrayEquals(Arrays.copyOf(payload, payloadLen1),
+                Arrays.copyOfRange(packets.get(0).array(), headerLen1, headerLen1 + payloadLen1));
+
+        // Verify second fragment (similar to the first one).
+        int headerLen2 = TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG2.length;
+        checkIpv6PacketIgnoreFragmentId(TEST_PACKET_ETHERHDR_IPV6HDR_UDPHDR_DATA_FRAG2,
+                Arrays.copyOf(packets.get(1).array(), headerLen2));
+        assertArrayEquals(Arrays.copyOfRange(payload, payloadLen1, payloadLen1 + payloadLen2),
+                Arrays.copyOfRange(packets.get(1).array(), headerLen2, headerLen2 + payloadLen2));
+        // Verify that the fragment IDs in the first and second fragments are the same.
+        final int offset = ETHER_HEADER_LEN + IPV6_HEADER_LEN + IPV6_FRAGMENT_ID_OFFSET;
+        assertArrayEquals(
+                Arrays.copyOfRange(packets.get(0).array(), offset, offset + IPV6_FRAGMENT_ID_LEN),
+                Arrays.copyOfRange(packets.get(1).array(), offset, offset + IPV6_FRAGMENT_ID_LEN));
     }
 
     @Test

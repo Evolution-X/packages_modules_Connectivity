@@ -24,10 +24,13 @@ import static android.system.OsConstants.IPPROTO_UDP;
 import static com.android.net.module.util.IpUtils.ipChecksum;
 import static com.android.net.module.util.IpUtils.tcpChecksum;
 import static com.android.net.module.util.IpUtils.udpChecksum;
+import static com.android.net.module.util.NetworkStackConstants.IPPROTO_FRAGMENT;
 import static com.android.net.module.util.NetworkStackConstants.IPV4_CHECKSUM_OFFSET;
 import static com.android.net.module.util.NetworkStackConstants.IPV4_LENGTH_OFFSET;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_FRAGMENT_HEADER_LEN;
 import static com.android.net.module.util.NetworkStackConstants.IPV6_HEADER_LEN;
 import static com.android.net.module.util.NetworkStackConstants.IPV6_LEN_OFFSET;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_PROTOCOL_OFFSET;
 import static com.android.net.module.util.NetworkStackConstants.TCP_CHECKSUM_OFFSET;
 import static com.android.net.module.util.NetworkStackConstants.UDP_CHECKSUM_OFFSET;
 import static com.android.net.module.util.NetworkStackConstants.UDP_LENGTH_OFFSET;
@@ -37,6 +40,7 @@ import android.net.MacAddress;
 import androidx.annotation.NonNull;
 
 import com.android.net.module.util.structs.EthernetHeader;
+import com.android.net.module.util.structs.FragmentHeader;
 import com.android.net.module.util.structs.Ipv4Header;
 import com.android.net.module.util.structs.Ipv6Header;
 import com.android.net.module.util.structs.TcpHeader;
@@ -47,6 +51,10 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
 
 /**
  * The class is used to build a packet.
@@ -210,6 +218,20 @@ public class PacketBuilder {
         }
     }
 
+    private void writeFragmentHeader(ByteBuffer buffer, short nextHeader, int offset,
+            boolean mFlag, int id) throws IOException {
+        if ((offset & 7) != 0) {
+            throw new IOException("Invalid offset value, must be multiple of 8");
+        }
+        final FragmentHeader fragmentHeader = new FragmentHeader(nextHeader,
+                offset | (mFlag ? 1 : 0), id);
+        try {
+            fragmentHeader.writeToByteBuffer(buffer);
+        } catch (IllegalArgumentException | BufferOverflowException e) {
+            throw new IOException("Error writing to buffer: ", e);
+        }
+    }
+
     /**
      * Finalize the packet.
      *
@@ -219,9 +241,31 @@ public class PacketBuilder {
      */
     @NonNull
     public ByteBuffer finalizePacket() throws IOException {
+        // If the packet is finalized with L2 mtu greater than or equal to its current size, it will
+        // either return a List of size 1 or throw an IOException if something goes wrong.
+        return finalizePacket(mBuffer.position()).get(0);
+    }
+
+    /**
+     * Finalizes the packet with specified link MTU.
+     *
+     * Call after writing L4 header (no payload) or L4 payload to the buffer used by the builder.
+     * L3 header length, L3 header checksum and L4 header checksum are calculated and written back
+     * after finalization.
+     *
+     * @param l2mtu the maximum size, in bytes, of each individual packet. If the packet size
+     *              exceeds the l2mtu, it will be fragmented into smaller packets.
+     * @return a list of packet(s), each containing a portion of the original L3 payload.
+     */
+    @NonNull
+    public List<ByteBuffer> finalizePacket(int l2mtu) throws IOException {
         // [1] Finalize IPv4 or IPv6 header.
         int ipHeaderOffset = INVALID_OFFSET;
         if (mIpv4HeaderOffset != INVALID_OFFSET) {
+            if (mBuffer.position() > l2mtu) {
+                throw new IOException("IPv4 fragmentation is not supported");
+            }
+
             ipHeaderOffset = mIpv4HeaderOffset;
 
             // Populate the IPv4 totalLength field.
@@ -243,12 +287,15 @@ public class PacketBuilder {
         }
 
         // [2] Finalize TCP or UDP header.
+        final int ipPayloadOffset;
         if (mTcpHeaderOffset != INVALID_OFFSET) {
+            ipPayloadOffset = mTcpHeaderOffset;
             // Populate the TCP header checksum field.
             mBuffer.putShort(mTcpHeaderOffset + TCP_CHECKSUM_OFFSET, tcpChecksum(mBuffer,
                     ipHeaderOffset /* ipOffset */, mTcpHeaderOffset /* transportOffset */,
                     mBuffer.position() - mTcpHeaderOffset /* transportLen */));
         } else if (mUdpHeaderOffset != INVALID_OFFSET) {
+            ipPayloadOffset = mUdpHeaderOffset;
             // Populate the UDP header length field.
             mBuffer.putShort(mUdpHeaderOffset + UDP_LENGTH_OFFSET,
                     (short) (mBuffer.position() - mUdpHeaderOffset));
@@ -257,11 +304,81 @@ public class PacketBuilder {
             mBuffer.putShort(mUdpHeaderOffset + UDP_CHECKSUM_OFFSET, udpChecksum(mBuffer,
                     ipHeaderOffset /* ipOffset */, mUdpHeaderOffset /* transportOffset */));
         } else {
-            throw new IOException("Packet is missing neither TCP nor UDP header");
+            throw new IOException("Packet has neither TCP nor UDP header");
         }
 
-        mBuffer.flip();
-        return mBuffer;
+        if (mBuffer.position() <= l2mtu) {
+            mBuffer.flip();
+            return Arrays.asList(mBuffer);
+        }
+
+        // IPv6 Packet is fragmented into multiple smaller packets that would fit within the link
+        // MTU.
+        // Refer to https://tools.ietf.org/html/rfc2460
+        //
+        // original packet:
+        // +------------------+--------------+--------------+--//--+----------+
+        // |  Unfragmentable  |    first     |    second    |      |   last   |
+        // |       Part       |   fragment   |   fragment   | .... | fragment |
+        // +------------------+--------------+--------------+--//--+----------+
+        //
+        // fragment packets:
+        // +------------------+--------+--------------+
+        // |  Unfragmentable  |Fragment|    first     |
+        // |       Part       | Header |   fragment   |
+        // +------------------+--------+--------------+
+        //
+        // +------------------+--------+--------------+
+        // |  Unfragmentable  |Fragment|    second    |
+        // |       Part       | Header |   fragment   |
+        // +------------------+--------+--------------+
+        //                       o
+        //                       o
+        //                       o
+        // +------------------+--------+----------+
+        // |  Unfragmentable  |Fragment|   last   |
+        // |       Part       | Header | fragment |
+        // +------------------+--------+----------+
+        final List<ByteBuffer> fragments = new ArrayList<>();
+        final int totalPayloadLen = mBuffer.position() - ipPayloadOffset;
+        final int perPacketPayloadLen = l2mtu - ipPayloadOffset - IPV6_FRAGMENT_HEADER_LEN;
+        final short protocol = (short) Byte.toUnsignedInt(
+                mBuffer.get(mIpv6HeaderOffset + IPV6_PROTOCOL_OFFSET));
+        Random random = new Random();
+        final int id = random.nextInt(Integer.MAX_VALUE);
+        int startOffset = 0;
+        // Copy the packet content to a byte array.
+        byte[] packet = new byte[mBuffer.position()];
+        // The ByteBuffer#get(int index, byte[] dst) method is only available in API level 35 and
+        // above. Here, we use a more primitive approach: reposition the ByteBuffer to the beginning
+        // before copying, then return its position to the end afterward.
+        mBuffer.position(0);
+        mBuffer.get(packet);
+        mBuffer.position(packet.length);
+        while (startOffset < totalPayloadLen) {
+            int copyPayloadLen = Math.min(perPacketPayloadLen, totalPayloadLen - startOffset);
+            // The data portion must be broken into segments aligned with 8-octet boundaries.
+            // Therefore, the payload length should be a multiple of 8 bytes for all fragments
+            // except the last one.
+            // See https://datatracker.ietf.org/doc/html/rfc791 section 3.2
+            if (copyPayloadLen != totalPayloadLen - startOffset) {
+                copyPayloadLen &= ~7;
+            }
+            ByteBuffer fragment = ByteBuffer.allocate(ipPayloadOffset + IPV6_FRAGMENT_HEADER_LEN
+                    + copyPayloadLen);
+            fragment.put(packet, 0, ipPayloadOffset);
+            writeFragmentHeader(fragment, protocol, startOffset,
+                    startOffset + copyPayloadLen < totalPayloadLen, id);
+            fragment.put(packet, ipPayloadOffset + startOffset, copyPayloadLen);
+            fragment.putShort(mIpv6HeaderOffset + IPV6_LEN_OFFSET,
+                    (short) (IPV6_FRAGMENT_HEADER_LEN + copyPayloadLen));
+            fragment.put(mIpv6HeaderOffset + IPV6_PROTOCOL_OFFSET, (byte) IPPROTO_FRAGMENT);
+            fragment.flip();
+            fragments.add(fragment);
+            startOffset += copyPayloadLen;
+        }
+
+        return fragments;
     }
 
     /**
