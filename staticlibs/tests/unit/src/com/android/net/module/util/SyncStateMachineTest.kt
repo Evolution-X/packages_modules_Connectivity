@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.networkstack.tethering.util
+package com.android.net.module.util
 
 import android.os.Message
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.util.State
-import com.android.networkstack.tethering.util.SyncStateMachine.StateInfo
+import com.android.net.module.util.SyncStateMachine.StateInfo
 import java.util.ArrayDeque
 import java.util.ArrayList
 import kotlin.test.assertFailsWith
@@ -45,7 +45,7 @@ private const val ARG_2 = 200
 
 @RunWith(AndroidJUnit4::class)
 @SmallTest
-class SynStateMachineTest {
+class SyncStateMachineTest {
     private val mState1 = spy(object : TestState(MSG_1) {})
     private val mState2 = spy(object : TestState(MSG_2) {})
     private val mState3 = spy(object : TestState(MSG_3) {})

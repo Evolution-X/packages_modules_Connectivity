@@ -19,9 +19,10 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.util.State
+import com.android.net.module.util.SyncStateMachine
+import com.android.net.module.util.SyncStateMachine.StateInfo
 import com.android.networkstack.tethering.util.StateMachineShim.AsyncStateMachine
 import com.android.networkstack.tethering.util.StateMachineShim.Dependencies
-import com.android.networkstack.tethering.util.SyncStateMachine.StateInfo
 import kotlin.test.assertFailsWith
 import org.junit.Test
 import org.junit.runner.RunWith

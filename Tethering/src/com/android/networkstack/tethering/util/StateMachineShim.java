@@ -22,7 +22,8 @@ import android.os.Looper;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
-import com.android.networkstack.tethering.util.SyncStateMachine.StateInfo;
+import com.android.net.module.util.SyncStateMachine;
+import com.android.net.module.util.SyncStateMachine.StateInfo;
 
 import java.util.List;
 

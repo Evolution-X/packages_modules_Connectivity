@@ -39,12 +39,13 @@ java_library {
         "device/com/android/net/module/util/DeviceConfigUtils.java",
         "device/com/android/net/module/util/DomainUtils.java",
         "device/com/android/net/module/util/FdEventsReader.java",
+        "device/com/android/net/module/util/FeatureVersions.java",
+        "device/com/android/net/module/util/HandlerUtils.java",
         "device/com/android/net/module/util/NetworkMonitorUtils.java",
         "device/com/android/net/module/util/PacketReader.java",
         "device/com/android/net/module/util/SharedLog.java",
         "device/com/android/net/module/util/SocketUtils.java",
-        "device/com/android/net/module/util/FeatureVersions.java",
-        "device/com/android/net/module/util/HandlerUtils.java",
+        "device/com/android/net/module/util/SyncStateMachine.java",
         // This library is used by system modules, for which the system health impact of Kotlin
         // has not yet been evaluated. Annotations may need jarjar'ing.
         // "src_devicecommon/**/*.kt",
@@ -68,6 +69,7 @@ java_library {
         "//packages/modules/CaptivePortalLogin",
     ],
     static_libs: [
+        "modules-utils-statemachine",
         "net-utils-framework-common",
     ],
     libs: [
