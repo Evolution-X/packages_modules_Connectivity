@@ -420,7 +420,11 @@ class ApfIntegrationTest {
         assumeApfVersionSupportAtLeast(4)
 
         // clear any active APF filter
-        var gen = ApfV4Generator(4).addPass()
+        var gen = ApfV4Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        ).addPass()
         installProgram(gen.generate())
         readProgram() // wait for install completion
 
@@ -435,7 +439,11 @@ class ApfIntegrationTest {
         assertThat(packetReader.expectPingReply()).isEqualTo(data)
 
         // Generate an APF program that drops the next ping
-        gen = ApfV4Generator(4)
+        gen = ApfV4Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        )
 
         // If not ICMPv6 Echo Reply -> PASS
         gen.addPassIfNotIcmpv6EchoReply()
@@ -469,7 +477,11 @@ class ApfIntegrationTest {
         // Test v4 memory slots on both v4 and v6 interpreters.
         assumeApfVersionSupportAtLeast(4)
         clearApfMemory()
-        val gen = ApfV4Generator(4)
+        val gen = ApfV4Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        )
 
         // If not ICMPv6 Echo Reply -> PASS
         gen.addPassIfNotIcmpv6EchoReply()
@@ -524,7 +536,11 @@ class ApfIntegrationTest {
         assume().that(getVsrApiLevel()).isAtLeast(34)
         assumeApfVersionSupportAtLeast(4)
         clearApfMemory()
-        val gen = ApfV4Generator(4)
+        val gen = ApfV4Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        )
 
         // If not ICMPv6 Echo Reply -> PASS
         gen.addPassIfNotIcmpv6EchoReply()
