@@ -129,7 +129,9 @@ public final class NetworkStackConstants {
     public static final int IPV6_PROTOCOL_OFFSET = 6;
     public static final int IPV6_SRC_ADDR_OFFSET = 8;
     public static final int IPV6_DST_ADDR_OFFSET = 24;
+    public static final int IPV6_FRAGMENT_ID_OFFSET = 4;
     public static final int IPV6_MIN_MTU = 1280;
+    public static final int IPV6_FRAGMENT_ID_LEN = 4;
     public static final int IPV6_FRAGMENT_HEADER_LEN = 8;
     public static final int RFC7421_PREFIX_LENGTH = 64;
     // getSockOpt() for v6 MTU
@@ -140,6 +142,8 @@ public final class NetworkStackConstants {
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::2");
     public static final Inet6Address IPV6_ADDR_ALL_HOSTS_MULTICAST =
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::3");
+
+    public static final int IPPROTO_FRAGMENT = 44;
 
     /**
      * ICMP constants.
