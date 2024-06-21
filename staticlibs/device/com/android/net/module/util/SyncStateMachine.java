@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.networkstack.tethering.util;
+package com.android.net.module.util;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -165,6 +165,11 @@ public class SyncStateMachine {
      * The message is processed sequentially, so calling this method recursively is not permitted.
      * In other words, using this method inside State#enter, State#exit, or State#processMessage
      * is incorrect and will result in an IllegalStateException.
+     *
+     * @param what is assigned to Message.what
+     * @param arg1 is assigned to Message.arg1
+     * @param arg2 is assigned to Message.arg2
+     * @param obj  is assigned to Message.obj
      */
     public final void processMessage(int what, int arg1, int arg2, @Nullable Object obj) {
         ensureCorrectThread();
@@ -187,6 +192,15 @@ public class SyncStateMachine {
         maybeProcessSelfMessageQueue();
 
         mCurrentlyProcessing = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Synchronously process a message and perform state transition.
+     *
+     * @param what is assigned to Message.what.
+     */
+    public final void processMessage(int what) {
+        processMessage(what, 0, 0, null);
     }
 
     private void maybeProcessSelfMessageQueue() {
