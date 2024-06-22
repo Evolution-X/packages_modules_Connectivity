@@ -75,6 +75,7 @@ import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
+import com.android.net.module.util.SyncStateMachine.StateInfo;
 import com.android.net.module.util.ip.InterfaceController;
 import com.android.net.module.util.ip.IpNeighborMonitor;
 import com.android.net.module.util.ip.IpNeighborMonitor.NeighborEvent;
@@ -87,7 +88,6 @@ import com.android.networkstack.tethering.metrics.TetheringMetrics;
 import com.android.networkstack.tethering.util.InterfaceSet;
 import com.android.networkstack.tethering.util.PrefixUtils;
 import com.android.networkstack.tethering.util.StateMachineShim;
-import com.android.networkstack.tethering.util.SyncStateMachine.StateInfo;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
