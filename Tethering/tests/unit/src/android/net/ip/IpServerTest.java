@@ -53,7 +53,6 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -94,7 +93,6 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
-import com.android.net.module.util.ip.IpNeighborMonitor;
 import com.android.networkstack.tethering.BpfCoordinator;
 import com.android.networkstack.tethering.PrivateAddressCoordinator;
 import com.android.networkstack.tethering.TetheringConfiguration;
@@ -174,7 +172,6 @@ public class IpServerTest {
     @Mock private IDhcpServer mDhcpServer;
     @Mock private DadProxy mDadProxy;
     @Mock private RouterAdvertisementDaemon mRaDaemon;
-    @Mock private IpNeighborMonitor mIpNeighborMonitor;
     @Mock private IpServer.Dependencies mDependencies;
     @Mock private PrivateAddressCoordinator mAddressCoordinator;
     private final LateSdk<RoutingCoordinatorManager> mRoutingCoordinatorManager =
@@ -213,20 +210,17 @@ public class IpServerTest {
             mInterfaceConfiguration.prefixLength = BLUETOOTH_DHCP_PREFIX_LENGTH;
         }
 
-        doReturn(mIpNeighborMonitor).when(mDependencies).getIpNeighborMonitor(any(), any(), any());
-
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(usingBpfOffload);
         when(mTetherConfig.useLegacyDhcpServer()).thenReturn(usingLegacyDhcp);
         when(mTetherConfig.getP2pLeasesSubnetPrefixLength()).thenReturn(P2P_SUBNET_PREFIX_LENGTH);
         when(mBpfCoordinator.isUsingBpfOffload()).thenReturn(usingBpfOffload);
         mIpServer = createIpServer(interfaceType);
-        verify(mIpNeighborMonitor).start();
         mIpServer.start();
 
         // Starting the state machine always puts us in a consistent state and notifies
         // the rest of the world that we've changed from an unknown to available state.
         mLooper.dispatchAll();
-        reset(mNetd, mCallback, mIpNeighborMonitor);
+        reset(mNetd, mCallback);
 
         when(mRaDaemon.start()).thenReturn(true);
     }
@@ -242,6 +236,7 @@ public class IpServerTest {
             throws Exception {
         initStateMachine(interfaceType, usingLegacyDhcp, usingBpfOffload);
         dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        verify(mBpfCoordinator).addIpServer(mIpServer);
         if (upstreamIface != null) {
             InterfaceParams interfaceParams = mDependencies.getInterfaceParams(upstreamIface);
             assertNotNull("missing upstream interface: " + upstreamIface, interfaceParams);
@@ -250,8 +245,12 @@ public class IpServerTest {
             lp.setLinkAddresses(upstreamAddresses);
             dispatchTetherConnectionChanged(upstreamIface, lp, 0);
             Set<IpPrefix> upstreamPrefixes = getTetherableIpv6Prefixes(lp.getLinkAddresses());
-            verify(mBpfCoordinator).updateAllIpv6Rules(
-                    mIpServer, TEST_IFACE_PARAMS, interfaceParams.index, upstreamPrefixes);
+            // One is called when handling CMD_TETHER_CONNECTION_CHANGED and the other one is called
+            // when upstream's LinkProperties is updated (updateUpstreamIPv6LinkProperties)
+            verify(mBpfCoordinator, times(2)).maybeAddUpstreamToLookupTable(
+                    interfaceParams.index, upstreamIface);
+            verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                    mIpServer, interfaceParams.index, upstreamPrefixes);
         }
         reset(mNetd, mBpfCoordinator, mCallback, mAddressCoordinator);
         when(mAddressCoordinator.requestDownstreamAddress(any(), anyInt(),
@@ -314,8 +313,6 @@ public class IpServerTest {
 
     @Test
     public void startsOutAvailable() throws Exception {
-        when(mDependencies.getIpNeighborMonitor(any(), any(), any()))
-                .thenReturn(mIpNeighborMonitor);
         mIpServer = createIpServer(TETHERING_BLUETOOTH);
         mIpServer.start();
         mLooper.dispatchAll();
@@ -557,8 +554,8 @@ public class IpServerTest {
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
         inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
         inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        inOrder.verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES);
         // When tethering stops, upstream interface is set to zero and thus clearing all upstream
         // rules. Downstream rules are needed to be cleared explicitly by calling
         // BpfCoordinator#clearAllIpv6Rules in TetheredState#exit.
@@ -570,7 +567,7 @@ public class IpServerTest {
                 argThat(cfg -> IFACE_NAME.equals(cfg.ifName)));
         inOrder.verify(mAddressCoordinator).releaseDownstream(any());
         inOrder.verify(mBpfCoordinator).tetherOffloadClientClear(mIpServer);
-        inOrder.verify(mBpfCoordinator).stopMonitoring(mIpServer);
+        inOrder.verify(mBpfCoordinator).removeIpServer(mIpServer);
         inOrder.verify(mCallback).updateInterfaceState(
                 mIpServer, STATE_AVAILABLE, TETHER_ERROR_NO_ERROR);
         inOrder.verify(mCallback).updateLinkProperties(
@@ -765,8 +762,8 @@ public class IpServerTest {
         lp.setInterfaceName(UPSTREAM_IFACE2);
         lp.setLinkAddresses(UPSTREAM_ADDRESSES);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES);
         reset(mBpfCoordinator);
 
         // Upstream link addresses change result in updating the rules.
@@ -774,8 +771,8 @@ public class IpServerTest {
         lp2.setInterfaceName(UPSTREAM_IFACE2);
         lp2.setLinkAddresses(UPSTREAM_ADDRESSES2);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2, lp2, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES2);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX2, UPSTREAM_PREFIXES2);
         reset(mBpfCoordinator);
 
         // When the upstream is lost, rules are removed.
@@ -784,53 +781,54 @@ public class IpServerTest {
         // - processMessage CMD_TETHER_CONNECTION_CHANGED for the upstream is lost.
         // - processMessage CMD_IPV6_TETHER_UPDATE for the IPv6 upstream is lost.
         // See dispatchTetherConnectionChanged.
-        verify(mBpfCoordinator, times(2)).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator, times(2)).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES);
         reset(mBpfCoordinator);
 
         // If the upstream is IPv4-only, no rules are added.
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
-        verify(mBpfCoordinator, never()).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator, never()).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES);
         reset(mBpfCoordinator);
 
         // Rules are added again once upstream IPv6 connectivity is available.
         lp.setInterfaceName(UPSTREAM_IFACE);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
         reset(mBpfCoordinator);
 
         // If upstream IPv6 connectivity is lost, rules are removed.
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, null, 0);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES);
         reset(mBpfCoordinator);
 
         // When upstream IPv6 connectivity comes back, rules are added.
         lp.setInterfaceName(UPSTREAM_IFACE);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE, lp, -1);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, UPSTREAM_IFINDEX, UPSTREAM_PREFIXES);
         reset(mBpfCoordinator);
 
         // When the downstream interface goes down, rules are removed.
         mIpServer.stop();
         mLooper.dispatchAll();
         verify(mBpfCoordinator).clearAllIpv6Rules(mIpServer);
-        verify(mBpfCoordinator).updateAllIpv6Rules(
-                mIpServer, TEST_IFACE_PARAMS, NO_UPSTREAM, NO_PREFIXES);
+        verify(mBpfCoordinator).removeIpServer(mIpServer);
+        verify(mBpfCoordinator).updateIpv6UpstreamInterface(
+                mIpServer, NO_UPSTREAM, NO_PREFIXES);
         reset(mBpfCoordinator);
     }
 
     @Test
-    public void stopNeighborMonitoringWhenInterfaceDown() throws Exception {
+    public void removeIpServerWhenInterfaceDown() throws Exception {
         initTetheredStateMachine(TETHERING_WIFI, UPSTREAM_IFACE, UPSTREAM_ADDRESSES,
                 false /* usingLegacyDhcp */, DEFAULT_USING_BPF_OFFLOAD);
 
         mIpServer.stop();
         mLooper.dispatchAll();
-        verify(mIpNeighborMonitor).stop();
+        verify(mBpfCoordinator).removeIpServer(mIpServer);
     }
 
     private LinkProperties buildIpv6OnlyLinkProperties(final String iface) {
