@@ -180,8 +180,18 @@ public final class NsdServiceInfo implements Parcelable {
         return new ArrayList<>(mHostAddresses);
     }
 
-    /** Set the host addresses */
+    /**
+     * Set the host addresses.
+     *
+     * <p>When registering hosts/services, there can only be one registration including address
+     * records for a given hostname.
+     *
+     * <p>For example, if a client registers a service with the hostname "MyHost" and the address
+     * records of 192.168.1.1 and 192.168.1.2, then other registrations for the hostname "MyHost"
+     * must not have any address record, otherwise there will be a conflict.
+     */
     public void setHostAddresses(@NonNull List<InetAddress> addresses) {
+        // TODO: b/284905335 - Notify the client when there is a conflict.
         mHostAddresses.clear();
         mHostAddresses.addAll(addresses);
     }

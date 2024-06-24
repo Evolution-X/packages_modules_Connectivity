@@ -91,12 +91,14 @@ import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.ActiveOperationalDataset.SecurityPolicy;
 import android.net.thread.ChannelMaxPower;
 import android.net.thread.IActiveOperationalDatasetReceiver;
+import android.net.thread.IConfigurationReceiver;
 import android.net.thread.IOperationReceiver;
 import android.net.thread.IOperationalDatasetCallback;
 import android.net.thread.IStateCallback;
 import android.net.thread.IThreadNetworkController;
 import android.net.thread.OperationalDatasetTimestamp;
 import android.net.thread.PendingOperationalDataset;
+import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkController.DeviceRole;
 import android.net.thread.ThreadNetworkException;
@@ -189,6 +191,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private final OtDaemonCallbackProxy mOtDaemonCallbackProxy = new OtDaemonCallbackProxy();
     private final ConnectivityResources mResources;
     private final Supplier<String> mCountryCodeSupplier;
+    private final Map<IConfigurationReceiver, IBinder.DeathRecipient> mConfigurationReceivers =
+            new HashMap<>();
 
     // This should not be directly used for calling IOtDaemon APIs because ot-daemon may die and
     // {@code mOtDaemon} will be set to {@code null}. Instead, use {@code getOtDaemon()}
@@ -518,17 +522,86 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
+    @Override
+    public void setConfiguration(
+            @NonNull ThreadConfiguration configuration, @NonNull IOperationReceiver receiver) {
+        enforceAllPermissionsGranted(PERMISSION_THREAD_NETWORK_PRIVILEGED);
+        mHandler.post(() -> setConfigurationInternal(configuration, receiver));
+    }
+
+    private void setConfigurationInternal(
+            @NonNull ThreadConfiguration configuration,
+            @NonNull IOperationReceiver operationReceiver) {
+        checkOnHandlerThread();
+
+        Log.i(TAG, "Set Thread configuration: " + configuration);
+
+        final boolean changed = mPersistentSettings.putConfiguration(configuration);
+        try {
+            operationReceiver.onSuccess();
+        } catch (RemoteException e) {
+            // do nothing if the client is dead
+        }
+        if (changed) {
+            for (IConfigurationReceiver configReceiver : mConfigurationReceivers.keySet()) {
+                try {
+                    configReceiver.onConfigurationChanged(configuration);
+                } catch (RemoteException e) {
+                    // do nothing if the client is dead
+                }
+            }
+        }
+    }
+
+    @Override
+    public void registerConfigurationCallback(@NonNull IConfigurationReceiver callback) {
+        enforceAllPermissionsGranted(permission.THREAD_NETWORK_PRIVILEGED);
+        mHandler.post(() -> registerConfigurationCallbackInternal(callback));
+    }
+
+    private void registerConfigurationCallbackInternal(@NonNull IConfigurationReceiver callback) {
+        checkOnHandlerThread();
+        if (mConfigurationReceivers.containsKey(callback)) {
+            throw new IllegalStateException("Registering the same IConfigurationReceiver twice");
+        }
+        IBinder.DeathRecipient deathRecipient =
+                () -> mHandler.post(() -> unregisterConfigurationCallbackInternal(callback));
+        try {
+            callback.asBinder().linkToDeath(deathRecipient, 0);
+        } catch (RemoteException e) {
+            return;
+        }
+        mConfigurationReceivers.put(callback, deathRecipient);
+        try {
+            callback.onConfigurationChanged(mPersistentSettings.getConfiguration());
+        } catch (RemoteException e) {
+            // do nothing if the client is dead
+        }
+    }
+
+    @Override
+    public void unregisterConfigurationCallback(@NonNull IConfigurationReceiver callback) {
+        enforceAllPermissionsGranted(permission.THREAD_NETWORK_PRIVILEGED);
+        mHandler.post(() -> unregisterConfigurationCallbackInternal(callback));
+    }
+
+    private void unregisterConfigurationCallbackInternal(@NonNull IConfigurationReceiver callback) {
+        checkOnHandlerThread();
+        if (!mConfigurationReceivers.containsKey(callback)) {
+            return;
+        }
+        callback.asBinder().unlinkToDeath(mConfigurationReceivers.remove(callback), 0);
+    }
+
     private void registerUserRestrictionsReceiver() {
         mContext.registerReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        onUserRestrictionsChanged(isThreadUserRestricted());
+                        mHandler.post(() -> onUserRestrictionsChanged(isThreadUserRestricted()));
                     }
                 },
-                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED),
-                null /* broadcastPermission */,
-                mHandler);
+                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED));
     }
 
     private void onUserRestrictionsChanged(boolean newUserRestrictedState) {
@@ -580,12 +653,10 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        onAirplaneModeChanged(isAirplaneModeOn());
+                        mHandler.post(() -> onAirplaneModeChanged(isAirplaneModeOn()));
                     }
                 },
-                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED),
-                null /* broadcastPermission */,
-                mHandler);
+                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED));
     }
 
     private void onAirplaneModeChanged(boolean newAirplaneModeOn) {

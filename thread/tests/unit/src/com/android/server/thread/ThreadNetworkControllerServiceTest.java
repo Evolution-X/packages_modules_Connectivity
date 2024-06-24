@@ -59,6 +59,7 @@ import android.net.NetworkProvider;
 import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.IActiveOperationalDatasetReceiver;
 import android.net.thread.IOperationReceiver;
+import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkException;
 import android.os.Handler;
 import android.os.IBinder;
@@ -539,9 +540,7 @@ public final class ThreadNetworkControllerServiceTest {
                 .when(mContext)
                 .registerReceiver(
                         any(BroadcastReceiver.class),
-                        argThat(actualIntentFilter -> actualIntentFilter.hasAction(action)),
-                        any(),
-                        any());
+                        argThat(actualIntentFilter -> actualIntentFilter.hasAction(action)));
 
         return receiverRef;
     }
@@ -707,5 +706,36 @@ public final class ThreadNetworkControllerServiceTest {
         InOrder inOrder = Mockito.inOrder(mMockTunIfController);
         inOrder.verify(mMockTunIfController, times(1)).setInterfaceUp(false);
         inOrder.verify(mMockTunIfController, times(1)).setInterfaceUp(true);
+    }
+
+    @Test
+    public void setConfiguration_configurationUpdated() throws Exception {
+        mService.initialize();
+        final IOperationReceiver mockReceiver1 = mock(IOperationReceiver.class);
+        final IOperationReceiver mockReceiver2 = mock(IOperationReceiver.class);
+        final IOperationReceiver mockReceiver3 = mock(IOperationReceiver.class);
+        ThreadConfiguration config1 =
+                new ThreadConfiguration.Builder()
+                        .setNat64Enabled(false)
+                        .setDhcp6PdEnabled(false)
+                        .build();
+        ThreadConfiguration config2 =
+                new ThreadConfiguration.Builder()
+                        .setNat64Enabled(true)
+                        .setDhcp6PdEnabled(true)
+                        .build();
+        ThreadConfiguration config3 =
+                new ThreadConfiguration.Builder(config2).build(); // Same as config2
+
+        mService.setConfiguration(config1, mockReceiver1);
+        mService.setConfiguration(config2, mockReceiver2);
+        mService.setConfiguration(config3, mockReceiver3);
+        mTestLooper.dispatchAll();
+
+        assertThat(mPersistentSettings.getConfiguration()).isEqualTo(config3);
+        InOrder inOrder = Mockito.inOrder(mockReceiver1, mockReceiver2, mockReceiver3);
+        inOrder.verify(mockReceiver1).onSuccess();
+        inOrder.verify(mockReceiver2).onSuccess();
+        inOrder.verify(mockReceiver3).onSuccess();
     }
 }
