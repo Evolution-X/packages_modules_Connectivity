@@ -523,12 +523,10 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        onUserRestrictionsChanged(isThreadUserRestricted());
+                        mHandler.post(() -> onUserRestrictionsChanged(isThreadUserRestricted()));
                     }
                 },
-                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED),
-                null /* broadcastPermission */,
-                mHandler);
+                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED));
     }
 
     private void onUserRestrictionsChanged(boolean newUserRestrictedState) {
@@ -580,12 +578,10 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        onAirplaneModeChanged(isAirplaneModeOn());
+                        mHandler.post(() -> onAirplaneModeChanged(isAirplaneModeOn()));
                     }
                 },
-                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED),
-                null /* broadcastPermission */,
-                mHandler);
+                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED));
     }
 
     private void onAirplaneModeChanged(boolean newAirplaneModeOn) {
