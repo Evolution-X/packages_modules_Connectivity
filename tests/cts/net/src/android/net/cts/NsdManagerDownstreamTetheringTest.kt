@@ -28,7 +28,9 @@ import androidx.test.filters.SmallTest
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
+import com.android.testutils.NsdDiscoveryRecord
 import com.android.testutils.TapPacketReader
+import com.android.testutils.pollForQuery
 import com.android.testutils.tryTest
 import java.util.Random
 import kotlin.test.assertEquals
