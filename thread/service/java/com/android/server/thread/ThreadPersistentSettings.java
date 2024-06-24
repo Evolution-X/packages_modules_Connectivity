@@ -18,9 +18,11 @@ package com.android.server.thread;
 
 import static com.android.net.module.util.DeviceConfigUtils.TETHERING_MODULE_NAME;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.ApexEnvironment;
 import android.content.Context;
+import android.net.thread.ThreadConfiguration;
 import android.os.PersistableBundle;
 import android.util.AtomicFile;
 import android.util.Log;
@@ -73,6 +75,16 @@ public class ThreadPersistentSettings {
 
     /** Stores the Thread country code, null if no country code is stored. */
     public static final Key<String> THREAD_COUNTRY_CODE = new Key<>("thread_country_code", null);
+
+    /** Stores the Thread NAT64 feature toggle state, true for enabled and false for disabled. */
+    private static final Key<Boolean> CONFIG_NAT64_ENABLED =
+            new Key<>("config_nat64_enabled", false);
+
+    /**
+     * Stores the Thread DHCPv6-PD feature toggle state, true for enabled and false for disabled.
+     */
+    private static final Key<Boolean> CONFIG_DHCP6_PD_ENABLED =
+            new Key<>("config_dhcp6_pd_enabled", false);
 
     /******** Thread persistent setting keys ***************/
 
@@ -172,6 +184,30 @@ public class ThreadPersistentSettings {
      */
     public <T> T get(Key<T> key) {
         return getObject(key.key, key.defaultValue);
+    }
+
+    /**
+     * Store a {@link ThreadConfiguration} to the persistent settings.
+     *
+     * @param configuration {@link ThreadConfiguration} to be stored.
+     * @return {@code true} if the configuration was changed, {@code false} otherwise.
+     */
+    public boolean putConfiguration(@NonNull ThreadConfiguration configuration) {
+        if (getConfiguration().equals(configuration)) {
+            return false;
+        }
+        putObject(CONFIG_NAT64_ENABLED.key, configuration.isNat64Enabled());
+        putObject(CONFIG_DHCP6_PD_ENABLED.key, configuration.isDhcp6PdEnabled());
+        writeToStoreFile();
+        return true;
+    }
+
+    /** Retrieve the {@link ThreadConfiguration} from the persistent settings. */
+    public ThreadConfiguration getConfiguration() {
+        return new ThreadConfiguration.Builder()
+                .setNat64Enabled(get(CONFIG_NAT64_ENABLED))
+                .setDhcp6PdEnabled(get(CONFIG_DHCP6_PD_ENABLED))
+                .build();
     }
 
     /**
