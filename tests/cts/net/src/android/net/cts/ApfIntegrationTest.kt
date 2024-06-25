@@ -29,7 +29,11 @@ import android.net.apf.ApfCapabilities
 import android.net.apf.ApfConstants.ETH_ETHERTYPE_OFFSET
 import android.net.apf.ApfConstants.ICMP6_TYPE_OFFSET
 import android.net.apf.ApfConstants.IPV6_NEXT_HEADER_OFFSET
+import android.net.apf.ApfCounterTracker
+import android.net.apf.ApfCounterTracker.Counter.FILTER_AGE_16384THS
 import android.net.apf.ApfV4Generator
+import android.net.apf.ApfV4GeneratorBase
+import android.net.apf.ApfV6Generator
 import android.net.apf.BaseApfGenerator
 import android.net.apf.BaseApfGenerator.MemorySlot
 import android.net.apf.BaseApfGenerator.Register.R0
@@ -73,7 +77,6 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import com.google.common.truth.TruthJUnit.assume
 import java.io.FileDescriptor
-import java.lang.Thread
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
@@ -394,7 +397,7 @@ class ApfIntegrationTest {
         }
     }
 
-    fun ApfV4Generator.addPassIfNotIcmpv6EchoReply() {
+    fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply() {
         // If not IPv6 -> PASS
         addLoad16(R0, ETH_ETHERTYPE_OFFSET)
         addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), BaseApfGenerator.PASS_LABEL)
@@ -572,5 +575,51 @@ class ApfIntegrationTest {
         // Assert that filter age has increased, but not too much.
         val timeDiff = filterAgeSeconds - filterAgeSecondsOrig
         assertThat(timeDiff).isAnyOf(5, 6)
+    }
+
+    @VsrTest(requirements = ["VSR-5.3.12-002", "VSR-5.3.12-005"])
+    @Test
+    fun testFilterAge16384thsIncreasesBetweenPackets() {
+        assumeApfVersionSupportAtLeast(6000)
+        clearApfMemory()
+        val gen = ApfV6Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        )
+
+        // If not ICMPv6 Echo Reply -> PASS
+        gen.addPassIfNotIcmpv6EchoReply()
+
+        // Store all prefilled memory slots in counter region [500, 520)
+        gen.addLoadFromMemory(R0, MemorySlot.FILTER_AGE_16384THS)
+        gen.addStoreCounter(FILTER_AGE_16384THS, R0)
+
+        installProgram(gen.generate())
+        readProgram() // wait for install completion
+
+        val payloadSize = 56
+        val data = ByteArray(payloadSize).also { Random.nextBytes(it) }
+        packetReader.sendPing(data, payloadSize)
+        packetReader.expectPingReply()
+
+        var apfRam = readProgram()
+        val filterAge16384thSecondsOrig =
+                ApfCounterTracker.getCounterValue(apfRam, FILTER_AGE_16384THS)
+
+        Thread.sleep(5000)
+
+        packetReader.sendPing(data, payloadSize)
+        packetReader.expectPingReply()
+
+        apfRam = readProgram()
+        val filterAge16384thSeconds = ApfCounterTracker.getCounterValue(apfRam, FILTER_AGE_16384THS)
+        val timeDiff = (filterAge16384thSeconds - filterAge16384thSecondsOrig)
+        // Expect the HAL plus ping latency to be less than 800ms.
+        val timeDiffLowerBound = (4.99 * 16384).toInt()
+        val timeDiffUpperBound = (5.81 * 16384).toInt()
+        // Assert that filter age has increased, but not too much.
+        assertThat(timeDiff).isGreaterThan(timeDiffLowerBound)
+        assertThat(timeDiff).isLessThan(timeDiffUpperBound)
     }
 }
