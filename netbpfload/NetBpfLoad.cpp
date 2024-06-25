@@ -57,6 +57,7 @@ namespace bpf {
 using base::StartsWith;
 using base::EndsWith;
 using std::string;
+using std::vector;
 
 static bool exists(const char* const path) {
     int v = access(path, F_OK);
@@ -248,6 +249,22 @@ static bool isTV() {
     return tv;
 }
 
+static bool isWear() {
+    static string wearSdkStr = base::GetProperty("ro.cw_build.wear_sdk.version", "");
+    static int wearSdkInt = base::GetIntProperty("ro.cw_build.wear_sdk.version", 0);
+    static string buildChars = base::GetProperty("ro.build.characteristics", "");
+    static vector<string> v = base::Tokenize(buildChars, ",");
+    static bool watch = (std::find(v.begin(), v.end(), "watch") != v.end());
+    static bool wear = (wearSdkInt > 0) || watch;
+    static bool logged = false;
+    if (!logged) {
+        logged = true;
+        ALOGI("isWear(ro.cw_build.wear_sdk.version=%d[%s] ro.build.characteristics='%s'): %s",
+              wearSdkInt, wearSdkStr.c_str(), buildChars.c_str(), wear ? "true" : "false");
+    }
+    return wear;
+}
+
 static int doLoad(char** argv, char * const envp[]) {
     const bool runningAsRoot = !getuid();  // true iff U QPR3 or V+
 
@@ -402,7 +419,8 @@ static int doLoad(char** argv, char * const envp[]) {
          * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
          */
         ALOGE("64-bit userspace required on 6.2+ kernels.");
-        if (!isTV()) return 1;
+        // Stuff won't work reliably, but exempt TVs & Arm Wear devices
+        if (!isTV() && !(isWear() && isArm())) return 1;
     }
 
     // Ensure we can determine the Android build type.
