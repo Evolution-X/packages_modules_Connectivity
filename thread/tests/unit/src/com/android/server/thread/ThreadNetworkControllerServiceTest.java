@@ -99,6 +99,8 @@ import org.mockito.MockitoSession;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -581,6 +583,55 @@ public final class ThreadNetworkControllerServiceTest {
         verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
         ActiveOperationalDataset activeDataset = mActiveDatasetCaptor.getValue();
         assertThat(activeDataset.getActiveTimestamp().isAuthoritativeSource()).isFalse();
+    }
+
+    @Test
+    public void createRandomizedDataset_zeroNanoseconds_returnsZeroTicks() throws Exception {
+        Instant now = Instant.ofEpochSecond(0, 0);
+        Clock clock = Clock.fixed(now, ZoneId.systemDefault());
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
+
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock()).thenReturn(clock);
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
+
+        verify(mockReceiver, never()).onError(anyInt(), anyString());
+        verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
+        ActiveOperationalDataset activeDataset = mActiveDatasetCaptor.getValue();
+        assertThat(activeDataset.getActiveTimestamp().getTicks()).isEqualTo(0);
+    }
+
+    @Test
+    public void createRandomizedDataset_maxNanoseconds_returnsMaxTicks() throws Exception {
+        // The nanoseconds to ticks conversion is rounded in the current implementation.
+        // 32767.5 / 32768 * 1000000000 = 999984741.2109375, using 999984741 to
+        // produce the maximum ticks.
+        Instant now = Instant.ofEpochSecond(0, 999984741);
+        Clock clock = Clock.fixed(now, ZoneId.systemDefault());
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
+
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock()).thenReturn(clock);
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
+
+        verify(mockReceiver, never()).onError(anyInt(), anyString());
+        verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
+        ActiveOperationalDataset activeDataset = mActiveDatasetCaptor.getValue();
+        assertThat(activeDataset.getActiveTimestamp().getTicks()).isEqualTo(32767);
     }
 
     @Test
