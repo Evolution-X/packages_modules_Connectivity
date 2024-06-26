@@ -41,6 +41,19 @@ public final class OperationalDatasetTimestampTest {
     }
 
     @Test
+    public void fromInstant_authoritativeIsSetAsSpecified() {
+        Instant instant = Instant.now();
+
+        OperationalDatasetTimestamp timestampAuthoritativeFalse =
+                OperationalDatasetTimestamp.fromInstant(instant, false);
+        OperationalDatasetTimestamp timestampAuthoritativeTrue =
+                OperationalDatasetTimestamp.fromInstant(instant, true);
+
+        assertThat(timestampAuthoritativeFalse.isAuthoritativeSource()).isEqualTo(false);
+        assertThat(timestampAuthoritativeTrue.isAuthoritativeSource()).isEqualTo(true);
+    }
+
+    @Test
     public void fromTlvValue_goodValue_success() {
         OperationalDatasetTimestamp timestamp =
                 OperationalDatasetTimestamp.fromTlvValue(base16().decode("FFEEDDCCBBAA9989"));

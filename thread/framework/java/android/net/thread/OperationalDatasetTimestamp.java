@@ -65,11 +65,32 @@ public final class OperationalDatasetTimestamp {
      */
     @NonNull
     public static OperationalDatasetTimestamp fromInstant(@NonNull Instant instant) {
+        return OperationalDatasetTimestamp.fromInstant(instant, true /* isAuthoritativeSource */);
+    }
+
+    /**
+     * Creates a new {@link OperationalDatasetTimestamp} object from an {@link Instant}.
+     *
+     * <p>The {@code seconds} is set to {@code instant.getEpochSecond()}, {@code ticks} is set to
+     * {@link instant#getNano()} based on frequency of 32768 Hz, and {@code isAuthoritativeSource}
+     * is set to {@code isAuthoritativeSource}.
+     *
+     * <p>Note that this conversion can lose precision and a value returned by {@link #toInstant}
+     * may not equal exactly the {@code instant}.
+     *
+     * @throws IllegalArgumentException if {@code instant.getEpochSecond()} is larger than {@code
+     *     0xffffffffffffL}
+     * @see toInstant
+     * @hide
+     */
+    @NonNull
+    public static OperationalDatasetTimestamp fromInstant(
+            @NonNull Instant instant, boolean isAuthoritativeSource) {
         int ticks = getRoundedTicks(instant.getNano());
         long seconds = instant.getEpochSecond() + ticks / TICKS_UPPER_BOUND;
         // the rounded ticks can be 0x8000 if instant.getNano() >= 999984742
         ticks = ticks % TICKS_UPPER_BOUND;
-        return new OperationalDatasetTimestamp(seconds, ticks, true /* isAuthoritativeSource */);
+        return new OperationalDatasetTimestamp(seconds, ticks, isAuthoritativeSource);
     }
 
     /**
