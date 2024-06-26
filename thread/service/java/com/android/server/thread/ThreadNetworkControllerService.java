@@ -955,9 +955,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         final byte[] securityFlags = new byte[] {(byte) 0xff, (byte) 0xf8};
 
         return new ActiveOperationalDataset.Builder()
-                .setActiveTimestamp(
-                        new OperationalDatasetTimestamp(
-                                now.getEpochSecond() & 0xffffffffffffL, 0, authoritative))
+                .setActiveTimestamp(OperationalDatasetTimestamp.fromInstant(now, authoritative))
                 .setExtendedPanId(newRandomBytes(random, LENGTH_EXTENDED_PAN_ID))
                 .setPanId(panId)
                 .setNetworkName(networkName)

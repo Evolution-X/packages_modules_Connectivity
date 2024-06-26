@@ -153,7 +153,8 @@ interface IConnectivityManager
 
     NetworkRequest requestNetwork(int uid, in NetworkCapabilities networkCapabilities, int reqType,
             in Messenger messenger, int timeoutSec, in IBinder binder, int legacy,
-            int callbackFlags, String callingPackageName, String callingAttributionTag);
+            int callbackFlags, String callingPackageName, String callingAttributionTag,
+            int declaredMethodsFlag);
 
     NetworkRequest pendingRequestForNetwork(in NetworkCapabilities networkCapabilities,
             in PendingIntent operation, String callingPackageName, String callingAttributionTag);
@@ -162,7 +163,7 @@ interface IConnectivityManager
 
     NetworkRequest listenForNetwork(in NetworkCapabilities networkCapabilities,
             in Messenger messenger, in IBinder binder, int callbackFlags, String callingPackageName,
-            String callingAttributionTag);
+            String callingAttributionTag, int declaredMethodsFlag);
 
     void pendingListenForNetwork(in NetworkCapabilities networkCapabilities,
             in PendingIntent operation, String callingPackageName,
