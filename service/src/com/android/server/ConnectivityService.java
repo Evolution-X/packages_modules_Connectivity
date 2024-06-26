@@ -11833,6 +11833,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
                         return 0;
                     }
                     case "get-package-networking-enabled": {
+                        if (!mDeps.isAtLeastT()) {
+                            throw new UnsupportedOperationException(
+                                    "This command is not supported on T-");
+                        }
                         final String packageName = getNextArg();
                         final int rule = getPackageFirewallRule(
                                 ConnectivityManager.FIREWALL_CHAIN_OEM_DENY_3, packageName);
@@ -11862,6 +11866,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
                         return 0;
                     }
                     case "get-background-networking-enabled-for-uid": {
+                        if (!mDeps.isAtLeastT()) {
+                            throw new UnsupportedOperationException(
+                                    "This command is not supported on T-");
+                        }
                         final Integer uid = parseIntegerArgument(getNextArg());
                         if (null == uid) {
                             onHelp();
@@ -13910,6 +13918,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private int getPackageFirewallRule(final int chain, final String packageName)
             throws PackageManager.NameNotFoundException {
         final PackageManager pm = mContext.getPackageManager();
@@ -13917,6 +13926,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         return getUidFirewallRule(chain, appId);
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @Override
     public int getUidFirewallRule(final int chain, final int uid) {
         enforceNetworkStackOrSettingsPermission();
