@@ -2871,7 +2871,7 @@ public class ConnectivityServiceTest {
         };
         final NetworkRequest request = mService.listenForNetwork(caps, messenger, binder,
                 NetworkCallback.FLAG_NONE, mContext.getOpPackageName(),
-                mContext.getAttributionTag());
+                mContext.getAttributionTag(), ~0 /* declaredMethodsFlag */);
         mService.releaseNetworkRequest(request);
         deathRecipient.get().binderDied();
         // Wait for the release message to be processed.
@@ -5407,7 +5407,7 @@ public class ConnectivityServiceTest {
             mService.requestNetwork(Process.INVALID_UID, networkCapabilities,
                     NetworkRequest.Type.REQUEST.ordinal(), null, 0, null,
                     ConnectivityManager.TYPE_WIFI, NetworkCallback.FLAG_NONE,
-                    mContext.getPackageName(), getAttributionTag());
+                    mContext.getPackageName(), getAttributionTag(), ~0 /* declaredMethodsFlag */);
         });
 
         final NetworkRequest.Builder builder =
@@ -13655,7 +13655,8 @@ public class ConnectivityServiceTest {
                     IllegalArgumentException.class,
                     () -> mService.requestNetwork(Process.INVALID_UID, nc, reqTypeInt, null, 0,
                             null, ConnectivityManager.TYPE_NONE, NetworkCallback.FLAG_NONE,
-                            mContext.getPackageName(), getAttributionTag())
+                            mContext.getPackageName(), getAttributionTag(),
+                            ~0 /* declaredMethodsFlag */)
             );
         }
     }
