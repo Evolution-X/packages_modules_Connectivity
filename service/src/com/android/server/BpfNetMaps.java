@@ -580,6 +580,7 @@ public class BpfNetMaps {
      * @throws ServiceSpecificException in case of failure, with an error code indicating the
      *                                  cause of the failure.
      */
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public int getUidRule(final int childChain, final int uid) {
         return BpfNetMapsUtils.getUidRule(sUidOwnerMap, childChain, uid);
     }

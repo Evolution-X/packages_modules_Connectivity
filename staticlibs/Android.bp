@@ -282,7 +282,7 @@ java_library {
         "//apex_available:platform",
     ],
     lint: {
-        baseline_filename: "lint-baseline.xml",
+        strict_updatability_linting: true,
         error_checks: ["NewApi"],
     },
 }
