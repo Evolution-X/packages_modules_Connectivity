@@ -16,7 +16,6 @@
 package com.android.networkstack.tethering.util;
 
 import android.net.TetherStatsParcel;
-import android.net.TetheringRequestParcel;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -29,7 +28,6 @@ import java.net.Inet6Address;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
-import java.util.Objects;
 
 /**
  * The classes and the methods for tethering utilization.
@@ -156,20 +154,6 @@ public class TetheringUtils {
      */
     public static int uint16(short s) {
         return s & 0xffff;
-    }
-
-    /** Check whether two TetheringRequestParcels are the same. */
-    public static boolean isTetheringRequestEquals(final TetheringRequestParcel request,
-            final TetheringRequestParcel otherRequest) {
-        if (request == otherRequest) return true;
-
-        return request != null && otherRequest != null
-                && request.tetheringType == otherRequest.tetheringType
-                && Objects.equals(request.localIPv4Address, otherRequest.localIPv4Address)
-                && Objects.equals(request.staticClientAddress, otherRequest.staticClientAddress)
-                && request.exemptFromEntitlementCheck == otherRequest.exemptFromEntitlementCheck
-                && request.showProvisioningUi == otherRequest.showProvisioningUi
-                && request.connectivityScope == otherRequest.connectivityScope;
     }
 
     /** Get inet6 address for all nodes given scope ID. */
