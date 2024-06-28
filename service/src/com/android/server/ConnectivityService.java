@@ -8209,21 +8209,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // Policy already enforced.
             return;
         }
-        if (mDeps.isAtLeastV()) {
-            if (mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid)) {
-                // If UID is restricted, don't allow them to bring up metered APNs.
-                networkCapabilities.addCapability(NET_CAPABILITY_NOT_METERED);
-            }
-            return;
-        }
-        final long ident = Binder.clearCallingIdentity();
-        try {
-            if (mPolicyManager.isUidRestrictedOnMeteredNetworks(uid)) {
-                // If UID is restricted, don't allow them to bring up metered APNs.
-                networkCapabilities.addCapability(NET_CAPABILITY_NOT_METERED);
-            }
-        } finally {
-            Binder.restoreCallingIdentity(ident);
+        final boolean isRestrictedOnMeteredNetworks = mDeps.isAtLeastV()
+                ? mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid)
+                : BinderUtils.withCleanCallingIdentity(() ->
+                        mPolicyManager.isUidRestrictedOnMeteredNetworks(uid));
+        if (isRestrictedOnMeteredNetworks) {
+            // If UID is restricted, don't allow them to bring up metered APNs.
+            networkCapabilities.addCapability(NET_CAPABILITY_NOT_METERED);
         }
     }
 
