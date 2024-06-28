@@ -419,4 +419,30 @@ class CSBlockedReasonsTest : CSTest() {
         deps.setChangeIdEnabled(true, NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION)
         doTestBlockedReasonsNoInternetPermission(blockedByNoInternetPermission = true)
     }
+
+    private fun doTestEnforceMeteredApnPolicy(restricted: Boolean) {
+        doReturn(restricted).`when`(bpfNetMaps).isUidRestrictedOnMeteredNetworks(Process.myUid())
+
+        val cellAgent = Agent(nc = cellNc())
+        cellAgent.connect()
+        val cb = TestableNetworkCallback()
+        cm.requestNetwork(cellRequest(), cb)
+
+        if (restricted) {
+            waitForIdle()
+            cb.assertNoCallback()
+        } else {
+            cb.expectAvailableCallbacks(cellAgent.network, validated = false)
+        }
+    }
+
+    @Test
+    fun testEnforceMeteredApnPolicy_restricted() {
+        doTestEnforceMeteredApnPolicy(restricted = true)
+    }
+
+    @Test
+    fun testEnforceMeteredApnPolicy_notRestricted() {
+        doTestEnforceMeteredApnPolicy(restricted = false)
+    }
 }
