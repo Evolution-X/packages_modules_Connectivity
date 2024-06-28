@@ -27,10 +27,17 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.apf.ApfCapabilities
 import android.net.apf.ApfConstants.ETH_ETHERTYPE_OFFSET
+import android.net.apf.ApfConstants.ETH_HEADER_LEN
+import android.net.apf.ApfConstants.ICMP6_CHECKSUM_OFFSET
 import android.net.apf.ApfConstants.ICMP6_TYPE_OFFSET
+import android.net.apf.ApfConstants.IPV6_DEST_ADDR_OFFSET
+import android.net.apf.ApfConstants.IPV6_HEADER_LEN
 import android.net.apf.ApfConstants.IPV6_NEXT_HEADER_OFFSET
+import android.net.apf.ApfConstants.IPV6_SRC_ADDR_OFFSET
 import android.net.apf.ApfCounterTracker
+import android.net.apf.ApfCounterTracker.Counter.DROPPED_IPV6_MULTICAST_PING
 import android.net.apf.ApfCounterTracker.Counter.FILTER_AGE_16384THS
+import android.net.apf.ApfCounterTracker.Counter.PASSED_IPV6_ICMP
 import android.net.apf.ApfV4Generator
 import android.net.apf.ApfV4GeneratorBase
 import android.net.apf.ApfV6Generator
@@ -61,6 +68,12 @@ import com.android.compatibility.common.util.SystemUtil.runShellCommand
 import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
 import com.android.compatibility.common.util.VsrTest
 import com.android.internal.util.HexDump
+import com.android.net.module.util.NetworkStackConstants.ETHER_ADDR_LEN
+import com.android.net.module.util.NetworkStackConstants.ETHER_DST_ADDR_OFFSET
+import com.android.net.module.util.NetworkStackConstants.ETHER_HEADER_LEN
+import com.android.net.module.util.NetworkStackConstants.ETHER_SRC_ADDR_OFFSET
+import com.android.net.module.util.NetworkStackConstants.ICMPV6_HEADER_MIN_LEN
+import com.android.net.module.util.NetworkStackConstants.IPV6_ADDR_LEN
 import com.android.net.module.util.PacketReader
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
@@ -216,8 +229,8 @@ class ApfIntegrationTest {
             Os.sendto(sockFd!!, packet, 0, packet.size, 0, PING_DESTINATION)
         }
 
-        fun expectPingReply(): ByteArray {
-            return futureReply!!.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        fun expectPingReply(timeoutMs: Long = TIMEOUT_MS): ByteArray {
+            return futureReply!!.get(timeoutMs, TimeUnit.MILLISECONDS)
         }
 
         fun expectPingDropped() {
@@ -621,5 +634,104 @@ class ApfIntegrationTest {
         // Assert that filter age has increased, but not too much.
         assertThat(timeDiff).isGreaterThan(timeDiffLowerBound)
         assertThat(timeDiff).isLessThan(timeDiffUpperBound)
+    }
+
+    @VsrTest(
+            requirements = ["VSR-5.3.12-002", "VSR-5.3.12-005", "VSR-5.3.12-012", "VSR-5.3.12-013",
+                "VSR-5.3.12-014", "VSR-5.3.12-015", "VSR-5.3.12-016", "VSR-5.3.12-017"]
+    )
+    @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Test
+    fun testReplyPing() {
+        assumeApfVersionSupportAtLeast(6000)
+        installProgram(ByteArray(caps.maximumApfProgramSize) { 0 }) // Clear previous program
+        readProgram() // Ensure installation is complete
+
+        val payloadSize = 56
+        val payload = ByteArray(payloadSize).also { Random.nextBytes(it) }
+        val firstByte = payload.take(1).toByteArray()
+
+        val pingRequestIpv6PayloadLen = PING_HEADER_LENGTH + 1
+        val pingRequestPktLen = ETH_HEADER_LEN + IPV6_HEADER_LEN + pingRequestIpv6PayloadLen
+
+        val gen = ApfV6Generator(
+                caps.apfVersionSupported,
+                caps.maximumApfProgramSize,
+                caps.maximumApfProgramSize
+        )
+        val skipPacketLabel = gen.uniqueLabel
+
+        // Summary of the program:
+        //   if the packet is not ICMPv6 echo reply
+        //     pass
+        //   else if the echo reply payload size is 1
+        //     increase PASSED_IPV6_ICMP counter
+        //     pass
+        //   else
+        //     transmit a ICMPv6 echo request packet with the first byte of the payload in the reply
+        //     increase DROPPED_IPV6_MULTICAST_PING counter
+        //     drop
+        val program = gen
+                .addLoad16(R0, ETH_ETHERTYPE_OFFSET)
+                .addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), skipPacketLabel)
+                .addLoad8(R0, IPV6_NEXT_HEADER_OFFSET)
+                .addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), skipPacketLabel)
+                .addLoad8(R0, ICMP6_TYPE_OFFSET)
+                .addJumpIfR0NotEquals(0x81, skipPacketLabel) // Echo reply type
+                .addLoadFromMemory(R0, MemorySlot.PACKET_SIZE)
+                .addCountAndPassIfR0Equals(
+                        (ETHER_HEADER_LEN + IPV6_HEADER_LEN + PING_HEADER_LENGTH + firstByte.size)
+                                .toLong(),
+                        PASSED_IPV6_ICMP
+                )
+                // Ping Packet Generation
+                .addAllocate(pingRequestPktLen)
+                // Eth header
+                .addPacketCopy(ETHER_SRC_ADDR_OFFSET, ETHER_ADDR_LEN) // dst MAC address
+                .addPacketCopy(ETHER_DST_ADDR_OFFSET, ETHER_ADDR_LEN) // src MAC address
+                .addWriteU16(ETH_P_IPV6) // IPv6 type
+                // IPv6 Header
+                .addWrite32(0x60000000) // IPv6 Header: version, traffic class, flowlabel
+                // payload length (2 bytes) | next header: ICMPv6 (1 byte) | hop limit (1 byte)
+                .addWrite32(pingRequestIpv6PayloadLen shl 16 or (IPPROTO_ICMPV6 shl 8 or 64))
+                .addPacketCopy(IPV6_DEST_ADDR_OFFSET, IPV6_ADDR_LEN) // src ip
+                .addPacketCopy(IPV6_SRC_ADDR_OFFSET, IPV6_ADDR_LEN) // dst ip
+                // ICMPv6
+                .addWriteU8(0x80) // type: echo request
+                .addWriteU8(0) // code
+                .addWriteU16(pingRequestIpv6PayloadLen) // checksum
+                // identifier
+                .addPacketCopy(ETHER_HEADER_LEN + IPV6_HEADER_LEN + ICMPV6_HEADER_MIN_LEN, 2)
+                .addWriteU16(0) // sequence number
+                .addDataCopy(firstByte) // data
+                .addTransmitL4(
+                        ETHER_HEADER_LEN, // ip_ofs
+                        ICMP6_CHECKSUM_OFFSET, // csum_ofs
+                        IPV6_SRC_ADDR_OFFSET, // csum_start
+                        IPPROTO_ICMPV6, // partial_sum
+                        false // udp
+                )
+                // Warning: the program abuse DROPPED_IPV6_MULTICAST_PING for debugging purpose
+                .addCountAndDrop(DROPPED_IPV6_MULTICAST_PING)
+                .defineLabel(skipPacketLabel)
+                .addPass()
+                .generate()
+
+        installProgram(program)
+        readProgram() // Ensure installation is complete
+
+        packetReader.sendPing(payload, payloadSize)
+
+        val replyPayload = try {
+            packetReader.expectPingReply(TIMEOUT_MS * 2)
+        } catch (e: TimeoutException) {
+            byteArrayOf() // Empty payload if timeout occurs
+        }
+
+        val apfCounterTracker = ApfCounterTracker()
+        apfCounterTracker.updateCountersFromData(readProgram())
+        Log.i(TAG, "counter map: ${apfCounterTracker.counters}")
+
+        assertThat(replyPayload).isEqualTo(firstByte)
     }
 }
