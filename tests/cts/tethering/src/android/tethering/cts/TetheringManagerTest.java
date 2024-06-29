@@ -235,6 +235,12 @@ public class TetheringManagerTest {
         assertEquals(TETHERING_USB, tr2.getTetheringType());
         assertTrue(tr2.isExemptFromEntitlementCheck());
         assertFalse(tr2.getShouldShowEntitlementUi());
+
+        final TetheringRequest tr3 = new TetheringRequest.Builder(TETHERING_USB)
+                .setStaticIpv4Addresses(localAddr, clientAddr)
+                .setExemptFromEntitlementCheck(true)
+                .setShouldShowEntitlementUi(false).build();
+        assertEquals(tr2, tr3);
     }
 
     @Test
@@ -246,15 +252,7 @@ public class TetheringManagerTest {
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false).build();
         final TetheringRequest parceled = ParcelUtils.parcelingRoundTrip(unparceled);
-        assertEquals(unparceled.getTetheringType(), parceled.getTetheringType());
-        assertEquals(unparceled.getConnectivityScope(), parceled.getConnectivityScope());
-        assertEquals(unparceled.getLocalIpv4Address(), parceled.getLocalIpv4Address());
-        assertEquals(unparceled.getClientStaticIpv4Address(),
-                parceled.getClientStaticIpv4Address());
-        assertEquals(unparceled.isExemptFromEntitlementCheck(),
-                parceled.isExemptFromEntitlementCheck());
-        assertEquals(unparceled.getShouldShowEntitlementUi(),
-                parceled.getShouldShowEntitlementUi());
+        assertEquals(unparceled, parceled);
     }
 
     @Test
