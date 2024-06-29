@@ -62,6 +62,17 @@ public class RtNetlinkLinkMessage extends NetlinkMessage {
         mInterfaceName = null;
     }
 
+    @VisibleForTesting
+    public RtNetlinkLinkMessage(@NonNull StructNlMsgHdr nlmsghdr,
+            int mtu, @NonNull StructIfinfoMsg ifinfomsg, @NonNull MacAddress hardwareAddress,
+            @NonNull String interfaceName) {
+        super(nlmsghdr);
+        mMtu = mtu;
+        mIfinfomsg = ifinfomsg;
+        mHardwareAddress = hardwareAddress;
+        mInterfaceName = interfaceName;
+    }
+
     public int getMtu() {
         return mMtu;
     }
