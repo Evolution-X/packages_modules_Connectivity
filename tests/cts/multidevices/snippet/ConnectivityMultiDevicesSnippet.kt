@@ -36,6 +36,7 @@ import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiSsid
 import androidx.test.platform.app.InstrumentationRegistry
+import com.android.modules.utils.build.SdkLevel
 import com.android.testutils.AutoReleaseNetworkCallbackRule
 import com.android.testutils.ConnectUtil
 import com.android.testutils.NetworkCallbackHelper
@@ -70,6 +71,9 @@ class ConnectivityMultiDevicesSnippet : Snippet {
 
     @Rpc(description = "Check whether the device supporters AP + STA concurrency.")
     fun isStaApConcurrencySupported() = wifiManager.isStaApConcurrencySupported()
+
+    @Rpc(description = "Check whether the device SDK is as least T")
+    fun isAtLeastT() = SdkLevel.isAtLeastT()
 
     @Rpc(description = "Request cellular connection and ensure it is the default network.")
     fun requestCellularAndEnsureDefault() {
