@@ -267,6 +267,10 @@
     },
     {
       "name": "FrameworksNetTests"
+    },
+    // TODO: Move to presumit after meet SLO requirement.
+    {
+      "name": "NetworkStaticLibHostPythonTests"
     }
   ],
   "mainline-presubmit": [
