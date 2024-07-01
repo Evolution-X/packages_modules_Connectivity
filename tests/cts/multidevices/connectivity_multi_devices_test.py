@@ -5,9 +5,8 @@ from mobly import base_test
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
-from utils import mdns_utils
-from utils import tether_utils
-from utils.tether_utils import UpstreamType
+from net_tests_utils.host.python import mdns_utils, tether_utils
+from net_tests_utils.host.python.tether_utils import UpstreamType
 
 CONNECTIVITY_MULTI_DEVICES_SNIPPET_PACKAGE = "com.google.snippet.connectivity"
 
