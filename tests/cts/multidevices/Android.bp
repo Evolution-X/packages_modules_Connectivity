@@ -22,10 +22,10 @@ python_test_host {
     main: "connectivity_multi_devices_test.py",
     srcs: [
         "connectivity_multi_devices_test.py",
-        "utils/*.py",
     ],
     libs: [
         "mobly",
+        "net-tests-utils-host-python-common",
     ],
     test_suites: [
         "cts",
