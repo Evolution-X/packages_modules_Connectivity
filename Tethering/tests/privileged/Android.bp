@@ -53,4 +53,5 @@ android_test {
         "TetheringApiCurrentLib",
     ],
     compile_multilib: "both",
+    min_sdk_version: "30",
 }
