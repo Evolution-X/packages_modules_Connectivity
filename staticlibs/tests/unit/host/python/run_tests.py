@@ -18,6 +18,7 @@ import unittest
 
 # Import all unittest classes here, so it can be discovered by unittest module.
 # TODO: make the tests can be executed without manually import classes.
+from host.python.adb_utils_test import TestAdbUtils
 from host.python.assert_utils_test import TestAssertUtils
 
 
