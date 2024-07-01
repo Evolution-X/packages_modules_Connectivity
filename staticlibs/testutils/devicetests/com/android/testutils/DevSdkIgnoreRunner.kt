@@ -90,25 +90,10 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
         Modifier.isStatic(it.modifiers) &&
                 it.isAnnotationPresent(Parameterized.Parameters::class.java) }
 
-    override fun run(notifier: RunNotifier) {
-        if (baseRunner == null) {
-            // Report a single, skipped placeholder test for this class, as the class is expected to
-            // report results when run. In practice runners that apply the Filterable implementation
-            // would see a NoTestsRemainException and not call the run method.
-            notifier.fireTestIgnored(
-                    Description.createTestDescription(klass, "skippedClassForDevSdkMismatch"))
-            return
-        }
-        if (!shouldThreadLeakFailTest) {
-            baseRunner.run(notifier)
-            return
-        }
-
-        // Dump threads as a baseline to monitor thread leaks.
-        val threadCountsBeforeTest = getAllThreadNameCounts()
-
-        baseRunner.run(notifier)
-
+    private fun checkThreadLeak(
+            notifier: RunNotifier,
+            threadCountsBeforeTest: Map<String, Int>
+    ) {
         notifier.fireTestStarted(leakMonitorDesc)
         val threadCountsAfterTest = getAllThreadNameCounts()
         // TODO : move CompareOrUpdateResult to its own util instead of LinkProperties.
@@ -122,13 +107,39 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
         val increasedThreads = threadsDiff.updated
                 .filter { threadCountsBeforeTest[it.key]!! < it.value }
         if (threadsDiff.added.isNotEmpty() || increasedThreads.isNotEmpty()) {
-            notifier.fireTestFailure(Failure(leakMonitorDesc,
-                    IllegalStateException("Unexpected thread changes: $threadsDiff")))
+            notifier.fireTestFailure(Failure(
+                    leakMonitorDesc,
+                    IllegalStateException("Unexpected thread changes: $threadsDiff")
+            ))
+        }
+        notifier.fireTestFinished(leakMonitorDesc)
+    }
+
+    override fun run(notifier: RunNotifier) {
+        if (baseRunner == null) {
+            // Report a single, skipped placeholder test for this class, as the class is expected to
+            // report results when run. In practice runners that apply the Filterable implementation
+            // would see a NoTestsRemainException and not call the run method.
+            notifier.fireTestIgnored(
+                    Description.createTestDescription(klass, "skippedClassForDevSdkMismatch")
+            )
+            return
+        }
+        val threadCountsBeforeTest = if (shouldThreadLeakFailTest) {
+            // Dump threads as a baseline to monitor thread leaks.
+            getAllThreadNameCounts()
+        } else {
+            null
+        }
+
+        baseRunner.run(notifier)
+
+        if (threadCountsBeforeTest != null) {
+            checkThreadLeak(notifier, threadCountsBeforeTest)
         }
         // Clears up internal state of all inline mocks.
         // TODO: Call clearInlineMocks() at the end of each test.
         Mockito.framework().clearInlineMocks()
-        notifier.fireTestFinished(leakMonitorDesc)
     }
 
     private fun getAllThreadNameCounts(): Map<String, Int> {
