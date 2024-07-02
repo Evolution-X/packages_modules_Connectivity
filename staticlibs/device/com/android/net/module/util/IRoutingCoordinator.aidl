@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
-package android.net;
+package com.android.net.module.util;
 
 import android.net.RouteInfo;
 
 /** @hide */
+// TODO: b/350630377 - This @Descriptor annotation workaround is to prevent the DESCRIPTOR from
+// being jarjared which changes the DESCRIPTOR and casues "java.lang.SecurityException: Binder
+// invocation to an incorrect interface" when calling the IPC.
+@Descriptor("value=no.jarjar.com.android.net.module.util.IRoutingCoordinator")
 interface IRoutingCoordinator {
    /**
     * Add a route for specific network
