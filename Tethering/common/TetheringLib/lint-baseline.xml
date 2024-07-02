@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.4.0-alpha08" type="baseline" client="" dependencies="true" name="" variant="all" version="8.4.0-alpha08">
+
+    <issue
+        id="FlaggedApi"
+        message="Field `TETHERING_VIRTUAL` is a flagged API and should be inside an `if (Flags.tetheringRequestVirtual())` check (or annotate the surrounding method `?` with `@FlaggedApi(Flags.TETHERING_REQUEST_VIRTUAL) to transfer requirement to caller`)"
+        errorLine1="    public static final int MAX_TETHERING_TYPE = TETHERING_VIRTUAL;"
+        errorLine2="                                                 ~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/Tethering/common/TetheringLib/src/android/net/TetheringManager.java"
+            line="211"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="FlaggedApi"
+        message="Method `TetheringRequest()` is a flagged API and should be inside an `if (Flags.tetheringRequestWithSoftApConfig())` check (or annotate the surrounding method `build` with `@FlaggedApi(Flags.TETHERING_REQUEST_WITH_SOFT_AP_CONFIG) to transfer requirement to caller`)"
+        errorLine1="                return new TetheringRequest(mBuilderParcel);"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="packages/modules/Connectivity/Tethering/common/TetheringLib/src/android/net/TetheringManager.java"
+            line="814"
+            column="24"/>
+    </issue>
+
+</issues>
