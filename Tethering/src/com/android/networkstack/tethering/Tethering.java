@@ -2400,9 +2400,6 @@ public class Tethering {
                 hasCallingPermission(NETWORK_SETTINGS)
                         || hasCallingPermission(PERMISSION_MAINLINE_NETWORK_STACK)
                         || hasCallingPermission(NETWORK_STACK);
-        if (callback == null) {
-            throw new NullPointerException();
-        }
         mHandler.post(() -> {
             mTetheringEventCallbacks.register(callback, new CallbackCookie(hasListPermission));
             final TetheringCallbackStartedParcel parcel = new TetheringCallbackStartedParcel();
@@ -2440,9 +2437,6 @@ public class Tethering {
 
     /** Unregister tethering event callback */
     void unregisterTetheringEventCallback(ITetheringEventCallback callback) {
-        if (callback == null) {
-            throw new NullPointerException();
-        }
         mHandler.post(() -> {
             mTetheringEventCallbacks.unregister(callback);
         });
