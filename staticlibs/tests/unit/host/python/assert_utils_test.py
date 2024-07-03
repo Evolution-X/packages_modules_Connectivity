@@ -12,11 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import unittest
+from mobly import asserts
+from mobly import base_test
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError, expect_with_retry
 
 
-class TestAssertUtils(unittest.TestCase):
+class TestAssertUtils(base_test.BaseTestClass):
 
   def test_predicate_succeed(self):
     """Test when the predicate becomes True within retries."""
@@ -28,12 +29,12 @@ class TestAssertUtils(unittest.TestCase):
       return call_count > 2  # True on the third call
 
     expect_with_retry(predicate, max_retries=5, retry_interval_sec=0)
-    self.assertEqual(call_count, 3)  # Ensure it was called exactly 3 times
+    asserts.assert_equal(call_count, 3)  # Ensure it was called exactly 3 times
 
   def test_predicate_failed(self):
     """Test when the predicate never becomes True."""
 
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       expect_with_retry(
           predicate=lambda: False, max_retries=3, retry_interval_sec=0
       )
@@ -52,7 +53,9 @@ class TestAssertUtils(unittest.TestCase):
         max_retries=5,
         retry_interval_sec=0,
     )
-    self.assertFalse(retry_action_called)  # Assert retry_action was NOT called
+    asserts.assert_false(
+        retry_action_called, "retry_action called."
+    )  # Assert retry_action was NOT called
 
   def test_retry_action_not_called_failed(self):
     """Test that the retry_action is not called if the max_retries is reached."""
@@ -62,14 +65,16 @@ class TestAssertUtils(unittest.TestCase):
       nonlocal retry_action_called
       retry_action_called = True
 
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       expect_with_retry(
           predicate=lambda: False,
           retry_action=retry_action,
           max_retries=1,
           retry_interval_sec=0,
       )
-    self.assertFalse(retry_action_called)  # Assert retry_action was NOT called
+    asserts.assert_false(
+        retry_action_called, "retry_action called."
+    )  # Assert retry_action was NOT called
 
   def test_retry_action_called(self):
     """Test that the retry_action is executed when provided."""
@@ -79,11 +84,11 @@ class TestAssertUtils(unittest.TestCase):
       nonlocal retry_action_called
       retry_action_called = True
 
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       expect_with_retry(
           predicate=lambda: False,
           retry_action=retry_action,
           max_retries=2,
           retry_interval_sec=0,
       )
-    self.assertTrue(retry_action_called)
+    asserts.assert_true(retry_action_called, "retry_action not called.")

@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import unittest
 from unittest.mock import MagicMock, patch
+from mobly import asserts
+from mobly import base_test
+from mobly import config_parser
 from mobly.controllers.android_device_lib.adb import AdbError
 from net_tests_utils.host.python.apf_utils import (
     PatternNotFoundException,
@@ -27,9 +29,12 @@ from net_tests_utils.host.python.apf_utils import (
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError
 
 
-class TestApfUtils(unittest.TestCase):
+class TestApfUtils(base_test.BaseTestClass):
 
-  def setUp(self):
+  def __init__(self, configs: config_parser.TestRunConfig):
+    super().__init__(configs)
+
+  def setup_test(self):
     self.mock_ad = MagicMock()  # Mock Android device object
 
   @patch("net_tests_utils.host.python.adb_utils.get_dumpsys_for_service")
@@ -43,7 +48,7 @@ IpClient.wlan0
     COUNTER_NAME2: 456
 """
     counters = get_apf_counters_from_dumpsys(self.mock_ad, "wlan0")
-    self.assertEqual(counters, {"COUNTER_NAME1": 123, "COUNTER_NAME2": 456})
+    asserts.assert_equal(counters, {"COUNTER_NAME1": 123, "COUNTER_NAME2": 456})
 
   @patch("net_tests_utils.host.python.adb_utils.get_dumpsys_for_service")
   def test_get_apf_counters_from_dumpsys_exceptions(
@@ -63,7 +68,7 @@ IpClient.wlan1
 
     for dumpsys_output in test_cases:
       mock_get_dumpsys.return_value = dumpsys_output
-      with self.assertRaises(PatternNotFoundException):
+      with asserts.assert_raises(PatternNotFoundException):
         get_apf_counters_from_dumpsys(self.mock_ad, "wlan0")
 
   @patch("net_tests_utils.host.python.apf_utils.get_apf_counters_from_dumpsys")
@@ -73,9 +78,13 @@ IpClient.wlan1
         "COUNTER_NAME1": 123,
         "COUNTER_NAME2": 456,
     }
-    self.assertEqual(get_apf_counter(self.mock_ad, iface, "COUNTER_NAME1"), 123)
+    asserts.assert_equal(
+        get_apf_counter(self.mock_ad, iface, "COUNTER_NAME1"), 123
+    )
     # Not found
-    self.assertEqual(get_apf_counter(self.mock_ad, iface, "COUNTER_NAME3"), 0)
+    asserts.assert_equal(
+        get_apf_counter(self.mock_ad, iface, "COUNTER_NAME3"), 0
+    )
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_get_hardware_address_success(
@@ -86,14 +95,14 @@ IpClient.wlan1
  link/ether 72:05:77:82:21:e0 brd ff:ff:ff:ff:ff:ff
 """
     mac_address = get_hardware_address(self.mock_ad, "wlan0")
-    self.assertEqual(mac_address, "72:05:77:82:21:E0")
+    asserts.assert_equal(mac_address, "72:05:77:82:21:E0")
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_get_hardware_address_not_found(
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = "Some output without MAC address"
-    with self.assertRaises(PatternNotFoundException):
+    with asserts.assert_raises(PatternNotFoundException):
       get_hardware_address(self.mock_ad, "wlan0")
 
   @patch("net_tests_utils.host.python.apf_utils.get_hardware_address")
@@ -133,7 +142,7 @@ IpClient.wlan1
     mock_adb_shell.return_value = (  # Unexpected command output
         "Any Unexpected Output"
     )
-    with self.assertRaises(UnexpectedBehaviorError):
+    with asserts.assert_raises(UnexpectedBehaviorError):
       send_raw_packet_downstream(
           self.mock_ad, "BEEF", "eth0", "1234567890AB", "AABBCCDDEEFF"
       )
@@ -145,11 +154,7 @@ IpClient.wlan1
     mock_adb_shell.side_effect = AdbError(
         cmd="", stdout="Unknown command", stderr="", ret_code=3
     )
-    with self.assertRaises(UnsupportedOperationException):
+    with asserts.assert_raises(UnsupportedOperationException):
       send_raw_packet_downstream(
           self.mock_ad, "BEEF", "eth0", "1234567890AB", "AABBCCDDEEFF"
       )
-
-
-if __name__ == "__main__":
-  unittest.main()

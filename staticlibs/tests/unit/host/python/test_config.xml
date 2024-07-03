@@ -14,9 +14,11 @@
      limitations under the License.
 -->
 <configuration description="Config for NetworkStaticLibHostPythonTests">
-    <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer" />
-    <test class="com.android.tradefed.testtype.python.PythonBinaryHostTest">
-        <option name="par-file-name" value="NetworkStaticLibHostPythonTests" />
-        <option name="test-timeout" value="3m" />
+    <target_preparer class="com.android.tradefed.targetprep.PythonVirtualenvPreparer">
+        <option name="dep-module" value="absl-py" />
+    </target_preparer>
+    <test class="com.android.tradefed.testtype.mobly.MoblyBinaryHostTest" >
+        <option name="mobly-par-file-name" value="NetworkStaticLibHostPythonTests" />
+        <option name="mobly-test-timeout" value="3m" />
     </test>
 </configuration>
