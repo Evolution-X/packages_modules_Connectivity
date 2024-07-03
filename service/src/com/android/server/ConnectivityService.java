@@ -145,6 +145,7 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
+import static com.android.server.connectivity.ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS;
 import static com.android.server.connectivity.ConnectivityFlags.REQUEST_RESTRICTED_WIFI;
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 
@@ -509,6 +510,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final boolean mBackgroundFirewallChainEnabled;
 
     private final boolean mUseDeclaredMethodsForCallbacksEnabled;
+
+    // Flag to delay callbacks for frozen apps, suppressing duplicate and stale callbacks.
+    private final boolean mQueueCallbacksForFrozenApps;
 
     /**
      * Uids ConnectivityService tracks blocked status of to send blocked status callbacks.
@@ -1873,6 +1877,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 context, ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN);
         mUseDeclaredMethodsForCallbacksEnabled = mDeps.isFeatureEnabled(context,
                 ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
+        // registerUidFrozenStateChangedCallback is only available on U+
+        mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
+                && mDeps.isFeatureEnabled(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
         mCarrierPrivilegeAuthenticator = mDeps.makeCarrierPrivilegeAuthenticator(
                 mContext, mTelephonyManager, mRequestRestrictedWifiEnabled,
                 this::handleUidCarrierPrivilegesLost, mHandler);
@@ -2028,7 +2035,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mDelayDestroySockets = mDeps.isFeatureNotChickenedOut(context, DELAY_DESTROY_SOCKETS);
         mAllowSysUiConnectivityReports = mDeps.isFeatureNotChickenedOut(
                 mContext, ALLOW_SYSUI_CONNECTIVITY_REPORTS);
-        if (mDestroyFrozenSockets) {
+        if (mDestroyFrozenSockets || mQueueCallbacksForFrozenApps) {
             final UidFrozenStateChangedCallback frozenStateChangedCallback =
                     new UidFrozenStateChangedCallback() {
                 @Override
@@ -3464,6 +3471,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     private void handleFrozenUids(int[] uids, int[] frozenStates) {
         ensureRunningOnConnectivityServiceThread();
+        handleDestroyFrozenSockets(uids, frozenStates);
+        // TODO: handle freezing NetworkCallbacks
+    }
+
+    private void handleDestroyFrozenSockets(int[] uids, int[] frozenStates) {
+        if (!mDestroyFrozenSockets) {
+            return;
+        }
         for (int i = 0; i < uids.length; i++) {
             final int uid = uids[i];
             final boolean addReason = frozenStates[i] == UID_FROZEN_STATE_FROZEN;
