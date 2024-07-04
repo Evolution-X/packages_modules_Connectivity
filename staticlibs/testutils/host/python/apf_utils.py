@@ -142,6 +142,19 @@ def send_broadcast_empty_ethercat_packet(
   send_raw_packet_downstream(ad, iface_name, packet)
 
 
+def is_send_raw_packet_downstream_supported(
+    ad: android_device.AndroidDevice,
+) -> bool:
+  try:
+    # Invoke the shell command with empty argument and see how NetworkStack respond.
+    # If supported, an IllegalArgumentException with help page will be printed.
+    send_raw_packet_downstream(ad, "", "")
+  except assert_utils.UnexpectedBehaviorError:
+    return True
+  except UnsupportedOperationException:
+    return False
+
+
 def send_raw_packet_downstream(
     ad: android_device.AndroidDevice,
     iface_name: str,
