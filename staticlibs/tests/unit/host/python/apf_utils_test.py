@@ -122,17 +122,13 @@ IpClient.wlan1
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = ""  # Successful command output
-    packet_type = "BEEF"
     iface_name = "eth0"
-    dst_mac = "1234567890AB"
     packet_in_hex = "AABBCCDDEEFF"
-    send_raw_packet_downstream(
-        self.mock_ad, packet_type, iface_name, dst_mac, packet_in_hex
-    )
+    send_raw_packet_downstream(self.mock_ad, iface_name, packet_in_hex)
     mock_adb_shell.assert_called_once_with(
         self.mock_ad,
         "cmd network_stack send-raw-packet-downstream"
-        f" {packet_type} {iface_name} {dst_mac} {packet_in_hex}",
+        f" {iface_name} {packet_in_hex}",
     )
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
@@ -143,9 +139,7 @@ IpClient.wlan1
         "Any Unexpected Output"
     )
     with asserts.assert_raises(UnexpectedBehaviorError):
-      send_raw_packet_downstream(
-          self.mock_ad, "BEEF", "eth0", "1234567890AB", "AABBCCDDEEFF"
-      )
+      send_raw_packet_downstream(self.mock_ad, "eth0", "AABBCCDDEEFF")
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_send_raw_packet_downstream_unsupported(
@@ -155,6 +149,4 @@ IpClient.wlan1
         cmd="", stdout="Unknown command", stderr="", ret_code=3
     )
     with asserts.assert_raises(UnsupportedOperationException):
-      send_raw_packet_downstream(
-          self.mock_ad, "BEEF", "eth0", "1234567890AB", "AABBCCDDEEFF"
-      )
+      send_raw_packet_downstream(self.mock_ad, "eth0", "AABBCCDDEEFF")
