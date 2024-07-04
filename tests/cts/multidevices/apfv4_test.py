@@ -12,32 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from mobly import asserts
-from net_tests_utils.host.python import adb_utils, apf_test_base, apf_utils, assert_utils, tether_utils
-from net_tests_utils.host.python.tether_utils import UpstreamType
+from net_tests_utils.host.python import apf_test_base
 
+# Constants.
 COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED = "DROPPED_ETHERTYPE_NOT_ALLOWED"
+ETHER_BROADCAST_ADDR = "FFFFFFFFFFFF"
+ETH_P_ETHERCAT = "88A4"
 
 
 class ApfV4Test(apf_test_base.ApfTestBase):
 
   def test_apf_drop_ethercat(self):
-    count_before_test = apf_utils.get_apf_counter(
-        self.clientDevice,
-        self.client_iface_name,
-        COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED,
-    )
-    apf_utils.send_broadcast_empty_ethercat_packet(
-        self.serverDevice, self.server_iface_name
-    )
+    # Ethernet header (14 bytes).
+    packet = ETHER_BROADCAST_ADDR  # Destination MAC (broadcast)
+    packet += self.server_mac_address.replace(":", "")  # Source MAC
+    packet += ETH_P_ETHERCAT  # EtherType (EtherCAT)
 
-    assert_utils.expect_with_retry(
-        lambda: apf_utils.get_apf_counter(
-            self.clientDevice,
-            self.client_iface_name,
-            COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED,
-        )
-        > count_before_test
+    # EtherCAT header (2 bytes) + 44 bytes of zero padding.
+    packet += "00" * 46
+    self.send_packet_and_expect_counter_increased(
+        packet, COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED
     )
-
-    # TODO: Verify the packet is not actually received.
