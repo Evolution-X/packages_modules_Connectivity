@@ -44,13 +44,18 @@ object NULL_NETWORK : Network(-1)
 object ANY_NETWORK : Network(-2)
 fun anyNetwork() = ANY_NETWORK
 
-open class RecorderCallback private constructor(
-    private val backingRecord: ArrayTrackRecord<CallbackEntry>
-) : NetworkCallback() {
-    public constructor() : this(ArrayTrackRecord())
-    protected constructor(src: RecorderCallback?) : this(src?.backingRecord ?: ArrayTrackRecord())
+private val DEFAULT_TAG = RecorderCallback::class.simpleName
+    ?: fail("Could not determine class name")
 
-    private val TAG = this::class.simpleName
+open class RecorderCallback private constructor(
+    private val backingRecord: ArrayTrackRecord<CallbackEntry>,
+    val logTag: String
+) : NetworkCallback() {
+    public constructor(logTag: String = DEFAULT_TAG) : this(ArrayTrackRecord(), logTag)
+    protected constructor(src: RecorderCallback?, logTag: String) : this(
+        src?.backingRecord ?: ArrayTrackRecord(),
+        logTag
+    )
 
     sealed class CallbackEntry {
         // To get equals(), hashcode(), componentN() etc for free, the child classes of
@@ -123,7 +128,7 @@ open class RecorderCallback private constructor(
     val mark get() = history.mark
 
     override fun onAvailable(network: Network) {
-        Log.d(TAG, "onAvailable $network")
+        Log.d(logTag, "onAvailable $network")
         history.add(Available(network))
     }
 
@@ -131,22 +136,22 @@ open class RecorderCallback private constructor(
     // expect the callbacks not to record this, do not listen to PreCheck here.
 
     override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-        Log.d(TAG, "onCapabilitiesChanged $network $caps")
+        Log.d(logTag, "onCapabilitiesChanged $network $caps")
         history.add(CapabilitiesChanged(network, caps))
     }
 
     override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
-        Log.d(TAG, "onLinkPropertiesChanged $network $lp")
+        Log.d(logTag, "onLinkPropertiesChanged $network $lp")
         history.add(LinkPropertiesChanged(network, lp))
     }
 
     override fun onLocalNetworkInfoChanged(network: Network, info: LocalNetworkInfo) {
-        Log.d(TAG, "onLocalNetworkInfoChanged $network $info")
+        Log.d(logTag, "onLocalNetworkInfoChanged $network $info")
         history.add(LocalInfoChanged(network, info))
     }
 
     override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
-        Log.d(TAG, "onBlockedStatusChanged $network $blocked")
+        Log.d(logTag, "onBlockedStatusChanged $network $blocked")
         history.add(BlockedStatus(network, blocked))
     }
 
@@ -154,27 +159,27 @@ open class RecorderCallback private constructor(
     // fun onBlockedStatusChanged(network: Network, blocked: Int) {
     // because on S, that needs to be "override fun", and on R, that cannot be "override fun".
     override fun onNetworkSuspended(network: Network) {
-        Log.d(TAG, "onNetworkSuspended $network $network")
+        Log.d(logTag, "onNetworkSuspended $network $network")
         history.add(Suspended(network))
     }
 
     override fun onNetworkResumed(network: Network) {
-        Log.d(TAG, "$network onNetworkResumed $network")
+        Log.d(logTag, "$network onNetworkResumed $network")
         history.add(Resumed(network))
     }
 
     override fun onLosing(network: Network, maxMsToLive: Int) {
-        Log.d(TAG, "onLosing $network $maxMsToLive")
+        Log.d(logTag, "onLosing $network $maxMsToLive")
         history.add(Losing(network, maxMsToLive))
     }
 
     override fun onLost(network: Network) {
-        Log.d(TAG, "onLost $network")
+        Log.d(logTag, "onLost $network")
         history.add(Lost(network))
     }
 
     override fun onUnavailable() {
-        Log.d(TAG, "onUnavailable")
+        Log.d(logTag, "onUnavailable")
         history.add(Unavailable())
     }
 }
@@ -188,10 +193,11 @@ private val NOOP = Runnable {}
  */
 open class TestableNetworkCallback private constructor(
     src: TestableNetworkCallback?,
-    val defaultTimeoutMs: Long = DEFAULT_TIMEOUT,
-    val defaultNoCallbackTimeoutMs: Long = DEFAULT_NO_CALLBACK_TIMEOUT,
-    val waiterFunc: Runnable = NOOP // "() -> Unit" would forbid calling with a void func from Java
-) : RecorderCallback(src) {
+    val defaultTimeoutMs: Long,
+    val defaultNoCallbackTimeoutMs: Long,
+    val waiterFunc: Runnable,
+    logTag: String
+) : RecorderCallback(src, logTag) {
     /**
      * Construct a testable network callback.
      * @param timeoutMs the default timeout for expecting a callback. Default 30 seconds. This
@@ -213,14 +219,16 @@ open class TestableNetworkCallback private constructor(
     constructor(
         timeoutMs: Long = DEFAULT_TIMEOUT,
         noCallbackTimeoutMs: Long = DEFAULT_NO_CALLBACK_TIMEOUT,
-        waiterFunc: Runnable = NOOP
-    ) : this(null, timeoutMs, noCallbackTimeoutMs, waiterFunc)
+        waiterFunc: Runnable = NOOP, // "() -> Unit" would forbid calling with a void func from Java
+        logTag: String = DEFAULT_TAG
+    ) : this(null, timeoutMs, noCallbackTimeoutMs, waiterFunc, logTag)
 
     fun createLinkedCopy() = TestableNetworkCallback(
         this,
         defaultTimeoutMs,
         defaultNoCallbackTimeoutMs,
-        waiterFunc
+        waiterFunc,
+        logTag
     )
 
     // The last available network, or null if any network was lost since the last call to
