@@ -48,8 +48,8 @@
              those tests with an annotation matching the name of the APK.
 
              This allows us to maintain one AndroidTestTemplate.xml for all CtsNetTestCases*.apk,
-             and have CtsNetTestCases and CtsNetTestCasesLatestSdk run all tests, but have
-             CtsNetTestCasesMaxTargetSdk31 run only tests that require target SDK 31.
+             and have CtsNetTestCases run all tests, but have CtsNetTestCasesMaxTargetSdk31 run only
+             tests that require target SDK 31.
 
              This relies on the fact that if the class specified in include-annotation exists, then
              the runner will only run the tests annotated with that annotation, but if it does not,
