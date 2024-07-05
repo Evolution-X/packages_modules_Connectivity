@@ -1,7 +1,7 @@
 {
   "captiveportal-networkstack-resolve-tethering-mainline-presubmit": [
     {
-      "name": "CtsNetTestCasesLatestSdk",
+      "name": "CtsNetTestCases",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -89,7 +89,7 @@
     // Test with APK modules only, in cases where APEX is not supported, or the other modules
     // were simply not updated
     {
-      "name": "CtsNetTestCasesLatestSdk",
+      "name": "CtsNetTestCases",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -115,7 +115,7 @@
     // really exist in the field, but there is no strong guarantee, and it is required by MTS
     // testing for module qualification, where modules are tested independently.
     {
-      "name": "CtsNetTestCasesLatestSdk",
+      "name": "CtsNetTestCases",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -158,22 +158,8 @@
     },
     // Run in addition to mainline-presubmit as mainline-presubmit is not
     // supported in every branch.
-    // CtsNetTestCasesLatestSdk uses stable API shims, so does not exercise
-    // some latest APIs. Run CtsNetTestCases to get coverage of newer APIs.
     {
       "name": "CtsNetTestCases",
-      "options": [
-        {
-          "exclude-annotation": "com.android.testutils.SkipPresubmit"
-        },
-        {
-          "exclude-annotation": "androidx.test.filters.RequiresDevice"
-        }
-      ]
-    },
-    // Also run CtsNetTestCasesLatestSdk to ensure tests using older shims pass.
-    {
-      "name": "CtsNetTestCasesLatestSdk",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -275,7 +261,7 @@
   ],
   "mainline-presubmit": [
     {
-      "name": "CtsNetTestCasesLatestSdk[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
+      "name": "CtsNetTestCases[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -333,7 +319,7 @@
     // Test with APK modules only, in cases where APEX is not supported, or the other modules
     // were simply not updated
     {
-      "name": "CtsNetTestCasesLatestSdk[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk]",
+      "name": "CtsNetTestCases[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk]",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -357,7 +343,7 @@
     // really exist in the field, but there is no strong guarantee, and it is required by MTS
     // testing for module qualification, where modules are tested independently.
     {
-      "name": "CtsNetTestCasesLatestSdk[com.google.android.tethering.apex]",
+      "name": "CtsNetTestCases[com.google.android.tethering.apex]",
       "options": [
         {
           "exclude-annotation": "com.android.testutils.SkipPresubmit"
@@ -408,7 +394,7 @@
   "mainline-postsubmit": [
     // Tests on physical devices with SIM cards: postsubmit only for capacity constraints
     {
-      "name": "CtsNetTestCasesLatestSdk[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
+      "name": "CtsNetTestCases[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
       "keywords": ["sim"]
     },
     {
@@ -422,7 +408,7 @@
     },
     // Postsubmit on virtual devices to monitor flakiness of @SkipMainlinePresubmit methods
     {
-      "name": "CtsNetTestCasesLatestSdk[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
+      "name": "CtsNetTestCases[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
       "options": [
         {
           "exclude-annotation": "androidx.test.filters.RequiresDevice"
