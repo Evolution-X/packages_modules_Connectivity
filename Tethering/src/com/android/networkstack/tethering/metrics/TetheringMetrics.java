@@ -65,6 +65,8 @@ import android.util.SparseArray;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.modules.utils.build.SdkLevel;
+import com.android.net.module.util.DeviceConfigUtils;
 import com.android.networkstack.tethering.UpstreamNetworkState;
 
 import java.util.ArrayList;
@@ -86,6 +88,11 @@ public class TetheringMetrics {
     private static final String SETTINGS_PKG_NAME = "com.android.settings";
     private static final String SYSTEMUI_PKG_NAME = "com.android.systemui";
     private static final String GMS_PKG_NAME = "com.google.android.gms";
+    /**
+     * A feature flag to control whether upstream data usage metrics should be enabled.
+     */
+    private static final String TETHER_UPSTREAM_DATA_USAGE_METRICS =
+            "tether_upstream_data_usage_metrics";
     private final SparseArray<NetworkTetheringReported.Builder> mBuilderMap = new SparseArray<>();
     private final SparseArray<Long> mDownstreamStartTime = new SparseArray<Long>();
     private final ArrayList<RecordUpstreamEvent> mUpstreamEventList = new ArrayList<>();
@@ -119,6 +126,16 @@ public class TetheringMetrics {
         public long timeNow() {
             return System.currentTimeMillis();
         }
+
+        /**
+         * Indicates whether {@link #TETHER_UPSTREAM_DATA_USAGE_METRICS} is enabled.
+         */
+        public boolean isUpstreamDataUsageMetricsEnabled(Context context) {
+            // Getting data usage requires building a NetworkTemplate. However, the
+            // NetworkTemplate#Builder API was introduced in Android T.
+            return SdkLevel.isAtLeastT() && DeviceConfigUtils.isTetheringFeatureNotChickenedOut(
+                    context, TETHER_UPSTREAM_DATA_USAGE_METRICS);
+        }
     }
 
     /**
@@ -135,16 +152,36 @@ public class TetheringMetrics {
         mDependencies = dependencies;
     }
 
+    private static class DataUsage {
+        final long mTxBytes;
+        final long mRxBytes;
+
+        DataUsage(long txBytes, long rxBytes) {
+            mTxBytes = txBytes;
+            mRxBytes = rxBytes;
+        }
+
+        public long getTxBytes() {
+            return mTxBytes;
+        }
+
+        public long getRxBytes() {
+            return mRxBytes;
+        }
+    }
+
     private static class RecordUpstreamEvent {
-        public final long mStartTime;
-        public final long mStopTime;
-        public final UpstreamType mUpstreamType;
+        final long mStartTime;
+        final long mStopTime;
+        final UpstreamType mUpstreamType;
+        final DataUsage mDataUsage;
 
         RecordUpstreamEvent(final long startTime, final long stopTime,
-                final UpstreamType upstream) {
+                final UpstreamType upstream, final DataUsage dataUsage) {
             mStartTime = startTime;
             mStopTime = stopTime;
             mUpstreamType = upstream;
+            mDataUsage = dataUsage;
         }
     }
 
@@ -182,6 +219,15 @@ public class TetheringMetrics {
         statsBuilder.setErrorCode(errorCodeToEnum(errCode));
     }
 
+    private DataUsage calculateDataUsage(@Nullable UpstreamType upstream) {
+        if (upstream != null && mDependencies.isUpstreamDataUsageMetricsEnabled(mContext)
+                && isUsageSupportedForUpstreamType(upstream)) {
+            // TODO: Implement data usage calculation for the upstream type.
+            return new DataUsage(0L, 0L);
+        }
+        return new DataUsage(0L, 0L);
+    }
+
     /**
      * Update the list of upstream types and their duration whenever the current upstream type
      * changes.
@@ -193,8 +239,9 @@ public class TetheringMetrics {
 
         final long newTime = mDependencies.timeNow();
         if (mCurrentUpstream != null) {
+            final DataUsage dataUsage = calculateDataUsage(upstream);
             mUpstreamEventList.add(new RecordUpstreamEvent(mCurrentUpStreamStartTime, newTime,
-                    mCurrentUpstream));
+                    mCurrentUpstream, dataUsage));
         }
         mCurrentUpstream = upstream;
         mCurrentUpStreamStartTime = newTime;
@@ -245,13 +292,14 @@ public class TetheringMetrics {
             final long startTime = Math.max(downstreamStartTime, event.mStartTime);
             // Handle completed upstream events.
             addUpstreamEvent(upstreamEventsBuilder, startTime, event.mStopTime,
-                    event.mUpstreamType, 0L /* txBytes */, 0L /* rxBytes */);
+                    event.mUpstreamType, event.mDataUsage.mTxBytes, event.mDataUsage.mRxBytes);
         }
         final long startTime = Math.max(downstreamStartTime, mCurrentUpStreamStartTime);
         final long stopTime = mDependencies.timeNow();
         // Handle the last upstream event.
+        final DataUsage dataUsage = calculateDataUsage(mCurrentUpstream);
         addUpstreamEvent(upstreamEventsBuilder, startTime, stopTime, mCurrentUpstream,
-                0L /* txBytes */, 0L /* rxBytes */);
+                dataUsage.mTxBytes, dataUsage.mRxBytes);
         statsBuilder.setUpstreamEvents(upstreamEventsBuilder);
         statsBuilder.setDurationMillis(stopTime - downstreamStartTime);
     }
