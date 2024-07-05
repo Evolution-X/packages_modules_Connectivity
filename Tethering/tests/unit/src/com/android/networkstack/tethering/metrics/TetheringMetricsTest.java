@@ -50,6 +50,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import android.content.Context;
 import android.net.NetworkCapabilities;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
@@ -64,6 +65,7 @@ import com.android.networkstack.tethering.UpstreamNetworkState;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidJUnit4.class)
@@ -76,6 +78,8 @@ public final class TetheringMetricsTest {
     private static final long TEST_START_TIME = 1670395936033L;
     private static final long SECOND_IN_MILLIS = 1_000L;
 
+    @Mock private Context mContext;
+
     private TetheringMetrics mTetheringMetrics;
     private final NetworkTetheringReported.Builder mStatsBuilder =
             NetworkTetheringReported.newBuilder();
@@ -83,6 +87,10 @@ public final class TetheringMetricsTest {
     private long mElapsedRealtime;
 
     private class MockTetheringMetrics extends TetheringMetrics {
+        MockTetheringMetrics(Context context) {
+            super(context);
+        }
+
         @Override
         public void write(final NetworkTetheringReported reported) {}
         @Override
@@ -111,7 +119,7 @@ public final class TetheringMetricsTest {
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
-        mTetheringMetrics = spy(new MockTetheringMetrics());
+        mTetheringMetrics = spy(new MockTetheringMetrics(mContext));
         mElapsedRealtime = 0L;
     }
 

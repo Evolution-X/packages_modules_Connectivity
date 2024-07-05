@@ -528,7 +528,7 @@ public class TetheringTest {
         }
 
         @Override
-        public TetheringMetrics makeTetheringMetrics() {
+        public TetheringMetrics makeTetheringMetrics(Context ctx) {
             return mTetheringMetrics;
         }
 
