@@ -73,7 +73,6 @@ import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.MacAddress;
 import android.net.RouteInfo;
-import android.net.RoutingCoordinatorManager;
 import android.net.dhcp.DhcpServerCallbacks;
 import android.net.dhcp.DhcpServingParamsParcel;
 import android.net.dhcp.IDhcpEventCallbacks;
@@ -91,6 +90,7 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.InterfaceParams;
+import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.tethering.BpfCoordinator;

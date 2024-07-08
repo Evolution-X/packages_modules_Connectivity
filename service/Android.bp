@@ -190,18 +190,12 @@ java_library {
         "connectivity_native_aidl_interface-lateststable-java",
         "dnsresolver_aidl_interface-V15-java",
         "modules-utils-shell-command-handler",
-        "net-utils-device-common",
-        "net-utils-device-common-ip",
-        "net-utils-device-common-netlink",
-        "net-utils-services-common",
+        "net-utils-service-connectivity",
         "netd-client",
         "networkstack-client",
         "PlatformProperties",
         "service-connectivity-protos",
         "service-connectivity-stats-protos",
-        // The required dependency net-utils-device-common-struct-base is in the classpath via
-        // framework-connectivity
-        "net-utils-device-common-struct",
     ],
     apex_available: [
         "com.android.tethering",

@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package android.net;
+package com.android.net.module.util;
 
 import android.content.Context;
+import android.net.RouteInfo;
 import android.os.Build;
+import android.os.IBinder;
 import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
@@ -36,9 +38,9 @@ public class RoutingCoordinatorManager {
     @NonNull final IRoutingCoordinator mService;
 
     public RoutingCoordinatorManager(@NonNull final Context context,
-            @NonNull final IRoutingCoordinator service) {
+            @NonNull final IBinder binder) {
         mContext = context;
-        mService = service;
+        mService = IRoutingCoordinator.Stub.asInterface(binder);
     }
 
     /**
