@@ -18,7 +18,6 @@ package android.net.connectivity;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
-import android.net.RoutingCoordinatorManager;
 import android.os.Build;
 import android.os.IBinder;
 
@@ -54,8 +53,8 @@ public class ConnectivityInternalApiUtil {
      * @return an instance of the coordinator manager
      */
     @RequiresApi(Build.VERSION_CODES.S)
-    public static RoutingCoordinatorManager getRoutingCoordinatorManager(Context ctx) {
+    public static IBinder getRoutingCoordinator(Context ctx) {
         final ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
-        return cm.getRoutingCoordinatorManager();
+        return cm.getRoutingCoordinatorService();
     }
 }

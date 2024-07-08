@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.server.connectivity
+package com.android.net.module.util
 
 import android.net.INetd
 import android.os.Build

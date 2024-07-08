@@ -95,8 +95,7 @@ java_defaults {
         "framework-connectivity-javastream-protos",
     ],
     impl_only_static_libs: [
-        "net-utils-device-common-bpf",
-        "net-utils-device-common-struct-base",
+        "net-utils-framework-connectivity",
     ],
     libs: [
         "androidx.annotation_annotation",
@@ -123,8 +122,7 @@ java_library {
         // to generate the SDK stubs.
         // Even if the library is included in "impl_only_static_libs" of defaults. This is still
         // needed because java_library which doesn't understand "impl_only_static_libs".
-        "net-utils-device-common-bpf",
-        "net-utils-device-common-struct-base",
+        "net-utils-framework-connectivity",
     ],
     libs: [
         // This cannot be in the defaults clause above because if it were, it would be used
@@ -332,7 +330,6 @@ java_library {
     srcs: [
         // Files listed here MUST all be annotated with @RequiresApi(Build.VERSION_CODES.S)
         // or above as appropriate so that API checks are enforced for R+ users of this library
-        "src/android/net/RoutingCoordinatorManager.java",
         "src/android/net/connectivity/ConnectivityInternalApiUtil.java",
     ],
     visibility: [
