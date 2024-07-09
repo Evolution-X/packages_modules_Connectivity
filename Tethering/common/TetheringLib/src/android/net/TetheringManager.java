@@ -1379,6 +1379,9 @@ public class TetheringManager {
     @RequiresPermission(Manifest.permission.ACCESS_NETWORK_STATE)
     public void registerTetheringEventCallback(@NonNull Executor executor,
             @NonNull TetheringEventCallback callback) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
         final String callerPkg = mContext.getOpPackageName();
         Log.i(TAG, "registerTetheringEventCallback caller:" + callerPkg);
 
@@ -1533,6 +1536,8 @@ public class TetheringManager {
             Manifest.permission.ACCESS_NETWORK_STATE
     })
     public void unregisterTetheringEventCallback(@NonNull final TetheringEventCallback callback) {
+        Objects.requireNonNull(callback);
+
         final String callerPkg = mContext.getOpPackageName();
         Log.i(TAG, "unregisterTetheringEventCallback caller:" + callerPkg);
 
