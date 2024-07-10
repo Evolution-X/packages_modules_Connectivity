@@ -92,6 +92,7 @@ java_defaults {
         "frameworks-net-integration-testutils",
         "framework-protos",
         "mockito-target-minus-junit4",
+        "modules-utils-build",
         "net-tests-utils",
         "net-utils-services-common",
         "platform-compat-test-rules",
