@@ -542,7 +542,9 @@ public final class ThreadNetworkControllerServiceTest {
                 .when(mContext)
                 .registerReceiver(
                         any(BroadcastReceiver.class),
-                        argThat(actualIntentFilter -> actualIntentFilter.hasAction(action)));
+                        argThat(actualIntentFilter -> actualIntentFilter.hasAction(action)),
+                        any(),
+                        any());
 
         return receiverRef;
     }
