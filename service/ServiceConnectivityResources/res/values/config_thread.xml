@@ -54,9 +54,21 @@
     -->
     <string translatable="false" name="config_thread_model_name">Thread Border Router</string>
 
-    <!-- Whether the Thread network will be managed by the Google Home ecosystem. When this value
-    is set, a TXT entry "vgh=0" or "vgh=1" will be added to the "_mehscop._udp" mDNS service
-    respectively (The TXT value is a string).
+    <!-- Specifies vendor-specific mDNS TXT entries which will be included in the "_meshcop._udp"
+    service. The TXT entries list MUST conform to the format requirement in RFC 6763 section 6. For
+    example, the key and value of each TXT entry MUST be separated with "=". If the value length is
+    0, the trailing "=" may be omitted. Additionally, the TXT keys MUST start with "v" and be at
+    least 2 characters.
+
+    Note, do not include credentials in any of the TXT entries - they will be advertised on Wi-Fi
+    or Ethernet link.
+
+    An example config can be:
+      <string-array name="config_thread_mdns_vendor_specific_txts">
+        <item>vab=123</item>
+        <item>vcd</item>
+      </string-array>
     -->
-    <bool name="config_thread_managed_by_google_home">false</bool>
+    <string-array name="config_thread_mdns_vendor_specific_txts">
+    </string-array>
 </resources>
