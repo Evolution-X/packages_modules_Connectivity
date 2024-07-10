@@ -34,6 +34,7 @@ import com.android.server.connectivity.mdns.MdnsRecord;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -360,5 +361,24 @@ public class MdnsUtils {
         public long elapsedRealtime() {
             return SystemClock.elapsedRealtime();
         }
+    }
+
+    /**
+     * Check all DatagramPackets with the same destination address.
+     */
+    public static boolean checkAllPacketsWithSameAddress(List<DatagramPacket> packets) {
+        // No packet for address check
+        if (packets.isEmpty()) {
+            return true;
+        }
+
+        final InetAddress address =
+                ((InetSocketAddress) packets.get(0).getSocketAddress()).getAddress();
+        for (DatagramPacket packet : packets) {
+            if (!address.equals(((InetSocketAddress) packet.getSocketAddress()).getAddress())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

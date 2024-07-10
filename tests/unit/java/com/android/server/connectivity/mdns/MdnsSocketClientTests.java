@@ -16,6 +16,7 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.testutils.Cleanup.testAndCleanup;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertFalse;
@@ -38,9 +39,11 @@ import android.Manifest.permission;
 import android.annotation.RequiresPermission;
 import android.content.Context;
 import android.net.ConnectivityManager;
+import android.net.InetAddresses;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.MulticastLock;
 import android.text.format.DateUtils;
+import android.util.Log;
 
 import com.android.net.module.util.HexDump;
 import com.android.net.module.util.SharedLog;
@@ -592,6 +595,29 @@ public class MdnsSocketClientTests {
             // immediately, it may not be called yet. So timeout is added.
             inOrder.verify(mockMulticastSocket, timeout(TIMEOUT)).send(packets.get(i));
         }
+    }
+
+    @Test
+    public void testSendPacketWithMultiplePacketsWithDifferentAddresses() throws IOException {
+        mdnsClient.startDiscovery();
+        final byte[] buffer = new byte[10];
+        final DatagramPacket ipv4Packet = new DatagramPacket(buffer, 0 /* offset */, buffer.length,
+                InetAddresses.parseNumericAddress("192.0.2.1"), 0 /* port */);
+        final DatagramPacket ipv6Packet = new DatagramPacket(buffer, 0 /* offset */, buffer.length,
+                InetAddresses.parseNumericAddress("2001:db8::"), 0 /* port */);
+
+        // Send packets with IPv4 and IPv6 then verify wtf logs and sending has never been called.
+        // Override the default TerribleFailureHandler, as that handler might terminate the process
+        // (if we're on an eng build).
+        final AtomicBoolean hasFailed = new AtomicBoolean(false);
+        final Log.TerribleFailureHandler originalHandler =
+                Log.setWtfHandler((tag, what, system) -> hasFailed.set(true));
+        testAndCleanup(() -> {
+            mdnsClient.sendPacketRequestingMulticastResponse(List.of(ipv4Packet, ipv6Packet),
+                    false /* onlyUseIpv6OnIpv6OnlyNetworks */);
+            assertTrue(hasFailed.get());
+            verify(mockMulticastSocket, never()).send(any());
+        }, () -> Log.setWtfHandler(originalHandler));
     }
 
     private DatagramPacket getTestDatagramPacket() {
