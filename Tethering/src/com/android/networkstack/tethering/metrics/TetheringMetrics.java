@@ -104,7 +104,7 @@ public class TetheringMetrics {
     private final SparseArray<NetworkTetheringReported.Builder> mBuilderMap = new SparseArray<>();
     private final SparseArray<Long> mDownstreamStartTime = new SparseArray<Long>();
     private final ArrayList<RecordUpstreamEvent> mUpstreamEventList = new ArrayList<>();
-    private final ArrayMap<UpstreamType, DataUsage> mUpstreamDataUsage = new ArrayMap<>();
+    private final ArrayMap<UpstreamType, DataUsage> mUpstreamUsageBaseline = new ArrayMap<>();
     private final Context mContext;
     private final Dependencies mDependencies;
     private final NetworkStatsManager mNetworkStatsManager;
@@ -171,6 +171,13 @@ public class TetheringMetrics {
         DataUsage(long txBytes, long rxBytes) {
             this.txBytes = txBytes;
             this.rxBytes = rxBytes;
+        }
+
+        /*** Calculate the data usage delta from give new and old usage */
+        public static DataUsage subtract(DataUsage newUsage, DataUsage oldUsage) {
+            return new DataUsage(
+                    newUsage.txBytes - oldUsage.txBytes,
+                    newUsage.rxBytes - oldUsage.rxBytes);
         }
 
         @Override
@@ -244,11 +251,24 @@ public class TetheringMetrics {
         statsBuilder.setErrorCode(errorCodeToEnum(errCode));
     }
 
-    private DataUsage calculateDataUsage(@Nullable UpstreamType upstream) {
+    /**
+     * Calculates the data usage difference between the current and previous usage for the
+     * specified upstream type.
+     *
+     * @return A DataUsage object containing the calculated difference in transmitted (tx) and
+     *         received (rx) bytes.
+     */
+    private DataUsage calculateDataUsageDelta(@Nullable UpstreamType upstream) {
         if (upstream != null && mDependencies.isUpstreamDataUsageMetricsEnabled(mContext)
                 && isUsageSupportedForUpstreamType(upstream)) {
-            // TODO: Implement data usage calculation for the upstream type.
-            return EMPTY;
+            final DataUsage oldUsage = mUpstreamUsageBaseline.getOrDefault(upstream, EMPTY);
+            if (oldUsage.equals(EMPTY)) {
+                Log.d(TAG, "No usage baseline for the upstream=" + upstream);
+                return EMPTY;
+            }
+            // TODO(b/352537247): Fix data usage which might be incorrect if the device uses
+            //  tethering with the same upstream for over 15 days.
+            return DataUsage.subtract(getCurrentDataUsageForUpstreamType(upstream), oldUsage);
         }
         return EMPTY;
     }
@@ -264,7 +284,7 @@ public class TetheringMetrics {
 
         final long newTime = mDependencies.timeNow();
         if (mCurrentUpstream != null) {
-            final DataUsage dataUsage = calculateDataUsage(upstream);
+            final DataUsage dataUsage = calculateDataUsageDelta(mCurrentUpstream);
             mUpstreamEventList.add(new RecordUpstreamEvent(mCurrentUpStreamStartTime, newTime,
                     mCurrentUpstream, dataUsage));
         }
@@ -322,7 +342,7 @@ public class TetheringMetrics {
         final long startTime = Math.max(downstreamStartTime, mCurrentUpStreamStartTime);
         final long stopTime = mDependencies.timeNow();
         // Handle the last upstream event.
-        final DataUsage dataUsage = calculateDataUsage(mCurrentUpstream);
+        final DataUsage dataUsage = calculateDataUsageDelta(mCurrentUpstream);
         addUpstreamEvent(upstreamEventsBuilder, startTime, stopTime, mCurrentUpstream,
                 dataUsage.txBytes, dataUsage.rxBytes);
         statsBuilder.setUpstreamEvents(upstreamEventsBuilder);
@@ -387,20 +407,20 @@ public class TetheringMetrics {
      */
     public void initUpstreamUsageBaseline() {
         if (!(mDependencies.isUpstreamDataUsageMetricsEnabled(mContext)
-                && mUpstreamDataUsage.isEmpty())) {
+                && mUpstreamUsageBaseline.isEmpty())) {
             return;
         }
 
         for (UpstreamType type : UpstreamType.values()) {
             if (!isUsageSupportedForUpstreamType(type)) continue;
-            mUpstreamDataUsage.put(type, getCurrentDataUsageForUpstreamType(type));
+            mUpstreamUsageBaseline.put(type, getCurrentDataUsageForUpstreamType(type));
         }
     }
 
     @VisibleForTesting
     @NonNull
     DataUsage getDataUsageFromUpstreamType(@NonNull UpstreamType type) {
-        return mUpstreamDataUsage.getOrDefault(type, EMPTY);
+        return mUpstreamUsageBaseline.getOrDefault(type, EMPTY);
     }
 
 
@@ -431,7 +451,7 @@ public class TetheringMetrics {
         mUpstreamEventList.clear();
         mCurrentUpstream = null;
         mCurrentUpStreamStartTime = 0L;
-        mUpstreamDataUsage.clear();
+        mUpstreamUsageBaseline.clear();
     }
 
     private DownstreamType downstreamTypeToEnum(final int ifaceType) {

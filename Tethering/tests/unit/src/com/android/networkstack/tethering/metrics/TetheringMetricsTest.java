@@ -120,6 +120,7 @@ public final class TetheringMetricsTest {
     private TetheringMetrics mTetheringMetrics;
     private final NetworkTetheringReported.Builder mStatsBuilder =
             NetworkTetheringReported.newBuilder();
+    private final ArrayMap<UpstreamType, DataUsage> mMockUpstreamUsageBaseline = new ArrayMap<>();
 
     private long mElapsedRealtime;
 
@@ -147,6 +148,18 @@ public final class TetheringMetricsTest {
         MockitoAnnotations.initMocks(this);
         doReturn(TEST_START_TIME).when(mDeps).timeNow();
         doReturn(mNetworkStatsManager).when(mContext).getSystemService(NetworkStatsManager.class);
+        // Set up the usage for upstream types.
+        mMockUpstreamUsageBaseline.put(UT_CELLULAR, new DataUsage(100L, 200L));
+        mMockUpstreamUsageBaseline.put(UT_WIFI, new DataUsage(400L, 800L));
+        mMockUpstreamUsageBaseline.put(UT_BLUETOOTH, new DataUsage(50L, 80L));
+        mMockUpstreamUsageBaseline.put(UT_ETHERNET, new DataUsage(0L, 0L));
+        doAnswer(inv -> {
+            final NetworkTemplate template = (NetworkTemplate) inv.getArguments()[0];
+            final DataUsage dataUsage = mMockUpstreamUsageBaseline.getOrDefault(
+                    matchRuleToUpstreamType(template.getMatchRule()), new DataUsage(0L, 0L));
+            return makeNetworkStatsWithTxRxBytes(dataUsage);
+        }).when(mNetworkStatsManager).queryDetailsForUidTagState(any(), eq(Long.MIN_VALUE),
+                eq(Long.MAX_VALUE), eq(UID_TETHERING), eq(TAG_NONE), eq(STATE_ALL));
         mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mElapsedRealtime = 0L;
     }
@@ -493,33 +506,24 @@ public final class TetheringMetricsTest {
         }
     }
 
+    private void initializeUpstreamUsageBaseline() {
+        doReturn(true).when(mDeps).isUpstreamDataUsageMetricsEnabled(any());
+        mTetheringMetrics.initUpstreamUsageBaseline();
+    }
+
     @Test
     @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testInitUpstreamUsageBaselineAndCleanup() {
         // Verify the usage is empty for all upstream types before initialization.
         verifyEmptyUsageForAllUpstreamTypes();
 
-        // Set up the usage for upstream types.
-        final ArrayMap<UpstreamType, DataUsage> upstreamDataUsage = new ArrayMap<>();
-        upstreamDataUsage.put(UT_CELLULAR, new DataUsage(100L, 200L));
-        upstreamDataUsage.put(UT_WIFI, new DataUsage(400L, 800L));
-        upstreamDataUsage.put(UT_BLUETOOTH, new DataUsage(50L, 80L));
-        upstreamDataUsage.put(UT_ETHERNET, new DataUsage(0L, 0L));
-        doAnswer(inv -> {
-            final NetworkTemplate template = (NetworkTemplate) inv.getArguments()[0];
-            final DataUsage dataUsage = upstreamDataUsage.getOrDefault(
-                    matchRuleToUpstreamType(template.getMatchRule()), new DataUsage(0L, 0L));
-            return makeNetworkStatsWithTxRxBytes(dataUsage);
-        }).when(mNetworkStatsManager).queryDetailsForUidTagState(any(), eq(Long.MIN_VALUE),
-                eq(Long.MAX_VALUE), eq(UID_TETHERING), eq(TAG_NONE), eq(STATE_ALL));
-
         // Verify the usage has been initialized
-        doReturn(true).when(mDeps).isUpstreamDataUsageMetricsEnabled(any());
-        mTetheringMetrics.initUpstreamUsageBaseline();
+        initializeUpstreamUsageBaseline();
+
         for (UpstreamType type : UpstreamType.values()) {
             final DataUsage dataUsage = mTetheringMetrics.getDataUsageFromUpstreamType(type);
             if (TetheringMetrics.isUsageSupportedForUpstreamType(type)) {
-                assertEquals(upstreamDataUsage.get(type), dataUsage);
+                assertEquals(mMockUpstreamUsageBaseline.get(type), dataUsage);
             } else {
                 assertEquals(EMPTY, dataUsage);
             }
@@ -528,5 +532,47 @@ public final class TetheringMetricsTest {
         // Verify the usage is empty after clean up
         mTetheringMetrics.cleanup();
         verifyEmptyUsageForAllUpstreamTypes();
+    }
+
+    private void updateUpstreamDataUsage(UpstreamType type, long usageDiff) {
+        final DataUsage oldWifiUsage = mMockUpstreamUsageBaseline.get(type);
+        final DataUsage newWifiUsage = new DataUsage(
+                oldWifiUsage.txBytes + usageDiff,
+                oldWifiUsage.rxBytes + usageDiff);
+        mMockUpstreamUsageBaseline.put(type, newWifiUsage);
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
+    public void testDataUsageCalculation() throws Exception {
+        initializeUpstreamUsageBaseline();
+        mTetheringMetrics.createBuilder(TETHERING_WIFI, SETTINGS_PKG);
+        final long wifiTetheringStartTime = currentTimeMillis();
+        incrementCurrentTime(1 * SECOND_IN_MILLIS);
+        mTetheringMetrics.maybeUpdateUpstreamType(buildUpstreamState(TRANSPORT_WIFI));
+        final long wifiDuration = 5 * SECOND_IN_MILLIS;
+        final long wifiUsageDiff = 100L;
+        incrementCurrentTime(wifiDuration);
+        updateUpstreamDataUsage(UT_WIFI, wifiUsageDiff);
+        mTetheringMetrics.maybeUpdateUpstreamType(buildUpstreamState(TRANSPORT_BLUETOOTH));
+        final long bluetoothDuration = 15 * SECOND_IN_MILLIS;
+        final long btUsageDiff = 50L;
+        incrementCurrentTime(bluetoothDuration);
+        updateUpstreamDataUsage(UT_BLUETOOTH, btUsageDiff);
+        mTetheringMetrics.maybeUpdateUpstreamType(buildUpstreamState(TRANSPORT_CELLULAR));
+        final long cellDuration = 20 * SECOND_IN_MILLIS;
+        final long cellUsageDiff = 500L;
+        incrementCurrentTime(cellDuration);
+        updateUpstreamDataUsage(UT_CELLULAR, cellUsageDiff);
+        updateErrorAndSendReport(TETHERING_WIFI, TETHER_ERROR_NO_ERROR);
+
+        UpstreamEvents.Builder upstreamEvents = UpstreamEvents.newBuilder();
+        addUpstreamEvent(upstreamEvents, UT_WIFI, wifiDuration, wifiUsageDiff, wifiUsageDiff);
+        addUpstreamEvent(upstreamEvents, UT_BLUETOOTH, bluetoothDuration, btUsageDiff, btUsageDiff);
+        addUpstreamEvent(upstreamEvents, UT_CELLULAR, cellDuration, cellUsageDiff, cellUsageDiff);
+
+        verifyReport(DownstreamType.DS_TETHERING_WIFI, ErrorCode.EC_NO_ERROR,
+                UserType.USER_SETTINGS, upstreamEvents,
+                currentTimeMillis() - wifiTetheringStartTime);
     }
 }
