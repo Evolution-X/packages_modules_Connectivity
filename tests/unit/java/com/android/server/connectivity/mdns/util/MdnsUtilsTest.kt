@@ -16,9 +16,12 @@
 
 package com.android.server.connectivity.mdns.util
 
+import android.net.InetAddresses
 import android.os.Build
 import com.android.server.connectivity.mdns.MdnsConstants
 import com.android.server.connectivity.mdns.MdnsConstants.FLAG_TRUNCATED
+import com.android.server.connectivity.mdns.MdnsConstants.IPV4_SOCKET_ADDR
+import com.android.server.connectivity.mdns.MdnsConstants.IPV6_SOCKET_ADDR
 import com.android.server.connectivity.mdns.MdnsPacket
 import com.android.server.connectivity.mdns.MdnsPacketReader
 import com.android.server.connectivity.mdns.MdnsPointerRecord
@@ -192,5 +195,32 @@ class MdnsUtilsTest {
             answers.addAll(mdnsPacket.answers)
         }
         return MdnsPacket(flags, questions, answers, emptyList(), emptyList())
+    }
+
+    @Test
+    fun testCheckAllPacketsWithSameAddress() {
+        val buffer = ByteArray(10)
+        val v4Packet = DatagramPacket(buffer, buffer.size, IPV4_SOCKET_ADDR)
+        val otherV4Packet = DatagramPacket(
+            buffer,
+            buffer.size,
+            InetAddresses.parseNumericAddress("192.0.2.1"),
+            1234
+        )
+        val v6Packet = DatagramPacket(ByteArray(10), 10, IPV6_SOCKET_ADDR)
+        val otherV6Packet = DatagramPacket(
+            buffer,
+            buffer.size,
+            InetAddresses.parseNumericAddress("2001:db8::"),
+            1234
+        )
+        assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf()))
+        assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v4Packet)))
+        assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v4Packet, v4Packet)))
+        assertFalse(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v4Packet, otherV4Packet)))
+        assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v6Packet)))
+        assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v6Packet, v6Packet)))
+        assertFalse(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v6Packet, otherV6Packet)))
+        assertFalse(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v4Packet, v6Packet)))
     }
 }

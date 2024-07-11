@@ -164,6 +164,8 @@ public class TetheringService extends Service {
         @Override
         public void registerTetheringEventCallback(ITetheringEventCallback callback,
                 String callerPkg) {
+            // Silently ignore call if the callback is null. This can only happen via reflection.
+            if (callback == null) return;
             try {
                 if (!hasTetherAccessPermission()) {
                     callback.onCallbackStopped(TETHER_ERROR_NO_ACCESS_TETHERING_PERMISSION);
@@ -176,6 +178,8 @@ public class TetheringService extends Service {
         @Override
         public void unregisterTetheringEventCallback(ITetheringEventCallback callback,
                 String callerPkg) {
+            // Silently ignore call if the callback is null. This can only happen via reflection.
+            if (callback == null) return;
             try {
                 if (!hasTetherAccessPermission()) {
                     callback.onCallbackStopped(TETHER_ERROR_NO_ACCESS_TETHERING_PERMISSION);

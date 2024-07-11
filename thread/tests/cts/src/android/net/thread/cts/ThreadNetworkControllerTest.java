@@ -45,7 +45,6 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
-
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import android.content.Context;
@@ -859,7 +858,6 @@ public class ThreadNetworkControllerTest {
         assertThat(txtMap.get("rv")).isNotNull();
         assertThat(txtMap.get("tv")).isNotNull();
         assertThat(txtMap.get("sb")).isNotNull();
-        assertThat(new String(txtMap.get("vgh"))).isIn(List.of("0", "1"));
     }
 
     @Test
@@ -886,7 +884,6 @@ public class ThreadNetworkControllerTest {
         assertThat(txtMap.get("tv")).isNotNull();
         assertThat(txtMap.get("sb")).isNotNull();
         assertThat(txtMap.get("id").length).isEqualTo(16);
-        assertThat(new String(txtMap.get("vgh"))).isIn(List.of("0", "1"));
     }
 
     @Test

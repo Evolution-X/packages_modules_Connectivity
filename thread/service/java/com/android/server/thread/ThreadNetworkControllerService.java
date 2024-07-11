@@ -139,6 +139,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -344,8 +345,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         final String modelName = resources.getString(R.string.config_thread_model_name);
         final String vendorName = resources.getString(R.string.config_thread_vendor_name);
         final String vendorOui = resources.getString(R.string.config_thread_vendor_oui);
-        final boolean managedByGoogle =
-                resources.getBoolean(R.bool.config_thread_managed_by_google_home);
+        final String[] vendorSpecificTxts =
+                resources.getStringArray(R.array.config_thread_mdns_vendor_specific_txts);
 
         if (!modelName.isEmpty()) {
             if (modelName.getBytes(UTF_8).length > MAX_MODEL_NAME_UTF8_BYTES) {
@@ -375,19 +376,44 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         meshcopTxts.modelName = modelName;
         meshcopTxts.vendorName = vendorName;
         meshcopTxts.vendorOui = HexEncoding.decode(vendorOui.replace("-", "").replace(":", ""));
-        meshcopTxts.nonStandardTxtEntries = List.of(makeManagedByGoogleTxtAttr(managedByGoogle));
+        meshcopTxts.nonStandardTxtEntries = makeVendorSpecificTxtAttrs(vendorSpecificTxts);
 
         return meshcopTxts;
     }
 
     /**
-     * Creates a DNS-SD TXT entry for indicating whether Thread on this device is managed by Google.
+     * Parses vendor-specific TXT entries from "=" separated strings into list of {@link
+     * DnsTxtAttribute}.
      *
-     * @return TXT entry "vgh=1" if {@code managedByGoogle} is {@code true}; otherwise, "vgh=0"
+     * @throws IllegalArgumentsException if invalid TXT entries are found in {@code vendorTxts}
      */
-    private static DnsTxtAttribute makeManagedByGoogleTxtAttr(boolean managedByGoogle) {
-        final byte[] value = (managedByGoogle ? "1" : "0").getBytes(UTF_8);
-        return new DnsTxtAttribute("vgh", value);
+    @VisibleForTesting
+    static List<DnsTxtAttribute> makeVendorSpecificTxtAttrs(String[] vendorTxts) {
+        List<DnsTxtAttribute> txts = new ArrayList<>();
+        for (String txt : vendorTxts) {
+            String[] kv = txt.split("=", 2 /* limit */); // Split with only the first '='
+            if (kv.length < 1) {
+                throw new IllegalArgumentException(
+                        "Invalid vendor-specific TXT is found in resources: " + txt);
+            }
+
+            if (kv[0].length() < 2) {
+                throw new IllegalArgumentException(
+                        "Invalid vendor-specific TXT key \""
+                                + kv[0]
+                                + "\": it must contain at least 2 characters");
+            }
+
+            if (!kv[0].startsWith("v")) {
+                throw new IllegalArgumentException(
+                        "Invalid vendor-specific TXT key \""
+                                + kv[0]
+                                + "\": it doesn't start with \"v\"");
+            }
+
+            txts.add(new DnsTxtAttribute(kv[0], (kv.length >= 2 ? kv[1] : "").getBytes(UTF_8)));
+        }
+        return txts;
     }
 
     private void onOtDaemonDied() {
@@ -598,10 +624,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        mHandler.post(() -> onUserRestrictionsChanged(isThreadUserRestricted()));
+                        onUserRestrictionsChanged(isThreadUserRestricted());
                     }
                 },
-                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED));
+                new IntentFilter(UserManager.ACTION_USER_RESTRICTIONS_CHANGED),
+                null /* broadcastPermission */,
+                mHandler);
     }
 
     private void onUserRestrictionsChanged(boolean newUserRestrictedState) {
@@ -653,10 +681,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        mHandler.post(() -> onAirplaneModeChanged(isAirplaneModeOn()));
+                        onAirplaneModeChanged(isAirplaneModeOn());
                     }
                 },
-                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED));
+                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED),
+                null /* broadcastPermission */,
+                mHandler);
     }
 
     private void onAirplaneModeChanged(boolean newAirplaneModeOn) {
