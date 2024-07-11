@@ -13,13 +13,16 @@
 #  limitations under the License.
 
 from unittest.mock import MagicMock, patch
+from absl.testing import parameterized
 from mobly import asserts
 from mobly import base_test
 from mobly import config_parser
 from mobly.controllers.android_device_lib.adb import AdbError
 from net_tests_utils.host.python.apf_utils import (
+    ApfCapabilities,
     PatternNotFoundException,
     UnsupportedOperationException,
+    get_apf_capabilities,
     get_apf_counter,
     get_apf_counters_from_dumpsys,
     get_hardware_address,
@@ -29,7 +32,7 @@ from net_tests_utils.host.python.apf_utils import (
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError
 
 
-class TestApfUtils(base_test.BaseTestClass):
+class TestApfUtils(base_test.BaseTestClass, parameterized.TestCase):
 
   def __init__(self, configs: config_parser.TestRunConfig):
     super().__init__(configs)
@@ -150,3 +153,23 @@ IpClient.wlan1
     )
     with asserts.assert_raises(UnsupportedOperationException):
       send_raw_packet_downstream(self.mock_ad, "eth0", "AABBCCDDEEFF")
+
+  @parameterized.parameters(
+      ("2,2048,1", ApfCapabilities(2, 2048, 1)),  # Valid input
+      ("3,1024,0", ApfCapabilities(3, 1024, 0)),  # Valid input
+      ("invalid,output", ApfCapabilities(0, 0, 0)),  # Invalid input
+      ("", ApfCapabilities(0, 0, 0)),  # Empty input
+  )
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_apf_capabilities(
+      self, mock_output, expected_result, mock_adb_shell
+  ):
+    """Tests the get_apf_capabilities function with various inputs and expected results."""
+    # Configure the mock adb_shell to return the specified output
+    mock_adb_shell.return_value = mock_output
+
+    # Call the function under test
+    result = get_apf_capabilities(self.mock_ad, "wlan0")
+
+    # Assert that the result matches the expected result
+    asserts.assert_equal(result, expected_result)
