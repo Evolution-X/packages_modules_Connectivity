@@ -72,7 +72,6 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
-import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.SyncStateMachine.StateInfo;
 import com.android.net.module.util.ip.InterfaceController;
@@ -239,11 +238,8 @@ public class IpServer extends StateMachineShim {
     private final INetd mNetd;
     @NonNull
     private final BpfCoordinator mBpfCoordinator;
-    // Contains null if the connectivity module is unsupported, as the routing coordinator is not
-    // available. Must use LateSdk because MessageUtils enumerates fields in this class, so it
-    // must be able to find all classes at runtime.
     @NonNull
-    private final LateSdk<RoutingCoordinatorManager> mRoutingCoordinator;
+    private final RoutingCoordinatorManager mRoutingCoordinator;
     private final Callback mCallback;
     private final InterfaceController mInterfaceCtrl;
     private final PrivateAddressCoordinator mPrivateAddressCoordinator;
@@ -301,7 +297,7 @@ public class IpServer extends StateMachineShim {
     public IpServer(
             String ifaceName, Handler handler, int interfaceType, SharedLog log,
             INetd netd, @NonNull BpfCoordinator bpfCoordinator,
-            @Nullable LateSdk<RoutingCoordinatorManager> routingCoordinator, Callback callback,
+            RoutingCoordinatorManager routingCoordinatorManager, Callback callback,
             TetheringConfiguration config, PrivateAddressCoordinator addressCoordinator,
             TetheringMetrics tetheringMetrics, Dependencies deps) {
         super(ifaceName, USE_SYNC_SM ? null : handler.getLooper());
@@ -309,7 +305,7 @@ public class IpServer extends StateMachineShim {
         mLog = log.forSubComponent(ifaceName);
         mNetd = netd;
         mBpfCoordinator = bpfCoordinator;
-        mRoutingCoordinator = routingCoordinator;
+        mRoutingCoordinator = routingCoordinatorManager;
         mCallback = callback;
         mInterfaceCtrl = new InterfaceController(ifaceName, mNetd, mLog);
         mIfaceName = ifaceName;
@@ -825,47 +821,25 @@ public class IpServer extends StateMachineShim {
 
     private void addInterfaceToNetwork(final int netId, @NonNull final String ifaceName) {
         try {
-            if (SdkLevel.isAtLeastS() && null != mRoutingCoordinator.value) {
-                // TODO : remove this call in favor of using the LocalNetworkConfiguration
-                // correctly, which will let ConnectivityService do it automatically.
-                mRoutingCoordinator.value.addInterfaceToNetwork(netId, ifaceName);
-            } else {
-                mNetd.networkAddInterface(netId, ifaceName);
-            }
-        } catch (ServiceSpecificException | RemoteException e) {
+            // TODO : remove this call in favor of using the LocalNetworkConfiguration
+            // correctly, which will let ConnectivityService do it automatically.
+            mRoutingCoordinator.addInterfaceToNetwork(netId, ifaceName);
+        } catch (ServiceSpecificException e) {
             mLog.e("Failed to add " + mIfaceName + " to local table: ", e);
         }
     }
 
-    private void addInterfaceForward(@NonNull final String fromIface,
-            @NonNull final String toIface) throws ServiceSpecificException, RemoteException {
-        if (SdkLevel.isAtLeastS() && null != mRoutingCoordinator.value) {
-            mRoutingCoordinator.value.addInterfaceForward(fromIface, toIface);
-        } else {
-            mNetd.tetherAddForward(fromIface, toIface);
-            mNetd.ipfwdAddInterfaceForward(fromIface, toIface);
-        }
+    private void addInterfaceForward(@NonNull final String fromIface, @NonNull final String toIface)
+            throws ServiceSpecificException {
+        mRoutingCoordinator.addInterfaceForward(fromIface, toIface);
     }
 
     private void removeInterfaceForward(@NonNull final String fromIface,
             @NonNull final String toIface) {
-        if (SdkLevel.isAtLeastS() && null != mRoutingCoordinator.value) {
-            try {
-                mRoutingCoordinator.value.removeInterfaceForward(fromIface, toIface);
-            } catch (ServiceSpecificException e) {
-                mLog.e("Exception in removeInterfaceForward", e);
-            }
-        } else {
-            try {
-                mNetd.ipfwdRemoveInterfaceForward(fromIface, toIface);
-            } catch (RemoteException | ServiceSpecificException e) {
-                mLog.e("Exception in ipfwdRemoveInterfaceForward", e);
-            }
-            try {
-                mNetd.tetherRemoveForward(fromIface, toIface);
-            } catch (RemoteException | ServiceSpecificException e) {
-                mLog.e("Exception in disableNat", e);
-            }
+        try {
+            mRoutingCoordinator.removeInterfaceForward(fromIface, toIface);
+        } catch (RuntimeException e) {
+            mLog.e("Exception in removeInterfaceForward", e);
         }
     }
 
@@ -1370,7 +1344,7 @@ public class IpServer extends StateMachineShim {
                         mBpfCoordinator.maybeAttachProgram(mIfaceName, ifname);
                         try {
                             addInterfaceForward(mIfaceName, ifname);
-                        } catch (RemoteException | ServiceSpecificException e) {
+                        } catch (RuntimeException e) {
                             mLog.e("Exception enabling iface forward", e);
                             cleanupUpstream();
                             mLastError = TETHER_ERROR_ENABLE_FORWARDING_ERROR;

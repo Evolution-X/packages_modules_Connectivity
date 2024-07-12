@@ -18,12 +18,10 @@ package com.android.net.module.util;
 
 import android.content.Context;
 import android.net.RouteInfo;
-import android.os.Build;
 import android.os.IBinder;
 import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 
 /**
  * A manager class for talking to the routing coordinator service.
@@ -32,7 +30,6 @@ import androidx.annotation.RequiresApi;
  * by the build rules. Do not change build rules to gain access to this class from elsewhere.
  * @hide
  */
-@RequiresApi(Build.VERSION_CODES.S)
 public class RoutingCoordinatorManager {
     @NonNull final Context mContext;
     @NonNull final IRoutingCoordinator mService;
