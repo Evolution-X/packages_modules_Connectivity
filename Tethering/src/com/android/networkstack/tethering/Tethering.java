@@ -298,7 +298,7 @@ public class Tethering {
         mRoutingCoordinator = mDeps.getRoutingCoordinator(mContext);
         mLooper = mDeps.makeTetheringLooper();
         mNotificationUpdater = mDeps.makeNotificationUpdater(mContext, mLooper);
-        mTetheringMetrics = mDeps.makeTetheringMetrics();
+        mTetheringMetrics = mDeps.makeTetheringMetrics(mContext);
 
         // This is intended to ensrure that if something calls startTethering(bluetooth) just after
         // bluetooth is enabled. Before onServiceConnected is called, store the calls into this

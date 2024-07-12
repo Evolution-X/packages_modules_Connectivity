@@ -187,8 +187,8 @@ public abstract class TetheringDependencies {
     /**
      * Make the TetheringMetrics to be used by tethering.
      */
-    public TetheringMetrics makeTetheringMetrics() {
-        return new TetheringMetrics();
+    public TetheringMetrics makeTetheringMetrics(Context ctx) {
+        return new TetheringMetrics(ctx);
     }
 
     /**
