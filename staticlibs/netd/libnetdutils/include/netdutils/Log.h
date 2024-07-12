@@ -203,7 +203,7 @@ class Log {
     void record(Level lvl, const std::string& entry);
 
     mutable std::shared_mutex mLock;
-    std::deque<const std::string> mEntries;  // GUARDED_BY(mLock), when supported
+    std::deque<std::string> mEntries;  // GUARDED_BY(mLock), when supported
 };
 
 }  // namespace netdutils
