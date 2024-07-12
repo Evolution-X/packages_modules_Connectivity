@@ -46,6 +46,7 @@ import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.TetheringManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
 
 import android.annotation.Nullable;
+import android.content.Context;
 import android.net.NetworkCapabilities;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
@@ -81,16 +82,50 @@ public class TetheringMetrics {
     private final SparseArray<NetworkTetheringReported.Builder> mBuilderMap = new SparseArray<>();
     private final SparseArray<Long> mDownstreamStartTime = new SparseArray<Long>();
     private final ArrayList<RecordUpstreamEvent> mUpstreamEventList = new ArrayList<>();
+    private final Context mContext;
+    private final Dependencies mDependencies;
     private UpstreamType mCurrentUpstream = null;
     private Long mCurrentUpStreamStartTime = 0L;
 
+    /**
+     * Dependencies of TetheringMetrics, for injection in tests.
+     */
+    @VisibleForTesting
+    public static class Dependencies {
+        /**
+         * @see TetheringStatsLog
+         */
+        public void write(NetworkTetheringReported reported) {
+            TetheringStatsLog.write(
+                    TetheringStatsLog.NETWORK_TETHERING_REPORTED,
+                    reported.getErrorCode().getNumber(),
+                    reported.getDownstreamType().getNumber(),
+                    reported.getUpstreamType().getNumber(),
+                    reported.getUserType().getNumber(),
+                    reported.getUpstreamEvents().toByteArray(),
+                    reported.getDurationMillis());
+        }
+
+        /**
+         * @see System#currentTimeMillis()
+         */
+        public long timeNow() {
+            return System.currentTimeMillis();
+        }
+    }
 
     /**
-     * Return the current system time in milliseconds.
-     * @return the current system time in milliseconds.
+     * Constructor for the TetheringMetrics class.
+     *
+     * @param context The Context object used to access system services.
      */
-    public long timeNow() {
-        return System.currentTimeMillis();
+    public TetheringMetrics(Context context) {
+        this(context, new Dependencies());
+    }
+
+    TetheringMetrics(Context context, Dependencies dependencies) {
+        mContext = context;
+        mDependencies = dependencies;
     }
 
     private static class RecordUpstreamEvent {
@@ -123,7 +158,7 @@ public class TetheringMetrics {
                 .setUpstreamEvents(UpstreamEvents.newBuilder())
                 .setDurationMillis(0);
         mBuilderMap.put(downstreamType, statsBuilder);
-        mDownstreamStartTime.put(downstreamType, timeNow());
+        mDownstreamStartTime.put(downstreamType, mDependencies.timeNow());
     }
 
     /**
@@ -149,7 +184,7 @@ public class TetheringMetrics {
         UpstreamType upstream = transportTypeToUpstreamTypeEnum(ns);
         if (upstream.equals(mCurrentUpstream)) return;
 
-        final long newTime = timeNow();
+        final long newTime = mDependencies.timeNow();
         if (mCurrentUpstream != null) {
             mUpstreamEventList.add(new RecordUpstreamEvent(mCurrentUpStreamStartTime, newTime,
                     mCurrentUpstream));
@@ -206,7 +241,7 @@ public class TetheringMetrics {
                     event.mUpstreamType, 0L /* txBytes */, 0L /* rxBytes */);
         }
         final long startTime = Math.max(downstreamStartTime, mCurrentUpStreamStartTime);
-        final long stopTime = timeNow();
+        final long stopTime = mDependencies.timeNow();
         // Handle the last upstream event.
         addUpstreamEvent(upstreamEventsBuilder, startTime, stopTime, mCurrentUpstream,
                 0L /* txBytes */, 0L /* rxBytes */);
@@ -248,15 +283,7 @@ public class TetheringMetrics {
     @VisibleForTesting
     public void write(@NonNull final NetworkTetheringReported reported) {
         final byte[] upstreamEvents = reported.getUpstreamEvents().toByteArray();
-
-        TetheringStatsLog.write(
-                TetheringStatsLog.NETWORK_TETHERING_REPORTED,
-                reported.getErrorCode().getNumber(),
-                reported.getDownstreamType().getNumber(),
-                reported.getUpstreamType().getNumber(),
-                reported.getUserType().getNumber(),
-                upstreamEvents,
-                reported.getDurationMillis());
+        mDependencies.write(reported);
         if (DBG) {
             Log.d(
                     TAG,
