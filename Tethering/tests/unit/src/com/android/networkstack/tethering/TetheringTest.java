@@ -191,7 +191,6 @@ import com.android.internal.util.test.FakeSettingsProvider;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.RoutingCoordinatorManager;
-import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.ip.IpNeighborMonitor;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
@@ -292,6 +291,7 @@ public class TetheringTest {
     @Mock private BluetoothPanShim mBluetoothPanShim;
     @Mock private TetheredInterfaceRequestShim mTetheredInterfaceRequestShim;
     @Mock private TetheringMetrics mTetheringMetrics;
+    @Mock private RoutingCoordinatorManager mRoutingCoordinatorManager;
 
     private final MockIpServerDependencies mIpServerDependencies =
             spy(new MockIpServerDependencies());
@@ -484,10 +484,10 @@ public class TetheringTest {
             return mEntitleMgr;
         }
 
-        @Nullable
         @Override
-        public LateSdk<RoutingCoordinatorManager> getRoutingCoordinator(final Context context) {
-            return new LateSdk<>(null);
+        public RoutingCoordinatorManager getRoutingCoordinator(final Context context,
+                SharedLog log) {
+            return mRoutingCoordinatorManager;
         }
 
         @Override
@@ -498,7 +498,7 @@ public class TetheringTest {
         }
 
         @Override
-        public INetd getINetd(Context context) {
+        public INetd getINetd(Context context, SharedLog log) {
             return mNetd;
         }
 
@@ -528,7 +528,7 @@ public class TetheringTest {
         }
 
         @Override
-        public TetheringMetrics makeTetheringMetrics() {
+        public TetheringMetrics makeTetheringMetrics(Context ctx) {
             return mTetheringMetrics;
         }
 
@@ -1082,8 +1082,8 @@ public class TetheringTest {
         UpstreamNetworkState upstreamState = buildMobileIPv4UpstreamState();
         runUsbTethering(upstreamState);
 
-        verify(mNetd, times(1)).tetherAddForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
 
         sendIPv6TetherUpdates(upstreamState);
         assertSetIfaceToDadProxy(0 /* numOfCalls */, "" /* ifaceName */);
@@ -1111,8 +1111,8 @@ public class TetheringTest {
         UpstreamNetworkState upstreamState = buildMobileIPv6UpstreamState();
         runUsbTethering(upstreamState);
 
-        verify(mNetd, times(1)).tetherAddForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
 
         sendIPv6TetherUpdates(upstreamState);
         // TODO: add interfaceParams to compare in verify.
@@ -1127,8 +1127,8 @@ public class TetheringTest {
         UpstreamNetworkState upstreamState = buildMobileDualStackUpstreamState();
         runUsbTethering(upstreamState);
 
-        verify(mNetd, times(1)).tetherAddForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
         verify(mRouterAdvertisementDaemon, times(1)).start();
         verify(mDhcpServer, timeout(DHCPSERVER_START_TIMEOUT_MS).times(1)).startWithCallbacks(
                 any(), any());
@@ -1145,13 +1145,12 @@ public class TetheringTest {
         UpstreamNetworkState upstreamState = buildMobile464xlatUpstreamState();
         runUsbTethering(upstreamState);
 
-        verify(mNetd, times(1)).tetherAddForward(TEST_RNDIS_IFNAME, TEST_XLAT_MOBILE_IFNAME);
-        verify(mNetd, times(1)).tetherAddForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_RNDIS_IFNAME, TEST_XLAT_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
         verify(mDhcpServer, timeout(DHCPSERVER_START_TIMEOUT_MS).times(1)).startWithCallbacks(
                 any(), any());
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_RNDIS_IFNAME,
-                TEST_XLAT_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_RNDIS_IFNAME, TEST_MOBILE_IFNAME);
 
         sendIPv6TetherUpdates(upstreamState);
         assertSetIfaceToDadProxy(1 /* numOfCalls */, TEST_MOBILE_IFNAME /* ifaceName */);
@@ -1172,10 +1171,10 @@ public class TetheringTest {
         UpstreamNetworkState upstreamState = buildMobileIPv6UpstreamState();
         runUsbTethering(upstreamState);
 
-        verify(mNetd, times(1)).tetherAddForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
         verify(mDhcpServer, timeout(DHCPSERVER_START_TIMEOUT_MS).times(1)).startWithCallbacks(
                 any(), any());
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
 
         // Then 464xlat comes up
         upstreamState = buildMobile464xlatUpstreamState();
@@ -1187,12 +1186,11 @@ public class TetheringTest {
         mLooper.dispatchAll();
 
         // Forwarding is added for 464xlat
-        verify(mNetd, times(1)).tetherAddForward(TEST_NCM_IFNAME, TEST_XLAT_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_NCM_IFNAME,
-                TEST_XLAT_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_NCM_IFNAME, TEST_XLAT_MOBILE_IFNAME);
         // Forwarding was not re-added for v6 (still times(1))
-        verify(mNetd, times(1)).tetherAddForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
-        verify(mNetd, times(1)).ipfwdAddInterfaceForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager, times(1))
+                .addInterfaceForward(TEST_NCM_IFNAME, TEST_MOBILE_IFNAME);
         // DHCP not restarted on downstream (still times(1))
         verify(mDhcpServer, timeout(DHCPSERVER_START_TIMEOUT_MS).times(1)).startWithCallbacks(
                 any(), any());
@@ -3435,8 +3433,7 @@ public class TetheringTest {
         runUsbTethering(upstreamState);
 
         verify(mNetd).interfaceGetList();
-        verify(mNetd).tetherAddForward(expectedIface, TEST_MOBILE_IFNAME);
-        verify(mNetd).ipfwdAddInterfaceForward(expectedIface, TEST_MOBILE_IFNAME);
+        verify(mRoutingCoordinatorManager).addInterfaceForward(expectedIface, TEST_MOBILE_IFNAME);
 
         verify(mRouterAdvertisementDaemon).start();
         verify(mDhcpServer, timeout(DHCPSERVER_START_TIMEOUT_MS)).startWithCallbacks(

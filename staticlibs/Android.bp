@@ -345,12 +345,10 @@ java_library {
     ],
     sdk_version: "module_current",
     min_sdk_version: "30",
-    static_libs: [
-        "modules-utils-build_system",
-    ],
     libs: [
         "framework-annotations-lib",
         "framework-connectivity",
+        "modules-utils-build_system",
     ],
     // TODO: remove "apex_available:platform".
     apex_available: [

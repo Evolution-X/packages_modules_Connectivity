@@ -46,10 +46,10 @@ import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_TYPE;
 import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.TetheringManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
 
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
+import android.content.Context;
 import android.net.NetworkCapabilities;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
@@ -60,10 +60,12 @@ import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.networkstack.tethering.UpstreamNetworkState;
+import com.android.networkstack.tethering.metrics.TetheringMetrics.Dependencies;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidJUnit4.class)
@@ -76,20 +78,14 @@ public final class TetheringMetricsTest {
     private static final long TEST_START_TIME = 1670395936033L;
     private static final long SECOND_IN_MILLIS = 1_000L;
 
+    @Mock private Context mContext;
+    @Mock private Dependencies mDeps;
+
     private TetheringMetrics mTetheringMetrics;
     private final NetworkTetheringReported.Builder mStatsBuilder =
             NetworkTetheringReported.newBuilder();
 
     private long mElapsedRealtime;
-
-    private class MockTetheringMetrics extends TetheringMetrics {
-        @Override
-        public void write(final NetworkTetheringReported reported) {}
-        @Override
-        public long timeNow() {
-            return currentTimeMillis();
-        }
-    }
 
     private long currentTimeMillis() {
         return TEST_START_TIME + mElapsedRealtime;
@@ -97,7 +93,8 @@ public final class TetheringMetricsTest {
 
     private void incrementCurrentTime(final long duration) {
         mElapsedRealtime += duration;
-        mTetheringMetrics.timeNow();
+        final long currentTimeMillis = currentTimeMillis();
+        doReturn(currentTimeMillis).when(mDeps).timeNow();
     }
 
     private long getElapsedRealtime() {
@@ -106,12 +103,14 @@ public final class TetheringMetricsTest {
 
     private void clearElapsedRealtime() {
         mElapsedRealtime = 0;
+        doReturn(TEST_START_TIME).when(mDeps).timeNow();
     }
 
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
-        mTetheringMetrics = spy(new MockTetheringMetrics());
+        doReturn(TEST_START_TIME).when(mDeps).timeNow();
+        mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mElapsedRealtime = 0L;
     }
 
@@ -126,7 +125,7 @@ public final class TetheringMetricsTest {
                 .setUpstreamEvents(upstreamEvents)
                 .setDurationMillis(duration)
                 .build();
-        verify(mTetheringMetrics).write(expectedReport);
+        verify(mDeps).write(expectedReport);
     }
 
     private void updateErrorAndSendReport(final int downstream, final int error) {
@@ -162,6 +161,7 @@ public final class TetheringMetricsTest {
 
     private void runDownstreamTypesTest(final int type, final DownstreamType expectedResult)
             throws Exception {
+        mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mTetheringMetrics.createBuilder(type, TEST_CALLER_PKG);
         final long duration = 2 * SECOND_IN_MILLIS;
         incrementCurrentTime(duration);
@@ -172,9 +172,7 @@ public final class TetheringMetricsTest {
 
         verifyReport(expectedResult, ErrorCode.EC_NO_ERROR, UserType.USER_UNKNOWN,
                 upstreamEvents, getElapsedRealtime());
-        reset(mTetheringMetrics);
         clearElapsedRealtime();
-        mTetheringMetrics.cleanup();
     }
 
     @Test
@@ -189,6 +187,7 @@ public final class TetheringMetricsTest {
 
     private void runErrorCodesTest(final int errorCode, final ErrorCode expectedResult)
             throws Exception {
+        mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mTetheringMetrics.createBuilder(TETHERING_WIFI, TEST_CALLER_PKG);
         mTetheringMetrics.maybeUpdateUpstreamType(buildUpstreamState(TRANSPORT_WIFI));
         final long duration = 2 * SECOND_IN_MILLIS;
@@ -199,9 +198,7 @@ public final class TetheringMetricsTest {
         addUpstreamEvent(upstreamEvents, UpstreamType.UT_WIFI, duration, 0L, 0L);
         verifyReport(DownstreamType.DS_TETHERING_WIFI, expectedResult, UserType.USER_UNKNOWN,
                     upstreamEvents, getElapsedRealtime());
-        reset(mTetheringMetrics);
         clearElapsedRealtime();
-        mTetheringMetrics.cleanup();
     }
 
     @Test
@@ -231,6 +228,7 @@ public final class TetheringMetricsTest {
 
     private void runUserTypesTest(final String callerPkg, final UserType expectedResult)
             throws Exception {
+        mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mTetheringMetrics.createBuilder(TETHERING_WIFI, callerPkg);
         final long duration = 1 * SECOND_IN_MILLIS;
         incrementCurrentTime(duration);
@@ -241,9 +239,7 @@ public final class TetheringMetricsTest {
         addUpstreamEvent(upstreamEvents, UpstreamType.UT_NO_NETWORK, duration, 0L, 0L);
         verifyReport(DownstreamType.DS_TETHERING_WIFI, ErrorCode.EC_NO_ERROR, expectedResult,
                     upstreamEvents, getElapsedRealtime());
-        reset(mTetheringMetrics);
         clearElapsedRealtime();
-        mTetheringMetrics.cleanup();
     }
 
     @Test
@@ -256,6 +252,7 @@ public final class TetheringMetricsTest {
 
     private void runUpstreamTypesTest(final UpstreamNetworkState ns,
             final UpstreamType expectedResult) throws Exception {
+        mTetheringMetrics = new TetheringMetrics(mContext, mDeps);
         mTetheringMetrics.createBuilder(TETHERING_WIFI, TEST_CALLER_PKG);
         mTetheringMetrics.maybeUpdateUpstreamType(ns);
         final long duration = 2 * SECOND_IN_MILLIS;
@@ -266,9 +263,7 @@ public final class TetheringMetricsTest {
         addUpstreamEvent(upstreamEvents, expectedResult, duration, 0L, 0L);
         verifyReport(DownstreamType.DS_TETHERING_WIFI, ErrorCode.EC_NO_ERROR,
                 UserType.USER_UNKNOWN, upstreamEvents, getElapsedRealtime());
-        reset(mTetheringMetrics);
         clearElapsedRealtime();
-        mTetheringMetrics.cleanup();
     }
 
     @Test

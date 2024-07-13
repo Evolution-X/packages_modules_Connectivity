@@ -36,7 +36,7 @@ import androidx.annotation.RequiresApi;
 
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.RoutingCoordinatorManager;
-import com.android.net.module.util.SdkUtil.LateSdk;
+import com.android.net.module.util.RoutingCoordinatorService;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.apishim.BluetoothPanShimImpl;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
@@ -120,20 +120,26 @@ public abstract class TetheringDependencies {
     /**
      * Get a reference to INetd to be used by tethering.
      */
-    public INetd getINetd(Context context) {
-        return INetd.Stub.asInterface(
-                (IBinder) context.getSystemService(Context.NETD_SERVICE));
+    public INetd getINetd(Context context, SharedLog log) {
+        final INetd netd =
+                INetd.Stub.asInterface((IBinder) context.getSystemService(Context.NETD_SERVICE));
+        if (netd == null) {
+            log.wtf("INetd is null");
+        }
+        return netd;
     }
 
     /**
-     * Get the routing coordinator, or null if below S.
+     * Get the routing coordinator.
      */
-    @Nullable
-    public LateSdk<RoutingCoordinatorManager> getRoutingCoordinator(Context context) {
-        if (!SdkLevel.isAtLeastS()) return new LateSdk<>(null);
-        return new LateSdk<>(
-                new RoutingCoordinatorManager(
-                        context, ConnectivityInternalApiUtil.getRoutingCoordinator(context)));
+    public RoutingCoordinatorManager getRoutingCoordinator(Context context, SharedLog log) {
+        IBinder binder;
+        if (!SdkLevel.isAtLeastS()) {
+            binder = new RoutingCoordinatorService(getINetd(context, log));
+        } else {
+            binder = ConnectivityInternalApiUtil.getRoutingCoordinator(context);
+        }
+        return new RoutingCoordinatorManager(context, binder);
     }
 
     /**
@@ -187,8 +193,8 @@ public abstract class TetheringDependencies {
     /**
      * Make the TetheringMetrics to be used by tethering.
      */
-    public TetheringMetrics makeTetheringMetrics() {
-        return new TetheringMetrics();
+    public TetheringMetrics makeTetheringMetrics(Context ctx) {
+        return new TetheringMetrics(ctx);
     }
 
     /**

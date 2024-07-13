@@ -51,6 +51,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -174,8 +175,7 @@ public class IpServerTest {
     @Mock private RouterAdvertisementDaemon mRaDaemon;
     @Mock private IpServer.Dependencies mDependencies;
     @Mock private PrivateAddressCoordinator mAddressCoordinator;
-    private final LateSdk<RoutingCoordinatorManager> mRoutingCoordinatorManager =
-            new LateSdk<>(SdkLevel.isAtLeastS() ? mock(RoutingCoordinatorManager.class) : null);
+    @Mock private RoutingCoordinatorManager mRoutingCoordinatorManager;
     @Mock private NetworkStatsManager mStatsManager;
     @Mock private TetheringConfiguration mTetherConfig;
     @Mock private TetheringMetrics mTetheringMetrics;
@@ -279,24 +279,6 @@ public class IpServerTest {
                 anyBoolean())).thenReturn(mTestAddress);
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(DEFAULT_USING_BPF_OFFLOAD);
         when(mTetherConfig.useLegacyDhcpServer()).thenReturn(false /* default value */);
-
-        // Simulate the behavior of RoutingCoordinator
-        if (null != mRoutingCoordinatorManager.value) {
-            doAnswer(it -> {
-                final String fromIface = (String) it.getArguments()[0];
-                final String toIface = (String) it.getArguments()[1];
-                mNetd.tetherAddForward(fromIface, toIface);
-                mNetd.ipfwdAddInterfaceForward(fromIface, toIface);
-                return null;
-            }).when(mRoutingCoordinatorManager.value).addInterfaceForward(any(), any());
-            doAnswer(it -> {
-                final String fromIface = (String) it.getArguments()[0];
-                final String toIface = (String) it.getArguments()[1];
-                mNetd.ipfwdRemoveInterfaceForward(fromIface, toIface);
-                mNetd.tetherRemoveForward(fromIface, toIface);
-                return null;
-            }).when(mRoutingCoordinatorManager.value).removeInterfaceForward(any(), any());
-        }
 
         setUpDhcpServer();
     }
@@ -455,105 +437,114 @@ public class IpServerTest {
         // Telling the state machine about its upstream interface triggers
         // a little more configuration.
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
-        InOrder inOrder = inOrder(mNetd, mBpfCoordinator);
+        InOrder inOrder = inOrder(mBpfCoordinator, mRoutingCoordinatorManager);
 
         // Add the forwarding pair <IFACE_NAME, UPSTREAM_IFACE>.
         inOrder.verify(mBpfCoordinator).maybeAddUpstreamToLookupTable(UPSTREAM_IFINDEX,
                 UPSTREAM_IFACE);
         inOrder.verify(mBpfCoordinator).maybeAttachProgram(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).ipfwdAddInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
+        inOrder.verify(mRoutingCoordinatorManager).addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
 
-        verifyNoMoreInteractions(mNetd, mCallback, mBpfCoordinator);
+        verifyNoMoreInteractions(mCallback, mBpfCoordinator, mRoutingCoordinatorManager);
     }
 
     @Test
     public void handlesChangingUpstream() throws Exception {
         initTetheredStateMachine(TETHERING_BLUETOOTH, UPSTREAM_IFACE);
 
+        clearInvocations(mBpfCoordinator, mRoutingCoordinatorManager);
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2);
-        InOrder inOrder = inOrder(mNetd, mBpfCoordinator);
+        InOrder inOrder = inOrder(mBpfCoordinator, mRoutingCoordinatorManager);
 
         // Remove the forwarding pair <IFACE_NAME, UPSTREAM_IFACE>.
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
 
         // Add the forwarding pair <IFACE_NAME, UPSTREAM_IFACE2>.
         inOrder.verify(mBpfCoordinator).maybeAddUpstreamToLookupTable(UPSTREAM_IFINDEX2,
                 UPSTREAM_IFACE2);
         inOrder.verify(mBpfCoordinator).maybeAttachProgram(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).ipfwdAddInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
+        inOrder.verify(mRoutingCoordinatorManager).addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
 
-        verifyNoMoreInteractions(mNetd, mCallback, mBpfCoordinator);
+        verifyNoMoreInteractions(mCallback, mBpfCoordinator, mRoutingCoordinatorManager);
     }
 
     @Test
     public void handlesChangingUpstreamNatFailure() throws Exception {
         initTetheredStateMachine(TETHERING_WIFI, UPSTREAM_IFACE);
 
-        doThrow(RemoteException.class).when(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE2);
+        doThrow(RuntimeException.class)
+                .when(mRoutingCoordinatorManager)
+                .addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
 
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2);
-        InOrder inOrder = inOrder(mNetd, mBpfCoordinator);
+        InOrder inOrder = inOrder(mBpfCoordinator, mRoutingCoordinatorManager);
 
         // Remove the forwarding pair <IFACE_NAME, UPSTREAM_IFACE>.
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
 
         // Add the forwarding pair <IFACE_NAME, UPSTREAM_IFACE2> and expect that failed on
-        // tetherAddForward.
+        // addInterfaceForward.
         inOrder.verify(mBpfCoordinator).maybeAddUpstreamToLookupTable(UPSTREAM_IFINDEX2,
                 UPSTREAM_IFACE2);
         inOrder.verify(mBpfCoordinator).maybeAttachProgram(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE2);
+        inOrder.verify(mRoutingCoordinatorManager).addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
 
         // Remove the forwarding pair <IFACE_NAME, UPSTREAM_IFACE2> to fallback.
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE2);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
     }
 
     @Test
     public void handlesChangingUpstreamInterfaceForwardingFailure() throws Exception {
         initTetheredStateMachine(TETHERING_WIFI, UPSTREAM_IFACE);
 
-        doThrow(RemoteException.class).when(mNetd).ipfwdAddInterfaceForward(
-                IFACE_NAME, UPSTREAM_IFACE2);
+        doThrow(RuntimeException.class)
+                .when(mRoutingCoordinatorManager)
+                .addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
 
         dispatchTetherConnectionChanged(UPSTREAM_IFACE2);
-        InOrder inOrder = inOrder(mNetd, mBpfCoordinator);
+        InOrder inOrder = inOrder(mBpfCoordinator, mRoutingCoordinatorManager);
 
         // Remove the forwarding pair <IFACE_NAME, UPSTREAM_IFACE>.
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
 
         // Add the forwarding pair <IFACE_NAME, UPSTREAM_IFACE2> and expect that failed on
         // ipfwdAddInterfaceForward.
         inOrder.verify(mBpfCoordinator).maybeAddUpstreamToLookupTable(UPSTREAM_IFINDEX2,
                 UPSTREAM_IFACE2);
         inOrder.verify(mBpfCoordinator).maybeAttachProgram(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).ipfwdAddInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
+        inOrder.verify(mRoutingCoordinatorManager).addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
 
         // Remove the forwarding pair <IFACE_NAME, UPSTREAM_IFACE2> to fallback.
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE2);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE2);
     }
 
     @Test
     public void canUnrequestTetheringWithUpstream() throws Exception {
         initTetheredStateMachine(TETHERING_BLUETOOTH, UPSTREAM_IFACE);
 
+        clearInvocations(
+                mNetd, mCallback, mAddressCoordinator, mBpfCoordinator, mRoutingCoordinatorManager);
         dispatchCommand(IpServer.CMD_TETHER_UNREQUESTED);
-        InOrder inOrder = inOrder(mNetd, mCallback, mAddressCoordinator, mBpfCoordinator);
+        InOrder inOrder =
+                inOrder(
+                        mNetd,
+                        mCallback,
+                        mAddressCoordinator,
+                        mBpfCoordinator,
+                        mRoutingCoordinatorManager);
         inOrder.verify(mBpfCoordinator).maybeDetachProgram(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).ipfwdRemoveInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
-        inOrder.verify(mNetd).tetherRemoveForward(IFACE_NAME, UPSTREAM_IFACE);
+        inOrder.verify(mRoutingCoordinatorManager)
+                .removeInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
         inOrder.verify(mBpfCoordinator).updateIpv6UpstreamInterface(
                 mIpServer, NO_UPSTREAM, NO_PREFIXES);
         // When tethering stops, upstream interface is set to zero and thus clearing all upstream
@@ -572,7 +563,8 @@ public class IpServerTest {
                 mIpServer, STATE_AVAILABLE, TETHER_ERROR_NO_ERROR);
         inOrder.verify(mCallback).updateLinkProperties(
                 eq(mIpServer), any(LinkProperties.class));
-        verifyNoMoreInteractions(mNetd, mCallback, mAddressCoordinator, mBpfCoordinator);
+        verifyNoMoreInteractions(
+                mNetd, mCallback, mAddressCoordinator, mBpfCoordinator, mRoutingCoordinatorManager);
     }
 
     @Test
@@ -624,10 +616,14 @@ public class IpServerTest {
     public void shouldTearDownUsbOnUpstreamError() throws Exception {
         initTetheredStateMachine(TETHERING_USB, null);
 
-        doThrow(RemoteException.class).when(mNetd).tetherAddForward(anyString(), anyString());
+        doThrow(RuntimeException.class)
+                .when(mRoutingCoordinatorManager)
+                .addInterfaceForward(anyString(), anyString());
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
-        InOrder usbTeardownOrder = inOrder(mNetd, mCallback);
-        usbTeardownOrder.verify(mNetd).tetherAddForward(IFACE_NAME, UPSTREAM_IFACE);
+        InOrder usbTeardownOrder = inOrder(mNetd, mCallback, mRoutingCoordinatorManager);
+        usbTeardownOrder
+                .verify(mRoutingCoordinatorManager)
+                .addInterfaceForward(IFACE_NAME, UPSTREAM_IFACE);
 
         usbTeardownOrder.verify(mNetd, times(2)).interfaceSetCfg(
                 argThat(cfg -> IFACE_NAME.equals(cfg.ifName)));

@@ -138,7 +138,6 @@ import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
-import com.android.net.module.util.SdkUtil.LateSdk;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceCallbackShim;
@@ -246,10 +245,7 @@ public class Tethering {
     private final Handler mHandler;
     private final INetd mNetd;
     private final NetdCallback mNetdCallback;
-    // Contains null if the connectivity module is unsupported, as the routing coordinator is not
-    // available. Must use LateSdk because MessageUtils enumerates fields in this class, so it
-    // must be able to find all classes at runtime.
-    @NonNull private final LateSdk<RoutingCoordinatorManager> mRoutingCoordinator;
+    private final RoutingCoordinatorManager mRoutingCoordinator;
     private final UserRestrictionActionListener mTetheringRestriction;
     private final ActiveDataSubIdListener mActiveDataSubIdListener;
     private final ConnectedClientsTracker mConnectedClientsTracker;
@@ -294,11 +290,11 @@ public class Tethering {
         mLog.mark("Tethering.constructed");
         mDeps = deps;
         mContext = mDeps.getContext();
-        mNetd = mDeps.getINetd(mContext);
-        mRoutingCoordinator = mDeps.getRoutingCoordinator(mContext);
+        mNetd = mDeps.getINetd(mContext, mLog);
+        mRoutingCoordinator = mDeps.getRoutingCoordinator(mContext, mLog);
         mLooper = mDeps.makeTetheringLooper();
         mNotificationUpdater = mDeps.makeNotificationUpdater(mContext, mLooper);
-        mTetheringMetrics = mDeps.makeTetheringMetrics();
+        mTetheringMetrics = mDeps.makeTetheringMetrics(mContext);
 
         // This is intended to ensrure that if something calls startTethering(bluetooth) just after
         // bluetooth is enabled. Before onServiceConnected is called, store the calls into this
