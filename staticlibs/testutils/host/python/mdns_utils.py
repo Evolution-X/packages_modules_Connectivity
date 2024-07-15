@@ -12,7 +12,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from mobly import asserts
 from mobly.controllers import android_device
+
+
+def assume_mdns_test_preconditions(
+    advertising_device: android_device, discovery_device: android_device
+) -> None:
+  advertising = advertising_device.connectivity_multi_devices_snippet
+  discovery = discovery_device.connectivity_multi_devices_snippet
+
+  asserts.skip_if(
+      not advertising.isAtLeastT(), "Advertising device SDK is lower than T."
+  )
+  asserts.skip_if(
+      not discovery.isAtLeastT(), "Discovery device SDK is lower than T."
+  )
 
 
 def register_mdns_service_and_discover_resolve(
