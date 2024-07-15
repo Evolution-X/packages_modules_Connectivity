@@ -26,7 +26,6 @@ import static android.net.thread.ThreadNetworkManager.DISALLOW_THREAD_NETWORK;
 import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_PRIVILEGED;
 
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
-import static com.android.server.thread.ThreadPersistentSettings.THREAD_ENABLED_IN_AIRPLANE_MODE;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_INVALID_STATE;
 
 import static com.google.common.io.BaseEncoding.base16;
@@ -70,7 +69,6 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserManager;
 import android.os.test.TestLooper;
-import android.provider.Settings;
 import android.util.AtomicFile;
 
 import androidx.test.annotation.UiThreadTest;
@@ -193,8 +191,6 @@ public final class ThreadNetworkControllerServiceTest {
         when(mMockTunIfController.getTunFd()).thenReturn(mMockTunFd);
 
         when(mMockUserManager.hasUserRestriction(eq(DISALLOW_THREAD_NETWORK))).thenReturn(false);
-
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
 
         when(mConnectivityResources.get()).thenReturn(mResources);
         when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(true);
@@ -479,100 +475,6 @@ public final class ThreadNetworkControllerServiceTest {
         var thrown = assertThrows(ExecutionException.class, () -> setEnabledFuture.get());
         ThreadNetworkException failure = (ThreadNetworkException) thrown.getCause();
         assertThat(failure.getErrorCode()).isEqualTo(ERROR_FAILED_PRECONDITION);
-    }
-
-    @Test
-    public void airplaneMode_initWithAirplaneModeOn_otDaemonNotStarted() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.isInitialized()).isFalse();
-    }
-
-    @Test
-    public void airplaneMode_initWithAirplaneModeOff_threadIsEnabled() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
-
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-    }
-
-    @Test
-    public void airplaneMode_changesFromOffToOn_stateIsDisabled() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
-        AtomicReference<BroadcastReceiver> receiverRef =
-                captureBroadcastReceiver(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-    }
-
-    @Test
-    public void airplaneMode_changesFromOnToOff_stateIsEnabled() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        AtomicReference<BroadcastReceiver> receiverRef =
-                captureBroadcastReceiver(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-    }
-
-    @Test
-    public void airplaneMode_setEnabledWhenAirplaneModeIsOn_WillNotAutoDisableSecondTime() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        AtomicReference<BroadcastReceiver> receiverRef =
-                captureBroadcastReceiver(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        CompletableFuture<Void> setEnabledFuture = new CompletableFuture<>();
-        mService.initialize();
-
-        mService.setEnabled(true, newOperationReceiver(setEnabledFuture));
-        mTestLooper.dispatchAll();
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-        assertThat(mPersistentSettings.get(THREAD_ENABLED_IN_AIRPLANE_MODE)).isTrue();
-    }
-
-    @Test
-    public void airplaneMode_setDisabledWhenAirplaneModeIsOn_WillAutoDisableSecondTime() {
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        AtomicReference<BroadcastReceiver> receiverRef =
-                captureBroadcastReceiver(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        CompletableFuture<Void> setEnabledFuture = new CompletableFuture<>();
-        mService.initialize();
-        mService.setEnabled(true, newOperationReceiver(setEnabledFuture));
-        mTestLooper.dispatchAll();
-
-        mService.setEnabled(false, newOperationReceiver(setEnabledFuture));
-        mTestLooper.dispatchAll();
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-        Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
-        receiverRef.get().onReceive(mContext, new Intent());
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-        assertThat(mPersistentSettings.get(THREAD_ENABLED_IN_AIRPLANE_MODE)).isFalse();
     }
 
     private AtomicReference<BroadcastReceiver> captureBroadcastReceiver(String action) {
