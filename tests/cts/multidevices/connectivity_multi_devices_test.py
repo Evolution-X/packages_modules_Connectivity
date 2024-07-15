@@ -68,6 +68,9 @@ class ConnectivityMultiDevicesTest(base_test.BaseTestClass):
     tether_utils.assume_hotspot_test_preconditions(
         self.serverDevice, self.clientDevice, UpstreamType.NONE
     )
+    mdns_utils.assume_mdns_test_preconditions(
+        self.clientDevice, self.serverDevice
+    )
     try:
       # Connectivity of the client verified by asserting the validated capability.
       tether_utils.setup_hotspot_and_client_for_upstream_type(
