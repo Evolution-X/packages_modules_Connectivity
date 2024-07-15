@@ -111,7 +111,6 @@ import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserManager;
-import android.provider.Settings;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -211,7 +210,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private final ThreadPersistentSettings mPersistentSettings;
     private final UserManager mUserManager;
     private boolean mUserRestricted;
-    private boolean mAirplaneModeOn;
     private boolean mForceStopOtDaemonEnabled;
 
     private BorderRouterConfigurationParcel mBorderRouterConfig;
@@ -446,8 +444,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                     requestThreadNetwork();
                     mUserRestricted = isThreadUserRestricted();
                     registerUserRestrictionsReceiver();
-                    mAirplaneModeOn = isAirplaneModeOn();
-                    registerAirplaneModeReceiver();
                     maybeInitializeOtDaemon();
                 });
     }
@@ -529,15 +525,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             // the otDaemon set enabled state operation succeeded or not, so that it can recover
             // to the desired value after reboot.
             mPersistentSettings.put(ThreadPersistentSettings.THREAD_ENABLED.key, isEnabled);
-
-            // Remember whether the user wanted to keep Thread enabled in airplane mode. If once
-            // the user disabled Thread again in airplane mode, the persistent settings state is
-            // reset (so that Thread will be auto-disabled again when airplane mode is turned on).
-            // This behavior is consistent with Wi-Fi and bluetooth.
-            if (mAirplaneModeOn) {
-                mPersistentSettings.put(
-                        ThreadPersistentSettings.THREAD_ENABLED_IN_AIRPLANE_MODE.key, isEnabled);
-            }
         }
 
         try {
@@ -676,74 +663,13 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return mUserManager.hasUserRestriction(DISALLOW_THREAD_NETWORK);
     }
 
-    private void registerAirplaneModeReceiver() {
-        mContext.registerReceiver(
-                new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        onAirplaneModeChanged(isAirplaneModeOn());
-                    }
-                },
-                new IntentFilter(Intent.ACTION_AIRPLANE_MODE_CHANGED),
-                null /* broadcastPermission */,
-                mHandler);
-    }
-
-    private void onAirplaneModeChanged(boolean newAirplaneModeOn) {
-        checkOnHandlerThread();
-        if (mAirplaneModeOn == newAirplaneModeOn) {
-            return;
-        }
-        Log.i(TAG, "Airplane mode changed: " + mAirplaneModeOn + " -> " + newAirplaneModeOn);
-        mAirplaneModeOn = newAirplaneModeOn;
-
-        final boolean shouldEnableThread = shouldEnableThread();
-        final IOperationReceiver receiver =
-                new IOperationReceiver.Stub() {
-                    @Override
-                    public void onSuccess() {
-                        Log.d(
-                                TAG,
-                                (shouldEnableThread ? "Enabled" : "Disabled")
-                                        + " Thread due to airplane mode change");
-                    }
-
-                    @Override
-                    public void onError(int errorCode, String errorMessage) {
-                        Log.e(
-                                TAG,
-                                "Failed to "
-                                        + (shouldEnableThread ? "enable" : "disable")
-                                        + " Thread for airplane mode change");
-                    }
-                };
-        // Do not save the user restriction state to persistent settings so that the user
-        // configuration won't be overwritten
-        setEnabledInternal(
-                shouldEnableThread, false /* persist */, new OperationReceiverWrapper(receiver));
-    }
-
-    /** Returns {@code true} if Airplane mode has been turned on. */
-    private boolean isAirplaneModeOn() {
-        return Settings.Global.getInt(
-                        mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0)
-                == 1;
-    }
-
     /**
      * Returns {@code true} if Thread should be enabled based on current settings, runtime user
-     * restriction and airplane mode state.
+     * restriction state.
      */
     private boolean shouldEnableThread() {
-        final boolean enabledInAirplaneMode =
-                mPersistentSettings.get(ThreadPersistentSettings.THREAD_ENABLED_IN_AIRPLANE_MODE);
-
         return !mForceStopOtDaemonEnabled
                 && !mUserRestricted
-                // FIXME(b/340744397): Note that here we need to call `isAirplaneModeOn()` to get
-                // the latest state of airplane mode but can't use `mIsAirplaneMode`. This is for
-                // avoiding the race conditions described in b/340744397
-                && (!isAirplaneModeOn() || enabledInAirplaneMode)
                 && mPersistentSettings.get(ThreadPersistentSettings.THREAD_ENABLED);
     }
 
