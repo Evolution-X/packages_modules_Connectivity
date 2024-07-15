@@ -46,6 +46,7 @@ import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_TYPE;
 import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.TetheringManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
@@ -373,5 +374,22 @@ public final class TetheringMetricsTest {
         verifyReport(DownstreamType.DS_TETHERING_WIFI, ErrorCode.EC_NO_ERROR,
                 UserType.USER_SETTINGS, upstreamEvents,
                 currentTimeMillis() - wifiTetheringStartTime);
+    }
+
+    private void runUsageSupportedForUpstreamTypeTest(final UpstreamType upstreamType,
+            final boolean isSupported) {
+        final boolean result = TetheringMetrics.isUsageSupportedForUpstreamType(upstreamType);
+        assertEquals(isSupported, result);
+    }
+
+    @Test
+    public void testUsageSupportedForUpstreamTypeTest() {
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_CELLULAR, true /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_WIFI, true /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_BLUETOOTH, true /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_ETHERNET, true /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_WIFI_AWARE, false /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_LOWPAN, false /* isSupported */);
+        runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_UNKNOWN, false /* isSupported */);
     }
 }
