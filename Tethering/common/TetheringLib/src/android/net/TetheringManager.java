@@ -198,6 +198,10 @@ public class TetheringManager {
 
     /**
      * VIRTUAL tethering type.
+     *
+     * This tethering type is for providing external network to virtual machines
+     * running on top of Android devices, which are created and managed by
+     * AVF(Android Virtualization Framework).
      * @hide
      */
     @FlaggedApi(Flags.TETHERING_REQUEST_VIRTUAL)
