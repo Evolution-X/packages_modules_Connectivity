@@ -4489,6 +4489,7 @@ public class ConnectivityManager {
     public static final int CALLBACK_BLK_CHANGED                = 11;
     /** @hide */
     public static final int CALLBACK_LOCAL_NETWORK_INFO_CHANGED = 12;
+    // When adding new IDs, note CallbackQueue assumes callback IDs are at most 16 bits.
 
 
     /** @hide */
