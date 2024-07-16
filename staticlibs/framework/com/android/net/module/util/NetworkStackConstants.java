@@ -260,6 +260,18 @@ public final class NetworkStackConstants {
     public static final short DNS_OVER_TLS_PORT = 853;
 
     /**
+     * Dns query type constants.
+     *
+     * See also:
+     *    - https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.2
+     */
+    public static final int TYPE_A = 1;
+    public static final int TYPE_PTR = 12;
+    public static final int TYPE_TXT = 16;
+    public static final int TYPE_AAAA = 28;
+    public static final int TYPE_SRV = 33;
+
+    /**
      * IEEE802.11 standard constants.
      *
      * See also:
