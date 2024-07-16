@@ -2180,6 +2180,7 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.CARRIER_SERVICE_CHANGED_USE_CALLBACK:
                 case ConnectivityFlags.REQUEST_RESTRICTED_WIFI:
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
+                case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                 case KEY_DESTROY_FROZEN_SOCKETS_VERSION:
                     return true;
                 default:
