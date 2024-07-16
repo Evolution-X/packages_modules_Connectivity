@@ -49,6 +49,9 @@ public final class ConnectivityFlags {
     public static final String USE_DECLARED_METHODS_FOR_CALLBACKS =
             "use_declared_methods_for_callbacks";
 
+    public static final String QUEUE_CALLBACKS_FOR_FROZEN_APPS =
+            "queue_callbacks_for_frozen_apps";
+
     private boolean mNoRematchAllRequestsOnRegister;
 
     /**
