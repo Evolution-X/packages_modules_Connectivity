@@ -41,6 +41,7 @@ import android.util.SparseArray;
 import com.android.connectivity.resources.R;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
@@ -272,7 +273,7 @@ public class MdnsAdvertiser {
             return true;
         }
         // Check if it conflicts with the default hostname.
-        return MdnsUtils.equalsIgnoreDnsCase(newInfo.getHostname(), mDeviceHostName[0]);
+        return DnsUtils.equalsIgnoreDnsCase(newInfo.getHostname(), mDeviceHostName[0]);
     }
 
     private void updateRegistrationUntilNoConflict(
@@ -436,8 +437,8 @@ public class MdnsAdvertiser {
                     continue;
                 }
                 final NsdServiceInfo other = mPendingRegistrations.valueAt(i).getServiceInfo();
-                if (MdnsUtils.equalsIgnoreDnsCase(info.getServiceName(), other.getServiceName())
-                        && MdnsUtils.equalsIgnoreDnsCase(info.getServiceType(),
+                if (DnsUtils.equalsIgnoreDnsCase(info.getServiceName(), other.getServiceName())
+                        && DnsUtils.equalsIgnoreDnsCase(info.getServiceType(),
                         other.getServiceType())) {
                     return mPendingRegistrations.keyAt(i);
                 }
@@ -463,13 +464,13 @@ public class MdnsAdvertiser {
                 final NsdServiceInfo otherInfo = otherRegistration.getServiceInfo();
                 final int otherServiceId = mPendingRegistrations.keyAt(i);
                 if (clientUid != otherRegistration.mClientUid
-                        && MdnsUtils.equalsIgnoreDnsCase(
+                        && DnsUtils.equalsIgnoreDnsCase(
                                 info.getHostname(), otherInfo.getHostname())) {
                     return otherServiceId;
                 }
                 if (!info.getHostAddresses().isEmpty()
                         && !otherInfo.getHostAddresses().isEmpty()
-                        && MdnsUtils.equalsIgnoreDnsCase(
+                        && DnsUtils.equalsIgnoreDnsCase(
                                 info.getHostname(), otherInfo.getHostname())) {
                     return otherServiceId;
                 }
@@ -849,7 +850,7 @@ public class MdnsAdvertiser {
                 sharedLog.wtf("Invalid priority in config_nsdOffloadServicesPriority: " + entry);
                 continue;
             }
-            priorities.put(MdnsUtils.toDnsLowerCase(priorityAndType[1]), priority);
+            priorities.put(DnsUtils.toDnsLowerCase(priorityAndType[1]), priority);
         }
         return priorities;
     }
@@ -995,7 +996,7 @@ public class MdnsAdvertiser {
             @NonNull Registration registration, byte[] rawOffloadPacket) {
         final NsdServiceInfo nsdServiceInfo = registration.getServiceInfo();
         final Integer mapPriority = mServiceTypeToOffloadPriority.get(
-                MdnsUtils.toDnsLowerCase(nsdServiceInfo.getServiceType()));
+                DnsUtils.toDnsLowerCase(nsdServiceInfo.getServiceType()));
         // Higher values of priority are less prioritized
         final int priority = mapPriority == null ? Integer.MAX_VALUE : mapPriority;
         final OffloadServiceInfo offloadServiceInfo = new OffloadServiceInfo(
