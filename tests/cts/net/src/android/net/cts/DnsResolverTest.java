@@ -852,13 +852,14 @@ public class DnsResolverTest {
     }
 
     public void doTestContinuousQueries(Executor executor) throws InterruptedException {
-        final String msg = "Test continuous " + QUERY_TIMES + " queries " + TEST_DOMAIN;
         for (Network network : getTestableNetworks()) {
             for (int i = 0; i < QUERY_TIMES ; ++i) {
-                final VerifyCancelInetAddressCallback callback =
-                        new VerifyCancelInetAddressCallback(msg, null);
                 // query v6/v4 in turn
                 boolean queryV6 = (i % 2 == 0);
+                final String msg = "Test continuous " + QUERY_TIMES + " queries " + TEST_DOMAIN
+                        + " on " + network + ", queryV6=" + queryV6;
+                final VerifyCancelInetAddressCallback callback =
+                        new VerifyCancelInetAddressCallback(msg, null);
                 mDns.query(network, TEST_DOMAIN, queryV6 ? TYPE_AAAA : TYPE_A,
                         FLAG_NO_CACHE_LOOKUP, executor, null, callback);
 
