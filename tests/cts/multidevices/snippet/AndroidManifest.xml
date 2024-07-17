@@ -21,6 +21,8 @@
   <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
   <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
   <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+                   android:usesPermissionFlags="neverForLocation" />
   <application>
     <!-- Add any classes that implement the Snippet interface as meta-data, whose
          value is a comma-separated string, each section being the package path
@@ -28,7 +30,8 @@
     <meta-data
         android:name="mobly-snippets"
         android:value="com.google.snippet.connectivity.ConnectivityMultiDevicesSnippet,
-                       com.google.snippet.connectivity.MdnsMultiDevicesSnippet" />
+                       com.google.snippet.connectivity.MdnsMultiDevicesSnippet,
+                       com.google.snippet.connectivity.Wifip2pMultiDevicesSnippet" />
   </application>
   <!-- Add an instrumentation tag so that the app can be launched through an
        instrument command. The runner `com.google.android.mobly.snippet.SnippetRunner`
