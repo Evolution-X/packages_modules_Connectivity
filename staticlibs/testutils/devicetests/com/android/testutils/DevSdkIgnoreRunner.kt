@@ -16,6 +16,8 @@
 
 package com.android.testutils
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.net.module.util.LinkPropertiesUtils.CompareOrUpdateResult
 import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter
@@ -57,6 +59,10 @@ import org.mockito.Mockito
 class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, Sortable {
     private val leakMonitorDesc = Description.createTestDescription(klass, "ThreadLeakMonitor")
     private val shouldThreadLeakFailTest = klass.isAnnotationPresent(MonitorThreadLeak::class.java)
+    private val restoreDefaultNetworkDesc =
+            Description.createTestDescription(klass, "RestoreDefaultNetwork")
+    private val restoreDefaultNetwork = klass.isAnnotationPresent(RestoreDefaultNetwork::class.java)
+    val ctx = ApplicationProvider.getApplicationContext<Context>()
 
     // Inference correctly infers Runner & Filterable & Sortable for |baseRunner|, but the
     // Java bytecode doesn't have a way to express this. Give this type a name by wrapping it.
@@ -70,6 +76,10 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
     // Annotation for test classes to indicate the test runner should monitor thread leak.
     // TODO(b/307693729): Remove this annotation and monitor thread leak by default.
     annotation class MonitorThreadLeak
+
+    // Annotation for test classes to indicate the test runner should verify the default network is
+    // restored after each test.
+    annotation class RestoreDefaultNetwork
 
     private val baseRunner: RunnerWrapper<*>? = klass.let {
         val ignoreAfter = it.getAnnotation(IgnoreAfter::class.java)
@@ -125,6 +135,14 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
             )
             return
         }
+
+        val networkRestoreMonitor = if (restoreDefaultNetwork) {
+            DefaultNetworkRestoreMonitor(ctx, notifier).apply{
+                init(ConnectUtil(ctx))
+            }
+        } else {
+            null
+        }
         val threadCountsBeforeTest = if (shouldThreadLeakFailTest) {
             // Dump threads as a baseline to monitor thread leaks.
             getAllThreadNameCounts()
@@ -137,6 +155,7 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
         if (threadCountsBeforeTest != null) {
             checkThreadLeak(notifier, threadCountsBeforeTest)
         }
+        networkRestoreMonitor?.reportResultAndCleanUp(restoreDefaultNetworkDesc)
         // Clears up internal state of all inline mocks.
         // TODO: Call clearInlineMocks() at the end of each test.
         Mockito.framework().clearInlineMocks()
@@ -163,6 +182,9 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
             if (shouldThreadLeakFailTest) {
                 it.addChild(leakMonitorDesc)
             }
+            if (restoreDefaultNetwork) {
+                it.addChild(restoreDefaultNetworkDesc)
+            }
         }
     }
 
@@ -173,7 +195,14 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
         // When ignoring the tests, a skipped placeholder test is reported, so test count is 1.
         if (baseRunner == null) return 1
 
-        return baseRunner.testCount() + if (shouldThreadLeakFailTest) 1 else 0
+        var testCount = baseRunner.testCount()
+        if (shouldThreadLeakFailTest) {
+            testCount += 1
+        }
+        if (restoreDefaultNetwork) {
+            testCount += 1
+        }
+        return testCount
     }
 
     @Throws(NoTestsRemainException::class)
