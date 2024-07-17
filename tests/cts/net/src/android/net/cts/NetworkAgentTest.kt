@@ -194,15 +194,16 @@ private fun Message(what: Int, arg1: Int, arg2: Int, obj: Any?) = Message.obtain
 // TODO : enable this in a Mainline update or in V.
 private const val SHOULD_CREATE_NETWORKS_IMMEDIATELY = false
 
-@RunWith(DevSdkIgnoreRunner::class)
-// NetworkAgent is not updatable in R-, so this test does not need to be compatible with older
-// versions. NetworkAgent was also based on AsyncChannel before S so cannot be tested the same way.
-@IgnoreUpTo(Build.VERSION_CODES.R)
+@AppModeFull(reason = "Instant apps can't use NetworkAgent because it needs NETWORK_FACTORY'.")
 // NetworkAgent is updated as part of the connectivity module, and running NetworkAgent tests in MTS
 // for modules other than Connectivity does not provide much value. Only run them in connectivity
 // module MTS, so the tests only need to cover the case of an updated NetworkAgent.
 @ConnectivityModuleTest
-@AppModeFull(reason = "Instant apps can't use NetworkAgent because it needs NETWORK_FACTORY'.")
+@DevSdkIgnoreRunner.RestoreDefaultNetwork
+// NetworkAgent is not updatable in R-, so this test does not need to be compatible with older
+// versions. NetworkAgent was also based on AsyncChannel before S so cannot be tested the same way.
+@IgnoreUpTo(Build.VERSION_CODES.R)
+@RunWith(DevSdkIgnoreRunner::class)
 class NetworkAgentTest {
     private val LOCAL_IPV4_ADDRESS = InetAddresses.parseNumericAddress("192.0.2.1")
     private val REMOTE_IPV4_ADDRESS = InetAddresses.parseNumericAddress("192.0.2.2")
