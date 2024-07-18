@@ -443,6 +443,7 @@ java_library {
         "device/com/android/net/module/util/SharedLog.java",
         "framework/com/android/net/module/util/ByteUtils.java",
         "framework/com/android/net/module/util/CollectionUtils.java",
+        "framework/com/android/net/module/util/DnsUtils.java",
         "framework/com/android/net/module/util/HexDump.java",
         "framework/com/android/net/module/util/LinkPropertiesUtils.java",
     ],
