@@ -20,7 +20,7 @@ import android.annotation.Nullable;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.server.connectivity.mdns.util.MdnsUtils;
+import com.android.net.module.util.DnsUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -151,7 +151,7 @@ public class MdnsServiceRecord extends MdnsRecord {
     public int hashCode() {
         return (super.hashCode() * 31)
                 + Objects.hash(servicePriority, serviceWeight,
-                Arrays.hashCode(MdnsUtils.toDnsLabelsLowerCase(serviceHost)),
+                Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(serviceHost)),
                 servicePort);
     }
 
@@ -168,7 +168,7 @@ public class MdnsServiceRecord extends MdnsRecord {
         return super.equals(other)
                 && (servicePriority == otherRecord.servicePriority)
                 && (serviceWeight == otherRecord.serviceWeight)
-                && MdnsUtils.equalsDnsLabelIgnoreDnsCase(serviceHost, otherRecord.serviceHost)
+                && DnsUtils.equalsDnsLabelIgnoreDnsCase(serviceHost, otherRecord.serviceHost)
                 && (servicePort == otherRecord.servicePort);
     }
 }

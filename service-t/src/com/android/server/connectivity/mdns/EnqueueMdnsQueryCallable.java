@@ -24,6 +24,7 @@ import android.text.TextUtils;
 import android.util.Pair;
 
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
 
@@ -193,7 +194,7 @@ public class EnqueueMdnsQueryCallable implements Callable<Pair<Integer, List<Str
                         // Ignore any PTR records that don't match the current query.
                         if (!CollectionUtils.any(questions,
                                 q -> q instanceof MdnsPointerRecord
-                                        && MdnsUtils.equalsDnsLabelIgnoreDnsCase(
+                                        && DnsUtils.equalsDnsLabelIgnoreDnsCase(
                                                 q.getName(), ptrRecord.getName()))) {
                             continue;
                         }

@@ -93,6 +93,7 @@ import com.android.metrics.NetworkNsdReportedMetrics;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DeviceConfigUtils;
+import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.InetAddressUtils;
 import com.android.net.module.util.PermissionUtils;
@@ -768,7 +769,7 @@ public class NsdService extends INsdManager.Stub {
             private Set<String> dedupSubtypeLabels(Collection<String> subtypes) {
                 final Map<String, String> subtypeMap = new LinkedHashMap<>(subtypes.size());
                 for (String subtype : subtypes) {
-                    subtypeMap.put(MdnsUtils.toDnsLowerCase(subtype), subtype);
+                    subtypeMap.put(DnsUtils.toDnsLowerCase(subtype), subtype);
                 }
                 return new ArraySet<>(subtypeMap.values());
             }

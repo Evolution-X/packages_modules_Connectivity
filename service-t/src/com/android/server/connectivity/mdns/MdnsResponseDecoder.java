@@ -22,6 +22,7 @@ import android.net.Network;
 import android.util.ArrayMap;
 import android.util.Pair;
 
+import com.android.net.module.util.DnsUtils;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.EOFException;
@@ -49,7 +50,7 @@ public class MdnsResponseDecoder {
             List<MdnsResponse> responses, String[] pointer) {
         if (responses != null) {
             for (MdnsResponse response : responses) {
-                if (MdnsUtils.equalsDnsLabelIgnoreDnsCase(response.getServiceName(), pointer)) {
+                if (DnsUtils.equalsDnsLabelIgnoreDnsCase(response.getServiceName(), pointer)) {
                     return response;
                 }
             }
@@ -65,7 +66,7 @@ public class MdnsResponseDecoder {
                 if (serviceRecord == null) {
                     continue;
                 }
-                if (MdnsUtils.equalsDnsLabelIgnoreDnsCase(serviceRecord.getServiceHost(),
+                if (DnsUtils.equalsDnsLabelIgnoreDnsCase(serviceRecord.getServiceHost(),
                         hostName)) {
                     return response;
                 }
@@ -318,7 +319,7 @@ public class MdnsResponseDecoder {
             if (serviceRecord == null) {
                 continue;
             }
-            if (MdnsUtils.equalsDnsLabelIgnoreDnsCase(serviceRecord.getServiceHost(), hostName)) {
+            if (DnsUtils.equalsDnsLabelIgnoreDnsCase(serviceRecord.getServiceHost(), hostName)) {
                 if (result == null) {
                     result = new ArrayList<>(/* initialCapacity= */ responses.size());
                 }
