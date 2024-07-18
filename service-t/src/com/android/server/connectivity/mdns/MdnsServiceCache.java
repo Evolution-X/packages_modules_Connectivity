@@ -16,10 +16,10 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase;
+import static com.android.net.module.util.DnsUtils.toDnsLowerCase;
 import static com.android.server.connectivity.mdns.MdnsResponse.EXPIRATION_NEVER;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.ensureRunningOnHandlerThread;
-import static com.android.server.connectivity.mdns.util.MdnsUtils.equalsIgnoreDnsCase;
-import static com.android.server.connectivity.mdns.util.MdnsUtils.toDnsLowerCase;
 
 import static java.lang.Math.min;
 

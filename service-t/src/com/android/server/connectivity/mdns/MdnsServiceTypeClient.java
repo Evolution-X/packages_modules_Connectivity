@@ -33,6 +33,7 @@ import android.util.Pair;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
 
@@ -120,11 +121,11 @@ public class MdnsServiceTypeClient {
          * @return true if the service name was not discovered before.
          */
         boolean setServiceDiscovered(@NonNull String serviceName) {
-            return discoveredServiceNames.add(MdnsUtils.toDnsLowerCase(serviceName));
+            return discoveredServiceNames.add(DnsUtils.toDnsLowerCase(serviceName));
         }
 
         void unsetServiceDiscovered(@NonNull String serviceName) {
-            discoveredServiceNames.remove(MdnsUtils.toDnsLowerCase(serviceName));
+            discoveredServiceNames.remove(DnsUtils.toDnsLowerCase(serviceName));
         }
     }
 
@@ -458,7 +459,7 @@ public class MdnsServiceTypeClient {
             @NonNull MdnsSearchOptions options) {
         final boolean matchesInstanceName = options.getResolveInstanceName() == null
                 // DNS is case-insensitive, so ignore case in the comparison
-                || MdnsUtils.equalsIgnoreDnsCase(options.getResolveInstanceName(),
+                || DnsUtils.equalsIgnoreDnsCase(options.getResolveInstanceName(),
                 response.getServiceInstanceName());
 
         // If discovery is requiring some subtypes, the response must have one that matches a
@@ -468,7 +469,7 @@ public class MdnsServiceTypeClient {
         final boolean matchesSubtype = options.getSubtypes().size() == 0
                 || CollectionUtils.any(options.getSubtypes(), requiredSub ->
                 CollectionUtils.any(responseSubtypes, actualSub ->
-                        MdnsUtils.equalsIgnoreDnsCase(
+                        DnsUtils.equalsIgnoreDnsCase(
                                 MdnsConstants.SUBTYPE_PREFIX + requiredSub, actualSub)));
 
         return matchesInstanceName && matchesSubtype;
@@ -658,7 +659,7 @@ public class MdnsServiceTypeClient {
                 continue;
             }
             if (CollectionUtils.any(resolveResponses,
-                    r -> MdnsUtils.equalsIgnoreDnsCase(resolveName, r.getServiceInstanceName()))) {
+                    r -> DnsUtils.equalsIgnoreDnsCase(resolveName, r.getServiceInstanceName()))) {
                 continue;
             }
             MdnsResponse knownResponse =

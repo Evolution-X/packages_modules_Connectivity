@@ -20,7 +20,7 @@ import android.annotation.Nullable;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.server.connectivity.mdns.util.MdnsUtils;
+import com.android.net.module.util.DnsUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -68,7 +68,7 @@ public class MdnsPointerRecord extends MdnsRecord {
     }
 
     public boolean hasSubtype() {
-        return (name != null) && (name.length > 2) && MdnsUtils.equalsIgnoreDnsCase(name[1],
+        return (name != null) && (name.length > 2) && DnsUtils.equalsIgnoreDnsCase(name[1],
                 MdnsConstants.SUBTYPE_LABEL);
     }
 
@@ -83,7 +83,7 @@ public class MdnsPointerRecord extends MdnsRecord {
 
     @Override
     public int hashCode() {
-        return (super.hashCode() * 31) + Arrays.hashCode(MdnsUtils.toDnsLabelsLowerCase(pointer));
+        return (super.hashCode() * 31) + Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(pointer));
     }
 
     @Override
@@ -95,7 +95,7 @@ public class MdnsPointerRecord extends MdnsRecord {
             return false;
         }
 
-        return super.equals(other) && MdnsUtils.equalsDnsLabelIgnoreDnsCase(pointer,
+        return super.equals(other) && DnsUtils.equalsDnsLabelIgnoreDnsCase(pointer,
                 ((MdnsPointerRecord) other).pointer);
     }
 }

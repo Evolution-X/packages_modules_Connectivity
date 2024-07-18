@@ -38,6 +38,7 @@ import android.util.SparseIntArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.HexDump;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
 
@@ -494,8 +495,8 @@ public class MdnsRecordRepository {
         }
         for (int i = 0; i < mServices.size(); i++) {
             final NsdServiceInfo info = mServices.valueAt(i).serviceInfo;
-            if (MdnsUtils.equalsIgnoreDnsCase(serviceName, info.getServiceName())
-                    && MdnsUtils.equalsIgnoreDnsCase(serviceType, info.getServiceType())) {
+            if (DnsUtils.equalsIgnoreDnsCase(serviceName, info.getServiceName())
+                    && DnsUtils.equalsIgnoreDnsCase(serviceType, info.getServiceType())) {
                 return mServices.keyAt(i);
             }
         }
@@ -821,7 +822,7 @@ public class MdnsRecordRepository {
              must match the question qtype unless the qtype is "ANY" (255) or the rrtype is
              "CNAME" (5), and the record rrclass must match the question qclass unless the
              qclass is "ANY" (255) */
-            if (!MdnsUtils.equalsDnsLabelIgnoreDnsCase(info.record.getName(), question.getName())) {
+            if (!DnsUtils.equalsDnsLabelIgnoreDnsCase(info.record.getName(), question.getName())) {
                 continue;
             }
             hasFullyOwnedNameMatch |= !info.isSharedName;
@@ -1232,7 +1233,7 @@ public class MdnsRecordRepository {
             return RecordConflictType.NO_CONFLICT;
         }
 
-        if (!MdnsUtils.equalsDnsLabelIgnoreDnsCase(record.getName(), fullServiceName)) {
+        if (!DnsUtils.equalsDnsLabelIgnoreDnsCase(record.getName(), fullServiceName)) {
             return RecordConflictType.NO_CONFLICT;
         }
 
@@ -1270,7 +1271,7 @@ public class MdnsRecordRepository {
         }
 
         // Different names. There won't be a conflict.
-        if (!MdnsUtils.equalsIgnoreDnsCase(
+        if (!DnsUtils.equalsIgnoreDnsCase(
                 record.getName()[0], registration.serviceInfo.getHostname())) {
             return RecordConflictType.NO_CONFLICT;
         }
@@ -1351,7 +1352,7 @@ public class MdnsRecordRepository {
             int id = mServices.keyAt(i);
             ServiceRegistration service = mServices.valueAt(i);
             if (service.exiting) continue;
-            if (MdnsUtils.equalsIgnoreDnsCase(service.serviceInfo.getHostname(), hostname)) {
+            if (DnsUtils.equalsIgnoreDnsCase(service.serviceInfo.getHostname(), hostname)) {
                 consumer.accept(id, service);
             }
         }
