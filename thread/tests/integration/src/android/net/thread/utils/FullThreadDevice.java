@@ -282,6 +282,7 @@ public final class FullThreadDevice {
         for (String subtype : subtypes) {
             fullServiceType.append(",").append(subtype);
         }
+        waitForSrpServer();
         executeCommand(
                 "srp client service add %s %s %d %d %d %s",
                 serviceName,
@@ -490,6 +491,22 @@ public final class FullThreadDevice {
         }
         // No match found
         return -1;
+    }
+
+    /** Waits for an SRP server to be present in Network Data */
+    private void waitForSrpServer() throws TimeoutException {
+        // CLI output:
+        // > srp client server
+        // [fd64:db12:25f4:7e0b:1bfc:6344:25ac:2dd7]:53538
+        // Done
+        waitFor(
+                () -> {
+                    final String serverAddr = executeCommand("srp client server").get(0);
+                    final int lastColonIndex = serverAddr.lastIndexOf(':');
+                    final int port = Integer.parseInt(serverAddr.substring(lastColonIndex + 1));
+                    return port > 0;
+                },
+                SERVICE_DISCOVERY_TIMEOUT);
     }
 
     @FormatMethod

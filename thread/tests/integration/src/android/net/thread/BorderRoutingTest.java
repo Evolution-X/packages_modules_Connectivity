@@ -17,12 +17,13 @@
 package android.net.thread;
 
 import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
-import static android.net.thread.utils.IntegrationTestUtils.JOIN_TIMEOUT;
+import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv6Packet;
 import static android.net.thread.utils.IntegrationTestUtils.isFromIpv6Source;
 import static android.net.thread.utils.IntegrationTestUtils.isInMulticastGroup;
 import static android.net.thread.utils.IntegrationTestUtils.isToIpv6Destination;
+import static android.net.thread.utils.IntegrationTestUtils.joinNetworkAndWaitForOmr;
 import static android.net.thread.utils.IntegrationTestUtils.newPacketReader;
 import static android.net.thread.utils.IntegrationTestUtils.pollForPacket;
 import static android.net.thread.utils.IntegrationTestUtils.sendUdpMessage;
@@ -33,7 +34,6 @@ import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REQU
 import static com.android.testutils.TestNetworkTrackerKt.initTestNetwork;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
-import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertEquals;
@@ -94,17 +94,6 @@ public class BorderRoutingTest {
             (Inet6Address) InetAddresses.parseNumericAddress("ff04::1234");
     private static final Inet6Address GROUP_ADDR_SCOPE_3 =
             (Inet6Address) InetAddresses.parseNumericAddress("ff03::1234");
-
-    // A valid Thread Active Operational Dataset generated from OpenThread CLI "dataset init new".
-    private static final byte[] DEFAULT_DATASET_TLVS =
-            base16().decode(
-                            "0E080000000000010000000300001335060004001FFFE002"
-                                    + "08ACC214689BC40BDF0708FD64DB1225F47E0B0510F26B31"
-                                    + "53760F519A63BAFDDFFC80D2AF030F4F70656E5468726561"
-                                    + "642D643961300102D9A00410A245479C836D551B9CA557F7"
-                                    + "B9D351B40C0402A0FFF8");
-    private static final ActiveOperationalDataset DEFAULT_DATASET =
-            ActiveOperationalDataset.fromThreadTlvs(DEFAULT_DATASET_TLVS);
 
     @Rule public final ThreadFeatureCheckerRule mThreadRule = new ThreadFeatureCheckerRule();
 
@@ -171,7 +160,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         mInfraDevice.sendEchoRequest(ftd.getOmrAddress());
 
@@ -193,7 +182,7 @@ public class BorderRoutingTest {
 
         startInfraDeviceAndWaitForOnLinkAddr();
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         mInfraDevice.sendEchoRequest(ftd.getOmrAddress());
 
@@ -213,7 +202,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         Inet6Address ftdOmr = ftd.getOmrAddress();
         // Create a new infra network and let Thread prefer it
         TestNetworkTracker oldInfraNetworkTracker = mInfraNetworkTracker;
@@ -243,7 +232,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         Inet6Address ftdOmr = requireNonNull(ftd.getOmrAddress());
         Inet6Address ftdMlEid = requireNonNull(ftd.getMlEid());
 
@@ -285,7 +274,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         ftd.subscribeMulticastAddress(GROUP_ADDR_SCOPE_5);
 
@@ -307,7 +296,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         ftd.subscribeMulticastAddress(GROUP_ADDR_SCOPE_3);
 
@@ -328,7 +317,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd, GROUP_ADDR_SCOPE_5);
 
         mInfraDevice.sendEchoRequest(GROUP_ADDR_SCOPE_5);
@@ -360,7 +349,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         ftd.subscribeMulticastAddress(GROUP_ADDR_SCOPE_3);
 
         mInfraDevice.sendEchoRequest(GROUP_ADDR_SCOPE_3);
@@ -382,7 +371,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         mInfraDevice.sendEchoRequest(GROUP_ADDR_SCOPE_4);
 
@@ -407,11 +396,11 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd1 = mFtds.get(0);
-        startFtdChild(ftd1);
+        joinNetworkAndWaitForOmr(ftd1, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd1, GROUP_ADDR_SCOPE_5);
 
         FullThreadDevice ftd2 = mFtds.get(1);
-        startFtdChild(ftd2);
+        joinNetworkAndWaitForOmr(ftd2, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd2, GROUP_ADDR_SCOPE_4);
 
         mInfraDevice.sendEchoRequest(GROUP_ADDR_SCOPE_5);
@@ -443,11 +432,11 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd1 = mFtds.get(0);
-        startFtdChild(ftd1);
+        joinNetworkAndWaitForOmr(ftd1, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd1, GROUP_ADDR_SCOPE_5);
 
         FullThreadDevice ftd2 = mFtds.get(1);
-        startFtdChild(ftd2);
+        joinNetworkAndWaitForOmr(ftd2, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd2, GROUP_ADDR_SCOPE_5);
 
         mInfraDevice.sendEchoRequest(GROUP_ADDR_SCOPE_5);
@@ -473,7 +462,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         Inet6Address ftdOmr = ftd.getOmrAddress();
 
         ftd.ping(GROUP_ADDR_SCOPE_5);
@@ -499,7 +488,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
 
         ftd.ping(GROUP_ADDR_SCOPE_3);
 
@@ -521,7 +510,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         Inet6Address ftdLla = ftd.getLinkLocalAddress();
         assertNotNull(ftdLla);
 
@@ -544,7 +533,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         List<Inet6Address> ftdMlas = ftd.getMeshLocalAddresses();
         assertFalse(ftdMlas.isEmpty());
 
@@ -571,7 +560,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         subscribeMulticastAddressAndWait(ftd, GROUP_ADDR_SCOPE_5);
         Inet6Address ftdOmr = ftd.getOmrAddress();
 
@@ -599,7 +588,7 @@ public class BorderRoutingTest {
          */
 
         FullThreadDevice ftd = mFtds.get(0);
-        startFtdChild(ftd);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         Inet6Address ftdOmr = ftd.getOmrAddress();
 
         // Destroy infra link and re-create
@@ -627,15 +616,6 @@ public class BorderRoutingTest {
 
     private void tearDownInfraNetwork() {
         runAsShell(MANAGE_TEST_NETWORKS, () -> mInfraNetworkTracker.teardown());
-    }
-
-    private void startFtdChild(FullThreadDevice ftd) throws Exception {
-        ftd.factoryReset();
-        ftd.joinNetwork(DEFAULT_DATASET);
-        ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
-        waitFor(() -> ftd.getOmrAddress() != null, Duration.ofSeconds(60));
-        Inet6Address ftdOmr = ftd.getOmrAddress();
-        assertNotNull(ftdOmr);
     }
 
     private void startInfraDeviceAndWaitForOnLinkAddr() throws Exception {
