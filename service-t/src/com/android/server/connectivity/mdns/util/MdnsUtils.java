@@ -16,6 +16,8 @@
 
 package com.android.server.connectivity.mdns.util;
 
+import static com.android.net.module.util.DnsUtils.equalsDnsLabelIgnoreDnsCase;
+import static com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase;
 import static com.android.server.connectivity.mdns.MdnsConstants.FLAG_TRUNCATED;
 
 import android.annotation.NonNull;
@@ -56,18 +58,17 @@ public class MdnsUtils {
     private MdnsUtils() { }
 
     /**
-     * Convert the string to DNS case-insensitive lowercase
+     * Compare labels a equals b or a is suffix of b.
      *
-     * Per rfc6762#page-46, accented characters are not defined to be automatically equivalent to
-     * their unaccented counterparts. So the "DNS lowercase" should be if character is A-Z then they
-     * transform into a-z. Otherwise, they are kept as-is.
+     * @param a the type or subtype.
+     * @param b the base type
      */
-    public static String toDnsLowerCase(@NonNull String string) {
-        final char[] outChars = new char[string.length()];
-        for (int i = 0; i < string.length(); i++) {
-            outChars[i] = toDnsLowerCase(string.charAt(i));
-        }
-        return new String(outChars);
+    public static boolean typeEqualsOrIsSubtype(@NonNull String[] a,
+            @NonNull String[] b) {
+        return equalsDnsLabelIgnoreDnsCase(a, b)
+                || ((b.length == (a.length + 2))
+                && equalsIgnoreDnsCase(b[1], MdnsConstants.SUBTYPE_LABEL)
+                && MdnsRecord.labelsAreSuffix(a, b));
     }
 
     /**
@@ -79,70 +80,6 @@ public class MdnsUtils {
         } else {
             return new HashSet<>();
         }
-    }
-
-    /**
-     * Convert the array of labels to DNS case-insensitive lowercase.
-     */
-    public static String[] toDnsLabelsLowerCase(@NonNull String[] labels) {
-        final String[] outStrings = new String[labels.length];
-        for (int i = 0; i < labels.length; ++i) {
-            outStrings[i] = toDnsLowerCase(labels[i]);
-        }
-        return outStrings;
-    }
-
-    /**
-     * Compare two strings by DNS case-insensitive lowercase.
-     */
-    public static boolean equalsIgnoreDnsCase(@Nullable String a, @Nullable String b) {
-        if (a == null || b == null) {
-            return a == null && b == null;
-        }
-        if (a.length() != b.length()) return false;
-        for (int i = 0; i < a.length(); i++) {
-            if (toDnsLowerCase(a.charAt(i)) != toDnsLowerCase(b.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Compare two set of DNS labels by DNS case-insensitive lowercase.
-     */
-    public static boolean equalsDnsLabelIgnoreDnsCase(@NonNull String[] a, @NonNull String[] b) {
-        if (a == b) {
-            return true;
-        }
-        int length = a.length;
-        if (b.length != length) {
-            return false;
-        }
-        for (int i = 0; i < length; i++) {
-            if (!equalsIgnoreDnsCase(a[i], b[i])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Compare labels a equals b or a is suffix of b.
-     *
-     * @param a the type or subtype.
-     * @param b the base type
-     */
-    public static boolean typeEqualsOrIsSubtype(@NonNull String[] a,
-            @NonNull String[] b) {
-        return MdnsUtils.equalsDnsLabelIgnoreDnsCase(a, b)
-                || ((b.length == (a.length + 2))
-                && MdnsUtils.equalsIgnoreDnsCase(b[1], MdnsConstants.SUBTYPE_LABEL)
-                && MdnsRecord.labelsAreSuffix(a, b));
-    }
-
-    private static char toDnsLowerCase(char a) {
-        return a >= 'A' && a <= 'Z' ? (char) (a + ('a' - 'A')) : a;
     }
 
     /*** Ensure that current running thread is same as given handler thread */

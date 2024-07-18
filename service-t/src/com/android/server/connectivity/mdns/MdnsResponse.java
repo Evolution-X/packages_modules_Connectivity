@@ -21,7 +21,7 @@ import android.annotation.Nullable;
 import android.net.Network;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.server.connectivity.mdns.util.MdnsUtils;
+import com.android.net.module.util.DnsUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -111,7 +111,7 @@ public class MdnsResponse {
      * pointer record is already present in the response with the same TTL.
      */
     public synchronized boolean addPointerRecord(MdnsPointerRecord pointerRecord) {
-        if (!MdnsUtils.equalsDnsLabelIgnoreDnsCase(serviceName, pointerRecord.getPointer())) {
+        if (!DnsUtils.equalsDnsLabelIgnoreDnsCase(serviceName, pointerRecord.getPointer())) {
             throw new IllegalArgumentException(
                     "Pointer records for different service names cannot be added");
         }
@@ -305,13 +305,13 @@ public class MdnsResponse {
         boolean dropAddressRecords = false;
 
         for (MdnsInetAddressRecord inetAddressRecord : getInet4AddressRecords()) {
-            if (!MdnsUtils.equalsDnsLabelIgnoreDnsCase(
+            if (!DnsUtils.equalsDnsLabelIgnoreDnsCase(
                     this.serviceRecord.getServiceHost(), inetAddressRecord.getName())) {
                 dropAddressRecords = true;
             }
         }
         for (MdnsInetAddressRecord inetAddressRecord : getInet6AddressRecords()) {
-            if (!MdnsUtils.equalsDnsLabelIgnoreDnsCase(
+            if (!DnsUtils.equalsDnsLabelIgnoreDnsCase(
                     this.serviceRecord.getServiceHost(), inetAddressRecord.getName())) {
                 dropAddressRecords = true;
             }

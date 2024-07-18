@@ -16,8 +16,8 @@
 
 package com.android.server.connectivity.mdns;
 
+import com.android.net.module.util.DnsUtils;
 import com.android.server.connectivity.mdns.MdnsServiceInfo.TextEntry;
-import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -180,7 +180,7 @@ public class MdnsPacketWriter {
             int existingOffset = entry.getKey();
             String[] existingLabels = entry.getValue();
 
-            if (MdnsUtils.equalsDnsLabelIgnoreDnsCase(existingLabels, labels)) {
+            if (DnsUtils.equalsDnsLabelIgnoreDnsCase(existingLabels, labels)) {
                 writePointer(existingOffset);
                 return;
             } else if (MdnsRecord.labelsAreSuffix(existingLabels, labels)) {
