@@ -17,12 +17,14 @@ package android.net.cts
 
 import android.net.EthernetTetheringTestBase
 import android.net.LinkAddress
-import android.net.TestNetworkInterface
 import android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL
 import android.net.TetheringManager.TETHERING_ETHERNET
 import android.net.TetheringManager.TetheringRequest
+import android.net.cts.util.EthernetTestInterface
 import android.net.nsd.NsdManager
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
 import android.platform.test.annotations.AppModeFull
 import androidx.test.filters.SmallTest
 import com.android.testutils.ConnectivityModuleTest
@@ -41,6 +43,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private const val TAG = "NsdManagerDownstreamTetheringTest"
+
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
 @ConnectivityModuleTest
@@ -50,14 +54,24 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
     private val nsdManager by lazy { context.getSystemService(NsdManager::class.java)!! }
     private val serviceType = "_nmt%09d._tcp".format(Random().nextInt(1_000_000_000))
 
+    private val handlerThread = HandlerThread("$TAG thread").apply { start() }
+    private val handler = Handler(handlerThread.looper)
+    private lateinit var downstreamIface: EthernetTestInterface
+
     @Before
     override fun setUp() {
         super.setUp()
-        setIncludeTestInterfaces(true)
+        val iface = createTestInterface()
+        downstreamIface = EthernetTestInterface(context, handler, iface)
     }
 
     @After
     override fun tearDown() {
+        if (::downstreamIface.isInitialized) {
+            downstreamIface.destroy()
+        }
+        handlerThread.quitSafely()
+        handlerThread.join()
         super.tearDown()
     }
 
@@ -65,16 +79,14 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
     fun testMdnsDiscoveryCanSendPacketOnLocalOnlyDownstreamTetheringInterface() {
         assumeFalse(isInterfaceForTetheringAvailable())
 
-        var downstreamIface: TestNetworkInterface? = null
         var tetheringEventCallback: MyTetheringEventCallback? = null
         var downstreamReader: TapPacketReader? = null
 
         val discoveryRecord = NsdDiscoveryRecord()
 
         tryTest {
-            downstreamIface = createTestInterface()
             val iface = mTetheredInterfaceRequester.getInterface()
-            assertEquals(iface, downstreamIface?.interfaceName)
+            assertEquals(downstreamIface.name, iface)
             val request = TetheringRequest.Builder(TETHERING_ETHERNET)
                 .setConnectivityScope(CONNECTIVITY_SCOPE_LOCAL).build()
             tetheringEventCallback = enableEthernetTethering(
@@ -85,7 +97,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             }
             // This shouldn't be flaky because the TAP interface will buffer all packets even
             // before the reader is started.
-            downstreamReader = makePacketReader(downstreamIface)
+            downstreamReader = makePacketReader(downstreamIface.testIface)
             waitForRouterAdvertisement(downstreamReader, iface, WAIT_RA_TIMEOUT_MS)
 
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord)
@@ -96,8 +108,6 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
         } cleanupStep {
             maybeStopTapPacketReader(downstreamReader)
-        } cleanupStep {
-            maybeCloseTestInterface(downstreamIface)
         } cleanup {
             maybeUnregisterTetheringEventCallback(tetheringEventCallback)
         }
@@ -107,16 +117,14 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
     fun testMdnsDiscoveryWorkOnTetheringInterface() {
         assumeFalse(isInterfaceForTetheringAvailable())
 
-        var downstreamIface: TestNetworkInterface? = null
         var tetheringEventCallback: MyTetheringEventCallback? = null
         var downstreamReader: TapPacketReader? = null
 
         val discoveryRecord = NsdDiscoveryRecord()
 
         tryTest {
-            downstreamIface = createTestInterface()
             val iface = mTetheredInterfaceRequester.getInterface()
-            assertEquals(iface, downstreamIface?.interfaceName)
+            assertEquals(downstreamIface.name, iface)
 
             val localAddr = LinkAddress("192.0.2.3/28")
             val clientAddr = LinkAddress("192.0.2.2/28")
@@ -130,9 +138,9 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
                 awaitInterfaceTethered()
             }
 
-            val fd = downstreamIface?.fileDescriptor?.fileDescriptor
+            val fd = downstreamIface.testIface.fileDescriptor?.fileDescriptor
             assertNotNull(fd)
-            downstreamReader = makePacketReader(fd, getMTU(downstreamIface))
+            downstreamReader = makePacketReader(fd, getMTU(downstreamIface.testIface))
 
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStarted>()
@@ -143,8 +151,6 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
         } cleanupStep {
             maybeStopTapPacketReader(downstreamReader)
-        } cleanupStep {
-            maybeCloseTestInterface(downstreamIface)
         } cleanup {
             maybeUnregisterTetheringEventCallback(tetheringEventCallback)
         }
