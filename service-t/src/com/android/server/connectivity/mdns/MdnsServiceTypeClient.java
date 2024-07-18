@@ -147,7 +147,8 @@ public class MdnsServiceTypeClient {
                     final List<MdnsResponse> servicesToResolve = makeResponsesForResolve(socketKey);
                     final QueryTask queryTask = new QueryTask(taskArgs, servicesToResolve,
                             getAllDiscoverySubtypes(), needSendDiscoveryQueries(listeners),
-                            getExistingServices());
+                            getExistingServices(), searchOptions.onlyUseIpv6OnIpv6OnlyNetworks(),
+                            socketKey);
                     executor.submit(queryTask);
                     break;
                 }
@@ -178,7 +179,9 @@ public class MdnsServiceTypeClient {
                                     minRemainingTtl,
                                     now,
                                     lastSentTime,
-                                    sentResult.taskArgs.sessionId
+                                    sentResult.taskArgs.sessionId,
+                                    searchOptions.getQueryMode(),
+                                    searchOptions.numOfQueriesBeforeBackoff()
                             );
                     dependencies.sendMessageDelayed(
                             handler,
@@ -396,10 +399,7 @@ public class MdnsServiceTypeClient {
         // Keep tracking the ScheduledFuture for the task so we can cancel it if caller is not
         // interested anymore.
         final QueryTaskConfig taskConfig = new QueryTaskConfig(
-                searchOptions.getQueryMode(),
-                searchOptions.onlyUseIpv6OnIpv6OnlyNetworks(),
-                searchOptions.numOfQueriesBeforeBackoff(),
-                socketKey);
+                searchOptions.getQueryMode());
         final long now = clock.elapsedRealtime();
         if (lastSentTime == 0) {
             lastSentTime = now;
@@ -412,7 +412,9 @@ public class MdnsServiceTypeClient {
                             minRemainingTtl,
                             now,
                             lastSentTime,
-                            currentSessionId
+                            currentSessionId,
+                            searchOptions.getQueryMode(),
+                            searchOptions.numOfQueriesBeforeBackoff()
                     );
             dependencies.sendMessageDelayed(
                     handler,
@@ -424,7 +426,8 @@ public class MdnsServiceTypeClient {
                     mdnsQueryScheduler.scheduleFirstRun(taskConfig, now,
                             minRemainingTtl, currentSessionId), servicesToResolve,
                     getAllDiscoverySubtypes(), needSendDiscoveryQueries(listeners),
-                    getExistingServices());
+                    getExistingServices(), searchOptions.onlyUseIpv6OnIpv6OnlyNetworks(),
+                    socketKey);
             executor.submit(queryTask);
         }
 
@@ -535,7 +538,8 @@ public class MdnsServiceTypeClient {
             final long minRemainingTtl = getMinRemainingTtl(now);
             MdnsQueryScheduler.ScheduledQueryTaskArgs args =
                     mdnsQueryScheduler.maybeRescheduleCurrentRun(now, minRemainingTtl,
-                            lastSentTime, currentSessionId + 1);
+                            lastSentTime, currentSessionId + 1,
+                            searchOptions.numOfQueriesBeforeBackoff());
             if (args != null) {
                 removeScheduledTask();
                 dependencies.sendMessageDelayed(
@@ -723,15 +727,21 @@ public class MdnsServiceTypeClient {
         private final List<String> subtypes = new ArrayList<>();
         private final boolean sendDiscoveryQueries;
         private final List<MdnsResponse> existingServices = new ArrayList<>();
+        private final boolean onlyUseIpv6OnIpv6OnlyNetworks;
+        private final SocketKey socketKey;
         QueryTask(@NonNull MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs,
                 @NonNull Collection<MdnsResponse> servicesToResolve,
                 @NonNull Collection<String> subtypes, boolean sendDiscoveryQueries,
-                @NonNull Collection<MdnsResponse> existingServices) {
+                @NonNull Collection<MdnsResponse> existingServices,
+                boolean onlyUseIpv6OnIpv6OnlyNetworks,
+                @NonNull SocketKey socketKey) {
             this.taskArgs = taskArgs;
             this.servicesToResolve.addAll(servicesToResolve);
             this.subtypes.addAll(subtypes);
             this.sendDiscoveryQueries = sendDiscoveryQueries;
             this.existingServices.addAll(existingServices);
+            this.onlyUseIpv6OnIpv6OnlyNetworks = onlyUseIpv6OnIpv6OnlyNetworks;
+            this.socketKey = socketKey;
         }
 
         @Override
@@ -745,8 +755,8 @@ public class MdnsServiceTypeClient {
                                 subtypes,
                                 taskArgs.config.expectUnicastResponse,
                                 taskArgs.config.transactionId,
-                                taskArgs.config.socketKey,
-                                taskArgs.config.onlyUseIpv6OnIpv6OnlyNetworks,
+                                socketKey,
+                                onlyUseIpv6OnIpv6OnlyNetworks,
                                 sendDiscoveryQueries,
                                 servicesToResolve,
                                 clock,

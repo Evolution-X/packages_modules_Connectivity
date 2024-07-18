@@ -562,10 +562,7 @@ public class MdnsServiceTypeClientTests {
         //MdnsConfigsFlagsImpl.alwaysAskForUnicastResponseInEachBurst.override(true);
         MdnsSearchOptions searchOptions = MdnsSearchOptions.newBuilder()
                 .addSubtype(SUBTYPE).setQueryMode(ACTIVE_QUERY_MODE).build();
-        QueryTaskConfig config = new QueryTaskConfig(
-                searchOptions.getQueryMode(),
-                false /* onlyUseIpv6OnIpv6OnlyNetworks */, 3 /* numOfQueriesBeforeBackoff */,
-                socketKey);
+        QueryTaskConfig config = new QueryTaskConfig(searchOptions.getQueryMode());
 
         // This is the first query. We will ask for unicast response.
         assertTrue(config.expectUnicastResponse);
@@ -574,14 +571,14 @@ public class MdnsServiceTypeClientTests {
         // For the rest of queries in this burst, we will NOT ask for unicast response.
         for (int i = 1; i < MdnsConfigs.queriesPerBurst(); i++) {
             int oldTransactionId = config.transactionId;
-            config = config.getConfigForNextRun();
+            config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
             assertFalse(config.expectUnicastResponse);
             assertEquals(config.transactionId, oldTransactionId + 1);
         }
 
         // This is the first query of a new burst. We will ask for unicast response.
         int oldTransactionId = config.transactionId;
-        config = config.getConfigForNextRun();
+        config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
         assertTrue(config.expectUnicastResponse);
         assertEquals(config.transactionId, oldTransactionId + 1);
     }
@@ -590,10 +587,7 @@ public class MdnsServiceTypeClientTests {
     public void testQueryTaskConfig_askForUnicastInFirstQuery() {
         MdnsSearchOptions searchOptions = MdnsSearchOptions.newBuilder()
                 .addSubtype(SUBTYPE).setQueryMode(ACTIVE_QUERY_MODE).build();
-        QueryTaskConfig config = new QueryTaskConfig(
-                searchOptions.getQueryMode(),
-                false /* onlyUseIpv6OnIpv6OnlyNetworks */, 3 /* numOfQueriesBeforeBackoff */,
-                socketKey);
+        QueryTaskConfig config = new QueryTaskConfig(searchOptions.getQueryMode());
 
         // This is the first query. We will ask for unicast response.
         assertTrue(config.expectUnicastResponse);
@@ -602,14 +596,14 @@ public class MdnsServiceTypeClientTests {
         // For the rest of queries in this burst, we will NOT ask for unicast response.
         for (int i = 1; i < MdnsConfigs.queriesPerBurst(); i++) {
             int oldTransactionId = config.transactionId;
-            config = config.getConfigForNextRun();
+            config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
             assertFalse(config.expectUnicastResponse);
             assertEquals(config.transactionId, oldTransactionId + 1);
         }
 
         // This is the first query of a new burst. We will NOT ask for unicast response.
         int oldTransactionId = config.transactionId;
-        config = config.getConfigForNextRun();
+        config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
         assertFalse(config.expectUnicastResponse);
         assertEquals(config.transactionId, oldTransactionId + 1);
     }
