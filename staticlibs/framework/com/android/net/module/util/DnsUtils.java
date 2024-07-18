@@ -29,33 +29,33 @@ public class DnsUtils {
     private DnsUtils() { }
 
     /**
-     * Convert the string to DNS case-insensitive lowercase
+     * Convert the string to DNS case-insensitive uppercase.
      *
      * Per rfc6762#page-46, accented characters are not defined to be automatically equivalent to
-     * their unaccented counterparts. So the "DNS lowercase" should be if character is A-Z then they
-     * transform into a-z. Otherwise, they are kept as-is.
+     * their unaccented counterparts. So the "DNS uppercase" should be if character is a-z then they
+     * transform into A-Z. Otherwise, they are kept as-is.
      */
-    public static String toDnsLowerCase(@NonNull String string) {
+    public static String toDnsUpperCase(@NonNull String string) {
         final char[] outChars = new char[string.length()];
         for (int i = 0; i < string.length(); i++) {
-            outChars[i] = toDnsLowerCase(string.charAt(i));
+            outChars[i] = toDnsUpperCase(string.charAt(i));
         }
         return new String(outChars);
     }
 
     /**
-     * Convert the array of labels to DNS case-insensitive lowercase.
+     * Convert the array of labels to DNS case-insensitive uppercase.
      */
-    public static String[] toDnsLabelsLowerCase(@NonNull String[] labels) {
+    public static String[] toDnsLabelsUpperCase(@NonNull String[] labels) {
         final String[] outStrings = new String[labels.length];
         for (int i = 0; i < labels.length; ++i) {
-            outStrings[i] = toDnsLowerCase(labels[i]);
+            outStrings[i] = toDnsUpperCase(labels[i]);
         }
         return outStrings;
     }
 
     /**
-     * Compare two strings by DNS case-insensitive lowercase.
+     * Compare two strings by DNS case-insensitive uppercase.
      */
     public static boolean equalsIgnoreDnsCase(@Nullable String a, @Nullable String b) {
         if (a == null || b == null) {
@@ -63,7 +63,7 @@ public class DnsUtils {
         }
         if (a.length() != b.length()) return false;
         for (int i = 0; i < a.length(); i++) {
-            if (toDnsLowerCase(a.charAt(i)) != toDnsLowerCase(b.charAt(i))) {
+            if (toDnsUpperCase(a.charAt(i)) != toDnsUpperCase(b.charAt(i))) {
                 return false;
             }
         }
@@ -71,7 +71,7 @@ public class DnsUtils {
     }
 
     /**
-     * Compare two set of DNS labels by DNS case-insensitive lowercase.
+     * Compare two set of DNS labels by DNS case-insensitive uppercase.
      */
     public static boolean equalsDnsLabelIgnoreDnsCase(@NonNull String[] a, @NonNull String[] b) {
         if (a == b) {
@@ -89,7 +89,7 @@ public class DnsUtils {
         return true;
     }
 
-    private static char toDnsLowerCase(char a) {
-        return a >= 'A' && a <= 'Z' ? (char) (a + ('a' - 'A')) : a;
+    private static char toDnsUpperCase(char a) {
+        return a >= 'a' && a <= 'z' ? (char) (a - ('a' - 'A')) : a;
     }
 }
