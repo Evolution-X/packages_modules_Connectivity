@@ -290,7 +290,7 @@ public abstract class MdnsRecord {
 
     @Override
     public int hashCode() {
-        return Objects.hash(Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(name)), type);
+        return Objects.hash(Arrays.hashCode(DnsUtils.toDnsLabelsUpperCase(name)), type);
     }
 
     /**
@@ -311,7 +311,7 @@ public abstract class MdnsRecord {
 
         public Key(int recordType, String[] recordName) {
             this.recordType = recordType;
-            this.recordName = DnsUtils.toDnsLabelsLowerCase(recordName);
+            this.recordName = DnsUtils.toDnsLabelsUpperCase(recordName);
         }
 
         @Override
