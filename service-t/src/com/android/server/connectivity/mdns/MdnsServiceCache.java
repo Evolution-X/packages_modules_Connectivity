@@ -17,7 +17,7 @@
 package com.android.server.connectivity.mdns;
 
 import static com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase;
-import static com.android.net.module.util.DnsUtils.toDnsLowerCase;
+import static com.android.net.module.util.DnsUtils.toDnsUpperCase;
 import static com.android.server.connectivity.mdns.MdnsResponse.EXPIRATION_NEVER;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.ensureRunningOnHandlerThread;
 
@@ -49,16 +49,16 @@ import java.util.Objects;
  */
 public class MdnsServiceCache {
     static class CacheKey {
-        @NonNull final String mLowercaseServiceType;
+        @NonNull final String mUpperCaseServiceType;
         @NonNull final SocketKey mSocketKey;
 
         CacheKey(@NonNull String serviceType, @NonNull SocketKey socketKey) {
-            mLowercaseServiceType = toDnsLowerCase(serviceType);
+            mUpperCaseServiceType = toDnsUpperCase(serviceType);
             mSocketKey = socketKey;
         }
 
         @Override public int hashCode() {
-            return Objects.hash(mLowercaseServiceType, mSocketKey);
+            return Objects.hash(mUpperCaseServiceType, mSocketKey);
         }
 
         @Override public boolean equals(Object other) {
@@ -68,7 +68,7 @@ public class MdnsServiceCache {
             if (!(other instanceof CacheKey)) {
                 return false;
             }
-            return Objects.equals(mLowercaseServiceType, ((CacheKey) other).mLowercaseServiceType)
+            return Objects.equals(mUpperCaseServiceType, ((CacheKey) other).mUpperCaseServiceType)
                     && Objects.equals(mSocketKey, ((CacheKey) other).mSocketKey);
         }
     }

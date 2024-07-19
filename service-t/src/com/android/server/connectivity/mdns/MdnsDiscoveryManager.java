@@ -67,8 +67,8 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
 
         public void put(@NonNull String serviceType, @NonNull SocketKey socketKey,
                 @NonNull MdnsServiceTypeClient client) {
-            final String dnsLowerServiceType = DnsUtils.toDnsLowerCase(serviceType);
-            final Pair<String, SocketKey> perSocketServiceType = new Pair<>(dnsLowerServiceType,
+            final String dnsUpperServiceType = DnsUtils.toDnsUpperCase(serviceType);
+            final Pair<String, SocketKey> perSocketServiceType = new Pair<>(dnsUpperServiceType,
                     socketKey);
             clients.put(perSocketServiceType, client);
         }
@@ -76,18 +76,18 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
         @Nullable
         public MdnsServiceTypeClient get(
                 @NonNull String serviceType, @NonNull SocketKey socketKey) {
-            final String dnsLowerServiceType = DnsUtils.toDnsLowerCase(serviceType);
-            final Pair<String, SocketKey> perSocketServiceType = new Pair<>(dnsLowerServiceType,
+            final String dnsUpperServiceType = DnsUtils.toDnsUpperCase(serviceType);
+            final Pair<String, SocketKey> perSocketServiceType = new Pair<>(dnsUpperServiceType,
                     socketKey);
             return clients.getOrDefault(perSocketServiceType, null);
         }
 
         public List<MdnsServiceTypeClient> getByServiceType(@NonNull String serviceType) {
-            final String dnsLowerServiceType = DnsUtils.toDnsLowerCase(serviceType);
+            final String dnsUpperServiceType = DnsUtils.toDnsUpperCase(serviceType);
             final List<MdnsServiceTypeClient> list = new ArrayList<>();
             for (int i = 0; i < clients.size(); i++) {
                 final Pair<String, SocketKey> perSocketServiceType = clients.keyAt(i);
-                if (dnsLowerServiceType.equals(perSocketServiceType.first)) {
+                if (dnsUpperServiceType.equals(perSocketServiceType.first)) {
                     list.add(clients.valueAt(i));
                 }
             }

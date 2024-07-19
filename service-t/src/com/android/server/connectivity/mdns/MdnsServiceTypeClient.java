@@ -121,11 +121,11 @@ public class MdnsServiceTypeClient {
          * @return true if the service name was not discovered before.
          */
         boolean setServiceDiscovered(@NonNull String serviceName) {
-            return discoveredServiceNames.add(DnsUtils.toDnsLowerCase(serviceName));
+            return discoveredServiceNames.add(DnsUtils.toDnsUpperCase(serviceName));
         }
 
         void unsetServiceDiscovered(@NonNull String serviceName) {
-            discoveredServiceNames.remove(DnsUtils.toDnsLowerCase(serviceName));
+            discoveredServiceNames.remove(DnsUtils.toDnsUpperCase(serviceName));
         }
     }
 

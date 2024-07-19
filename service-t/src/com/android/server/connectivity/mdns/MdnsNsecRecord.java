@@ -153,7 +153,7 @@ public class MdnsNsecRecord extends MdnsRecord {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(),
-                Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(mNextDomain)),
+                Arrays.hashCode(DnsUtils.toDnsLabelsUpperCase(mNextDomain)),
                 Arrays.hashCode(mTypes));
     }
 
