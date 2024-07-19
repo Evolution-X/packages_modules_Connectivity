@@ -769,7 +769,7 @@ public class NsdService extends INsdManager.Stub {
             private Set<String> dedupSubtypeLabels(Collection<String> subtypes) {
                 final Map<String, String> subtypeMap = new LinkedHashMap<>(subtypes.size());
                 for (String subtype : subtypes) {
-                    subtypeMap.put(DnsUtils.toDnsLowerCase(subtype), subtype);
+                    subtypeMap.put(DnsUtils.toDnsUpperCase(subtype), subtype);
                 }
                 return new ArraySet<>(subtypeMap.values());
             }
