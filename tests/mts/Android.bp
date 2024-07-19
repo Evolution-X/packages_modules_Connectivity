@@ -40,6 +40,6 @@ cc_test {
     srcs: [
         "bpf_existence_test.cpp",
     ],
-    compile_multilib: "first",
+    compile_multilib: "both",
     min_sdk_version: "30", // Ensure test runs on R and above.
 }
