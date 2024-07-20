@@ -850,7 +850,7 @@ public class MdnsAdvertiser {
                 sharedLog.wtf("Invalid priority in config_nsdOffloadServicesPriority: " + entry);
                 continue;
             }
-            priorities.put(DnsUtils.toDnsLowerCase(priorityAndType[1]), priority);
+            priorities.put(DnsUtils.toDnsUpperCase(priorityAndType[1]), priority);
         }
         return priorities;
     }
@@ -996,7 +996,7 @@ public class MdnsAdvertiser {
             @NonNull Registration registration, byte[] rawOffloadPacket) {
         final NsdServiceInfo nsdServiceInfo = registration.getServiceInfo();
         final Integer mapPriority = mServiceTypeToOffloadPriority.get(
-                DnsUtils.toDnsLowerCase(nsdServiceInfo.getServiceType()));
+                DnsUtils.toDnsUpperCase(nsdServiceInfo.getServiceType()));
         // Higher values of priority are less prioritized
         final int priority = mapPriority == null ? Integer.MAX_VALUE : mapPriority;
         final OffloadServiceInfo offloadServiceInfo = new OffloadServiceInfo(

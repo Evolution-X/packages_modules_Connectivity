@@ -151,7 +151,7 @@ public class MdnsServiceRecord extends MdnsRecord {
     public int hashCode() {
         return (super.hashCode() * 31)
                 + Objects.hash(servicePriority, serviceWeight,
-                Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(serviceHost)),
+                Arrays.hashCode(DnsUtils.toDnsLabelsUpperCase(serviceHost)),
                 servicePort);
     }
 

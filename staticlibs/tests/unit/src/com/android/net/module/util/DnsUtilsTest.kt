@@ -18,8 +18,8 @@ package com.android.net.module.util
 
 import com.android.net.module.util.DnsUtils.equalsDnsLabelIgnoreDnsCase
 import com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase
-import com.android.net.module.util.DnsUtils.toDnsLabelsLowerCase
-import com.android.net.module.util.DnsUtils.toDnsLowerCase
+import com.android.net.module.util.DnsUtils.toDnsLabelsUpperCase
+import com.android.net.module.util.DnsUtils.toDnsUpperCase
 import com.android.testutils.DevSdkIgnoreRunner
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -31,23 +31,23 @@ import org.junit.runner.RunWith
 @RunWith(DevSdkIgnoreRunner::class)
 class DnsUtilsTest {
     @Test
-    fun testToDnsLowerCase() {
-        assertEquals("test", toDnsLowerCase("TEST"))
-        assertEquals("test", toDnsLowerCase("TeSt"))
-        assertEquals("test", toDnsLowerCase("test"))
-        assertEquals("tÉst", toDnsLowerCase("TÉST"))
-        assertEquals("ţést", toDnsLowerCase("ţést"))
+    fun testToDnsUpperCase() {
+        assertEquals("TEST", toDnsUpperCase("TEST"))
+        assertEquals("TEST", toDnsUpperCase("TeSt"))
+        assertEquals("TEST", toDnsUpperCase("test"))
+        assertEquals("TÉST", toDnsUpperCase("TÉST"))
+        assertEquals("ţéST", toDnsUpperCase("ţést"))
         // Unicode characters 0x10000 (𐀀), 0x10001 (𐀁), 0x10041 (𐁁)
         // Note the last 2 bytes of 0x10041 are identical to 'A', but it should remain unchanged.
         assertEquals(
-            "test: -->\ud800\udc00 \ud800\udc01 \ud800\udc41<-- ",
-                toDnsLowerCase("Test: -->\ud800\udc00 \ud800\udc01 \ud800\udc41<-- ")
+            "TEST: -->\ud800\udc00 \ud800\udc01 \ud800\udc41<-- ",
+                toDnsUpperCase("Test: -->\ud800\udc00 \ud800\udc01 \ud800\udc41<-- ")
         )
         // Also test some characters where the first surrogate is not \ud800
         assertEquals(
-            "test: >\ud83c\udff4\udb40\udc67\udb40\udc62\udb40" +
+            "TEST: >\ud83c\udff4\udb40\udc67\udb40\udc62\udb40" +
                 "\udc77\udb40\udc6c\udb40\udc73\udb40\udc7f<",
-                toDnsLowerCase(
+                toDnsUpperCase(
                     "Test: >\ud83c\udff4\udb40\udc67\udb40\udc62\udb40" +
                         "\udc77\udb40\udc6c\udb40\udc73\udb40\udc7f<"
                 )
@@ -55,10 +55,10 @@ class DnsUtilsTest {
     }
 
     @Test
-    fun testToDnsLabelsLowerCase() {
+    fun testToDnsLabelsUpperCase() {
         assertArrayEquals(
-            arrayOf("test", "tÉst", "ţést"),
-            toDnsLabelsLowerCase(arrayOf("TeSt", "TÉST", "ţést"))
+            arrayOf("TEST", "TÉST", "ţéST"),
+            toDnsLabelsUpperCase(arrayOf("TeSt", "TÉST", "ţést"))
         )
     }
 

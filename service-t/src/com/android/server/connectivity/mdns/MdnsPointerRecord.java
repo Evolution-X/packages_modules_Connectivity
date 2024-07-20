@@ -83,7 +83,7 @@ public class MdnsPointerRecord extends MdnsRecord {
 
     @Override
     public int hashCode() {
-        return (super.hashCode() * 31) + Arrays.hashCode(DnsUtils.toDnsLabelsLowerCase(pointer));
+        return (super.hashCode() * 31) + Arrays.hashCode(DnsUtils.toDnsLabelsUpperCase(pointer));
     }
 
     @Override
