@@ -19,9 +19,6 @@ package com.android.server.connectivity.mdns;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.AGGRESSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.PASSIVE_QUERY_MODE;
 
-import android.annotation.NonNull;
-import android.annotation.Nullable;
-
 import com.android.internal.annotations.VisibleForTesting;
 
 /**
@@ -51,9 +48,6 @@ public class QueryTaskConfig {
     static final int MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS = 60000;
     private final boolean alwaysAskForUnicastResponse =
             MdnsConfigs.alwaysAskForUnicastResponseInEachBurst();
-    private final int queryMode;
-    final boolean onlyUseIpv6OnIpv6OnlyNetworks;
-    private final int numOfQueriesBeforeBackoff;
     @VisibleForTesting
     final int transactionId;
     @VisibleForTesting
@@ -64,16 +58,11 @@ public class QueryTaskConfig {
     final long delayUntilNextTaskWithoutBackoffMs;
     private final boolean isFirstBurst;
     private final long queryCount;
-    @NonNull
-    final SocketKey socketKey;
 
-    QueryTaskConfig(@NonNull QueryTaskConfig other, long queryCount, int transactionId,
+    QueryTaskConfig(long queryCount, int transactionId,
             boolean expectUnicastResponse, boolean isFirstBurst, int burstCounter,
             int queriesPerBurst, int timeBetweenBurstsInMs,
             long delayUntilNextTaskWithoutBackoffMs) {
-        this.queryMode = other.queryMode;
-        this.onlyUseIpv6OnIpv6OnlyNetworks = other.onlyUseIpv6OnIpv6OnlyNetworks;
-        this.numOfQueriesBeforeBackoff = other.numOfQueriesBeforeBackoff;
         this.transactionId = transactionId;
         this.expectUnicastResponse = expectUnicastResponse;
         this.queriesPerBurst = queriesPerBurst;
@@ -82,27 +71,20 @@ public class QueryTaskConfig {
         this.delayUntilNextTaskWithoutBackoffMs = delayUntilNextTaskWithoutBackoffMs;
         this.isFirstBurst = isFirstBurst;
         this.queryCount = queryCount;
-        this.socketKey = other.socketKey;
     }
 
-    QueryTaskConfig(int queryMode,
-            boolean onlyUseIpv6OnIpv6OnlyNetworks,
-            int numOfQueriesBeforeBackoff,
-            @Nullable SocketKey socketKey) {
-        this.queryMode = queryMode;
-        this.onlyUseIpv6OnIpv6OnlyNetworks = onlyUseIpv6OnIpv6OnlyNetworks;
-        this.numOfQueriesBeforeBackoff = numOfQueriesBeforeBackoff;
+    QueryTaskConfig(int queryMode) {
         this.queriesPerBurst = QUERIES_PER_BURST;
         this.burstCounter = 0;
         this.transactionId = 1;
         this.expectUnicastResponse = true;
         this.isFirstBurst = true;
         // Config the scan frequency based on the scan mode.
-        if (this.queryMode == AGGRESSIVE_QUERY_MODE) {
+        if (queryMode == AGGRESSIVE_QUERY_MODE) {
             this.timeBetweenBurstsInMs = INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS;
             this.delayUntilNextTaskWithoutBackoffMs =
                     TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS;
-        } else if (this.queryMode == PASSIVE_QUERY_MODE) {
+        } else if (queryMode == PASSIVE_QUERY_MODE) {
             // In passive scan mode, sends a single burst of QUERIES_PER_BURST queries, and then
             // in each TIME_BETWEEN_BURSTS interval, sends QUERIES_PER_BURST_PASSIVE_MODE
             // queries.
@@ -116,12 +98,11 @@ public class QueryTaskConfig {
             this.timeBetweenBurstsInMs = INITIAL_TIME_BETWEEN_BURSTS_MS;
             this.delayUntilNextTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
         }
-        this.socketKey = socketKey;
         this.queryCount = 0;
     }
 
     long getDelayUntilNextTaskWithoutBackoff(boolean isFirstQueryInBurst,
-            boolean isLastQueryInBurst) {
+            boolean isLastQueryInBurst, int queryMode) {
         if (isFirstQueryInBurst && queryMode == AGGRESSIVE_QUERY_MODE) {
             return 0;
         }
@@ -133,7 +114,7 @@ public class QueryTaskConfig {
                 : TIME_BETWEEN_QUERIES_IN_BURST_MS;
     }
 
-    boolean getNextExpectUnicastResponse(boolean isLastQueryInBurst) {
+    boolean getNextExpectUnicastResponse(boolean isLastQueryInBurst, int queryMode) {
         if (!isLastQueryInBurst) {
             return false;
         }
@@ -143,7 +124,7 @@ public class QueryTaskConfig {
         return alwaysAskForUnicastResponse;
     }
 
-    int getNextTimeBetweenBurstsMs(boolean isLastQueryInBurst) {
+    int getNextTimeBetweenBurstsMs(boolean isLastQueryInBurst, int queryMode) {
         if (!isLastQueryInBurst) {
             return timeBetweenBurstsInMs;
         }
@@ -155,7 +136,7 @@ public class QueryTaskConfig {
     /**
      * Get new QueryTaskConfig for next run.
      */
-    public QueryTaskConfig getConfigForNextRun() {
+    public QueryTaskConfig getConfigForNextRun(int queryMode) {
         long newQueryCount = queryCount + 1;
         int newTransactionId = transactionId + 1;
         if (newTransactionId > UNSIGNED_SHORT_MAX_VALUE) {
@@ -177,16 +158,18 @@ public class QueryTaskConfig {
             }
         }
 
-        return new QueryTaskConfig(this, newQueryCount, newTransactionId,
-                getNextExpectUnicastResponse(isLastQueryInBurst), newIsFirstBurst, newBurstCounter,
-                newQueriesPerBurst, getNextTimeBetweenBurstsMs(isLastQueryInBurst),
-                getDelayUntilNextTaskWithoutBackoff(isFirstQueryInBurst, isLastQueryInBurst));
+        return new QueryTaskConfig(newQueryCount, newTransactionId,
+                getNextExpectUnicastResponse(isLastQueryInBurst, queryMode), newIsFirstBurst,
+                newBurstCounter, newQueriesPerBurst,
+                getNextTimeBetweenBurstsMs(isLastQueryInBurst, queryMode),
+                getDelayUntilNextTaskWithoutBackoff(
+                        isFirstQueryInBurst, isLastQueryInBurst, queryMode));
     }
 
     /**
      * Determine if the query backoff should be used.
      */
-    public boolean shouldUseQueryBackoff() {
+    public boolean shouldUseQueryBackoff(int numOfQueriesBeforeBackoff) {
         // Don't enable backoff mode during the burst or in the first burst
         if (burstCounter != 0 || isFirstBurst) {
             return false;
