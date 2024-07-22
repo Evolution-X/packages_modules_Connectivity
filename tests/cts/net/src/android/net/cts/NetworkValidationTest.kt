@@ -19,7 +19,6 @@ package android.net.cts
 import android.Manifest.permission.MANAGE_TEST_NETWORKS
 import android.Manifest.permission.NETWORK_SETTINGS
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.EthernetManager
 import android.net.InetAddresses
@@ -105,9 +104,7 @@ class NetworkValidationTest {
     @Before
     fun setUp() {
         // This test requires using a tap interface as an ethernet interface.
-        val pm = context.getPackageManager()
-        testSkipped = !pm.hasSystemFeature(PackageManager.FEATURE_ETHERNET) &&
-                context.getSystemService(EthernetManager::class.java) == null
+        testSkipped = context.getSystemService(EthernetManager::class.java) == null
         assumeFalse(testSkipped)
 
         // Register a request so the network does not get torn down
