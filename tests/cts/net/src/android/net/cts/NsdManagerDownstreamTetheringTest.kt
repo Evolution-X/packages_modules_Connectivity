@@ -27,6 +27,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.platform.test.annotations.AppModeFull
 import androidx.test.filters.SmallTest
+import com.android.testutils.AutoCloseTestInterfaceRule
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
@@ -40,6 +41,7 @@ import kotlin.test.assertNotNull
 import org.junit.After
 import org.junit.Assume.assumeFalse
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -58,10 +60,13 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
     private val handler = Handler(handlerThread.looper)
     private lateinit var downstreamIface: EthernetTestInterface
 
+    @get:Rule
+    val testInterfaceRule = AutoCloseTestInterfaceRule(context)
+
     @Before
     override fun setUp() {
         super.setUp()
-        val iface = createTestInterface()
+        val iface = testInterfaceRule.createTapInterface()
         downstreamIface = EthernetTestInterface(context, handler, iface)
     }
 
