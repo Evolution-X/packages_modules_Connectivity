@@ -58,13 +58,8 @@ java_library {
         "//apex_available:platform",
     ],
     visibility: [
-        "//frameworks/base/packages/Tethering",
         "//packages/modules/Connectivity:__subpackages__",
         "//packages/modules/Connectivity/framework:__subpackages__",
-        "//frameworks/opt/net/ike",
-        "//frameworks/opt/net/wifi/service",
-        "//packages/modules/Wifi/service",
-        "//frameworks/opt/net/telephony",
         "//packages/modules/NetworkStack:__subpackages__",
         "//packages/modules/CaptivePortalLogin",
     ],
