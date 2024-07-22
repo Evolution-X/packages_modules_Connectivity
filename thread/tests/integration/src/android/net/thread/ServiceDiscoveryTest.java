@@ -18,10 +18,10 @@ package android.net.thread;
 
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.nsd.NsdManager.PROTOCOL_DNS_SD;
-import static android.net.thread.utils.IntegrationTestUtils.JOIN_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.SERVICE_DISCOVERY_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.discoverForServiceLost;
 import static android.net.thread.utils.IntegrationTestUtils.discoverService;
+import static android.net.thread.utils.IntegrationTestUtils.joinNetworkAndWaitForOmr;
 import static android.net.thread.utils.IntegrationTestUtils.resolveService;
 import static android.net.thread.utils.IntegrationTestUtils.resolveServiceUntil;
 import static android.net.thread.utils.IntegrationTestUtils.waitFor;
@@ -168,8 +168,7 @@ public class ServiceDiscoveryTest {
 
         // Creates Full Thread Devices (FTD) and let them join the network.
         for (FullThreadDevice ftd : mFtds) {
-            ftd.joinNetwork(DEFAULT_DATASET);
-            ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+            joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         }
 
         int randomId = new Random().nextInt(10_000);
@@ -223,8 +222,7 @@ public class ServiceDiscoveryTest {
 
         // Creates a Full Thread Devices (FTD) and let it join the network.
         FullThreadDevice ftd = mFtds.get(0);
-        ftd.joinNetwork(DEFAULT_DATASET);
-        ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         ftd.setSrpHostname("my-host");
         ftd.setSrpHostAddresses(List.of((Inet6Address) parseNumericAddress("2001:db8::1")));
         ftd.addSrpService(
@@ -279,8 +277,7 @@ public class ServiceDiscoveryTest {
 
         // Creates a Full Thread Devices (FTD) and let it join the network.
         FullThreadDevice ftd = mFtds.get(0);
-        ftd.joinNetwork(DEFAULT_DATASET);
-        ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
         ftd.setSrpHostname("my-host");
         ftd.setSrpHostAddresses(
                 List.of(
@@ -346,8 +343,7 @@ public class ServiceDiscoveryTest {
         mRegistrationListeners.add(listener);
         for (int i = 0; i < NUM_FTD; ++i) {
             FullThreadDevice ftd = mFtds.get(i);
-            ftd.joinNetwork(DEFAULT_DATASET);
-            ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+            joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
             ftd.setDnsServerAddress(mOtCtl.getMlEid().getHostAddress());
         }
         final ArrayList<NsdServiceInfo> browsedServices = new ArrayList<>();
@@ -409,8 +405,7 @@ public class ServiceDiscoveryTest {
          * </pre>
          */
         FullThreadDevice srpClient = mFtds.get(0);
-        srpClient.joinNetwork(DEFAULT_DATASET);
-        srpClient.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+        joinNetworkAndWaitForOmr(srpClient, DEFAULT_DATASET);
         srpClient.setSrpHostname("my-host");
         srpClient.setSrpHostAddresses(List.of((Inet6Address) parseNumericAddress("2001::1")));
         srpClient.addSrpService(
@@ -421,8 +416,7 @@ public class ServiceDiscoveryTest {
                 Map.of("key1", bytes(0x01, 0x02), "key2", bytes(0x03)));
 
         FullThreadDevice dnsClient = mFtds.get(1);
-        dnsClient.joinNetwork(DEFAULT_DATASET);
-        dnsClient.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+        joinNetworkAndWaitForOmr(dnsClient, DEFAULT_DATASET);
         dnsClient.setDnsServerAddress(mOtCtl.getMlEid().getHostAddress());
 
         NsdServiceInfo browsedService = dnsClient.browseService("_test._udp.default.service.arpa.");
