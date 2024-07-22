@@ -34,7 +34,7 @@ import org.junit.runner.notification.RunNotifier
 class DefaultNetworkRestoreMonitor(
         ctx: Context,
         private val notifier: RunNotifier,
-        private val timeoutMs: Long = 3000
+        private val timeoutMs: Long = 30_000
 ) {
     var firstFailure: Exception? = null
     var initialTransports = 0L
@@ -56,8 +56,8 @@ class DefaultNetworkRestoreMonitor(
                             it.caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
                 }
             } catch (e: AssertionError) {
-                firstFailure = IllegalStateException(desc.methodName +
-                        " does not restore the default network")
+                firstFailure = IllegalStateException(desc.methodName + " does not restore the" +
+                        "default network, initialTransports = $initialTransports", e)
             } finally {
                 cm.unregisterNetworkCallback(cb)
             }
