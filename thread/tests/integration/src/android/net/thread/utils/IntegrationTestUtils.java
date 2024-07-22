@@ -22,7 +22,10 @@ import static com.android.compatibility.common.util.SystemUtil.runShellCommandOr
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ND_OPTION_PIO;
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ROUTER_ADVERTISEMENT;
 
+import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
+import static org.junit.Assert.assertNotNull;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -36,6 +39,7 @@ import android.net.NetworkRequest;
 import android.net.TestNetworkInterface;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.ThreadNetworkController;
 import android.os.Build;
 import android.os.Handler;
@@ -83,6 +87,17 @@ public final class IntegrationTestUtils {
     public static final Duration LEAVE_TIMEOUT = Duration.ofSeconds(2);
     public static final Duration CALLBACK_TIMEOUT = Duration.ofSeconds(1);
     public static final Duration SERVICE_DISCOVERY_TIMEOUT = Duration.ofSeconds(20);
+
+    // A valid Thread Active Operational Dataset generated from OpenThread CLI "dataset init new".
+    private static final byte[] DEFAULT_DATASET_TLVS =
+            base16().decode(
+                            "0E080000000000010000000300001335060004001FFFE002"
+                                    + "08ACC214689BC40BDF0708FD64DB1225F47E0B0510F26B31"
+                                    + "53760F519A63BAFDDFFC80D2AF030F4F70656E5468726561"
+                                    + "642D643961300102D9A00410A245479C836D551B9CA557F7"
+                                    + "B9D351B40C0402A0FFF8");
+    public static final ActiveOperationalDataset DEFAULT_DATASET =
+            ActiveOperationalDataset.fromThreadTlvs(DEFAULT_DATASET_TLVS);
 
     private IntegrationTestUtils() {}
 
@@ -411,6 +426,22 @@ public final class IntegrationTestUtils {
                 };
         cm.registerNetworkCallback(networkRequest, networkCallback);
         return networkFuture.get(timeout.toSeconds(), SECONDS);
+    }
+
+    /**
+     * Let the FTD join the specified Thread network and wait for border routing to be available.
+     *
+     * @return the OMR address
+     */
+    public static Inet6Address joinNetworkAndWaitForOmr(
+            FullThreadDevice ftd, ActiveOperationalDataset dataset) throws Exception {
+        ftd.factoryReset();
+        ftd.joinNetwork(dataset);
+        ftd.waitForStateAnyOf(List.of("router", "child"), JOIN_TIMEOUT);
+        waitFor(() -> ftd.getOmrAddress() != null, Duration.ofSeconds(60));
+        Inet6Address ftdOmr = ftd.getOmrAddress();
+        assertNotNull(ftdOmr);
+        return ftdOmr;
     }
 
     private static class DefaultDiscoveryListener implements NsdManager.DiscoveryListener {
