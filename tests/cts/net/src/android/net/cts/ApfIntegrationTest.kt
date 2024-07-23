@@ -410,6 +410,12 @@ class ApfIntegrationTest {
         }
     }
 
+    private fun installAndVerifyProgram(program: ByteArray) {
+        installProgram(program)
+        val readResult = readProgram().take(program.size).toByteArray()
+        assertThat(readResult).isEqualTo(program)
+    }
+
     fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply() {
         // If not IPv6 -> PASS
         addLoad16(R0, ETH_ETHERTYPE_OFFSET)
@@ -467,8 +473,7 @@ class ApfIntegrationTest {
         gen.addJump(BaseApfGenerator.DROP_LABEL)
 
         val program = gen.generate()
-        installProgram(program)
-        readProgram() // wait for install completion
+        installAndVerifyProgram(program)
 
         packetReader.sendPing(data, payloadSize)
         packetReader.expectPingDropped()
@@ -513,8 +518,7 @@ class ApfIntegrationTest {
 
         val program = gen.generate()
         assertThat(program.size).isLessThan(counterRegion)
-        installProgram(program)
-        readProgram() // wait for install completion
+        installAndVerifyProgram(program)
 
         // Trigger the program by sending a ping and waiting on the reply.
         val payloadSize = if (getFirstApiLevel() >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -562,8 +566,7 @@ class ApfIntegrationTest {
         gen.addLoadFromMemory(R0, MemorySlot.FILTER_AGE_SECONDS)
         gen.addStoreData(R0, 0)
 
-        installProgram(gen.generate())
-        readProgram() // wait for install completion
+        installAndVerifyProgram(gen.generate())
 
         val payloadSize = 56
         val data = ByteArray(payloadSize).also { Random.nextBytes(it) }
@@ -603,8 +606,7 @@ class ApfIntegrationTest {
         gen.addLoadFromMemory(R0, MemorySlot.FILTER_AGE_16384THS)
         gen.addStoreCounter(FILTER_AGE_16384THS, R0)
 
-        installProgram(gen.generate())
-        readProgram() // wait for install completion
+        installAndVerifyProgram(gen.generate())
 
         val payloadSize = 56
         val data = ByteArray(payloadSize).also { Random.nextBytes(it) }
@@ -712,8 +714,7 @@ class ApfIntegrationTest {
                 .addPass()
                 .generate()
 
-        installProgram(program)
-        readProgram() // Ensure installation is complete
+        installAndVerifyProgram(program)
 
         packetReader.sendPing(payload, payloadSize)
 
