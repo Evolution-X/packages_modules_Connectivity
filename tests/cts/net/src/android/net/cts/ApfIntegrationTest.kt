@@ -436,12 +436,7 @@ class ApfIntegrationTest {
         assumeApfVersionSupportAtLeast(4)
 
         // clear any active APF filter
-        var gen = ApfV4Generator(
-                caps.apfVersionSupported,
-                caps.maximumApfProgramSize,
-                caps.maximumApfProgramSize
-        ).addPass()
-        installProgram(gen.generate())
+        clearApfMemory()
         readProgram() // wait for install completion
 
         // Assert that initial ping does not get filtered.
@@ -455,7 +450,7 @@ class ApfIntegrationTest {
         assertThat(packetReader.expectPingReply()).isEqualTo(data)
 
         // Generate an APF program that drops the next ping
-        gen = ApfV4Generator(
+        val gen = ApfV4Generator(
                 caps.apfVersionSupported,
                 caps.maximumApfProgramSize,
                 caps.maximumApfProgramSize
