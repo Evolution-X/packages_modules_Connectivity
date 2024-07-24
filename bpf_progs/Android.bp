@@ -87,6 +87,7 @@ bpf {
 bpf {
     name: "offload.o",
     srcs: ["offload.c"],
+    btf: false,
     cflags: [
         "-Wall",
         "-Werror",
@@ -107,6 +108,7 @@ bpf {
 bpf {
     name: "test.o",
     srcs: ["test.c"],
+    btf: false,
     cflags: [
         "-Wall",
         "-Werror",
