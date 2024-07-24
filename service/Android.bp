@@ -206,6 +206,7 @@ java_library {
     },
     visibility: [
         "//packages/modules/Connectivity/service-t",
+        "//packages/modules/Connectivity/networksecurity:__subpackages__",
         "//packages/modules/Connectivity/tests:__subpackages__",
         "//packages/modules/Connectivity/thread/service:__subpackages__",
         "//packages/modules/Connectivity/thread/tests:__subpackages__",
@@ -247,6 +248,7 @@ java_defaults {
         "service-connectivity-pre-jarjar",
         "service-connectivity-tiramisu-pre-jarjar",
         "service-nearby-pre-jarjar",
+        "service-networksecurity-pre-jarjar",
         service_remoteauth_pre_jarjar_lib,
         "service-thread-pre-jarjar",
     ],
@@ -315,6 +317,7 @@ genrule {
         ":framework-connectivity-jarjar-rules",
         ":service-connectivity-jarjar-gen",
         ":service-nearby-jarjar-gen",
+        ":service-networksecurity-jarjar-gen",
         ":service-remoteauth-jarjar-gen",
         ":service-thread-jarjar-gen",
     ],
@@ -399,6 +402,24 @@ java_genrule {
     cmd: "$(location jarjar-rules-generator) " +
         "$(location :service-thread-pre-jarjar{.jar}) " +
         "--prefix com.android.server.thread " +
+        "--excludes $(location jarjar-excludes.txt) " +
+        "--output $(out)",
+    visibility: ["//visibility:private"],
+}
+
+java_genrule {
+    name: "service-networksecurity-jarjar-gen",
+    tool_files: [
+        ":service-networksecurity-pre-jarjar{.jar}",
+        "jarjar-excludes.txt",
+    ],
+    tools: [
+        "jarjar-rules-generator",
+    ],
+    out: ["service_ct_jarjar_rules.txt"],
+    cmd: "$(location jarjar-rules-generator) " +
+        "$(location :service-networksecurity-pre-jarjar{.jar}) " +
+        "--prefix com.android.server.net.ct " +
         "--excludes $(location jarjar-excludes.txt) " +
         "--output $(out)",
     visibility: ["//visibility:private"],
