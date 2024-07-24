@@ -20,6 +20,7 @@
 #include <android-base/unique_fd.h>
 #include <linux/bpf.h>
 #include <poll.h>
+#include <sys/epoll.h>
 #include <sys/mman.h>
 #include <utils/Log.h>
 
@@ -139,12 +140,24 @@ class BpfRingbuf : public BpfRingbufBase {
   static base::Result<std::unique_ptr<BpfRingbuf<Value>>> Create(
       const char* path);
 
+  int epoll_ctl_add(int epfd, struct epoll_event *event) {
+    return epoll_ctl(epfd, EPOLL_CTL_ADD, mRingFd.get(), event);
+  }
+
+  int epoll_ctl_mod(int epfd, struct epoll_event *event) {
+    return epoll_ctl(epfd, EPOLL_CTL_MOD, mRingFd.get(), event);
+  }
+
+  int epoll_ctl_del(int epfd) {
+    return epoll_ctl(epfd, EPOLL_CTL_DEL, mRingFd.get(), NULL);
+  }
+
   // Consumes all messages from the ring buffer, passing them to the callback.
   // Returns the number of messages consumed or a non-ok result on error. If the
   // ring buffer has no pending messages an OK result with count 0 is returned.
   base::Result<int> ConsumeAll(const MessageCallback& callback);
 
- private:
+ protected:
   // Empty ctor for use by Create.
   BpfRingbuf() : BpfRingbufBase(sizeof(Value)) {}
 };
