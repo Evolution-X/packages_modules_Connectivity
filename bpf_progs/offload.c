@@ -593,7 +593,7 @@ static inline __always_inline int do_forward4(struct __sk_buff* skb,
 
     // Calculate the IPv4 one's complement checksum of the IPv4 header.
     __wsum sum4 = 0;
-    for (int i = 0; i < sizeof(*ip) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(*ip) / sizeof(__u16); ++i) {
         sum4 += ((__u16*)ip)[i];
     }
     // Note that sum4 is guaranteed to be non-zero by virtue of ip4->version == 4
