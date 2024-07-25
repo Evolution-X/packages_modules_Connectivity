@@ -184,7 +184,7 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
     static __always_inline inline void update_##the_stats_map(const struct __sk_buff* const skb, \
                                                               const TypeOfKey* const key,        \
                                                               const struct egress_bool egress,   \
-                                                              const struct kver_uint kver) {     \
+                                                     __unused const struct kver_uint kver) {     \
         StatsValue* value = bpf_##the_stats_map##_lookup_elem(key);                              \
         if (!value) {                                                                            \
             StatsValue newValue = {};                                                            \
@@ -676,7 +676,7 @@ static __always_inline inline uint8_t get_app_permissions() {
 
 DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", AID_ROOT, AID_ROOT, inet_socket_create,
                           KVER_4_14)
-(struct bpf_sock* sk) {
+(__unused struct bpf_sock* sk) {
     // A return value of 1 means allow, everything else means deny.
     return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? 1 : 0;
 }
@@ -690,7 +690,7 @@ DEFINE_NETD_V_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT
     return 1;
 }
 
-static __always_inline inline int check_localhost(struct bpf_sock_addr *ctx) {
+static __always_inline inline int check_localhost(__unused struct bpf_sock_addr *ctx) {
     // See include/uapi/linux/bpf.h:
     //
     // struct bpf_sock_addr {
