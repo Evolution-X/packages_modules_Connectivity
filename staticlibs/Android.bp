@@ -481,7 +481,6 @@ java_defaults {
     name: "net-utils-non-bootclasspath-defaults",
     sdk_version: "module_current",
     min_sdk_version: "30",
-    jarjar_rules: "jarjar-rules-shared.txt",
     libs: [
         "androidx.annotation_annotation",
         "framework-annotations-lib",
@@ -527,6 +526,7 @@ java_library {
         "net-utils-framework-connectivity",
     ],
     defaults: ["net-utils-non-bootclasspath-defaults"],
+    jarjar_rules: "jarjar-rules-shared.txt",
 }
 
 java_library {
@@ -536,6 +536,7 @@ java_library {
         ":framework-connectivity-shared-srcs",
     ],
     defaults: ["net-utils-non-bootclasspath-defaults"],
+    jarjar_rules: "jarjar-rules-shared.txt",
 }
 
 aidl_interface {
@@ -550,6 +551,7 @@ aidl_interface {
             min_sdk_version: "30",
             apex_available: [
                 "com.android.tethering",
+                "com.android.wifi",
             ],
         },
         cpp: {
@@ -587,8 +589,7 @@ filegroup {
     ],
 }
 
-// Use a filegroup and not a library for wifi sources, as this needs corresponding jar-jar
-// rules on the wifi side.
+// Filegroup to build lib used by Wifi framework
 // Any class here *must* have a corresponding jarjar rule in the wifi build rules.
 filegroup {
     name: "net-utils-framework-wifi-common-srcs",
@@ -600,26 +601,7 @@ filegroup {
         "framework/com/android/net/module/util/NetUtils.java",
     ],
     path: "framework",
-    visibility: [
-        "//frameworks/base",
-    ],
-}
-
-// Use a filegroup and not a library for wifi sources, as this needs corresponding jar-jar
-// rules on the wifi side.
-// Any class here *must* have a corresponding jarjar rule in the wifi build rules.
-filegroup {
-    name: "net-utils-wifi-service-common-srcs",
-    srcs: [
-        "device/android/net/NetworkFactory.java",
-        "device/android/net/NetworkFactoryImpl.java",
-        "device/android/net/NetworkFactoryLegacyImpl.java",
-        "device/android/net/NetworkFactoryShim.java",
-    ],
-    visibility: [
-        "//frameworks/opt/net/wifi/service",
-        "//packages/modules/Wifi/service",
-    ],
+    visibility: ["//visibility:private"],
 }
 
 // Use a file group containing classes necessary for framework-connectivity. The file group should
@@ -658,4 +640,39 @@ filegroup {
     ],
     path: "device",
     visibility: ["//visibility:private"],
+}
+
+java_library {
+    name: "net-utils-service-wifi",
+    srcs: [
+        ":net-utils-all-srcs",
+    ],
+    exclude_srcs: [":net-utils-framework-wifi-common-srcs"],
+    libs: [
+        "net-utils-framework-wifi",
+    ],
+    defaults: ["net-utils-non-bootclasspath-defaults"],
+
+    visibility: [
+        "//packages/modules/Wifi/service",
+    ],
+    apex_available: [
+        "com.android.wifi",
+    ],
+}
+
+java_library {
+    name: "net-utils-framework-wifi",
+    sdk_version: "module_current",
+    min_sdk_version: "30",
+    srcs: [":net-utils-framework-wifi-common-srcs"],
+    libs: [
+        "framework-annotations-lib",
+        "framework-connectivity.stubs.module_lib",
+        "unsupportedappusage",
+    ],
+    visibility: [
+        "//packages/modules/Wifi/framework",
+    ],
+    apex_available: ["com.android.wifi"],
 }
