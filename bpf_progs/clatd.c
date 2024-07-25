@@ -177,7 +177,7 @@ static inline __always_inline int nat64(struct __sk_buff* skb,
 
     // Calculate the IPv4 one's complement checksum of the IPv4 header.
     __wsum sum4 = 0;
-    for (int i = 0; i < sizeof(ip) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(ip) / sizeof(__u16); ++i) {
         sum4 += ((__u16*)&ip)[i];
     }
     // Note that sum4 is guaranteed to be non-zero by virtue of ip.version == 4
@@ -188,7 +188,7 @@ static inline __always_inline int nat64(struct __sk_buff* skb,
     // Calculate the *negative* IPv6 16-bit one's complement checksum of the IPv6 header.
     __wsum sum6 = 0;
     // We'll end up with a non-zero sum due to ip6->version == 6 (which has '0' bits)
-    for (int i = 0; i < sizeof(*ip6) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(*ip6) / sizeof(__u16); ++i) {
         sum6 += ~((__u16*)ip6)[i];  // note the bitwise negation
     }
 
@@ -321,7 +321,7 @@ DEFINE_BPF_PROG("schedcls/egress4/clat_rawip", AID_ROOT, AID_SYSTEM, sched_cls_e
 
     // Calculate the IPv4 one's complement checksum of the IPv4 header.
     __wsum sum4 = 0;
-    for (int i = 0; i < sizeof(*ip4) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(*ip4) / sizeof(__u16); ++i) {
         sum4 += ((__u16*)ip4)[i];
     }
     // Note that sum4 is guaranteed to be non-zero by virtue of ip4->version == 4
@@ -387,7 +387,7 @@ DEFINE_BPF_PROG("schedcls/egress4/clat_rawip", AID_ROOT, AID_SYSTEM, sched_cls_e
     // Calculate the IPv6 16-bit one's complement checksum of the IPv6 header.
     __wsum sum6 = 0;
     // We'll end up with a non-zero sum due to ip6.version == 6
-    for (int i = 0; i < sizeof(ip6) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(ip6) / sizeof(__u16); ++i) {
         sum6 += ((__u16*)&ip6)[i];
     }
 

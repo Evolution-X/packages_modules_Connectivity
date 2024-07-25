@@ -127,7 +127,7 @@ DEFINE_BPF_MAP_GRW(tether_upstream6_map, HASH, TetherUpstream6Key, Tether6Value,
 static inline __always_inline int do_forward6(struct __sk_buff* skb,
                                               const struct rawip_bool rawip,
                                               const struct stream_bool stream,
-                                              const struct kver_uint kver) {
+                                              __unused const struct kver_uint kver) {
     const bool is_ethernet = !rawip.rawip;
 
     // Must be meta-ethernet IPv6 frame
@@ -343,13 +343,13 @@ DEFINE_BPF_PROG_KVER("schedcls/tether_upstream6_rawip$4_14", TETHERING_UID, TETH
 // and define no-op stubs for pre-4.14 kernels.
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_downstream6_rawip$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_downstream6_rawip_stub, KVER_NONE, KVER_4_14)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream6_rawip$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_upstream6_rawip_stub, KVER_NONE, KVER_4_14)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
@@ -363,7 +363,7 @@ static inline __always_inline int do_forward4_bottom(struct __sk_buff* skb,
         const int l2_header_size, void* data, const void* data_end,
         struct ethhdr* eth, struct iphdr* ip, const struct rawip_bool rawip,
         const struct stream_bool stream, const struct updatetime_bool updatetime,
-        const bool is_tcp, const struct kver_uint kver) {
+        const bool is_tcp, __unused const struct kver_uint kver) {
     const bool is_ethernet = !rawip.rawip;
     struct tcphdr* tcph = is_tcp ? (void*)(ip + 1) : NULL;
     struct udphdr* udph = is_tcp ? NULL : (void*)(ip + 1);
@@ -593,7 +593,7 @@ static inline __always_inline int do_forward4(struct __sk_buff* skb,
 
     // Calculate the IPv4 one's complement checksum of the IPv4 header.
     __wsum sum4 = 0;
-    for (int i = 0; i < sizeof(*ip) / sizeof(__u16); ++i) {
+    for (unsigned i = 0; i < sizeof(*ip) / sizeof(__u16); ++i) {
         sum4 += ((__u16*)ip)[i];
     }
     // Note that sum4 is guaranteed to be non-zero by virtue of ip4->version == 4
@@ -780,13 +780,13 @@ DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_ether$4_14", TETHERING_UID
 
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_downstream4_rawip$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_downstream4_rawip_stub, KVER_NONE, KVER_5_4)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_rawip$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_upstream4_rawip_stub, KVER_NONE, KVER_5_4)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
@@ -794,13 +794,13 @@ DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_rawip$stub", TETHERING_UID
 
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_downstream4_ether$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_downstream4_ether_stub, KVER_NONE, KVER_4_14)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
 DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_ether$stub", TETHERING_UID, TETHERING_GID,
                            sched_cls_tether_upstream4_ether_stub, KVER_NONE, KVER_4_14)
-(struct __sk_buff* skb) {
+(__unused struct __sk_buff* skb) {
     return TC_ACT_PIPE;
 }
 
@@ -808,13 +808,13 @@ DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_ether$stub", TETHERING_UID
 
 DEFINE_BPF_MAP_GRW(tether_dev_map, DEVMAP_HASH, uint32_t, uint32_t, 64, TETHERING_GID)
 
-static inline __always_inline int do_xdp_forward6(struct xdp_md *ctx, const struct rawip_bool rawip,
-        const struct stream_bool stream) {
+static inline __always_inline int do_xdp_forward6(__unused struct xdp_md *ctx,
+        __unused const struct rawip_bool rawip, __unused const struct stream_bool stream) {
     return XDP_PASS;
 }
 
-static inline __always_inline int do_xdp_forward4(struct xdp_md *ctx, const struct rawip_bool rawip,
-        const struct stream_bool stream) {
+static inline __always_inline int do_xdp_forward4(__unused struct xdp_md *ctx,
+        __unused const struct rawip_bool rawip, __unused const struct stream_bool stream) {
     return XDP_PASS;
 }
 
