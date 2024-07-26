@@ -25,6 +25,7 @@
     <option name="config-descriptor:metadata" key="mainline-param" value="com.google.android.tethering.apex" />
     <option name="not-shardable" value="true" />
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="has-server-side-config" value="false" />
         <option name="target" value="device" />
         <option name="config-filename" value="{MODULE}" />
         <option name="version" value="1.0" />
