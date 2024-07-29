@@ -58,6 +58,7 @@ import android.net.nsd.NsdServiceInfo;
 import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.OperationalDatasetTimestamp;
 import android.net.thread.PendingOperationalDataset;
+import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkController.OperationalDatasetCallback;
 import android.net.thread.ThreadNetworkController.StateCallback;
@@ -95,9 +96,11 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /** CTS tests for {@link ThreadNetworkController}. */
@@ -110,11 +113,14 @@ public class ThreadNetworkControllerTest {
     private static final int NETWORK_CALLBACK_TIMEOUT_MILLIS = 10 * 1000;
     private static final int CALLBACK_TIMEOUT_MILLIS = 1_000;
     private static final int ENABLED_TIMEOUT_MILLIS = 2_000;
+    private static final int SET_CONFIGURATION_TIMEOUT_MILLIS = 1_000;
     private static final int SERVICE_DISCOVERY_TIMEOUT_MILLIS = 30_000;
     private static final int SERVICE_LOST_TIMEOUT_MILLIS = 20_000;
     private static final String MESHCOP_SERVICE_TYPE = "_meshcop._udp";
     private static final String THREAD_NETWORK_PRIVILEGED =
             "android.permission.THREAD_NETWORK_PRIVILEGED";
+    private static final ThreadConfiguration DEFAULT_CONFIG =
+            new ThreadConfiguration.Builder().build();
 
     @Rule public final ThreadFeatureCheckerRule mThreadRule = new ThreadFeatureCheckerRule();
 
@@ -126,6 +132,9 @@ public class ThreadNetworkControllerTest {
     private Set<String> mGrantedPermissions;
     private HandlerThread mHandlerThread;
     private TapTestNetworkTracker mTestNetworkTracker;
+
+    private final List<Consumer<ThreadConfiguration>> mConfigurationCallbacksToCleanUp =
+            new ArrayList<>();
 
     @Before
     public void setUp() throws Exception {
@@ -141,6 +150,7 @@ public class ThreadNetworkControllerTest {
         mHandlerThread.start();
 
         setEnabledAndWait(mController, true);
+        setConfigurationAndWait(mController, DEFAULT_CONFIG);
     }
 
     @After
@@ -148,6 +158,18 @@ public class ThreadNetworkControllerTest {
         dropAllPermissions();
         leaveAndWait(mController);
         tearDownTestNetwork();
+        setConfigurationAndWait(mController, DEFAULT_CONFIG);
+        for (Consumer<ThreadConfiguration> configurationCallback :
+                mConfigurationCallbacksToCleanUp) {
+            try {
+                runAsShell(
+                        THREAD_NETWORK_PRIVILEGED,
+                        () -> mController.unregisterConfigurationCallback(configurationCallback));
+            } catch (IllegalArgumentException e) {
+                // Ignore the exception when the callback is not registered.
+            }
+        }
+        mConfigurationCallbacksToCleanUp.clear();
     }
 
     @Test
@@ -832,6 +854,152 @@ public class ThreadNetworkControllerTest {
                         NET_CAPABILITY_TRUSTED);
     }
 
+    @Test
+    public void setConfiguration_null_throwsNullPointerException() throws Exception {
+        CompletableFuture<Void> setConfigFuture = new CompletableFuture<>();
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                        mController.setConfiguration(
+                                null, mExecutor, newOutcomeReceiver(setConfigFuture)));
+    }
+
+    @Test
+    public void setConfiguration_noPermissions_throwsSecurityException() throws Exception {
+        ThreadConfiguration configuration =
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
+        CompletableFuture<Void> setConfigFuture = new CompletableFuture<>();
+        assertThrows(
+                SecurityException.class,
+                () -> {
+                    mController.setConfiguration(
+                            configuration, mExecutor, newOutcomeReceiver(setConfigFuture));
+                });
+    }
+
+    @Test
+    public void registerConfigurationCallback_permissionsGranted_returnsCurrentStatus()
+            throws Exception {
+        CompletableFuture<ThreadConfiguration> getConfigFuture = new CompletableFuture<>();
+        Consumer<ThreadConfiguration> callback = getConfigFuture::complete;
+
+        runAsShell(
+                THREAD_NETWORK_PRIVILEGED,
+                () -> registerConfigurationCallback(mController, mExecutor, callback));
+        assertThat(getConfigFuture.get(CALLBACK_TIMEOUT_MILLIS, MILLISECONDS))
+                .isEqualTo(DEFAULT_CONFIG);
+    }
+
+    @Test
+    public void registerConfigurationCallback_noPermissions_throwsSecurityException()
+            throws Exception {
+        dropAllPermissions();
+
+        assertThrows(
+                SecurityException.class,
+                () -> registerConfigurationCallback(mController, mExecutor, config -> {}));
+    }
+
+    @Test
+    public void registerConfigurationCallback_returnsUpdatedConfigurations() throws Exception {
+        CompletableFuture<Void> setFuture1 = new CompletableFuture<>();
+        CompletableFuture<Void> setFuture2 = new CompletableFuture<>();
+        ConfigurationListener listener = new ConfigurationListener(mController);
+        ThreadConfiguration config1 =
+                new ThreadConfiguration.Builder()
+                        .setNat64Enabled(true)
+                        .setDhcpv6PdEnabled(true)
+                        .build();
+        ThreadConfiguration config2 =
+                new ThreadConfiguration.Builder()
+                        .setNat64Enabled(false)
+                        .setDhcpv6PdEnabled(true)
+                        .build();
+
+        try {
+            runAsShell(
+                    THREAD_NETWORK_PRIVILEGED,
+                    () ->
+                            mController.setConfiguration(
+                                    config1, mExecutor, newOutcomeReceiver(setFuture1)));
+            runAsShell(
+                    THREAD_NETWORK_PRIVILEGED,
+                    () ->
+                            mController.setConfiguration(
+                                    config2, mExecutor, newOutcomeReceiver(setFuture2)));
+            setFuture1.get(ENABLED_TIMEOUT_MILLIS, MILLISECONDS);
+            setFuture2.get(ENABLED_TIMEOUT_MILLIS, MILLISECONDS);
+
+            listener.expectConfiguration(DEFAULT_CONFIG);
+            listener.expectConfiguration(config1);
+            listener.expectConfiguration(config2);
+            listener.expectNoMoreConfiguration();
+        } finally {
+            listener.unregisterConfigurationCallback();
+        }
+    }
+
+    @Test
+    public void registerConfigurationCallback_alreadyRegistered_throwsIllegalArgumentException()
+            throws Exception {
+        grantPermissions(THREAD_NETWORK_PRIVILEGED);
+
+        Consumer<ThreadConfiguration> callback = config -> {};
+        registerConfigurationCallback(mController, mExecutor, callback);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> registerConfigurationCallback(mController, mExecutor, callback));
+    }
+
+    @Test
+    public void unregisterConfigurationCallback_noPermissions_throwsSecurityException()
+            throws Exception {
+        Consumer<ThreadConfiguration> callback = config -> {};
+        runAsShell(
+                THREAD_NETWORK_PRIVILEGED,
+                () -> registerConfigurationCallback(mController, mExecutor, callback));
+
+        assertThrows(
+                SecurityException.class,
+                () -> mController.unregisterConfigurationCallback(callback));
+    }
+
+    @Test
+    public void unregisterConfigurationCallback_callbackRegistered_success() throws Exception {
+        Consumer<ThreadConfiguration> callback = config -> {};
+        runAsShell(
+                THREAD_NETWORK_PRIVILEGED,
+                () -> {
+                    registerConfigurationCallback(mController, mExecutor, callback);
+                    mController.unregisterConfigurationCallback(callback);
+                });
+    }
+
+    @Test
+    public void
+            unregisterConfigurationCallback_callbackNotRegistered_throwsIllegalArgumentException()
+                    throws Exception {
+        Consumer<ThreadConfiguration> callback = config -> {};
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> mController.unregisterConfigurationCallback(callback));
+    }
+
+    @Test
+    public void unregisterConfigurationCallback_alreadyUnregistered_throwsIllegalArgumentException()
+            throws Exception {
+        grantPermissions(THREAD_NETWORK_PRIVILEGED);
+
+        Consumer<ThreadConfiguration> callback = config -> {};
+        registerConfigurationCallback(mController, mExecutor, callback);
+        mController.unregisterConfigurationCallback(callback);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> mController.unregisterConfigurationCallback(callback));
+    }
+
     private void grantPermissions(String... permissions) {
         for (String permission : permissions) {
             mGrantedPermissions.add(permission);
@@ -1038,6 +1206,35 @@ public class ThreadNetworkControllerTest {
         }
     }
 
+    private class ConfigurationListener {
+        private ArrayTrackRecord<ThreadConfiguration> mConfigurations = new ArrayTrackRecord<>();
+        private final ArrayTrackRecord<ThreadConfiguration>.ReadHead mReadHead =
+                mConfigurations.newReadHead();
+        ThreadNetworkController mController;
+        Consumer<ThreadConfiguration> mCallback = (config) -> mConfigurations.add(config);
+
+        ConfigurationListener(ThreadNetworkController controller) {
+            this.mController = controller;
+            runAsShell(
+                    THREAD_NETWORK_PRIVILEGED,
+                    () -> controller.registerConfigurationCallback(mExecutor, mCallback));
+        }
+
+        public void expectConfiguration(ThreadConfiguration config) {
+            assertThat(mReadHead.poll(CALLBACK_TIMEOUT_MILLIS, c -> c.equals(config))).isNotNull();
+        }
+
+        public void expectNoMoreConfiguration() {
+            assertThat(mReadHead.poll(CALLBACK_TIMEOUT_MILLIS, c -> true)).isNull();
+        }
+
+        public void unregisterConfigurationCallback() {
+            runAsShell(
+                    THREAD_NETWORK_PRIVILEGED,
+                    () -> mController.unregisterConfigurationCallback(mCallback));
+        }
+    }
+
     private int booleanToEnabledState(boolean enabled) {
         return enabled ? STATE_ENABLED : STATE_DISABLED;
     }
@@ -1050,6 +1247,18 @@ public class ThreadNetworkControllerTest {
                 () -> controller.setEnabled(enabled, mExecutor, newOutcomeReceiver(setFuture)));
         setFuture.get(ENABLED_TIMEOUT_MILLIS, MILLISECONDS);
         waitForEnabledState(controller, booleanToEnabledState(enabled));
+    }
+
+    private void setConfigurationAndWait(
+            ThreadNetworkController controller, ThreadConfiguration configuration)
+            throws Exception {
+        CompletableFuture<Void> setFuture = new CompletableFuture<>();
+        runAsShell(
+                THREAD_NETWORK_PRIVILEGED,
+                () ->
+                        controller.setConfiguration(
+                                configuration, mExecutor, newOutcomeReceiver(setFuture)));
+        setFuture.get(SET_CONFIGURATION_TIMEOUT_MILLIS, MILLISECONDS);
     }
 
     private CompletableFuture joinRandomizedDataset(
@@ -1116,6 +1325,14 @@ public class ThreadNetworkControllerTest {
                 pendingFuture.complete(pendingOpDataset);
             }
         };
+    }
+
+    private void registerConfigurationCallback(
+            ThreadNetworkController controller,
+            Executor executor,
+            Consumer<ThreadConfiguration> callback) {
+        controller.registerConfigurationCallback(executor, callback);
+        mConfigurationCallbacksToCleanUp.add(callback);
     }
 
     private static void assertDoesNotThrow(ThrowingRunnable runnable) {
