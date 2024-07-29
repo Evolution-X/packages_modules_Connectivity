@@ -152,7 +152,7 @@ public class ThreadPersistentSettingsTest {
         ThreadConfiguration configuration =
                 new ThreadConfiguration.Builder()
                         .setNat64Enabled(true)
-                        .setDhcp6PdEnabled(true)
+                        .setDhcpv6PdEnabled(true)
                         .build();
         mThreadPersistentSettings.putConfiguration(configuration);
 
@@ -164,13 +164,13 @@ public class ThreadPersistentSettingsTest {
         ThreadConfiguration configuration1 =
                 new ThreadConfiguration.Builder()
                         .setNat64Enabled(false)
-                        .setDhcp6PdEnabled(false)
+                        .setDhcpv6PdEnabled(false)
                         .build();
         mThreadPersistentSettings.putConfiguration(configuration1);
         ThreadConfiguration configuration2 =
                 new ThreadConfiguration.Builder()
                         .setNat64Enabled(true)
-                        .setDhcp6PdEnabled(true)
+                        .setDhcpv6PdEnabled(true)
                         .build();
 
         assertThat(mThreadPersistentSettings.putConfiguration(configuration2)).isTrue();
@@ -188,9 +188,9 @@ public class ThreadPersistentSettingsTest {
     }
 
     @Test
-    public void putConfiguration_dhcp6PdEnabled_valuesUpdatedAndPersisted() throws Exception {
+    public void putConfiguration_dhcpv6PdEnabled_valuesUpdatedAndPersisted() throws Exception {
         ThreadConfiguration configuration =
-                new ThreadConfiguration.Builder().setDhcp6PdEnabled(true).build();
+                new ThreadConfiguration.Builder().setDhcpv6PdEnabled(true).build();
         mThreadPersistentSettings.putConfiguration(configuration);
 
         assertThat(mThreadPersistentSettings.getConfiguration()).isEqualTo(configuration);
