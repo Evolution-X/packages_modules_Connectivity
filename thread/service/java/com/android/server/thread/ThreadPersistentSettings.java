@@ -197,7 +197,7 @@ public class ThreadPersistentSettings {
             return false;
         }
         putObject(CONFIG_NAT64_ENABLED.key, configuration.isNat64Enabled());
-        putObject(CONFIG_DHCP6_PD_ENABLED.key, configuration.isDhcp6PdEnabled());
+        putObject(CONFIG_DHCP6_PD_ENABLED.key, configuration.isDhcpv6PdEnabled());
         writeToStoreFile();
         return true;
     }
@@ -206,7 +206,7 @@ public class ThreadPersistentSettings {
     public ThreadConfiguration getConfiguration() {
         return new ThreadConfiguration.Builder()
                 .setNat64Enabled(get(CONFIG_NAT64_ENABLED))
-                .setDhcp6PdEnabled(get(CONFIG_DHCP6_PD_ENABLED))
+                .setDhcpv6PdEnabled(get(CONFIG_DHCP6_PD_ENABLED))
                 .build();
     }
 
