@@ -497,16 +497,26 @@ package android.net.thread {
     field @NonNull public static final android.os.Parcelable.Creator<android.net.thread.PendingOperationalDataset> CREATOR;
   }
 
+  @FlaggedApi("com.android.net.thread.flags.configuration_enabled") public final class ThreadConfiguration implements android.os.Parcelable {
+    method public int describeContents();
+    method public boolean isDhcpv6PdEnabled();
+    method public boolean isNat64Enabled();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.thread.ThreadConfiguration> CREATOR;
+  }
+
   @FlaggedApi("com.android.net.thread.flags.thread_enabled") public final class ThreadNetworkController {
     method public void createRandomizedDataset(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.net.thread.ActiveOperationalDataset,android.net.thread.ThreadNetworkException>);
     method public int getThreadVersion();
     method public static boolean isAttached(int);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void join(@NonNull android.net.thread.ActiveOperationalDataset, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void leave(@NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
+    method @FlaggedApi("com.android.net.thread.flags.configuration_enabled") @RequiresPermission(android.Manifest.permission.THREAD_NETWORK_PRIVILEGED) public void registerConfigurationCallback(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.net.thread.ThreadConfiguration>);
     method @RequiresPermission(allOf={android.Manifest.permission.ACCESS_NETWORK_STATE, "android.permission.THREAD_NETWORK_PRIVILEGED"}) public void registerOperationalDatasetCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.thread.ThreadNetworkController.OperationalDatasetCallback);
     method @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE) public void registerStateCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.thread.ThreadNetworkController.StateCallback);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void scheduleMigration(@NonNull android.net.thread.PendingOperationalDataset, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void setEnabled(boolean, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
+    method @FlaggedApi("com.android.net.thread.flags.configuration_enabled") @RequiresPermission(android.Manifest.permission.THREAD_NETWORK_PRIVILEGED) public void unregisterConfigurationCallback(@NonNull java.util.function.Consumer<android.net.thread.ThreadConfiguration>);
     method @RequiresPermission(allOf={android.Manifest.permission.ACCESS_NETWORK_STATE, "android.permission.THREAD_NETWORK_PRIVILEGED"}) public void unregisterOperationalDatasetCallback(@NonNull android.net.thread.ThreadNetworkController.OperationalDatasetCallback);
     method @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE) public void unregisterStateCallback(@NonNull android.net.thread.ThreadNetworkController.StateCallback);
     field public static final int DEVICE_ROLE_CHILD = 2; // 0x2

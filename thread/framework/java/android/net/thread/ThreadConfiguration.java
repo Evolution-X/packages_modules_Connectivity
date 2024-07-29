@@ -15,7 +15,9 @@
  */
 package android.net.thread;
 
+import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.SystemApi;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -37,19 +39,19 @@ import java.util.Objects;
  * @see ThreadNetworkController#unregisterConfigurationCallback
  * @hide
  */
-// @FlaggedApi(ThreadNetworkFlags.FLAG_CONFIGURATION_ENABLED)
-// @SystemApi
+@FlaggedApi(ThreadNetworkFlags.FLAG_CONFIGURATION_ENABLED)
+@SystemApi
 public final class ThreadConfiguration implements Parcelable {
     private final boolean mNat64Enabled;
-    private final boolean mDhcp6PdEnabled;
+    private final boolean mDhcpv6PdEnabled;
 
     private ThreadConfiguration(Builder builder) {
-        this(builder.mNat64Enabled, builder.mDhcp6PdEnabled);
+        this(builder.mNat64Enabled, builder.mDhcpv6PdEnabled);
     }
 
-    private ThreadConfiguration(boolean nat64Enabled, boolean dhcp6PdEnabled) {
+    private ThreadConfiguration(boolean nat64Enabled, boolean dhcpv6PdEnabled) {
         this.mNat64Enabled = nat64Enabled;
-        this.mDhcp6PdEnabled = dhcp6PdEnabled;
+        this.mDhcpv6PdEnabled = dhcpv6PdEnabled;
     }
 
     /** Returns {@code true} if NAT64 is enabled. */
@@ -58,8 +60,8 @@ public final class ThreadConfiguration implements Parcelable {
     }
 
     /** Returns {@code true} if DHCPv6 Prefix Delegation is enabled. */
-    public boolean isDhcp6PdEnabled() {
-        return mDhcp6PdEnabled;
+    public boolean isDhcpv6PdEnabled() {
+        return mDhcpv6PdEnabled;
     }
 
     @Override
@@ -71,13 +73,13 @@ public final class ThreadConfiguration implements Parcelable {
         } else {
             ThreadConfiguration otherConfig = (ThreadConfiguration) other;
             return mNat64Enabled == otherConfig.mNat64Enabled
-                    && mDhcp6PdEnabled == otherConfig.mDhcp6PdEnabled;
+                    && mDhcpv6PdEnabled == otherConfig.mDhcpv6PdEnabled;
         }
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mNat64Enabled, mDhcp6PdEnabled);
+        return Objects.hash(mNat64Enabled, mDhcpv6PdEnabled);
     }
 
     @Override
@@ -85,7 +87,7 @@ public final class ThreadConfiguration implements Parcelable {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         sb.append("Nat64Enabled=").append(mNat64Enabled);
-        sb.append(", Dhcp6PdEnabled=").append(mDhcp6PdEnabled);
+        sb.append(", Dhcpv6PdEnabled=").append(mDhcpv6PdEnabled);
         sb.append('}');
         return sb.toString();
     }
@@ -98,7 +100,7 @@ public final class ThreadConfiguration implements Parcelable {
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeBoolean(mNat64Enabled);
-        dest.writeBoolean(mDhcp6PdEnabled);
+        dest.writeBoolean(mDhcpv6PdEnabled);
     }
 
     public static final @NonNull Creator<ThreadConfiguration> CREATOR =
@@ -107,7 +109,7 @@ public final class ThreadConfiguration implements Parcelable {
                 public ThreadConfiguration createFromParcel(Parcel in) {
                     ThreadConfiguration.Builder builder = new ThreadConfiguration.Builder();
                     builder.setNat64Enabled(in.readBoolean());
-                    builder.setDhcp6PdEnabled(in.readBoolean());
+                    builder.setDhcpv6PdEnabled(in.readBoolean());
                     return builder.build();
                 }
 
@@ -117,10 +119,14 @@ public final class ThreadConfiguration implements Parcelable {
                 }
             };
 
-    /** The builder for creating {@link ThreadConfiguration} objects. */
+    /**
+     * The builder for creating {@link ThreadConfiguration} objects.
+     *
+     * @hide
+     */
     public static final class Builder {
         private boolean mNat64Enabled = false;
-        private boolean mDhcp6PdEnabled = false;
+        private boolean mDhcpv6PdEnabled = false;
 
         /** Creates a new {@link Builder} object with all features disabled. */
         public Builder() {}
@@ -134,7 +140,7 @@ public final class ThreadConfiguration implements Parcelable {
             Objects.requireNonNull(config);
 
             mNat64Enabled = config.mNat64Enabled;
-            mDhcp6PdEnabled = config.mDhcp6PdEnabled;
+            mDhcpv6PdEnabled = config.mDhcpv6PdEnabled;
         }
 
         /**
@@ -156,8 +162,8 @@ public final class ThreadConfiguration implements Parcelable {
          * IPv6.
          */
         @NonNull
-        public Builder setDhcp6PdEnabled(boolean enabled) {
-            this.mDhcp6PdEnabled = enabled;
+        public Builder setDhcpv6PdEnabled(boolean enabled) {
+            this.mDhcpv6PdEnabled = enabled;
             return this;
         }
 
