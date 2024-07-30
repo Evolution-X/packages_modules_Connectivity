@@ -74,12 +74,12 @@ import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIV
 import static com.android.net.module.util.DeviceConfigUtils.getDeviceConfigPropertyInt;
 import static com.android.net.module.util.NetworkCapabilitiesUtils.getDisplayTransport;
 import static com.android.net.module.util.NetworkStatsUtils.LIMIT_GLOBAL_ALERT;
-import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_PERIODIC;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_DUMPSYS;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_FORCE_UPDATE;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_GLOBAL_ALERT;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_NETWORK_STATUS_CHANGED;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_OPEN_SESSION;
+import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_PERIODIC;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_RAT_CHANGED;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_REG_CALLBACK;
 import static com.android.server.net.NetworkStatsEventLogger.POLL_REASON_REMOVE_UIDS;
@@ -242,13 +242,11 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     // A message for broadcasting ACTION_NETWORK_STATS_UPDATED in handler thread to prevent
     // deadlock.
     private static final int MSG_BROADCAST_NETWORK_STATS_UPDATED = 4;
-
     /** Flags to control detail level of poll event. */
     private static final int FLAG_PERSIST_NETWORK = 0x1;
     private static final int FLAG_PERSIST_UID = 0x2;
     private static final int FLAG_PERSIST_ALL = FLAG_PERSIST_NETWORK | FLAG_PERSIST_UID;
     private static final int FLAG_PERSIST_FORCE = 0x100;
-
     /**
      * When global alert quota is high, wait for this delay before processing each polling,
      * and do not schedule further polls once there is already one queued.
@@ -256,12 +254,6 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
      * high quota.
      */
     private static final int DEFAULT_PERFORM_POLL_DELAY_MS = 1000;
-
-    /**
-     * The delay time between to network stats update intents.
-     * Added to fix intent spams (b/3115462)
-     */
-    private static final int BROADCAST_NETWORK_STATS_UPDATED_DELAY_MS = 1000;
 
     private static final String TAG_NETSTATS_ERROR = "netstats_error";
 
@@ -319,6 +311,12 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     static final String TRAFFIC_STATS_CACHE_MAX_ENTRIES_NAME = "trafficstats_cache_max_entries";
     static final int DEFAULT_TRAFFIC_STATS_CACHE_EXPIRY_DURATION_MS = 1000;
     static final int DEFAULT_TRAFFIC_STATS_CACHE_MAX_ENTRIES = 400;
+    /**
+     * The delay time between to network stats update intents.
+     * Added to fix intent spams (b/3115462)
+     */
+    @VisibleForTesting(visibility = PRIVATE)
+    static final int BROADCAST_NETWORK_STATS_UPDATED_DELAY_MS = 1000;
 
     private final Context mContext;
     private final NetworkStatsFactory mStatsFactory;
@@ -391,6 +389,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         long getXtPersistBytes(long def);
         long getUidPersistBytes(long def);
         long getUidTagPersistBytes(long def);
+        long getBroadcastNetworkStatsUpdateDelayMs();
     }
 
     private final Object mStatsLock = new Object();
@@ -476,13 +475,18 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     private long mLastStatsSessionPoll;
 
     /**
-     * The latest time of broadcasting network stats updated message.
-     * Note that this time could be in the past for already done broadcasts,
-     * or in the future for scheduled broadcasts. This record is needed for
-     * rate limiting intents to prevent intent spams (b/3115462)
+     * The timestamp of the most recent network stats broadcast.
+     *
+     * Note that this time could be in the past for completed broadcasts,
+     * or in the future for scheduled broadcasts.
+     *
+     * It is initialized to {@code Long.MIN_VALUE} to ensure that the first broadcast request
+     * is fulfilled immediately, regardless of the delay time.
+     *
+     * This value is used to enforce rate limiting on intents, preventing intent spam.
      */
     @GuardedBy("mStatsLock")
-    private long mLatestNetworkStatsUpdatedBroadcastScheduledTime = -1;
+    private long mLatestNetworkStatsUpdatedBroadcastScheduledTime = Long.MIN_VALUE;
 
 
     private final TrafficStatsRateLimitCache mTrafficStatsTotalCache;
@@ -719,6 +723,15 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     // TODO: Move more stuff into dependencies object.
     @VisibleForTesting
     public static class Dependencies {
+        /**
+         * Get broadcast network stats updated delay time in ms
+         * @return
+         */
+        @NonNull
+        public long getBroadcastNetworkStatsUpdateDelayMs() {
+            return BROADCAST_NETWORK_STATS_UPDATED_DELAY_MS;
+        }
+
         /**
          * Get legacy platform stats directory.
          */
@@ -2688,9 +2701,11 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         if (!mBroadcastNetworkStatsUpdatedRateLimitEnabled) {
             mHandler.sendMessage(mHandler.obtainMessage(MSG_BROADCAST_NETWORK_STATS_UPDATED));
         } else if (mLatestNetworkStatsUpdatedBroadcastScheduledTime < SystemClock.uptimeMillis()) {
-            mLatestNetworkStatsUpdatedBroadcastScheduledTime = Math.max(SystemClock.uptimeMillis(),
+            mLatestNetworkStatsUpdatedBroadcastScheduledTime = Math.max(
                     mLatestNetworkStatsUpdatedBroadcastScheduledTime
-                    + BROADCAST_NETWORK_STATS_UPDATED_DELAY_MS);
+                            + mSettings.getBroadcastNetworkStatsUpdateDelayMs(),
+                    SystemClock.uptimeMillis()
+            );
             mHandler.sendMessageAtTime(mHandler.obtainMessage(MSG_BROADCAST_NETWORK_STATS_UPDATED),
                     mLatestNetworkStatsUpdatedBroadcastScheduledTime);
         }
@@ -3651,6 +3666,11 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         @Override
         public long getUidTagPersistBytes(long def) {
             return def;
+        }
+
+        @Override
+        public long getBroadcastNetworkStatsUpdateDelayMs() {
+            return BROADCAST_NETWORK_STATS_UPDATED_DELAY_MS;
         }
     }
 
