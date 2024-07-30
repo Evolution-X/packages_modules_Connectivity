@@ -567,7 +567,9 @@ public class NetworkDiagnostics {
 
         @Override
         public void close() {
-            IoUtils.closeQuietly(mFileDescriptor);
+            if (mFileDescriptor != null) {
+                IoUtils.closeQuietly(mFileDescriptor);
+            }
         }
     }
 
@@ -611,6 +613,7 @@ public class NetworkDiagnostics {
                 setupSocket(SOCK_DGRAM, mProtocol, TIMEOUT_SEND, TIMEOUT_RECV, 0);
             } catch (ErrnoException | IOException e) {
                 mMeasurement.recordFailure(e.toString());
+                close();
                 return;
             }
             mMeasurement.description += " src{" + socketAddressToString(mSocketAddress) + "}";
@@ -695,6 +698,7 @@ public class NetworkDiagnostics {
                         NetworkConstants.DNS_SERVER_PORT);
             } catch (ErrnoException | IOException e) {
                 mMeasurement.recordFailure(e.toString());
+                close();
                 return;
             }
 
