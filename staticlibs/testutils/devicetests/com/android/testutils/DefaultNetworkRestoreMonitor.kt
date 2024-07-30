@@ -88,7 +88,7 @@ class DefaultNetworkRestoreMonitor(
         }
         cm.registerDefaultNetworkCallback(cb)
         try {
-            val cap = capFuture.get(100, TimeUnit.MILLISECONDS)
+            val cap = capFuture.get(10_000, TimeUnit.MILLISECONDS)
             initialTransports = BitUtils.packBits(cap.transportTypes)
         } catch (e: Exception) {
             firstFailure = IllegalStateException(
