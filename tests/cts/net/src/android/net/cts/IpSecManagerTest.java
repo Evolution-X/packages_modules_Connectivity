@@ -451,9 +451,10 @@ public class IpSecManagerTest extends IpSecBaseTest {
             long uidTxDelta = 0;
             long uidRxDelta = 0;
             for (int i = 0; i < 100; i++) {
-                // Clear TrafficStats cache is needed to avoid rate-limit caching for
-                // TrafficStats API results on V+ devices.
-                if (SdkLevel.isAtLeastV()) {
+                // Since the target SDK of this test should always equal or be larger than V,
+                // TrafficStats caching is always enabled. Clearing the cache is needed to
+                // avoid rate-limiting on devices with a mainlined (T+) NetworkStatsService.
+                if (SdkLevel.isAtLeastT()) {
                     runAsShell(NETWORK_SETTINGS, () -> TrafficStats.clearRateLimitCaches());
                 }
                 uidTxDelta = TrafficStats.getUidTxPackets(Os.getuid()) - uidTxPackets;
@@ -530,9 +531,10 @@ public class IpSecManagerTest extends IpSecBaseTest {
         }
 
         private static void initStatsChecker() throws Exception {
-            // Clear TrafficStats cache is needed to avoid rate-limit caching for
-            // TrafficStats API results on V+ devices.
-            if (SdkLevel.isAtLeastV()) {
+            // Since the target SDK of this test should always equal or be larger than V,
+            // TrafficStats caching is always enabled. Clearing the cache is needed to
+            // avoid rate-limiting on devices with a mainlined (T+) NetworkStatsService.
+            if (SdkLevel.isAtLeastT()) {
                 runAsShell(NETWORK_SETTINGS, () -> TrafficStats.clearRateLimitCaches());
             }
             uidTxBytes = TrafficStats.getUidTxBytes(Os.getuid());
