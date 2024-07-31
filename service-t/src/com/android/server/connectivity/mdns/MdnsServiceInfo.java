@@ -355,6 +355,13 @@ public class MdnsServiceInfo implements Parcelable {
 
     /** Represents a DNS TXT key-value pair defined by RFC 6763. */
     public static final class TextEntry implements Parcelable {
+        /**
+         * The value to use for attributes with no value.
+         *
+         * <p>As per RFC6763 P.16, attributes may have no value, which is different from having an
+         * empty value (which would be an empty byte array).
+         */
+        public static final byte[] VALUE_NONE = null;
         public static final Parcelable.Creator<TextEntry> CREATOR =
                 new Parcelable.Creator<TextEntry>() {
                     @Override
@@ -389,7 +396,7 @@ public class MdnsServiceInfo implements Parcelable {
             // 2. If there is no '=' in a DNS-SD TXT record string, then it is a
             // boolean attribute, simply identified as being present, with no value.
             if (delimitPos < 0) {
-                return new TextEntry(new String(textBytes, US_ASCII), (byte[]) null);
+                return new TextEntry(new String(textBytes, US_ASCII), VALUE_NONE);
             } else if (delimitPos == 0) {
                 return null;
             }
@@ -400,13 +407,13 @@ public class MdnsServiceInfo implements Parcelable {
 
         /** Creates a new {@link TextEntry} with given key and value of a UTF-8 string. */
         public TextEntry(String key, String value) {
-            this(key, value == null ? null : value.getBytes(UTF_8));
+            this(key, value == null ? VALUE_NONE : value.getBytes(UTF_8));
         }
 
         /** Creates a new {@link TextEntry} with given key and value of a byte array. */
         public TextEntry(String key, byte[] value) {
             this.key = key;
-            this.value = value == null ? null : value.clone();
+            this.value = value == VALUE_NONE ? VALUE_NONE : value.clone();
         }
 
         private TextEntry(Parcel in) {
@@ -419,22 +426,26 @@ public class MdnsServiceInfo implements Parcelable {
         }
 
         public byte[] getValue() {
-            return value == null ? null : value.clone();
+            return value == VALUE_NONE ? VALUE_NONE : value.clone();
         }
 
         /** Converts this {@link TextEntry} instance to '=' separated byte array. */
         public byte[] toBytes() {
             final byte[] keyBytes = key.getBytes(US_ASCII);
-            if (value == null) {
+            if (value == VALUE_NONE) {
                 return keyBytes;
             }
             return ByteUtils.concat(keyBytes, new byte[]{'='}, value);
         }
 
+        public boolean isEmpty() {
+            return TextUtils.isEmpty(key) && (value == VALUE_NONE || value.length == 0);
+        }
+
         /** Converts this {@link TextEntry} instance to '=' separated string. */
         @Override
         public String toString() {
-            if (value == null) {
+            if (value == VALUE_NONE) {
                 return key;
             }
             return key + "=" + new String(value, UTF_8);
