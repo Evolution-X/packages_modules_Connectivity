@@ -105,7 +105,6 @@ import com.android.testutils.TestDnsPacket
 import com.android.testutils.TestableNetworkAgent
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
 import com.android.testutils.TestableNetworkCallback
-import com.android.testutils.assertContainsExactly
 import com.android.testutils.assertEmpty
 import com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk30
 import com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk33
@@ -128,6 +127,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Random
 import java.util.concurrent.Executor
 import kotlin.math.min
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -2465,6 +2465,44 @@ class NsdManagerTest {
             discoveryRecord1.expectCallback<DiscoveryStopped>()
             discoveryRecord2.expectCallback<DiscoveryStopped>()
             discoveryRecord3.expectCallback<DiscoveryStopped>()
+        } cleanup {
+            nsdManager.unregisterService(registrationRecord)
+            registrationRecord.expectCallback<ServiceUnregistered>()
+        }
+    }
+
+    @Test
+    fun testAdvertiseServiceWithNoAttributes_TxtRecordIstNotEmpty() {
+        deviceConfigRule.setConfig(
+            NAMESPACE_TETHERING,
+            "test_nsd_avoid_advertising_empty_txt_records",
+            "1"
+        )
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+            testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
+        packetReader.startAsyncForTest()
+        handlerThread.waitForIdle(TIMEOUT_MS)
+
+        // Test behavior described in RFC6763 6.1: empty TXT records are not allowed, but TXT
+        // records with a zero length string are equivalent.
+        val si = makeTestServiceInfo(testNetwork1.network)
+        // Register service on testNetwork1
+        val registrationRecord = NsdRegistrationRecord()
+        registerService(registrationRecord, si)
+
+        tryTest {
+            val announcement =
+                packetReader.pollForReply("$serviceName.$serviceType.local", DnsResolver.TYPE_TXT)
+            assertNotNull(announcement)
+            val txtRecords = announcement.records[ANSECTION].filter {
+                it.nsType == DnsResolver.TYPE_TXT
+            }
+            assertEquals(1, txtRecords.size)
+            // The TXT record should contain as single zero
+            assertContentEquals(byteArrayOf(0), txtRecords[0].rr)
         } cleanup {
             nsdManager.unregisterService(registrationRecord)
             registrationRecord.expectCallback<ServiceUnregistered>()

@@ -28,6 +28,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import static java.util.Collections.emptyList;
+
 import android.util.Log;
 
 import com.android.net.module.util.HexDump;
@@ -370,6 +372,30 @@ public class MdnsRecordTests {
         Log.d(TAG, dataOutText);
 
         assertEquals(dataInText, dataOutText);
+    }
+
+    private static MdnsTextRecord makeTextRecordWithEntries(List<TextEntry> entries) {
+        return new MdnsTextRecord(new String[] { "test", "record" }, 0L /* receiptTimeMillis */,
+                true /* cacheFlush */, 120_000L /* ttlMillis */, entries);
+    }
+
+    @Test
+    public void testTextRecord_EmptyRecordsAreEquivalent() {
+        final MdnsTextRecord record1 = makeTextRecordWithEntries(emptyList());
+        final MdnsTextRecord record2 = makeTextRecordWithEntries(
+                List.of(new TextEntry("", (byte[]) null)));
+        final MdnsTextRecord record3 = makeTextRecordWithEntries(
+                List.of(new TextEntry(null, (byte[]) null)));
+        final MdnsTextRecord nonEmptyRecord = makeTextRecordWithEntries(
+                List.of(new TextEntry("a", (byte[]) null)));
+
+        assertEquals(record1, record1);
+        assertEquals(record1, record2);
+        assertEquals(record1, record3);
+
+        assertNotEquals(nonEmptyRecord, record1);
+        assertNotEquals(nonEmptyRecord, record2);
+        assertNotEquals(nonEmptyRecord, record3);
     }
 
     private static String toHex(MdnsRecord record) throws IOException {

@@ -172,11 +172,13 @@ class MdnsRecordRepositoryTest {
     private fun makeFlags(
         includeInetAddressesInProbing: Boolean = false,
         isKnownAnswerSuppressionEnabled: Boolean = false,
-        unicastReplyEnabled: Boolean = true
+        unicastReplyEnabled: Boolean = true,
+        avoidAdvertisingEmptyTxtRecords: Boolean = true
     ) = MdnsFeatureFlags.Builder()
         .setIncludeInetAddressRecordsInProbing(includeInetAddressesInProbing)
         .setIsKnownAnswerSuppressionEnabled(isKnownAnswerSuppressionEnabled)
         .setIsUnicastReplyEnabled(unicastReplyEnabled)
+        .setAvoidAdvertisingEmptyTxtRecords(avoidAdvertisingEmptyTxtRecords)
         .build()
 
     @Test
@@ -1721,6 +1723,30 @@ class MdnsRecordRepositoryTest {
     }
 
     @Test
+    fun testGetConflictingServices_ZeroLengthTxtRecord_NoConflict() {
+        val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
+        repository.addServiceAndFinishProbing(TEST_SERVICE_ID_1, TEST_SERVICE_1)
+
+        val packet = MdnsPacket(
+            0 /* flags */,
+            emptyList() /* questions */,
+            listOf(
+                    MdnsTextRecord(
+                        arrayOf("MyOtherTestService", "_testservice", "_tcp", "local"),
+                        0L /* receiptTimeMillis */,
+                        true /* cacheFlush */,
+                        SHORT_TTL,
+                        listOf(TextEntry("", null as ByteArray?))
+                    ),
+            ) /* answers */,
+            emptyList() /* authorityRecords */,
+            emptyList() /* additionalRecords */
+        )
+
+        assertEquals(emptyMap(), repository.getConflictingServices(packet))
+    }
+
+    @Test
     fun testGetServiceRepliedRequestsCount() {
         val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
         repository.initWithService(TEST_SERVICE_ID_1, TEST_SERVICE_1)
@@ -2166,6 +2192,46 @@ class MdnsRecordRepositoryTest {
         assertEquals(0, reply.answers.size)
         assertEquals(0, reply.additionalAnswers.size)
         assertEquals(knownAnswers, reply.knownAnswers)
+    }
+
+    private fun doAddServiceWithEmptyTxtRecordTest(flags: MdnsFeatureFlags): MdnsTextRecord {
+        val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, flags)
+        repository.addServiceAndFinishProbing(TEST_SERVICE_ID_1, TEST_SERVICE_1)
+
+        val questions = listOf(MdnsTextRecord(
+            arrayOf("MyTestService", "_testservice", "_tcp", "local"),
+            true /* isUnicast */
+        ))
+        val query = MdnsPacket(
+            0 /* flags */,
+            questions,
+            emptyList() /* answers */,
+            emptyList() /* authorityRecords */,
+            emptyList() /* additionalRecords */
+        )
+        val src = InetSocketAddress(parseNumericAddress("192.0.2.123"), 5353)
+        val reply = repository.getReply(query, src)
+
+        assertNotNull(reply)
+        assertEquals(1, reply.answers.size)
+        assertTrue(reply.answers[0] is MdnsTextRecord)
+        return reply.answers[0] as MdnsTextRecord
+    }
+
+    @Test
+    fun testAddService_AvoidEmptyTxtRecords_HasTxtRecordWithEmptyString() {
+        val answerRecord = doAddServiceWithEmptyTxtRecordTest(makeFlags())
+        assertEquals(1, answerRecord.entries.size)
+        assertEquals(0, answerRecord.entries[0].key.length)
+        assertNull(answerRecord.entries[0].value)
+    }
+
+    @Test
+    fun testAddService_UsesEmptyTxtRecords_HasEmptyTxtRecord() {
+        val answerRecord = doAddServiceWithEmptyTxtRecordTest(makeFlags(
+            avoidAdvertisingEmptyTxtRecords = false
+        ))
+        assertEquals(0, answerRecord.entries.size)
     }
 
     @Test
