@@ -130,6 +130,7 @@ import kotlin.math.min
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.fail
@@ -142,10 +143,10 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import kotlin.test.assertNotEquals
 
 private const val TAG = "NsdManagerTest"
 private const val TIMEOUT_MS = 2000L
+
 // Registration may take a long time if there are devices with the same hostname on the network,
 // as the device needs to try another name and probe again. This is especially true since when using
 // mdnsresponder the usual hostname is "Android", and on conflict "Android-2", "Android-3", ... are
@@ -187,11 +188,12 @@ class NsdManagerTest {
     private val customHostname = "NsdTestHost%09d".format(Random().nextInt(1_000_000_000))
     private val customHostname2 = "NsdTestHost%09d".format(Random().nextInt(1_000_000_000))
     private val publicKey = hexStringToByteArray(
-            "0201030dc141d0637960b98cbc12cfca"
-                    + "221d2879dac26ee5b460e9007c992e19"
-                    + "02d897c391b03764d448f7d0c772fdb0"
-                    + "3b1d9d6d52ff8886769e8e2362513565"
-                    + "270962d3")
+            "0201030dc141d0637960b98cbc12cfca" +
+                    "221d2879dac26ee5b460e9007c992e19" +
+                    "02d897c391b03764d448f7d0c772fdb0" +
+                    "3b1d9d6d52ff8886769e8e2362513565" +
+                    "270962d3"
+    )
     private val handlerThread = HandlerThread(NsdManagerTest::class.java.simpleName)
     private val ctsNetUtils by lazy{ CtsNetUtils(context) }
 
@@ -243,11 +245,14 @@ class NsdManagerTest {
         val iface = tnm.createTapInterface()
         val cb = TestableNetworkCallback()
         val testNetworkSpecifier = TestNetworkSpecifier(iface.interfaceName)
-        cm.requestNetwork(NetworkRequest.Builder()
+        cm.requestNetwork(
+            NetworkRequest.Builder()
                 .removeCapability(NET_CAPABILITY_TRUSTED)
                 .addTransportType(TRANSPORT_TEST)
                 .setNetworkSpecifier(testNetworkSpecifier)
-                .build(), cb)
+                .build(),
+            cb
+        )
         val agent = registerTestNetworkAgent(iface.interfaceName)
         val network = agent.network ?: fail("Registered agent should have a network")
 
@@ -267,12 +272,17 @@ class NsdManagerTest {
         val lp = LinkProperties().apply {
             interfaceName = ifaceName
         }
-        val agent = TestableNetworkAgent(context, handlerThread.looper,
+        val agent = TestableNetworkAgent(
+            context,
+            handlerThread.looper,
                 NetworkCapabilities().apply {
                     removeCapability(NET_CAPABILITY_TRUSTED)
                     addTransportType(TRANSPORT_TEST)
                     setNetworkSpecifier(TestNetworkSpecifier(ifaceName))
-                }, lp, NetworkAgentConfig.Builder().build())
+                },
+            lp,
+            NetworkAgentConfig.Builder().build()
+        )
         val network = agent.register()
         agent.markConnected()
         agent.expectCallback<OnNetworkCreated>()
@@ -346,15 +356,19 @@ class NsdManagerTest {
                 Triple(null, null, "null key"),
                 Triple("", null, "empty key"),
                 Triple(string256, null, "key with 256 characters"),
-                Triple("key", string256.substring(3),
-                        "key+value combination with more than 255 characters"),
+                Triple(
+                    "key",
+                    string256.substring(3),
+                        "key+value combination with more than 255 characters"
+                ),
                 Triple("key", string256.substring(4), "key+value combination with 255 characters"),
                 Triple("\u0019", null, "key with invalid character"),
                 Triple("=", null, "key with invalid character"),
                 Triple("\u007f", null, "key with invalid character")
         ).forEach {
             assertFailsWith<IllegalArgumentException>(
-                    "Setting invalid ${it.third} unexpectedly succeeded") {
+                    "Setting invalid ${it.third} unexpectedly succeeded"
+            ) {
                 si.setAttribute(it.first, it.second)
             }
         }
@@ -377,7 +391,8 @@ class NsdManagerTest {
         // Test registering without an Executor
         nsdManager.registerService(si, NsdManager.PROTOCOL_DNS_SD, registrationRecord)
         val registeredInfo = registrationRecord.expectCallback<ServiceRegistered>(
-                REGISTRATION_TIMEOUT_MS).serviceInfo
+                REGISTRATION_TIMEOUT_MS
+        ).serviceInfo
 
         // Only service name is included in ServiceRegistered callbacks
         assertNull(registeredInfo.serviceType)
@@ -392,7 +407,9 @@ class NsdManagerTest {
 
         // Expect a service record to be discovered
         val foundInfo = discoveryRecord.waitForServiceDiscovered(
-                registeredInfo.serviceName, serviceType)
+                registeredInfo.serviceName,
+            serviceType
+        )
 
         // Test resolving without an Executor
         val resolveRecord = NsdResolveRecord()
@@ -407,8 +424,10 @@ class NsdManagerTest {
         assertNull(resolvedService.attributes["booleanAttr"])
         assertEquals("value", resolvedService.attributes["keyValueAttr"].utf8ToString())
         assertEquals("=", resolvedService.attributes["keyEqualsAttr"].utf8ToString())
-        assertEquals(" value ",
-                resolvedService.attributes[" whiteSpaceKeyValueAttr "].utf8ToString())
+        assertEquals(
+            " value ",
+                resolvedService.attributes[" whiteSpaceKeyValueAttr "].utf8ToString()
+        )
         assertEquals(string256.substring(9), resolvedService.attributes["longkey"].utf8ToString())
         assertArrayEquals(testByteArray, resolvedService.attributes["binaryDataAttr"])
         assertTrue(resolvedService.attributes.containsKey("nullBinaryDataAttr"))
@@ -442,12 +461,15 @@ class NsdManagerTest {
         val registrationRecord2 = NsdRegistrationRecord()
         nsdManager.registerService(si2, NsdManager.PROTOCOL_DNS_SD, registrationRecord2)
         val registeredInfo2 = registrationRecord2.expectCallback<ServiceRegistered>(
-                REGISTRATION_TIMEOUT_MS).serviceInfo
+                REGISTRATION_TIMEOUT_MS
+        ).serviceInfo
 
         // Expect a service record to be discovered (and filter the ones
         // that are unrelated to this test)
         val foundInfo2 = discoveryRecord.waitForServiceDiscovered(
-                registeredInfo2.serviceName, serviceType)
+                registeredInfo2.serviceName,
+            serviceType
+        )
 
         // Resolve the service
         val resolveRecord2 = NsdResolveRecord()
@@ -950,7 +972,8 @@ class NsdManagerTest {
         // when the compat change is disabled.
         // Note that before T the compat constant had a different int value.
         assertFalse(CompatChanges.isChangeEnabled(
-                ConnectivityCompatChanges.RUN_NATIVE_NSD_ONLY_IF_LEGACY_APPS_T_AND_LATER))
+                ConnectivityCompatChanges.RUN_NATIVE_NSD_ONLY_IF_LEGACY_APPS_T_AND_LATER
+        ))
     }
 
     @Test
@@ -1023,7 +1046,9 @@ class NsdManagerTest {
         // onStopResolutionFailed on the record directly then verify it is received.
         val resolveRecord = NsdResolveRecord()
         resolveRecord.onStopResolutionFailed(
-                NsdServiceInfo(), NsdManager.FAILURE_OPERATION_NOT_RUNNING)
+                NsdServiceInfo(),
+            NsdManager.FAILURE_OPERATION_NOT_RUNNING
+        )
         val failedCb = resolveRecord.expectCallback<StopResolutionFailed>()
         assertEquals(NsdManager.FAILURE_OPERATION_NOT_RUNNING, failedCb.errorCode)
     }
@@ -1274,15 +1299,22 @@ class NsdManagerTest {
 
         val si = makeTestServiceInfo(testNetwork1.network)
 
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
-        nsdManager.registerService(si, NsdManager.PROTOCOL_DNS_SD, { it.run() },
-                registrationRecord)
+        nsdManager.registerService(
+            si,
+            NsdManager.PROTOCOL_DNS_SD,
+            { it.run() },
+                registrationRecord
+        )
 
         tryTest {
             assertNotNull(packetReader.pollForProbe(serviceName, serviceType),
@@ -1313,15 +1345,22 @@ class NsdManagerTest {
                     parseNumericAddress("2001:db8::3"))
         }
 
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
-        nsdManager.registerService(si, NsdManager.PROTOCOL_DNS_SD, { it.run() },
-                registrationRecord)
+        nsdManager.registerService(
+            si,
+            NsdManager.PROTOCOL_DNS_SD,
+            { it.run() },
+                registrationRecord
+        )
 
         tryTest {
             assertNotNull(packetReader.pollForProbe(serviceName, serviceType),
@@ -1352,15 +1391,22 @@ class NsdManagerTest {
             hostname = customHostname
         }
 
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
-        nsdManager.registerService(si, NsdManager.PROTOCOL_DNS_SD, { it.run() },
-                registrationRecord)
+        nsdManager.registerService(
+            si,
+            NsdManager.PROTOCOL_DNS_SD,
+            { it.run() },
+                registrationRecord
+        )
 
         tryTest {
             assertNotNull(packetReader.pollForProbe(serviceName, serviceType),
@@ -1392,8 +1438,11 @@ class NsdManagerTest {
         val registrationRecord = NsdRegistrationRecord()
         val discoveryRecord = NsdDiscoveryRecord()
         val registeredService = registerService(registrationRecord, si)
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -1471,7 +1520,9 @@ class NsdManagerTest {
         val registeredService = registerService(registrationRecord, si)
         val packetReader = TapPacketReader(
                 Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -1501,11 +1552,11 @@ class NsdManagerTest {
             val newRegistration =
                     registrationRecord
                             .expectCallbackEventually<ServiceRegistered>(REGISTRATION_TIMEOUT_MS) {
-                                it.serviceInfo.serviceName == serviceName
-                                        && it.serviceInfo.hostname.let { hostname ->
-                                    hostname != null
-                                            && hostname.startsWith(customHostname)
-                                            && hostname != customHostname
+                                it.serviceInfo.serviceName == serviceName &&
+                                        it.serviceInfo.hostname.let { hostname ->
+                                    hostname != null &&
+                                            hostname.startsWith(customHostname) &&
+                                            hostname != customHostname
                                 }
                             }
 
@@ -1536,8 +1587,11 @@ class NsdManagerTest {
         val registrationRecord = NsdRegistrationRecord()
         val discoveryRecord = NsdDiscoveryRecord()
         val registeredService = registerService(registrationRecord, si)
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -1576,13 +1630,21 @@ class NsdManagerTest {
     fun testDiscoveryWithPtrOnlyResponse_ServiceIsFound() {
         // Register service on testNetwork1
         val discoveryRecord = NsdDiscoveryRecord()
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
-        nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD,
-                testNetwork1.network, { it.run() }, discoveryRecord)
+        nsdManager.discoverServices(
+            serviceType,
+            NsdManager.PROTOCOL_DNS_SD,
+                testNetwork1.network,
+            { it.run() },
+            discoveryRecord
+        )
 
         tryTest {
             discoveryRecord.expectCallback<DiscoveryStarted>()
@@ -1626,8 +1688,10 @@ class NsdManagerTest {
     fun testResolveWhenServerSendsNoAdditionalRecord() {
         // Resolve service on testNetwork1
         val resolveRecord = NsdResolveRecord()
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1651,16 +1715,21 @@ class NsdManagerTest {
                 rdata='testkey=testvalue')
         ))).hex()
          */
-        val srvTxtResponsePayload = HexDump.hexStringToByteArray("000084000000000200000000104" +
+        val srvTxtResponsePayload = HexDump.hexStringToByteArray(
+            "000084000000000200000000104" +
                 "e7364546573743132333435363738390d5f6e6d74313233343536373839045f746370056c6f6" +
                 "3616c0000218001000000780011000000007a020874657374686f7374c030c00c00100001000" +
-                "00078001211746573746b65793d7465737476616c7565")
+                "00078001211746573746b65793d7465737476616c7565"
+        )
         replaceServiceNameAndTypeWithTestSuffix(srvTxtResponsePayload)
         packetReader.sendResponse(buildMdnsPacket(srvTxtResponsePayload))
 
         val testHostname = "testhost.local"
-        val addressQuery = packetReader.pollForQuery(testHostname,
-            DnsResolver.TYPE_A, DnsResolver.TYPE_AAAA)
+        val addressQuery = packetReader.pollForQuery(
+            testHostname,
+            DnsResolver.TYPE_A,
+            DnsResolver.TYPE_AAAA
+        )
         assertNotNull(addressQuery)
 
         /*
@@ -1672,9 +1741,11 @@ class NsdManagerTest {
                 rdata='2001:db8::123')
         ))).hex()
          */
-        val addressPayload = HexDump.hexStringToByteArray("0000840000000002000000000874657374" +
+        val addressPayload = HexDump.hexStringToByteArray(
+            "0000840000000002000000000874657374" +
                 "686f7374056c6f63616c0000010001000000780004c000027bc00c001c000100000078001020" +
-                "010db8000000000000000000000123")
+                "010db8000000000000000000000123"
+        )
         packetReader.sendResponse(buildMdnsPacket(addressPayload))
 
         val serviceResolved = resolveRecord.expectCallback<ServiceResolved>()
@@ -1688,7 +1759,8 @@ class NsdManagerTest {
         }
         assertEquals(
                 setOf(parseNumericAddress("192.0.2.123"), parseNumericAddress("2001:db8::123")),
-                serviceResolved.serviceInfo.hostAddresses.toSet())
+                serviceResolved.serviceInfo.hostAddresses.toSet()
+        )
     }
 
     @Test
@@ -1715,7 +1787,7 @@ class NsdManagerTest {
             scapy.raw(scapy.DNS(rd=0, qr=0, aa=0, qd =
                     scapy.DNSQR(qname='_nmt123456789._tcp.local', qtype='PTR', qclass=0x8001)
             )).hex()
-            */
+             */
             val mdnsPayload = HexDump.hexStringToByteArray("0000000000010000000000000d5f6e6d74313" +
                     "233343536373839045f746370056c6f63616c00000c8001")
             replaceServiceNameAndTypeWithTestSuffix(mdnsPayload)
@@ -1771,7 +1843,7 @@ class NsdManagerTest {
                     an = scapy.DNSRR(rrname='_nmt123456789._tcp.local', type='PTR', ttl=4500,
                             rdata='NsdTest123456789._nmt123456789._tcp.local')
             )).hex()
-            */
+             */
             val query = HexDump.hexStringToByteArray("0000000000020001000000000d5f6e6d74313233343" +
                     "536373839045f746370056c6f63616c00000c8001104e7364546573743132333435363738390" +
                     "d5f6e6d74313233343536373839045f746370056c6f63616c00001080010d5f6e6d743132333" +
@@ -1806,7 +1878,7 @@ class NsdManagerTest {
                     an = scapy.DNSRR(rrname='_nmt123456789._tcp.local', type='PTR', ttl=2150,
                             rdata='NsdTest123456789._nmt123456789._tcp.local')
             )).hex()
-            */
+             */
             val query2 = HexDump.hexStringToByteArray("0000000000020001000000000d5f6e6d7431323334" +
                     "3536373839045f746370056c6f63616c00000c8001104e736454657374313233343536373839" +
                     "0d5f6e6d74313233343536373839045f746370056c6f63616c00001080010d5f6e6d74313233" +
@@ -1858,7 +1930,7 @@ class NsdManagerTest {
                     scapy.DNSQR(qname='NsdTest123456789._nmt123456789._tcp.local', qtype='TXT',
                             qclass=0x8001)
             )).hex()
-            */
+             */
             val query = HexDump.hexStringToByteArray("0000020000020000000000000d5f6e6d74313233343" +
                     "536373839045f746370056c6f63616c00000c8001104e7364546573743132333435363738390" +
                     "d5f6e6d74313233343536373839045f746370056c6f63616c0000108001")
@@ -1870,7 +1942,7 @@ class NsdManagerTest {
                     an = scapy.DNSRR(rrname='_test._tcp.local', type='PTR', ttl=4500,
                             rdata='NsdTest._test._tcp.local')
             )).hex()
-            */
+             */
             val knownAnswer1 = HexDump.hexStringToByteArray("000002000000000100000000055f74657374" +
                     "045f746370056c6f63616c00000c000100001194001a074e736454657374055f74657374045f" +
                     "746370056c6f63616c00")
@@ -1882,7 +1954,7 @@ class NsdManagerTest {
                     an = scapy.DNSRR(rrname='_nmt123456789._tcp.local', type='PTR', ttl=4500,
                             rdata='NsdTest123456789._nmt123456789._tcp.local')
             )).hex()
-            */
+             */
             val knownAnswer2 = HexDump.hexStringToByteArray("0000000000000001000000000d5f6e6d7431" +
                     "3233343536373839045f746370056c6f63616c00000c000100001194002b104e736454657374" +
                     "3132333435363738390d5f6e6d74313233343536373839045f746370056c6f63616c00")
@@ -1919,13 +1991,21 @@ class NsdManagerTest {
 
         // Register service on testNetwork1
         val discoveryRecord = NsdDiscoveryRecord()
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
-        nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD,
-                testNetwork1.network, { it.run() }, discoveryRecord)
+        nsdManager.discoverServices(
+            serviceType,
+            NsdManager.PROTOCOL_DNS_SD,
+                testNetwork1.network,
+            { it.run() },
+            discoveryRecord
+        )
 
         tryTest {
             discoveryRecord.expectCallback<DiscoveryStarted>()
@@ -1987,10 +2067,12 @@ class NsdManagerTest {
         val hostAddresses1 = listOf(
                 parseNumericAddress("192.0.2.23"),
                 parseNumericAddress("2001:db8::1"),
-                parseNumericAddress("2001:db8::2"))
+                parseNumericAddress("2001:db8::2")
+        )
         val hostAddresses2 = listOf(
                 parseNumericAddress("192.0.2.24"),
-                parseNumericAddress("2001:db8::3"))
+                parseNumericAddress("2001:db8::3")
+        )
         val si1 = NsdServiceInfo().also {
             it.network = testNetwork1.network
             it.serviceName = serviceName
@@ -2054,10 +2136,12 @@ class NsdManagerTest {
         val hostAddresses1 = listOf(
                 parseNumericAddress("192.0.2.23"),
                 parseNumericAddress("2001:db8::1"),
-                parseNumericAddress("2001:db8::2"))
+                parseNumericAddress("2001:db8::2")
+        )
         val hostAddresses2 = listOf(
                 parseNumericAddress("192.0.2.24"),
-                parseNumericAddress("2001:db8::3"))
+                parseNumericAddress("2001:db8::3")
+        )
         val si1 = NsdServiceInfo().also {
             it.network = testNetwork1.network
             it.hostname = customHostname
@@ -2105,7 +2189,8 @@ class NsdManagerTest {
         val hostAddresses = listOf(
                 parseNumericAddress("192.0.2.23"),
                 parseNumericAddress("2001:db8::1"),
-                parseNumericAddress("2001:db8::2"))
+                parseNumericAddress("2001:db8::2")
+        )
         val si1 = NsdServiceInfo().also {
             it.network = testNetwork1.network
             it.serviceType = serviceType
@@ -2270,8 +2355,11 @@ class NsdManagerTest {
             it.port = TEST_PORT
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -2322,8 +2410,11 @@ class NsdManagerTest {
                     parseNumericAddress("2001:db8::2"))
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -2376,8 +2467,11 @@ class NsdManagerTest {
             it.hostAddresses = listOf()
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(Handler(handlerThread.looper),
-            testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+        val packetReader = TapPacketReader(
+            Handler(handlerThread.looper),
+            testNetwork1.iface.fileDescriptor.fileDescriptor,
+            1500 /* maxPacketSize */
+        )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
 
@@ -2430,10 +2524,20 @@ class NsdManagerTest {
         val discoveryRecord1 = NsdDiscoveryRecord()
         val discoveryRecord2 = NsdDiscoveryRecord()
         val discoveryRecord3 = NsdDiscoveryRecord()
-        nsdManager.discoverServices("_test1._tcp", NsdManager.PROTOCOL_DNS_SD,
-                testNetwork1.network, { it.run() }, discoveryRecord1)
-        nsdManager.discoverServices("_test2._tcp", NsdManager.PROTOCOL_DNS_SD,
-                testNetwork1.network, { it.run() }, discoveryRecord2)
+        nsdManager.discoverServices(
+            "_test1._tcp",
+            NsdManager.PROTOCOL_DNS_SD,
+                testNetwork1.network,
+            { it.run() },
+            discoveryRecord1
+        )
+        nsdManager.discoverServices(
+            "_test2._tcp",
+            NsdManager.PROTOCOL_DNS_SD,
+                testNetwork1.network,
+            { it.run() },
+            discoveryRecord2
+        )
         nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord3)
 
         tryTest {
@@ -2527,11 +2631,16 @@ class NsdManagerTest {
      */
     private fun getServiceTypeClients(): List<String> {
         return SystemUtil.runShellCommand(
-                InstrumentationRegistry.getInstrumentation(), "dumpsys servicediscovery")
+                InstrumentationRegistry.getInstrumentation(),
+            "dumpsys servicediscovery"
+        )
                 .split("\n").mapNotNull { line ->
                     line.indexOf("ServiceTypeClient:").let { idx ->
-                        if (idx == -1) null
-                        else line.substring(idx)
+                        if (idx == -1) {
+                            null
+                        } else {
+                            line.substring(idx)
+                        }
                     }
                 }
     }
@@ -2544,9 +2653,11 @@ class NsdManagerTest {
                     rclass=0x8001, port=31234, target='conflict.local', ttl=120)
         )).hex()
          */
-        val mdnsPayload = HexDump.hexStringToByteArray("000084000000000100000000104e736454657" +
+        val mdnsPayload = HexDump.hexStringToByteArray(
+            "000084000000000100000000104e736454657" +
                 "3743132333435363738390d5f6e6d74313233343536373839045f746370056c6f63616c00002" +
-                "18001000000780016000000007a0208636f6e666c696374056c6f63616c00")
+                "18001000000780016000000007a0208636f6e666c696374056c6f63616c00"
+        )
         replaceServiceNameAndTypeWithTestSuffix(mdnsPayload)
 
         return buildMdnsPacket(mdnsPayload)
@@ -2560,9 +2671,11 @@ class NsdManagerTest {
                     rdata='2001:db8::321')
         )).hex()
          */
-        val mdnsPayload = HexDump.hexStringToByteArray("000084000000000100000000144e7364" +
+        val mdnsPayload = HexDump.hexStringToByteArray(
+            "000084000000000100000000144e7364" +
                 "54657374486f7374313233343536373839056c6f63616c00001c000100000078001020010db80000" +
-                "00000000000000000321")
+                "00000000000000000321"
+        )
         replaceCustomHostnameWithTestSuffix(mdnsPayload)
 
         return buildMdnsPacket(mdnsPayload)
@@ -2613,22 +2726,29 @@ class NsdManagerTest {
         mdnsPayload: ByteArray,
         srcAddr: Inet6Address = testSrcAddr
     ): ByteBuffer {
-        val packetBuffer = PacketBuilder.allocate(true /* hasEther */, IPPROTO_IPV6,
-                IPPROTO_UDP, mdnsPayload.size)
+        val packetBuffer = PacketBuilder.allocate(
+            true /* hasEther */,
+            IPPROTO_IPV6,
+                IPPROTO_UDP,
+            mdnsPayload.size
+        )
         val packetBuilder = PacketBuilder(packetBuffer)
         // Multicast ethernet address for IPv6 to ff02::fb
         val multicastEthAddr = MacAddress.fromBytes(
-                byteArrayOf(0x33, 0x33, 0, 0, 0, 0xfb.toByte()))
+                byteArrayOf(0x33, 0x33, 0, 0, 0, 0xfb.toByte())
+        )
         packetBuilder.writeL2Header(
                 MacAddress.fromBytes(byteArrayOf(1, 2, 3, 4, 5, 6)) /* srcMac */,
                 multicastEthAddr,
-                ETH_P_IPV6.toShort())
+                ETH_P_IPV6.toShort()
+        )
         packetBuilder.writeIpv6Header(
                 0x60000000, // version=6, traffic class=0x0, flowlabel=0x0
                 IPPROTO_UDP.toByte(),
                 64 /* hop limit */,
                 srcAddr,
-                multicastIpv6Addr /* dstIp */)
+                multicastIpv6Addr /* dstIp */
+        )
         packetBuilder.writeUdpHeader(MDNS_PORT /* srcPort */, MDNS_PORT /* dstPort */)
         packetBuffer.put(mdnsPayload)
         return packetBuilder.finalizePacket()
