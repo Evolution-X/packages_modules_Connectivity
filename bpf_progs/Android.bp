@@ -38,6 +38,7 @@ cc_library_headers {
     cflags: [
         "-Wall",
         "-Werror",
+        "-Wextra",
     ],
     sdk_version: "30",
     min_sdk_version: "30",
@@ -65,22 +66,12 @@ cc_library_headers {
 bpf {
     name: "block.o",
     srcs: ["block.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     sub_dir: "net_shared",
 }
 
 bpf {
     name: "dscpPolicy.o",
     srcs: ["dscpPolicy.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     sub_dir: "net_shared",
 }
 
@@ -88,52 +79,29 @@ bpf {
     name: "offload.o",
     srcs: ["offload.c"],
     btf: false,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
 }
 
 bpf {
     name: "offload@mainline.o",
     srcs: ["offload@mainline.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-DMAINLINE",
-    ],
+    cflags: ["-DMAINLINE"],
 }
 
 bpf {
     name: "test.o",
     srcs: ["test.c"],
     btf: false,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
 }
 
 bpf {
     name: "test@mainline.o",
     srcs: ["test@mainline.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-DMAINLINE",
-    ],
+    cflags: ["-DMAINLINE"],
 }
 
 bpf {
     name: "clatd.o",
     srcs: ["clatd.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     sub_dir: "net_shared",
 }
 
@@ -141,11 +109,6 @@ bpf {
     // WARNING: Android T's non-updatable netd depends on 'netd' string for xt_bpf programs it loads
     name: "netd.o",
     srcs: ["netd.c"],
-    btf: true,
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
     // WARNING: Android T's non-updatable netd depends on 'netd_shared' string for xt_bpf programs
     sub_dir: "netd_shared",
 }
