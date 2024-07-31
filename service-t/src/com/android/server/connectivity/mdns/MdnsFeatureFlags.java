@@ -67,6 +67,12 @@ public class MdnsFeatureFlags {
      */
     public static final String NSD_QUERY_WITH_KNOWN_ANSWER = "nsd_query_with_known_answer";
 
+    /**
+     * A feature flag to avoid advertising empty TXT records, as per RFC 6763 6.1.
+     */
+    public static final String NSD_AVOID_ADVERTISING_EMPTY_TXT_RECORDS =
+            "nsd_avoid_advertising_empty_txt_records";
+
     // Flag for offload feature
     public final boolean mIsMdnsOffloadFeatureEnabled;
 
@@ -90,6 +96,9 @@ public class MdnsFeatureFlags {
 
     // Flag for query with known-answer
     public final boolean mIsQueryWithKnownAnswerEnabled;
+
+    // Flag for avoiding advertising empty TXT records
+    public final boolean mAvoidAdvertisingEmptyTxtRecords;
 
     @Nullable
     private final FlagOverrideProvider mOverrideProvider;
@@ -142,6 +151,15 @@ public class MdnsFeatureFlags {
     }
 
     /**
+     * Indicates whether {@link #NSD_AVOID_ADVERTISING_EMPTY_TXT_RECORDS} is enabled, including for
+     * testing.
+     */
+    public boolean avoidAdvertisingEmptyTxtRecords() {
+        return mAvoidAdvertisingEmptyTxtRecords
+                || isForceEnabledForTest(NSD_AVOID_ADVERTISING_EMPTY_TXT_RECORDS);
+    }
+
+    /**
      * The constructor for {@link MdnsFeatureFlags}.
      */
     public MdnsFeatureFlags(boolean isOffloadFeatureEnabled,
@@ -152,6 +170,7 @@ public class MdnsFeatureFlags {
             boolean isUnicastReplyEnabled,
             boolean isAggressiveQueryModeEnabled,
             boolean isQueryWithKnownAnswerEnabled,
+            boolean avoidAdvertisingEmptyTxtRecords,
             @Nullable FlagOverrideProvider overrideProvider) {
         mIsMdnsOffloadFeatureEnabled = isOffloadFeatureEnabled;
         mIncludeInetAddressRecordsInProbing = includeInetAddressRecordsInProbing;
@@ -161,6 +180,7 @@ public class MdnsFeatureFlags {
         mIsUnicastReplyEnabled = isUnicastReplyEnabled;
         mIsAggressiveQueryModeEnabled = isAggressiveQueryModeEnabled;
         mIsQueryWithKnownAnswerEnabled = isQueryWithKnownAnswerEnabled;
+        mAvoidAdvertisingEmptyTxtRecords = avoidAdvertisingEmptyTxtRecords;
         mOverrideProvider = overrideProvider;
     }
 
@@ -181,6 +201,7 @@ public class MdnsFeatureFlags {
         private boolean mIsUnicastReplyEnabled;
         private boolean mIsAggressiveQueryModeEnabled;
         private boolean mIsQueryWithKnownAnswerEnabled;
+        private boolean mAvoidAdvertisingEmptyTxtRecords;
         private FlagOverrideProvider mOverrideProvider;
 
         /**
@@ -195,6 +216,7 @@ public class MdnsFeatureFlags {
             mIsUnicastReplyEnabled = true; // Default enabled.
             mIsAggressiveQueryModeEnabled = false;
             mIsQueryWithKnownAnswerEnabled = false;
+            mAvoidAdvertisingEmptyTxtRecords = true; // Default enabled.
             mOverrideProvider = null;
         }
 
@@ -291,6 +313,16 @@ public class MdnsFeatureFlags {
         }
 
         /**
+         * Set whether to avoid advertising empty TXT records.
+         *
+         * @see #NSD_AVOID_ADVERTISING_EMPTY_TXT_RECORDS
+         */
+        public Builder setAvoidAdvertisingEmptyTxtRecords(boolean avoidAdvertisingEmptyTxtRecords) {
+            mAvoidAdvertisingEmptyTxtRecords = avoidAdvertisingEmptyTxtRecords;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsFeatureFlags} with the arguments supplied to this builder.
          */
         public MdnsFeatureFlags build() {
@@ -302,6 +334,7 @@ public class MdnsFeatureFlags {
                     mIsUnicastReplyEnabled,
                     mIsAggressiveQueryModeEnabled,
                     mIsQueryWithKnownAnswerEnabled,
+                    mAvoidAdvertisingEmptyTxtRecords,
                     mOverrideProvider);
         }
     }

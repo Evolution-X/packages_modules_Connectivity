@@ -89,6 +89,13 @@ public class MdnsTextRecord extends MdnsRecord {
         }
     }
 
+    private boolean isEmpty() {
+        return entries == null || entries.size() == 0
+                // RFC6763 6.1 indicates that a TXT record with a single zero byte is equivalent to
+                // an empty record.
+                || (entries.size() == 1 && entries.get(0).isEmpty());
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -105,7 +112,7 @@ public class MdnsTextRecord extends MdnsRecord {
 
     @Override
     public int hashCode() {
-        return (super.hashCode() * 31) + Objects.hash(entries);
+        return (super.hashCode() * 31) + (isEmpty() ? 0 : Objects.hash(entries));
     }
 
     @Override
@@ -116,7 +123,19 @@ public class MdnsTextRecord extends MdnsRecord {
         if (!(other instanceof MdnsTextRecord)) {
             return false;
         }
-
-        return super.equals(other) && Objects.equals(entries, ((MdnsTextRecord) other).entries);
+        if (!super.equals(other)) {
+            return false;
+        }
+        // As per RFC6763 6.1: DNS-SD clients MUST treat the following as equivalent:
+        // - A TXT record containing a single zero byte.
+        // - An empty (zero-length) TXT record. (This is not strictly legal, but should one be
+        //   received, it should be interpreted as the same as a single empty string.)
+        // - No TXT record
+        // Ensure that empty TXT records are considered equal, so that they are not considered
+        // conflicting for example.
+        if (isEmpty() && ((MdnsTextRecord) other).isEmpty()) {
+            return true;
+        }
+        return Objects.equals(entries, ((MdnsTextRecord) other).entries);
     }
 }
