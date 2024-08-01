@@ -19,7 +19,6 @@ package android.net.cts
 import android.Manifest.permission.MANAGE_TEST_NETWORKS
 import android.Manifest.permission.NETWORK_SETTINGS
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.EthernetManager
 import android.net.InetAddresses
@@ -36,7 +35,6 @@ import android.net.dhcp.DhcpPacket.DHCP_MESSAGE_TYPE
 import android.net.dhcp.DhcpPacket.DHCP_MESSAGE_TYPE_DISCOVER
 import android.net.dhcp.DhcpPacket.DHCP_MESSAGE_TYPE_REQUEST
 import android.net.dhcp.DhcpRequestPacket
-import android.os.Build
 import android.os.HandlerThread
 import android.platform.test.annotations.AppModeFull
 import androidx.test.platform.app.InstrumentationRegistry
@@ -44,7 +42,7 @@ import androidx.test.runner.AndroidJUnit4
 import com.android.net.module.util.Inet4AddressUtils.getBroadcastAddress
 import com.android.net.module.util.Inet4AddressUtils.getPrefixMaskAsInet4Address
 import com.android.net.module.util.NetworkStackConstants.IPV4_ADDR_ANY
-import com.android.testutils.DevSdkIgnoreRule
+import com.android.testutils.AutoCloseTestInterfaceRule
 import com.android.testutils.DhcpClientPacketFilter
 import com.android.testutils.DhcpOptionFilter
 import com.android.testutils.RecorderCallback.CallbackEntry
@@ -79,10 +77,6 @@ private const val TEST_MTU = 1500.toShort()
 @AppModeFull(reason = "Instant apps cannot create test networks")
 @RunWith(AndroidJUnit4::class)
 class NetworkValidationTest {
-    @JvmField
-    @Rule
-    val ignoreRule = DevSdkIgnoreRule(ignoreClassUpTo = Build.VERSION_CODES.Q)
-
     private val context by lazy { InstrumentationRegistry.getInstrumentation().context }
     private val tnm by lazy { context.assertHasService(TestNetworkManager::class.java) }
     private val eth by lazy { context.assertHasService(EthernetManager::class.java) }
@@ -104,23 +98,24 @@ class NetworkValidationTest {
 
     private var testSkipped = false
 
+    @get:Rule
+    val testInterfaceRule = AutoCloseTestInterfaceRule(context)
+
     @Before
     fun setUp() {
         // This test requires using a tap interface as an ethernet interface.
-        val pm = context.getPackageManager()
-        testSkipped = !pm.hasSystemFeature(PackageManager.FEATURE_ETHERNET) &&
-                context.getSystemService(EthernetManager::class.java) == null
+        testSkipped = context.getSystemService(EthernetManager::class.java) == null
         assumeFalse(testSkipped)
 
         // Register a request so the network does not get torn down
         cm.requestNetwork(ethRequest, ethRequestCb)
         runAsShell(NETWORK_SETTINGS, MANAGE_TEST_NETWORKS) {
             eth.setIncludeTestInterfaces(true)
-            // Keeping a reference to the test interface also makes sure the ParcelFileDescriptor
-            // does not go out of scope, which would cause it to close the underlying FileDescriptor
-            // in its finalizer.
-            iface = tnm.createTapInterface()
         }
+        // Keeping a reference to the test interface also makes sure the ParcelFileDescriptor
+        // does not go out of scope, which would cause it to close the underlying FileDescriptor
+        // in its finalizer.
+        iface = testInterfaceRule.createTapInterface()
 
         handlerThread.start()
         reader = TapPacketReader(
@@ -147,8 +142,6 @@ class NetworkValidationTest {
         handlerThread.threadHandler.post { reader.stop() }
         handlerThread.quitSafely()
         handlerThread.join()
-
-        iface.fileDescriptor.close()
     }
 
     @Test
