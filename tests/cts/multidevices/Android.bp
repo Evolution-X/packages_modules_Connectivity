@@ -19,9 +19,11 @@ package {
 
 python_test_host {
     name: "CtsConnectivityMultiDevicesTestCases",
-    main: "connectivity_multi_devices_test.py",
+    main: "run_tests.py",
     srcs: [
+        "apfv4_test.py",
         "connectivity_multi_devices_test.py",
+        "run_tests.py",
     ],
     libs: [
         "mobly",
