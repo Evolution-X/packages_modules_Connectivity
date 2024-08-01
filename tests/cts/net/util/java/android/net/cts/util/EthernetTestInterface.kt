@@ -29,6 +29,7 @@ import android.os.Handler
 import android.util.Log
 import com.android.net.module.util.ArrayTrackRecord
 import com.android.testutils.runAsShell
+import kotlin.concurrent.Volatile
 import kotlin.test.assertNotNull
 
 private const val TAG = "EthernetTestInterface"
@@ -77,7 +78,7 @@ class EthernetTestInterface(
     val name get() = testIface.interfaceName
     private val listener = EthernetStateListener(name)
     private val em = context.getSystemService(EthernetManager::class.java)!!
-    private var cleanedUp = false
+    @Volatile private var cleanedUp = false
 
     init{
         em.addInterfaceStateListener(handler::post, listener)
