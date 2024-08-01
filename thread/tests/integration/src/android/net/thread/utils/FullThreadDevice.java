@@ -417,7 +417,7 @@ public final class FullThreadDevice {
         executeCommand("ipmaddr add " + address.getHostAddress());
     }
 
-    public void ping(Inet6Address address, Inet6Address source) {
+    public void ping(InetAddress address, Inet6Address source) {
         ping(
                 address,
                 source,
@@ -428,7 +428,7 @@ public final class FullThreadDevice {
                 PING_TIMEOUT_0_1_SECOND);
     }
 
-    public void ping(Inet6Address address) {
+    public void ping(InetAddress address) {
         ping(
                 address,
                 null,
@@ -440,7 +440,7 @@ public final class FullThreadDevice {
     }
 
     /** Returns the number of ping reply packets received. */
-    public int ping(Inet6Address address, int count) {
+    public int ping(InetAddress address, int count) {
         List<String> output =
                 ping(
                         address,
@@ -454,7 +454,7 @@ public final class FullThreadDevice {
     }
 
     private List<String> ping(
-            Inet6Address address,
+            InetAddress address,
             Inet6Address source,
             int size,
             int count,
