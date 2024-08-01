@@ -271,10 +271,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     }
 
     private NetworkRequest newUpstreamNetworkRequest() {
-        NetworkRequest.Builder builder = new NetworkRequest.Builder().clearCapabilities();
+        NetworkRequest.Builder builder = new NetworkRequest.Builder();
 
         if (mUpstreamTestNetworkSpecifier != null) {
-            return builder.addTransportType(NetworkCapabilities.TRANSPORT_TEST)
+            // Test networks don't have NET_CAPABILITY_TRUSTED
+            return builder.removeCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
+                    .addTransportType(NetworkCapabilities.TRANSPORT_TEST)
                     .setNetworkSpecifier(mUpstreamTestNetworkSpecifier)
                     .build();
         }
