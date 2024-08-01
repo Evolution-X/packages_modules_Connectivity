@@ -26,10 +26,14 @@ from net_tests_utils.host.python.apf_utils import (
     get_apf_counter,
     get_apf_counters_from_dumpsys,
     get_hardware_address,
+    is_send_raw_packet_downstream_supported,
     send_broadcast_empty_ethercat_packet,
     send_raw_packet_downstream,
 )
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError
+
+TEST_IFACE_NAME = "eth0"
+TEST_PACKET_IN_HEX = "AABBCCDDEEFF"
 
 
 class TestApfUtils(base_test.BaseTestClass, parameterized.TestCase):
@@ -125,13 +129,13 @@ IpClient.wlan1
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = ""  # Successful command output
-    iface_name = "eth0"
-    packet_in_hex = "AABBCCDDEEFF"
-    send_raw_packet_downstream(self.mock_ad, iface_name, packet_in_hex)
+    send_raw_packet_downstream(
+        self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+    )
     mock_adb_shell.assert_called_once_with(
         self.mock_ad,
         "cmd network_stack send-raw-packet-downstream"
-        f" {iface_name} {packet_in_hex}",
+        f" {TEST_IFACE_NAME} {TEST_PACKET_IN_HEX}",
     )
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
@@ -142,7 +146,13 @@ IpClient.wlan1
         "Any Unexpected Output"
     )
     with asserts.assert_raises(UnexpectedBehaviorError):
-      send_raw_packet_downstream(self.mock_ad, "eth0", "AABBCCDDEEFF")
+      send_raw_packet_downstream(
+          self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+      )
+    asserts.assert_true(
+        is_send_raw_packet_downstream_supported(self.mock_ad),
+        "Send raw packet should be supported.",
+    )
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_send_raw_packet_downstream_unsupported(
@@ -152,7 +162,13 @@ IpClient.wlan1
         cmd="", stdout="Unknown command", stderr="", ret_code=3
     )
     with asserts.assert_raises(UnsupportedOperationException):
-      send_raw_packet_downstream(self.mock_ad, "eth0", "AABBCCDDEEFF")
+        send_raw_packet_downstream(
+            self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+        )
+    asserts.assert_false(
+        is_send_raw_packet_downstream_supported(self.mock_ad),
+        "Send raw packet should not be supported.",
+    )
 
   @parameterized.parameters(
       ("2,2048,1", ApfCapabilities(2, 2048, 1)),  # Valid input
