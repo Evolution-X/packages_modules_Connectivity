@@ -619,17 +619,36 @@ public class BorderRoutingTest {
                         ICMPV6_ECHO_REQUEST_TYPE, ftdOmr, GROUP_ADDR_SCOPE_4));
     }
 
+    @Test
+    public void nat64_threadDevicePingIpv4InfraDevice_outboundPacketIsForwarded() throws Exception {
+        FullThreadDevice ftd = mFtds.get(0);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
+        // TODO: enable NAT64 via ThreadNetworkController API instead of ot-ctl
+        mOtCtl.setNat64Cidr(NAT64_CIDR);
+        mOtCtl.setNat64Enabled(true);
+        waitFor(() -> mOtCtl.hasNat64PrefixInNetdata(), Duration.ofSeconds(10));
+
+        ftd.ping(IPV4_SERVER_ADDR);
+
+        assertNotNull(pollForIcmpPacketOnInfraNetwork(ICMP_ECHO, null, IPV4_SERVER_ADDR));
     }
 
     private void setUpInfraNetwork() throws Exception {
+        LinkProperties lp = new LinkProperties();
+        // NAT64 feature requires the infra network to have an IPv4 default route.
+        lp.addRoute(
+                new RouteInfo(
+                        new IpPrefix("0.0.0.0/0") /* destination */,
+                        null /* gateway */,
+                        null,
+                        RouteInfo.RTN_UNICAST,
+                        1500 /* mtu */));
         mInfraNetworkTracker =
                 runAsShell(
                         MANAGE_TEST_NETWORKS,
-                        () ->
-                                initTestNetwork(
-                                        mContext, new LinkProperties(), 5000 /* timeoutMs */));
-        mController.setTestNetworkAsUpstreamAndWait(
-                mInfraNetworkTracker.getTestIface().getInterfaceName());
+                        () -> initTestNetwork(mContext, lp, 5000 /* timeoutMs */));
+        String infraNetworkName = mInfraNetworkTracker.getTestIface().getInterfaceName();
+        mController.setTestNetworkAsUpstreamAndWait(infraNetworkName);
     }
 
     private void tearDownInfraNetwork() {
