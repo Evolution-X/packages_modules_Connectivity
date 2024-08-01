@@ -21,6 +21,7 @@ cc_test {
     stl: "libc++_static",
     shared_libs: [
         "libbinder_ndk",
+        "libcom.android.tethering.connectivity_native",
         "liblog",
         "libnetutils",
         "libprocessgroup",

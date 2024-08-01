@@ -14,24 +14,16 @@
  * limitations under the License.
  */
 
+#include <android-modules-utils/sdk_level.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <android-modules-utils/sdk_level.h>
-#include <cutils/misc.h>  // FIRST_APPLICATION_UID
+#include <connectivity_native.h>
+#include <cutils/misc.h> // FIRST_APPLICATION_UID
 #include <dlfcn.h>
 #include <gtest/gtest.h>
 #include <netinet/in.h>
 
 #include "bpf/BpfUtils.h"
-
-typedef int (*GetPortsBlockedForBind)(in_port_t*, size_t*);
-GetPortsBlockedForBind getPortsBlockedForBind;
-typedef int (*BlockPortForBind)(in_port_t);
-BlockPortForBind blockPortForBind;
-typedef int (*UnblockPortForBind)(in_port_t);
-UnblockPortForBind unblockPortForBind;
-typedef int (*UnblockAllPortsForBind)();
-UnblockAllPortsForBind unblockAllPortsForBind;
 
 class ConnectivityNativeBinderTest : public ::testing::Test {
   public:
@@ -50,29 +42,12 @@ class ConnectivityNativeBinderTest : public ::testing::Test {
         if (!android::bpf::isAtLeastKernelVersion(5, 4, 0))
             GTEST_SKIP() << "Kernel should be at least 5.4.";
 
-        // Necessary to use dlopen/dlsym since the lib is only available on U and there
-        // is no Sdk34ModuleController in tradefed yet.
-        // TODO: link against the library directly and add Sdk34ModuleController to
-        // AndroidTest.txml when available.
-        void* nativeLib = dlopen("libcom.android.tethering.connectivity_native.so", RTLD_NOW);
-        ASSERT_NE(nullptr, nativeLib);
-        getPortsBlockedForBind = reinterpret_cast<GetPortsBlockedForBind>(
-                dlsym(nativeLib, "AConnectivityNative_getPortsBlockedForBind"));
-        ASSERT_NE(nullptr, getPortsBlockedForBind);
-        blockPortForBind = reinterpret_cast<BlockPortForBind>(
-                dlsym(nativeLib, "AConnectivityNative_blockPortForBind"));
-        ASSERT_NE(nullptr, blockPortForBind);
-        unblockPortForBind = reinterpret_cast<UnblockPortForBind>(
-                dlsym(nativeLib, "AConnectivityNative_unblockPortForBind"));
-        ASSERT_NE(nullptr, unblockPortForBind);
-        unblockAllPortsForBind = reinterpret_cast<UnblockAllPortsForBind>(
-                dlsym(nativeLib, "AConnectivityNative_unblockAllPortsForBind"));
-        ASSERT_NE(nullptr, unblockAllPortsForBind);
-
-        // If there are already ports being blocked on device unblockAllPortsForBind() store
-        // the currently blocked ports and add them back at the end of the test. Do this for
-        // every test case so additional test cases do not forget to add ports back.
-        int err = getPortsBlockedForBind(mActualBlockedPorts, &mActualBlockedPortsCount);
+        // If there are already ports being blocked on device store the
+        // currently blocked ports and add them back at the end of the test. Do
+        // this for every test case so additional test cases do not forget to
+        // add ports back.
+        int err = AConnectivityNative_getPortsBlockedForBind(
+            mActualBlockedPorts, &mActualBlockedPortsCount);
         EXPECT_EQ(err, 0);
         restoreBlockedPorts = true;
     }
@@ -81,8 +56,9 @@ class ConnectivityNativeBinderTest : public ::testing::Test {
         int err;
         if (mActualBlockedPortsCount > 0 && restoreBlockedPorts) {
             for (int i=0; i < mActualBlockedPortsCount; i++) {
-                err = blockPortForBind(mActualBlockedPorts[i]);
-                EXPECT_EQ(err, 0);
+              err =
+                  AConnectivityNative_blockPortForBind(mActualBlockedPorts[i]);
+              EXPECT_EQ(err, 0);
             }
         }
     }
@@ -99,7 +75,7 @@ class ConnectivityNativeBinderTest : public ::testing::Test {
         int blockedPort = 0;
         if (blockPort) {
             blockedPort = ntohs(port);
-            err = blockPortForBind(blockedPort);
+            err = AConnectivityNative_blockPortForBind(blockedPort);
             EXPECT_EQ(err, 0);
         }
 
@@ -107,7 +83,7 @@ class ConnectivityNativeBinderTest : public ::testing::Test {
 
         if (blockPort) {
             EXPECT_EQ(-1, sock3);
-            err = unblockPortForBind(blockedPort);
+            err = AConnectivityNative_unblockPortForBind(blockedPort);
             EXPECT_EQ(err, 0);
         } else {
             EXPECT_NE(-1, sock3);
@@ -197,11 +173,11 @@ TEST_F(ConnectivityNativeBinderTest, BlockPort6Tcp) {
 }
 
 TEST_F(ConnectivityNativeBinderTest, BlockPortTwice) {
-    int err = blockPortForBind(5555);
+    int err = AConnectivityNative_blockPortForBind(5555);
     EXPECT_EQ(err, 0);
-    err = blockPortForBind(5555);
+    err = AConnectivityNative_blockPortForBind(5555);
     EXPECT_EQ(err, 0);
-    err = unblockPortForBind(5555);
+    err = AConnectivityNative_unblockPortForBind(5555);
     EXPECT_EQ(err, 0);
 }
 
@@ -210,16 +186,17 @@ TEST_F(ConnectivityNativeBinderTest, GetBlockedPorts) {
     in_port_t blockedPorts[8] = {1, 100, 1220, 1333, 2700, 5555, 5600, 65000};
 
     if (mActualBlockedPortsCount > 0) {
-        err = unblockAllPortsForBind();
+        err = AConnectivityNative_unblockAllPortsForBind();
     }
 
     for (int i : blockedPorts) {
-        err = blockPortForBind(i);
+        err = AConnectivityNative_blockPortForBind(i);
         EXPECT_EQ(err, 0);
     }
     size_t actualBlockedPortsCount = 8;
     in_port_t actualBlockedPorts[actualBlockedPortsCount];
-    err = getPortsBlockedForBind((in_port_t*) actualBlockedPorts, &actualBlockedPortsCount);
+    err = AConnectivityNative_getPortsBlockedForBind(
+        (in_port_t *)actualBlockedPorts, &actualBlockedPortsCount);
     EXPECT_EQ(err, 0);
     EXPECT_NE(actualBlockedPortsCount, 0);
     for (int i=0; i < actualBlockedPortsCount; i++) {
@@ -227,9 +204,10 @@ TEST_F(ConnectivityNativeBinderTest, GetBlockedPorts) {
     }
 
     // Remove the ports we added.
-    err = unblockAllPortsForBind();
+    err = AConnectivityNative_unblockAllPortsForBind();
     EXPECT_EQ(err, 0);
-    err = getPortsBlockedForBind(actualBlockedPorts, &actualBlockedPortsCount);
+    err = AConnectivityNative_getPortsBlockedForBind(actualBlockedPorts,
+                                                     &actualBlockedPortsCount);
     EXPECT_EQ(err, 0);
     EXPECT_EQ(actualBlockedPortsCount, 0);
 }
@@ -239,23 +217,25 @@ TEST_F(ConnectivityNativeBinderTest, UnblockAllPorts) {
     in_port_t blockedPorts[8] = {1, 100, 1220, 1333, 2700, 5555, 5600, 65000};
 
     if (mActualBlockedPortsCount > 0) {
-        err = unblockAllPortsForBind();
+        err = AConnectivityNative_unblockAllPortsForBind();
     }
 
     for (int i : blockedPorts) {
-        err = blockPortForBind(i);
+        err = AConnectivityNative_blockPortForBind(i);
         EXPECT_EQ(err, 0);
     }
 
     size_t actualBlockedPortsCount = 8;
     in_port_t actualBlockedPorts[actualBlockedPortsCount];
-    err = getPortsBlockedForBind((in_port_t*) actualBlockedPorts, &actualBlockedPortsCount);
+    err = AConnectivityNative_getPortsBlockedForBind(
+        (in_port_t *)actualBlockedPorts, &actualBlockedPortsCount);
     EXPECT_EQ(err, 0);
     EXPECT_EQ(actualBlockedPortsCount, 8);
 
-    err = unblockAllPortsForBind();
+    err = AConnectivityNative_unblockAllPortsForBind();
     EXPECT_EQ(err, 0);
-    err = getPortsBlockedForBind((in_port_t*) actualBlockedPorts, &actualBlockedPortsCount);
+    err = AConnectivityNative_getPortsBlockedForBind(
+        (in_port_t *)actualBlockedPorts, &actualBlockedPortsCount);
     EXPECT_EQ(err, 0);
     EXPECT_EQ(actualBlockedPortsCount, 0);
     // If mActualBlockedPorts is not empty, ports will be added back in teardown.
@@ -264,7 +244,7 @@ TEST_F(ConnectivityNativeBinderTest, UnblockAllPorts) {
 TEST_F(ConnectivityNativeBinderTest, CheckPermission) {
     int curUid = getuid();
     EXPECT_EQ(0, seteuid(FIRST_APPLICATION_UID + 2000)) << "seteuid failed: " << strerror(errno);
-    int err = blockPortForBind((in_port_t) 5555);
+    int err = AConnectivityNative_blockPortForBind((in_port_t)5555);
     EXPECT_EQ(EPERM, err);
     EXPECT_EQ(0, seteuid(curUid)) << "seteuid failed: " << strerror(errno);
 }

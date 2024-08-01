@@ -15,8 +15,10 @@
 <configuration description="Configuration for connectivity {MODULE} tests">
     <option name="test-suite-tag" value="mts" />
     <option name="config-descriptor:metadata" key="mainline-param" value="CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex" />
-    <!-- The tested code is only part of a SDK 30+ module (Tethering) -->
-    <object type="module_controller" class="com.android.tradefed.testtype.suite.module.Sdk30ModuleController" />
+    <!-- The tested library is only usable on U+ -->
+    <object type="module_controller" class="com.android.tradefed.testtype.suite.module.Sdk34ModuleController" />
+    <!-- The tested library is only available with the primary abi -->
+    <option name="config-descriptor:metadata" key="parameter" value="not_multi_abi" />
 
     <target_preparer class="com.android.tradefed.targetprep.RootTargetPreparer"/>
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
