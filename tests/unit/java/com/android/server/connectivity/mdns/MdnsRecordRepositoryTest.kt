@@ -123,18 +123,18 @@ private val TEST_SERVICE_CUSTOM_HOST_NO_ADDRESSES = NsdServiceInfo().apply {
 }
 
 private val TEST_PUBLIC_KEY = hexStringToByteArray(
-        "0201030dc141d0637960b98cbc12cfca"
-                + "221d2879dac26ee5b460e9007c992e19"
-                + "02d897c391b03764d448f7d0c772fdb0"
-                + "3b1d9d6d52ff8886769e8e2362513565"
-                + "270962d3")
+        "0201030dc141d0637960b98cbc12cfca" +
+                "221d2879dac26ee5b460e9007c992e19" +
+                "02d897c391b03764d448f7d0c772fdb0" +
+                "3b1d9d6d52ff8886769e8e2362513565" +
+                "270962d3")
 
 private val TEST_PUBLIC_KEY_2 = hexStringToByteArray(
-        "0201030dc141d0637960b98cbc12cfca"
-                + "221d2879dac26ee5b460e9007c992e19"
-                + "02d897c391b03764d448f7d0c772fdb0"
-                + "3b1d9d6d52ff8886769e8e2362513565"
-                + "270962d4")
+        "0201030dc141d0637960b98cbc12cfca" +
+                "221d2879dac26ee5b460e9007c992e19" +
+                "02d897c391b03764d448f7d0c772fdb0" +
+                "3b1d9d6d52ff8886769e8e2362513565" +
+                "270962d4")
 
 @RunWith(DevSdkIgnoreRunner::class)
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
@@ -159,7 +159,7 @@ class MdnsRecordRepositoryTest {
 
     @Before
     fun setUp() {
-        deps.resetElapsedRealTime();
+        deps.resetElapsedRealTime()
         thread.start()
     }
 
