@@ -154,6 +154,11 @@ class MdnsServiceCacheTest {
         serviceCache.registerServiceExpiredCallback(cacheKey, callback)
     }
 
+    private fun removeServices(
+            serviceCache: MdnsServiceCache,
+            cacheKey: CacheKey
+    ): Unit = runningOnHandlerAndReturn { serviceCache.removeServices(cacheKey) }
+
     @Test
     fun testAddAndRemoveService() {
         val serviceCache = MdnsServiceCache(thread.looper, makeFlags(), clock)
@@ -289,6 +294,37 @@ class MdnsServiceCacheTest {
         assertEquals(response3, responses[1])
         assertEquals(response1, responses[2])
         assertEquals(response4, responses[3])
+    }
+
+    @Test
+    fun testRemoveServices() {
+        val serviceCache = MdnsServiceCache(thread.looper, makeFlags(), clock)
+        addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_1, SERVICE_TYPE_1))
+        addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_2, SERVICE_TYPE_1))
+        addOrUpdateService(serviceCache, cacheKey2, createResponse(SERVICE_NAME_1, SERVICE_TYPE_2))
+        val responses1 = getServices(serviceCache, cacheKey1)
+        assertEquals(2, responses1.size)
+        assertTrue(responses1.stream().anyMatch { response ->
+            response.serviceInstanceName == SERVICE_NAME_1
+        })
+        assertTrue(responses1.any { response ->
+            response.serviceInstanceName == SERVICE_NAME_2
+        })
+        val responses2 = getServices(serviceCache, cacheKey2)
+        assertEquals(1, responses2.size)
+        assertTrue(responses2.stream().anyMatch { response ->
+            response.serviceInstanceName == SERVICE_NAME_1
+        })
+
+        removeServices(serviceCache, cacheKey1)
+        val responses3 = getServices(serviceCache, cacheKey1)
+        assertEquals(0, responses3.size)
+        val responses4 = getServices(serviceCache, cacheKey2)
+        assertEquals(1, responses4.size)
+
+        removeServices(serviceCache, cacheKey2)
+        val responses5 = getServices(serviceCache, cacheKey2)
+        assertEquals(0, responses5.size)
     }
 
     private fun createResponse(
