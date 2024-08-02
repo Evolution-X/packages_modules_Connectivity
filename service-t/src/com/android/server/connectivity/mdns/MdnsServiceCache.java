@@ -233,6 +233,21 @@ public class MdnsServiceCache {
     }
 
     /**
+     * Remove services which matches the given type and socket.
+     *
+     * @param cacheKey the target CacheKey.
+     */
+    public void removeServices(@NonNull CacheKey cacheKey) {
+        ensureRunningOnHandlerThread(mHandler);
+        // Remove all services
+        if (mCachedServices.remove(cacheKey) == null) {
+            return;
+        }
+        // Update the next expiration check time if services are removed.
+        mNextExpirationTime = getNextExpirationTime(mClock.elapsedRealtime());
+    }
+
+    /**
      * Register a callback to listen to service expiration.
      *
      * <p> Registering the same callback instance twice is a no-op, since MdnsServiceTypeClient
