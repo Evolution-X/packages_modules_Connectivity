@@ -7976,7 +7976,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // Instead of shrinking the queue, possibly reallocating, the NRI could keep the array
             // and length in memory for future adds, but this saves memory by avoiding the cost
             // of an extra member and of unused array length (there are often hundreds of NRIs).
-            mQueuedCallbacks = queue.getShrinkedBackingArray();
+            mQueuedCallbacks = queue.getMinimizedBackingArray();
             return true;
         }
 

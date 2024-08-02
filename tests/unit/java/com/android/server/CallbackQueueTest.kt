@@ -116,7 +116,7 @@ class CallbackQueueTest {
             addCallback(TEST_NETID_1, CALLBACK_AVAILABLE)
             addCallback(TEST_NETID_2, CALLBACK_AVAILABLE)
         }
-        val queue2 = CallbackQueue(queue1.shrinkedBackingArray)
+        val queue2 = CallbackQueue(queue1.minimizedBackingArray)
         assertQueueEquals(listOf(
             TEST_NETID_1 to CALLBACK_AVAILABLE,
             TEST_NETID_2 to CALLBACK_AVAILABLE

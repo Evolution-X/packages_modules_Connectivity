@@ -168,7 +168,7 @@ public class GrowingIntArray {
      * stop using this instance of {@link GrowingIntArray} if they use the array returned by this
      * method.
      */
-    public int[] getShrinkedBackingArray() {
+    public int[] getMinimizedBackingArray() {
         shrinkToLength();
         return mValues;
     }
