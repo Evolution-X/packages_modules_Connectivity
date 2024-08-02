@@ -32,7 +32,6 @@ import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.NsdDiscoveryRecord
-import com.android.testutils.TapPacketReader
 import com.android.testutils.pollForQuery
 import com.android.testutils.tryTest
 import java.util.Random
@@ -59,6 +58,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
     private val handlerThread = HandlerThread("$TAG thread").apply { start() }
     private val handler = Handler(handlerThread.looper)
     private lateinit var downstreamIface: EthernetTestInterface
+    private var tetheringEventCallback: MyTetheringEventCallback? = null
 
     @get:Rule
     val testInterfaceRule = AutoCloseTestInterfaceRule(context)
@@ -77,15 +77,13 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
         }
         handlerThread.quitSafely()
         handlerThread.join()
+        maybeUnregisterTetheringEventCallback(tetheringEventCallback)
         super.tearDown()
     }
 
     @Test
     fun testMdnsDiscoveryCanSendPacketOnLocalOnlyDownstreamTetheringInterface() {
         assumeFalse(isInterfaceForTetheringAvailable())
-
-        var tetheringEventCallback: MyTetheringEventCallback? = null
-        var downstreamReader: TapPacketReader? = null
 
         val discoveryRecord = NsdDiscoveryRecord()
 
@@ -100,30 +98,21 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             ).apply {
                 awaitInterfaceLocalOnly()
             }
-            // This shouldn't be flaky because the TAP interface will buffer all packets even
-            // before the reader is started.
-            downstreamReader = makePacketReader(downstreamIface.testIface)
+            val downstreamReader = downstreamIface.packetReader
             waitForRouterAdvertisement(downstreamReader, iface, WAIT_RA_TIMEOUT_MS)
 
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStarted>()
-            assertNotNull(downstreamReader?.pollForQuery("$serviceType.local", 12 /* type PTR */))
+            assertNotNull(downstreamReader.pollForQuery("$serviceType.local", 12 /* type PTR */))
         } cleanupStep {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
-        } cleanupStep {
-            maybeStopTapPacketReader(downstreamReader)
-        } cleanup {
-            maybeUnregisterTetheringEventCallback(tetheringEventCallback)
         }
     }
 
     @Test
     fun testMdnsDiscoveryWorkOnTetheringInterface() {
         assumeFalse(isInterfaceForTetheringAvailable())
-
-        var tetheringEventCallback: MyTetheringEventCallback? = null
-        var downstreamReader: TapPacketReader? = null
 
         val discoveryRecord = NsdDiscoveryRecord()
 
@@ -143,21 +132,14 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
                 awaitInterfaceTethered()
             }
 
-            val fd = downstreamIface.testIface.fileDescriptor?.fileDescriptor
-            assertNotNull(fd)
-            downstreamReader = makePacketReader(fd, getMTU(downstreamIface.testIface))
-
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStarted>()
-            assertNotNull(downstreamReader?.pollForQuery("$serviceType.local", 12 /* type PTR */))
+            val downstreamReader = downstreamIface.packetReader
+            assertNotNull(downstreamReader.pollForQuery("$serviceType.local", 12 /* type PTR */))
             // TODO: Add another test to check packet reply can trigger serviceFound.
         } cleanupStep {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
-        } cleanupStep {
-            maybeStopTapPacketReader(downstreamReader)
-        } cleanup {
-            maybeUnregisterTetheringEventCallback(tetheringEventCallback)
         }
     }
 }
