@@ -20,11 +20,6 @@ from mobly.controllers.android_device_lib.adb import AdbError
 from net_tests_utils.host.python import adb_utils, assert_utils
 
 
-# Constants.
-ETHER_BROADCAST = "FFFFFFFFFFFF"
-ETH_P_ETHERCAT = "88A4"
-
-
 class PatternNotFoundException(Exception):
   """Raised when the given pattern cannot be found."""
 
@@ -121,25 +116,17 @@ def get_hardware_address(
     )
 
 
-def send_broadcast_empty_ethercat_packet(
-    ad: android_device.AndroidDevice, iface_name: str
-) -> None:
-  """Transmits a broadcast empty EtherCat packet on the specified interface."""
-
-  # Get the interface's MAC address.
-  mac_address = get_hardware_address(ad, iface_name)
-
-  # TODO: Build packet by using scapy library.
-  # Ethernet header (14 bytes).
-  packet = ETHER_BROADCAST  # Destination MAC (broadcast)
-  packet += mac_address.replace(":", "")  # Source MAC
-  packet += ETH_P_ETHERCAT  # EtherType (EtherCAT)
-
-  # EtherCAT header (2 bytes) + 44 bytes of zero padding.
-  packet += "00" * 46
-
-  # Send the packet using a raw socket.
-  send_raw_packet_downstream(ad, iface_name, packet)
+def is_send_raw_packet_downstream_supported(
+    ad: android_device.AndroidDevice,
+) -> bool:
+  try:
+    # Invoke the shell command with empty argument and see how NetworkStack respond.
+    # If supported, an IllegalArgumentException with help page will be printed.
+    send_raw_packet_downstream(ad, "", "")
+  except assert_utils.UnexpectedBehaviorError:
+    return True
+  except UnsupportedOperationException:
+    return False
 
 
 def send_raw_packet_downstream(
