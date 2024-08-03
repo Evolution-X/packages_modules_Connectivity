@@ -28,7 +28,10 @@ import android.net.cts.util.EthernetTestInterface.EthernetStateListener.Callback
 import android.os.Handler
 import android.util.Log
 import com.android.net.module.util.ArrayTrackRecord
+import com.android.testutils.TapPacketReader
 import com.android.testutils.runAsShell
+import com.android.testutils.waitForIdle
+import java.net.NetworkInterface
 import kotlin.concurrent.Volatile
 import kotlin.test.assertNotNull
 
@@ -76,6 +79,13 @@ class EthernetTestInterface(
     }
 
     val name get() = testIface.interfaceName
+    val mtu: Int
+        get() {
+            val nif = NetworkInterface.getByName(name)
+            assertNotNull(nif)
+            return nif.mtu
+        }
+    val packetReader = TapPacketReader(handler, testIface.fileDescriptor.fileDescriptor, mtu)
     private val listener = EthernetStateListener(name)
     private val em = context.getSystemService(EthernetManager::class.java)!!
     @Volatile private var cleanedUp = false
@@ -87,11 +97,14 @@ class EthernetTestInterface(
         }
         // Wait for link up to be processed in EthernetManager before returning.
         listener.eventuallyExpect(STATE_LINK_UP)
+        handler.post { packetReader.start() }
+        handler.waitForIdle(TIMEOUT_MS)
     }
 
     fun destroy() {
-        // It is possible that the fd was already closed by the test, in which case this is a noop.
-        testIface.getFileDescriptor().close()
+        // packetReader.stop() closes the test interface.
+        handler.post { packetReader.stop() }
+        handler.waitForIdle(TIMEOUT_MS)
         listener.eventuallyExpect(STATE_ABSENT)
 
         // setIncludeTestInterfaces() posts on the handler and does not run synchronously. However,

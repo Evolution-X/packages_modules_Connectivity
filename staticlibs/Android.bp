@@ -503,6 +503,7 @@ java_defaults {
         "//apex_available:platform",
     ],
     visibility: [
+        "//packages/modules/CaptivePortalLogin:__subpackages__",
         "//packages/modules/Connectivity:__subpackages__",
     ],
     defaults_visibility: [
@@ -530,7 +531,7 @@ java_library {
 }
 
 java_library {
-    name: "net-utils-tethering",
+    name: "net-utils-connectivity-apks",
     srcs: [
         ":net-utils-all-srcs",
         ":framework-connectivity-shared-srcs",
