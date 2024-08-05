@@ -34,8 +34,7 @@ import com.android.net.module.util.GrowingIntArray;
  *     queue.forEach(netId, callbackId -> { [...] });
  *     queue.addCallback(netId, callbackId);
  *     [...]
- *     queue.shrinkToLength();
- *     storedCallbacks = queue.getBackingArray();
+ *     storedCallbacks = queue.getMinimizedBackingArray();
  * </pre>
  *
  * <p>This class is not thread-safe.
