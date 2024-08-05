@@ -524,22 +524,12 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
     return match;
 }
 
-// This program is optional, and enables tracing on Android U+, 5.8+ on user builds.
-DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace_user", AID_ROOT, AID_SYSTEM,
-                    bpf_cgroup_ingress_trace_user, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
-                    "fs_bpf_netd_readonly", "",
-                    IGNORE_ON_ENG, LOAD_ON_USER, IGNORE_ON_USERDEBUG)
-(struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_8);
-}
-
-// This program is required, and enables tracing on Android U+, 5.8+, userdebug/eng.
+// Tracing on Android U+ 5.8+
 DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_ingress_trace, KVER_5_8, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
-                    LOAD_ON_ENG, IGNORE_ON_USER, LOAD_ON_USERDEBUG)
+                    LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_8);
 }
@@ -556,22 +546,12 @@ DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_SY
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE);
 }
 
-// This program is optional, and enables tracing on Android U+, 5.8+ on user builds.
-DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace_user", AID_ROOT, AID_SYSTEM,
-                    bpf_cgroup_egress_trace_user, KVER_5_8, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, OPTIONAL,
-                    "fs_bpf_netd_readonly", "",
-                    IGNORE_ON_ENG, LOAD_ON_USER, IGNORE_ON_USERDEBUG)
-(struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_8);
-}
-
-// This program is required, and enables tracing on Android U+, 5.8+, userdebug/eng.
+// Tracing on Android U+ 5.8+
 DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
                     bpf_cgroup_egress_trace, KVER_5_8, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
-                    LOAD_ON_ENG, IGNORE_ON_USER, LOAD_ON_USERDEBUG)
+                    LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_8);
 }
