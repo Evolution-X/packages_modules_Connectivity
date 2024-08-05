@@ -192,7 +192,8 @@ class CSAgentWrapper(
         connect()
     }
 
-    fun setProbesStatus(probesCompleted: Int, probesSucceeded: Int) {
+    fun setValidationResult(result: Int, probesCompleted: Int, probesSucceeded: Int) {
+        nmValidationResult = result
         nmProbesCompleted = probesCompleted
         nmProbesSucceeded = probesSucceeded
     }
@@ -204,8 +205,10 @@ class CSAgentWrapper(
         // in the beginning. Because NETWORK_VALIDATION_PROBE_HTTP is the decisive probe for captive
         // portal, considering the NETWORK_VALIDATION_PROBE_HTTPS hasn't probed yet and set only
         // DNS and HTTP probes completed.
-        setProbesStatus(
-            NETWORK_VALIDATION_PROBE_DNS or NETWORK_VALIDATION_PROBE_HTTP /* probesCompleted */,
-            VALIDATION_RESULT_INVALID /* probesSucceeded */)
+        setValidationResult(
+            VALIDATION_RESULT_INVALID,
+            probesCompleted = NETWORK_VALIDATION_PROBE_DNS or NETWORK_VALIDATION_PROBE_HTTP,
+            probesSucceeded = NO_PROBE_RESULT
+        )
     }
 }

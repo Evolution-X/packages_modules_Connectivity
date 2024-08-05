@@ -109,12 +109,12 @@ class GrowingIntArrayTest {
     }
 
     @Test
-    fun testGetShrinkedBackingArray() {
+    fun testGetMinimizedBackingArray() {
         val array = GrowingIntArray(10)
         array.add(-1)
         array.add(2)
 
-        assertContentEquals(intArrayOf(-1, 2), array.shrinkedBackingArray)
+        assertContentEquals(intArrayOf(-1, 2), array.minimizedBackingArray)
     }
 
     @Test
