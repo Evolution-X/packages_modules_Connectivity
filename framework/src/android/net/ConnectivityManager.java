@@ -4163,6 +4163,8 @@ public class ConnectivityManager {
          */
         @FilteredCallback(methodId = METHOD_ONAVAILABLE_5ARGS,
                 calledByCallbackId = CALLBACK_AVAILABLE,
+                // If this list is modified, ConnectivityService#addAvailableStateUpdateCallbacks
+                // needs to be updated too.
                 mayCall = { METHOD_ONAVAILABLE_4ARGS,
                         METHOD_ONLOCALNETWORKINFOCHANGED,
                         METHOD_ONBLOCKEDSTATUSCHANGED_INT })
@@ -4193,6 +4195,8 @@ public class ConnectivityManager {
          */
         @FilteredCallback(methodId = METHOD_ONAVAILABLE_4ARGS,
                 calledByCallbackId = CALLBACK_TRANSITIVE_CALLS_ONLY,
+                // If this list is modified, ConnectivityService#addAvailableStateUpdateCallbacks
+                // needs to be updated too.
                 mayCall = { METHOD_ONAVAILABLE_1ARG,
                         METHOD_ONNETWORKSUSPENDED,
                         METHOD_ONCAPABILITIESCHANGED,

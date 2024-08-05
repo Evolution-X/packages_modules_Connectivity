@@ -108,6 +108,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserManager;
@@ -119,7 +120,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceManagerWrapper;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.thread.openthread.BackboneRouterState;
-import com.android.server.thread.openthread.BorderRouterConfigurationParcel;
+import com.android.server.thread.openthread.BorderRouterConfiguration;
 import com.android.server.thread.openthread.DnsTxtAttribute;
 import com.android.server.thread.openthread.IChannelMasksReceiver;
 import com.android.server.thread.openthread.IOtDaemon;
@@ -212,7 +213,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean mUserRestricted;
     private boolean mForceStopOtDaemonEnabled;
 
-    private BorderRouterConfigurationParcel mBorderRouterConfig;
+    private BorderRouterConfiguration mBorderRouterConfig;
 
     @VisibleForTesting
     ThreadNetworkControllerService(
@@ -237,7 +238,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mInfraIfController = infraIfController;
         mUpstreamNetworkRequest = newUpstreamNetworkRequest();
         mNetworkToInterface = new HashMap<Network, String>();
-        mBorderRouterConfig = new BorderRouterConfigurationParcel();
+        mBorderRouterConfig = new BorderRouterConfiguration();
         mPersistentSettings = persistentSettings;
         mNsdPublisher = nsdPublisher;
         mUserManager = userManager;
@@ -1235,13 +1236,14 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         Log.i(TAG, "Enable border routing on AIL: " + infraIfName);
         try {
             mBorderRouterConfig.infraInterfaceName = infraIfName;
-            mBorderRouterConfig.infraInterfaceIcmp6Socket =
-                    mInfraIfController.createIcmp6Socket(infraIfName);
             mBorderRouterConfig.isBorderRoutingEnabled = true;
-
+            ParcelFileDescriptor infraIcmp6Socket =
+                    mInfraIfController.createIcmp6Socket(infraIfName);
             getOtDaemon()
                     .configureBorderRouter(
-                            mBorderRouterConfig, new ConfigureBorderRouterStatusReceiver());
+                            mBorderRouterConfig,
+                            infraIcmp6Socket,
+                            new ConfigureBorderRouterStatusReceiver());
         } catch (RemoteException | IOException | ThreadNetworkException e) {
             Log.w(TAG, "Failed to enable border routing", e);
         }
@@ -1250,12 +1252,13 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private void disableBorderRouting() {
         mUpstreamNetwork = null;
         mBorderRouterConfig.infraInterfaceName = null;
-        mBorderRouterConfig.infraInterfaceIcmp6Socket = null;
         mBorderRouterConfig.isBorderRoutingEnabled = false;
         try {
             getOtDaemon()
                     .configureBorderRouter(
-                            mBorderRouterConfig, new ConfigureBorderRouterStatusReceiver());
+                            mBorderRouterConfig,
+                            null /* infraIcmp6Socket */,
+                            new ConfigureBorderRouterStatusReceiver());
         } catch (RemoteException | ThreadNetworkException e) {
             Log.w(TAG, "Failed to disable border routing", e);
         }
