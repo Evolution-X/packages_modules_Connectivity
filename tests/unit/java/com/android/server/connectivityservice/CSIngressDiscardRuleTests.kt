@@ -26,6 +26,7 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
+import android.net.VpnManager.TYPE_VPN_OEM
 import android.net.VpnManager.TYPE_VPN_SERVICE
 import android.net.VpnManager.TYPE_VPN_LEGACY
 import android.net.VpnTransportInfo
@@ -50,11 +51,10 @@ private const val WIFI_IFNAME = "wlan0"
 private const val TIMEOUT_MS = 1_000L
 private const val LONG_TIMEOUT_MS = 5_000
 
-private fun vpnNc(legacyVpn: Boolean = false) = NetworkCapabilities.Builder().apply {
+private fun vpnNc(vpnType: Int = TYPE_VPN_SERVICE) = NetworkCapabilities.Builder().apply {
     addTransportType(TRANSPORT_VPN)
     removeCapability(NET_CAPABILITY_NOT_VPN)
     addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
-    val vpnType = if (legacyVpn) { TYPE_VPN_LEGACY } else { TYPE_VPN_SERVICE }
     setTransportInfo(
             VpnTransportInfo(
                     vpnType,
@@ -313,18 +313,37 @@ class CSIngressDiscardRuleTests : CSTest() {
         verify(bpfNetMaps, never()).setIngressDiscardRule(any(), any())
     }
 
-    @Test
-    fun testVpnIngressDiscardRule_LegacyVpn() {
+    fun doTestVpnIngressDiscardRule_VpnType(vpnType: Int, expectAddRule: Boolean) {
         val nr = nr(TRANSPORT_VPN)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(nr, cb)
-        val nc = vpnNc(legacyVpn = true)
+        val nc = vpnNc(vpnType)
         val lp = lp(VPN_IFNAME, IPV6_LINK_ADDRESS, LOCAL_IPV6_LINK_ADDRRESS)
         val agent = Agent(nc = nc, lp = lp)
         agent.connect()
         cb.expectAvailableCallbacks(agent.network, validated = false)
 
+        if (expectAddRule) {
+            verify(bpfNetMaps).setIngressDiscardRule(IPV6_ADDRESS, VPN_IFNAME)
+        } else {
+            verify(bpfNetMaps, never()).setIngressDiscardRule(any(), any())
+        }
+    }
+
+    @Test
+    fun testVpnIngressDiscardRule_ServiceVpn() {
+        doTestVpnIngressDiscardRule_VpnType(TYPE_VPN_SERVICE, expectAddRule = true)
+    }
+
+    @Test
+    fun testVpnIngressDiscardRule_LegacyVpn() {
         // IngressDiscardRule should not be added to Legacy VPN
-        verify(bpfNetMaps, never()).setIngressDiscardRule(any(), any())
+        doTestVpnIngressDiscardRule_VpnType(TYPE_VPN_LEGACY, expectAddRule = false)
+    }
+
+    @Test
+    fun testVpnIngressDiscardRule_OemVpn() {
+        // IngressDiscardRule should not be added to OEM VPN
+        doTestVpnIngressDiscardRule_VpnType(TYPE_VPN_OEM, expectAddRule = false)
     }
 }
