@@ -16,6 +16,7 @@
 package android.net.thread.utils;
 
 import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
+import static android.system.OsConstants.IPPROTO_ICMP;
 import static android.system.OsConstants.IPPROTO_ICMPV6;
 
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
@@ -49,7 +50,9 @@ import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 
 import com.android.net.module.util.Struct;
+import com.android.net.module.util.structs.Icmpv4Header;
 import com.android.net.module.util.structs.Icmpv6Header;
+import com.android.net.module.util.structs.Ipv4Header;
 import com.android.net.module.util.structs.Ipv6Header;
 import com.android.net.module.util.structs.PrefixInformationOption;
 import com.android.net.module.util.structs.RaHeader;
@@ -62,6 +65,7 @@ import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -192,16 +196,36 @@ public final class IntegrationTestUtils {
         return null;
     }
 
-    /** Returns {@code true} if {@code packet} is an ICMPv6 packet of given {@code type}. */
-    public static boolean isExpectedIcmpv6Packet(byte[] packet, int type) {
-        if (packet == null) {
+    /** Returns {@code true} if {@code packet} is an ICMPv4 packet of given {@code type}. */
+    public static boolean isExpectedIcmpv4Packet(byte[] packet, int type) {
+        ByteBuffer buf = makeByteBuffer(packet);
+        Ipv4Header header = extractIpv4Header(buf);
+        if (header == null) {
             return false;
         }
-        ByteBuffer buf = ByteBuffer.wrap(packet);
+        if (header.protocol != (byte) IPPROTO_ICMP) {
+            return false;
+        }
         try {
-            if (Struct.parse(Ipv6Header.class, buf).nextHeader != (byte) IPPROTO_ICMPV6) {
-                return false;
-            }
+            return Struct.parse(Icmpv4Header.class, buf).type == (short) type;
+        } catch (IllegalArgumentException ignored) {
+            // It's fine that the passed in packet is malformed because it's could be sent
+            // by anybody.
+        }
+        return false;
+    }
+
+    /** Returns {@code true} if {@code packet} is an ICMPv6 packet of given {@code type}. */
+    public static boolean isExpectedIcmpv6Packet(byte[] packet, int type) {
+        ByteBuffer buf = makeByteBuffer(packet);
+        Ipv6Header header = extractIpv6Header(buf);
+        if (header == null) {
+            return false;
+        }
+        if (header.nextHeader != (byte) IPPROTO_ICMPV6) {
+            return false;
+        }
+        try {
             return Struct.parse(Icmpv6Header.class, buf).type == (short) type;
         } catch (IllegalArgumentException ignored) {
             // It's fine that the passed in packet is malformed because it's could be sent
@@ -210,32 +234,66 @@ public final class IntegrationTestUtils {
         return false;
     }
 
-    public static boolean isFromIpv6Source(byte[] packet, Inet6Address src) {
-        if (packet == null) {
-            return false;
-        }
-        ByteBuffer buf = ByteBuffer.wrap(packet);
-        try {
-            return Struct.parse(Ipv6Header.class, buf).srcIp.equals(src);
-        } catch (IllegalArgumentException ignored) {
-            // It's fine that the passed in packet is malformed because it's could be sent
-            // by anybody.
+    public static boolean isFrom(byte[] packet, InetAddress src) {
+        if (src instanceof Inet4Address) {
+            return isFromIpv4Source(packet, (Inet4Address) src);
+        } else if (src instanceof Inet6Address) {
+            return isFromIpv6Source(packet, (Inet6Address) src);
         }
         return false;
     }
 
-    public static boolean isToIpv6Destination(byte[] packet, Inet6Address dest) {
-        if (packet == null) {
-            return false;
+    public static boolean isTo(byte[] packet, InetAddress dest) {
+        if (dest instanceof Inet4Address) {
+            return isToIpv4Destination(packet, (Inet4Address) dest);
+        } else if (dest instanceof Inet6Address) {
+            return isToIpv6Destination(packet, (Inet6Address) dest);
         }
-        ByteBuffer buf = ByteBuffer.wrap(packet);
+        return false;
+    }
+
+    private static boolean isFromIpv4Source(byte[] packet, Inet4Address src) {
+        Ipv4Header header = extractIpv4Header(makeByteBuffer(packet));
+        return header != null && header.srcIp.equals(src);
+    }
+
+    private static boolean isFromIpv6Source(byte[] packet, Inet6Address src) {
+        Ipv6Header header = extractIpv6Header(makeByteBuffer(packet));
+        return header != null && header.srcIp.equals(src);
+    }
+
+    private static boolean isToIpv4Destination(byte[] packet, Inet4Address dest) {
+        Ipv4Header header = extractIpv4Header(makeByteBuffer(packet));
+        return header != null && header.dstIp.equals(dest);
+    }
+
+    private static boolean isToIpv6Destination(byte[] packet, Inet6Address dest) {
+        Ipv6Header header = extractIpv6Header(makeByteBuffer(packet));
+        return header != null && header.dstIp.equals(dest);
+    }
+
+    private static ByteBuffer makeByteBuffer(byte[] packet) {
+        return packet == null ? null : ByteBuffer.wrap(packet);
+    }
+
+    private static Ipv4Header extractIpv4Header(ByteBuffer buf) {
         try {
-            return Struct.parse(Ipv6Header.class, buf).dstIp.equals(dest);
+            return Struct.parse(Ipv4Header.class, buf);
         } catch (IllegalArgumentException ignored) {
             // It's fine that the passed in packet is malformed because it's could be sent
             // by anybody.
         }
-        return false;
+        return null;
+    }
+
+    private static Ipv6Header extractIpv6Header(ByteBuffer buf) {
+        try {
+            return Struct.parse(Ipv6Header.class, buf);
+        } catch (IllegalArgumentException ignored) {
+            // It's fine that the passed in packet is malformed because it's could be sent
+            // by anybody.
+        }
+        return null;
     }
 
     /** Returns the Prefix Information Options (PIO) extracted from an ICMPv6 RA message. */
