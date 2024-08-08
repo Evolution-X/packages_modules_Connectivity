@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2023 The Android Open Source Project
+ * Copyright (C) 2018-2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,62 @@
  * limitations under the License.
  */
 
-#pragma once
+#define LOG_TAG "NetBpfLoad"
 
-#include <linux/bpf.h>
-
+#include <arpa/inet.h>
+#include <cstdlib>
+#include <dirent.h>
+#include <elf.h>
+#include <errno.h>
+#include <error.h>
+#include <fcntl.h>
 #include <fstream>
+#include <inttypes.h>
+#include <iostream>
+#include <linux/bpf.h>
+#include <linux/elf.h>
+#include <linux/unistd.h>
+#include <log/log.h>
+#include <net/if.h>
+#include <optional>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <sysexits.h>
+#include <unistd.h>
+#include <unordered_map>
+#include <vector>
+
+#include <android-base/cmsg.h>
+#include <android-base/file.h>
+#include <android-base/logging.h>
+#include <android-base/macros.h>
+#include <android-base/properties.h>
+#include <android-base/stringprintf.h>
+#include <android-base/strings.h>
+#include <android-base/unique_fd.h>
+#include <android/api-level.h>
+
+#include "BpfSyscallWrappers.h"
+#include "bpf/BpfUtils.h"
+#include "bpf/bpf_map_def.h"
+
+using android::base::EndsWith;
+using android::base::StartsWith;
+using android::base::unique_fd;
+using std::ifstream;
+using std::ios;
+using std::optional;
+using std::string;
+using std::vector;
 
 namespace android {
 namespace bpf {
@@ -69,80 +120,24 @@ struct Location {
     const char* const prefix = "";
 };
 
-// BPF loader implementation. Loads an eBPF ELF object
-int loadProg(const char* elfPath, bool* isCritical, const unsigned int bpfloader_ver,
-             const Location &location = {});
-
-// Exposed for testing
-unsigned int readSectionUint(const char* name, std::ifstream& elfFile, unsigned int defVal);
-
 // Returns the build type string (from ro.build.type).
-const std::string& getBuildType();
+const std::string& getBuildType() {
+    static std::string t = android::base::GetProperty("ro.build.type", "unknown");
+    return t;
+}
 
 // The following functions classify the 3 Android build types.
 inline bool isEng() {
     return getBuildType() == "eng";
 }
+
 inline bool isUser() {
     return getBuildType() == "user";
 }
+
 inline bool isUserdebug() {
     return getBuildType() == "userdebug";
 }
-
-}  // namespace bpf
-}  // namespace android
-/*
- * Copyright (C) 2018-2023 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-#define LOG_TAG "NetBpfLoad"
-
-#include <errno.h>
-#include <fcntl.h>
-#include <linux/bpf.h>
-#include <linux/elf.h>
-#include <log/log.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <sys/stat.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#include "BpfSyscallWrappers.h"
-#include "bpf/BpfUtils.h"
-#include "bpf/bpf_map_def.h"
-#include "loader.h"
-
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <optional>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-#include <android-base/cmsg.h>
-#include <android-base/file.h>
-#include <android-base/properties.h>
-#include <android-base/strings.h>
-#include <android-base/unique_fd.h>
 
 #define BPF_FS_PATH "/sys/fs/bpf/"
 
@@ -151,22 +146,6 @@ inline bool isUserdebug() {
 
 // Unspecified attach type is 0 which is BPF_CGROUP_INET_INGRESS.
 #define BPF_ATTACH_TYPE_UNSPEC BPF_CGROUP_INET_INGRESS
-
-using android::base::StartsWith;
-using android::base::unique_fd;
-using std::ifstream;
-using std::ios;
-using std::optional;
-using std::string;
-using std::vector;
-
-namespace android {
-namespace bpf {
-
-const std::string& getBuildType() {
-    static std::string t = android::base::GetProperty("ro.build.type", "unknown");
-    return t;
-}
 
 static unsigned int page_size = static_cast<unsigned int>(getpagesize());
 
@@ -1283,69 +1262,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
 
     return ret;
 }
-
-}  // namespace bpf
-}  // namespace android
-/*
- * Copyright (C) 2017-2023 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-#ifndef LOG_TAG
-#define LOG_TAG "NetBpfLoad"
-#endif
-
-#include <arpa/inet.h>
-#include <dirent.h>
-#include <elf.h>
-#include <error.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <linux/bpf.h>
-#include <linux/unistd.h>
-#include <net/if.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <android/api-level.h>
-#include <android-base/logging.h>
-#include <android-base/macros.h>
-#include <android-base/properties.h>
-#include <android-base/stringprintf.h>
-#include <android-base/strings.h>
-#include <android-base/unique_fd.h>
-#include <log/log.h>
-
-#include "BpfSyscallWrappers.h"
-#include "bpf/BpfUtils.h"
-#include "loader.h"
-
-namespace android {
-namespace bpf {
-
-using base::StartsWith;
-using base::EndsWith;
-using std::string;
-using std::vector;
 
 static bool exists(const char* const path) {
     int v = access(path, F_OK);
