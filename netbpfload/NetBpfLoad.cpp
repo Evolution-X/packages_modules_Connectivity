@@ -142,9 +142,9 @@ inline bool isUserdebug() {
 
 static unsigned int page_size = static_cast<unsigned int>(getpagesize());
 
-constexpr const char* lookupSelinuxContext(const domain d, const char* const unspecified = "") {
+constexpr const char* lookupSelinuxContext(const domain d) {
     switch (d) {
-        case domain::unspecified:   return unspecified;
+        case domain::unspecified:   return "";
         case domain::tethering:     return "fs_bpf_tethering";
         case domain::net_private:   return "fs_bpf_net_private";
         case domain::net_shared:    return "fs_bpf_net_shared";
