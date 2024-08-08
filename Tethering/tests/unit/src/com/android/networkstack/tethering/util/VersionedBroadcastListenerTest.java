@@ -16,6 +16,8 @@
 
 package com.android.networkstack.tethering.util;
 
+import static com.android.testutils.HandlerUtils.waitForIdle;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.reset;
 
@@ -23,7 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.HandlerThread;
 import android.os.UserHandle;
 
 import androidx.test.filters.SmallTest;
@@ -33,7 +35,6 @@ import com.android.internal.util.test.BroadcastInterceptingContext;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -44,9 +45,11 @@ import org.mockito.MockitoAnnotations;
 public class VersionedBroadcastListenerTest {
     private static final String TAG = VersionedBroadcastListenerTest.class.getSimpleName();
     private static final String ACTION_TEST = "action.test.happy.broadcasts";
+    private static final long TEST_TIMEOUT_MS = 10_000L;
 
     @Mock private Context mContext;
     private BroadcastInterceptingContext mServiceContext;
+    private HandlerThread mHandlerThread;
     private Handler mHandler;
     private VersionedBroadcastListener mListener;
     private int mCallbackCount;
@@ -61,18 +64,13 @@ public class VersionedBroadcastListenerTest {
         }
     }
 
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception {
-        if (Looper.myLooper() == null) {
-            Looper.prepare();
-        }
-    }
-
     @Before public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         reset(mContext);
+        mHandlerThread = new HandlerThread(TAG);
+        mHandlerThread.start();
+        mHandler = new Handler(mHandlerThread.getLooper());
         mServiceContext = new MockContext(mContext);
-        mHandler = new Handler(Looper.myLooper());
         mCallbackCount = 0;
         final IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TEST);
@@ -85,11 +83,15 @@ public class VersionedBroadcastListenerTest {
             mListener.stopListening();
             mListener = null;
         }
+        mHandlerThread.quitSafely();
+        mHandlerThread.join(TEST_TIMEOUT_MS);
     }
 
     private void sendBroadcast() {
         final Intent intent = new Intent(ACTION_TEST);
         mServiceContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
+        // Sending the broadcast is synchronous, but the receiver just posts on the handler
+        waitForIdle(mHandler, TEST_TIMEOUT_MS);
     }
 
     @Test

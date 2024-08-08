@@ -62,8 +62,8 @@ public class VersionedBroadcastListener {
         if (DBG) Log.d(mTag, "startListening");
         if (mReceiver != null) return;
 
-        mReceiver = new Receiver(mTag, mGenerationNumber, mCallback);
-        mContext.registerReceiver(mReceiver, mFilter, null, mHandler);
+        mReceiver = new Receiver(mTag, mGenerationNumber, mCallback, mHandler);
+        mContext.registerReceiver(mReceiver, mFilter);
     }
 
     /** Stop listening to intent broadcast. */
@@ -77,30 +77,35 @@ public class VersionedBroadcastListener {
     }
 
     private static class Receiver extends BroadcastReceiver {
-        public final String tag;
-        public final AtomicInteger atomicGenerationNumber;
-        public final Consumer<Intent> callback;
+        final String mTag;
+        final AtomicInteger mAtomicGenerationNumber;
+        final Consumer<Intent> mCallback;
         // Used to verify this receiver is still current.
-        public final int generationNumber;
+        final int mGenerationNumber;
+        private final Handler mHandler;
 
-        Receiver(String tag, AtomicInteger atomicGenerationNumber, Consumer<Intent> callback) {
-            this.tag = tag;
-            this.atomicGenerationNumber = atomicGenerationNumber;
-            this.callback = callback;
-            generationNumber = atomicGenerationNumber.incrementAndGet();
+        Receiver(String tag, AtomicInteger atomicGenerationNumber, Consumer<Intent> callback,
+                Handler handler) {
+            mTag = tag;
+            mAtomicGenerationNumber = atomicGenerationNumber;
+            mCallback = callback;
+            mGenerationNumber = atomicGenerationNumber.incrementAndGet();
+            mHandler = handler;
         }
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            final int currentGenerationNumber = atomicGenerationNumber.get();
+            mHandler.post(() -> {
+                final int currentGenerationNumber = mAtomicGenerationNumber.get();
 
-            if (DBG) {
-                Log.d(tag, "receiver generationNumber=" + generationNumber
-                        + ", current generationNumber=" + currentGenerationNumber);
-            }
-            if (generationNumber != currentGenerationNumber) return;
+                if (DBG) {
+                    Log.d(mTag, "receiver generationNumber=" + mGenerationNumber
+                            + ", current generationNumber=" + currentGenerationNumber);
+                }
+                if (mGenerationNumber != currentGenerationNumber) return;
 
-            callback.accept(intent);
+                mCallback.accept(intent);
+            });
         }
     }
 }
