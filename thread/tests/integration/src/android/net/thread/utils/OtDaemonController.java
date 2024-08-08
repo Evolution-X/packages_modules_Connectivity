@@ -105,6 +105,29 @@ public final class OtDaemonController {
         return prefixes.isEmpty() ? null : prefixes.get(0);
     }
 
+    /** Enables/Disables NAT64 feature. */
+    public void setNat64Enabled(boolean enabled) {
+        executeCommand("nat64 " + (enabled ? "enable" : "disable"));
+    }
+
+    /** Sets the NAT64 CIDR. */
+    public void setNat64Cidr(String cidr) {
+        executeCommand("nat64 cidr " + cidr);
+    }
+
+    /** Returns whether there's a NAT64 prefix in network data */
+    public boolean hasNat64PrefixInNetdata() {
+        // Example (in the 'Routes' section):
+        // fdb2:bae3:5b59:2:0:0::/96 sn low c000
+        List<String> outputLines = executeCommandAndParse("netdata show");
+        for (String line : outputLines) {
+            if (line.contains(" sn")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public String executeCommand(String cmd) {
         return SystemUtil.runShellCommand(OT_CTL + " " + cmd);
     }

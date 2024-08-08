@@ -553,6 +553,7 @@ aidl_interface {
             apex_available: [
                 "com.android.tethering",
                 "com.android.wifi",
+                "//apex_available:platform",
             ],
         },
         cpp: {
