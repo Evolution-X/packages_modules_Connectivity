@@ -87,7 +87,6 @@ namespace bpf {
 // is aware of.  Thus there currently needs to be a 1:1 mapping between the two.
 //
 enum class domain : int {
-    unrecognized = -1,  // invalid for this version of the bpfloader
     unspecified = 0,    // means just use the default for that specific pin location
     tethering,          // (S+) fs_bpf_tethering     /sys/fs/bpf/tethering
     net_private,        // (T+) fs_bpf_net_private   /sys/fs/bpf/net_private
@@ -96,7 +95,6 @@ enum class domain : int {
     netd_shared,        // (T+) fs_bpf_netd_shared   /sys/fs/bpf/netd_shared
 };
 
-// Note: this does not include domain::unrecognized, but does include domain::unspecified
 static constexpr domain AllDomains[] = {
     domain::unspecified,
     domain::tethering,
@@ -106,11 +104,6 @@ static constexpr domain AllDomains[] = {
     domain::netd_shared,
 };
 
-static constexpr bool unrecognized(domain d) {
-    return d == domain::unrecognized;
-}
-
-// Note: this doesn't handle unrecognized, handle it first.
 static constexpr bool specified(domain d) {
     return d != domain::unspecified;
 }
@@ -157,7 +150,6 @@ constexpr const char* lookupSelinuxContext(const domain d, const char* const uns
         case domain::net_shared:    return "fs_bpf_net_shared";
         case domain::netd_readonly: return "fs_bpf_netd_readonly";
         case domain::netd_shared:   return "fs_bpf_netd_shared";
-        default:                    return "(unrecognized)";
     }
 }
 
@@ -167,15 +159,10 @@ domain getDomainFromSelinuxContext(const char s[BPF_SELINUX_CONTEXT_CHAR_ARRAY_S
         if (strlen(lookupSelinuxContext(d)) >= BPF_SELINUX_CONTEXT_CHAR_ARRAY_SIZE) abort();
         if (!strncmp(s, lookupSelinuxContext(d), BPF_SELINUX_CONTEXT_CHAR_ARRAY_SIZE)) return d;
     }
-    ALOGW("ignoring unrecognized selinux_context '%-32s'", s);
-    // We should return 'unrecognized' here, however: returning unspecified will
-    // result in the system simply using the default context, which in turn
-    // will allow future expansion by adding more restrictive selinux types.
-    // Older bpfloader will simply ignore that, and use the less restrictive default.
-    // This does mean you CANNOT later add a *less* restrictive type than the default.
-    //
-    // Note: we cannot just abort() here as this might be a mainline module shipped optional update
-    return domain::unspecified;
+    ALOGE("unrecognized selinux_context '%-32s'", s);
+    // Note: we *can* just abort() here as we only load bpf .o files shipped
+    // in the same mainline module / apex as NetBpfLoad itself.
+    abort();
 }
 
 constexpr const char* lookupPinSubdir(const domain d, const char* const unspecified = "") {
@@ -186,7 +173,6 @@ constexpr const char* lookupPinSubdir(const domain d, const char* const unspecif
         case domain::net_shared:    return "net_shared/";
         case domain::netd_readonly: return "netd_readonly/";
         case domain::netd_shared:   return "netd_shared/";
-        default:                    return "(unrecognized)";
     }
 };
 
@@ -197,14 +183,9 @@ domain getDomainFromPinSubdir(const char s[BPF_PIN_SUBDIR_CHAR_ARRAY_SIZE]) {
         if (!strncmp(s, lookupPinSubdir(d), BPF_PIN_SUBDIR_CHAR_ARRAY_SIZE)) return d;
     }
     ALOGE("unrecognized pin_subdir '%-32s'", s);
-    // pin_subdir affects the object's full pathname,
-    // and thus using the default would change the location and thus our code's ability to find it,
-    // hence this seems worth treating as a true error condition.
-    //
-    // Note: we cannot just abort() here as this might be a mainline module shipped optional update
-    // However, our callers will treat this as an error, and stop loading the specific .o,
-    // which will fail bpfloader if the .o is marked critical.
-    return domain::unrecognized;
+    // Note: we *can* just abort() here as we only load bpf .o files shipped
+    // in the same mainline module / apex as NetBpfLoad itself.
+    abort();
 }
 
 static string pathToObjName(const string& path) {
@@ -816,7 +797,6 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
         }
 
         domain pin_subdir = getDomainFromPinSubdir(md[i].pin_subdir);
-        if (unrecognized(pin_subdir)) return -ENOTDIR;
         if (specified(pin_subdir)) {
             ALOGI("map %s pin_subdir [%-32s] -> %d -> '%s'", mapNames[i].c_str(), md[i].pin_subdir,
                   static_cast<int>(pin_subdir), lookupPinSubdir(pin_subdir));
@@ -1020,8 +1000,6 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
         unsigned bpfMaxVer = cs[i].prog_def->bpfloader_max_ver;
         domain selinux_context = getDomainFromSelinuxContext(cs[i].prog_def->selinux_context);
         domain pin_subdir = getDomainFromPinSubdir(cs[i].prog_def->pin_subdir);
-        // Note: make sure to only check for unrecognized *after* verifying bpfloader
-        // version limits include this bpfloader's version.
 
         ALOGD("cs[%d].name:%s requires bpfloader version [0x%05x,0x%05x)", i, name.c_str(),
               bpfMinVer, bpfMaxVer);
@@ -1044,8 +1022,6 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             ALOGD("cs[%d].name:%s is ignored on %s", i, name.c_str(), describeArch());
             continue;
         }
-
-        if (unrecognized(pin_subdir)) return -ENOTDIR;
 
         if (specified(selinux_context)) {
             ALOGI("prog %s selinux_context [%-32s] -> %d -> '%s' (%s)", name.c_str(),
