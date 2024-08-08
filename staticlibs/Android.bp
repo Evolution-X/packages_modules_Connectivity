@@ -450,6 +450,7 @@ java_library {
     visibility: ["//packages/modules/Connectivity/service-t"],
 }
 
+// net-utils-framework-connectivity is only for framework-connectivity.
 java_library {
     name: "net-utils-framework-connectivity",
     srcs: [
@@ -462,8 +463,7 @@ java_library {
         "//apex_available:platform",
     ],
     visibility: [
-        "//packages/modules/Connectivity:__subpackages__",
-        "//packages/modules/NetworkStack:__subpackages__",
+        "//packages/modules/Connectivity/framework",
     ],
     libs: [
         "androidx.annotation_annotation",
@@ -502,10 +502,6 @@ java_defaults {
         "com.android.tethering",
         "//apex_available:platform",
     ],
-    visibility: [
-        "//packages/modules/CaptivePortalLogin:__subpackages__",
-        "//packages/modules/Connectivity:__subpackages__",
-    ],
     defaults_visibility: [
         "//visibility:private",
     ],
@@ -515,6 +511,7 @@ java_defaults {
     },
 }
 
+// net-utils-service-connectivity is only for service-connectivity.
 java_library {
     name: "net-utils-service-connectivity",
     srcs: [
@@ -528,6 +525,10 @@ java_library {
     ],
     defaults: ["net-utils-non-bootclasspath-defaults"],
     jarjar_rules: "jarjar-rules-shared.txt",
+    visibility: [
+        "//packages/modules/Connectivity/service",
+        "//packages/modules/Connectivity/staticlibs/tests/unit",
+    ],
 }
 
 java_library {
@@ -538,6 +539,10 @@ java_library {
     ],
     defaults: ["net-utils-non-bootclasspath-defaults"],
     jarjar_rules: "jarjar-rules-shared.txt",
+    visibility: [
+        "//packages/modules/CaptivePortalLogin:__subpackages__",
+        "//packages/modules/Connectivity/Tethering",
+    ],
 }
 
 aidl_interface {
