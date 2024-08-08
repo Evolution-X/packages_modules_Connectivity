@@ -19,9 +19,9 @@ package android.net.thread;
 import android.net.thread.IThreadNetworkController;
 
 /**
-* Interface for communicating with ThreadNetworkService.
-* @hide
-*/
+ * Interface for communicating with ThreadNetworkService.
+ * @hide
+ */
 interface IThreadNetworkManager {
     List<IThreadNetworkController> getAllThreadNetworkControllers();
 }
