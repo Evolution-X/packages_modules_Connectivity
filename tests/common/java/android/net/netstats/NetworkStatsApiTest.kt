@@ -28,18 +28,26 @@ import android.net.NetworkStats.ROAMING_YES
 import android.net.NetworkStats.SET_DEFAULT
 import android.net.NetworkStats.SET_FOREGROUND
 import android.net.NetworkStats.TAG_NONE
+import android.os.Build
 import androidx.test.filters.SmallTest
+import com.android.testutils.ConnectivityModuleTest
+import com.android.testutils.DevSdkIgnoreRule
+import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
+import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.assertNetworkStatsEquals
 import com.android.testutils.assertParcelingIsLossless
 import kotlin.test.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
 
-@RunWith(JUnit4::class)
+@DevSdkIgnoreRunner.MonitorThreadLeak
+@RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
 class NetworkStatsApiTest {
+    @get:Rule
+    val ignoreRule = DevSdkIgnoreRule()
     private val testStatsEmpty = NetworkStats(0L, 0)
 
     // Note that these variables need to be initialized outside of constructor, initialize
@@ -49,6 +57,7 @@ class NetworkStatsApiTest {
     // be merged if performing add on these 2 stats.
     private lateinit var testStats1: NetworkStats
     private lateinit var testStats2: NetworkStats
+    private lateinit var expectedEntriesInStats2: List<Entry>
 
     // This is a result of adding stats1 and stats2, while the merging of common key items is
     // subject to test later, this should not be initialized with for a loop to add stats1
@@ -84,19 +93,23 @@ class NetworkStatsApiTest {
                         METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 3, 1, 6, 2, 0))
         assertEquals(8, testStats1.size())
 
-        testStats2 = NetworkStats(0L, 0)
-                // Entries which are common for set1 and set2.
-                .addEntry(Entry(TEST_IFACE, TEST_UID1, SET_DEFAULT, 0x80,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 3, 15, 2, 31, 1))
-                .addEntry(Entry(TEST_IFACE, TEST_UID1, SET_FOREGROUND, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 13, 61, 10, 1, 45))
-                .addEntry(Entry(TEST_IFACE, TEST_UID2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 11, 2, 3, 4, 7))
-                .addEntry(Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 4, 3, 2, 1, 0))
-                // Entry which only appears in set2.
-                .addEntry(Entry(IFACE_VT, TEST_UID2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 2, 3, 7, 8, 0))
+        expectedEntriesInStats2 = listOf(
+            // Entries which are common for set1 and set2.
+            Entry(TEST_IFACE, TEST_UID1, SET_DEFAULT, 0x80,
+                  METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 3, 15, 2, 31, 1),
+            Entry(TEST_IFACE, TEST_UID1, SET_FOREGROUND, TAG_NONE,
+                  METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 13, 61, 10, 1, 45),
+            Entry(TEST_IFACE, TEST_UID2, SET_DEFAULT, TAG_NONE,
+                  METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 11, 2, 3, 4, 7),
+            Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
+                  METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 4, 3, 2, 1, 0),
+            // Entry which only appears in set2.
+            Entry(IFACE_VT, TEST_UID2, SET_DEFAULT, TAG_NONE,
+                  METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 2, 3, 7, 8, 0))
+        testStats2 = NetworkStats(0L, 5)
+        for (entry in expectedEntriesInStats2) {
+            testStats2 = testStats2.addEntry(entry)
+        }
         assertEquals(5, testStats2.size())
 
         testStats3 = NetworkStats(0L, 9)
@@ -125,18 +138,6 @@ class NetworkStatsApiTest {
 
     @Test
     fun testAddEntry() {
-        val expectedEntriesInStats2 = arrayOf(
-                Entry(TEST_IFACE, TEST_UID1, SET_DEFAULT, 0x80,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 3, 15, 2, 31, 1),
-                Entry(TEST_IFACE, TEST_UID1, SET_FOREGROUND, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 13, 61, 10, 1, 45),
-                Entry(TEST_IFACE, TEST_UID2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 11, 2, 3, 4, 7),
-                Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 4, 3, 2, 1, 0),
-                Entry(IFACE_VT, TEST_UID2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 2, 3, 7, 8, 0))
-
         // While testStats* are already initialized with addEntry, verify content added
         // matches expectation.
         for (i in expectedEntriesInStats2.indices) {
@@ -150,6 +151,27 @@ class NetworkStatsApiTest {
         assertEquals(Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
                 METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 16, -2, 9, 1, 9),
                 stats.getValues(3, null))
+
+        // Verify the original ststs object is not altered.
+        for (i in expectedEntriesInStats2.indices) {
+            val entry = testStats2.getValues(i, null)
+            assertEquals(expectedEntriesInStats2[i], entry)
+        }
+    }
+
+    @ConnectivityModuleTest
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2) // Mainlined NetworkStats only runs on T+
+    @Test
+    fun testAddEntries() {
+        val baseStats = NetworkStats(0L, 1)
+                .addEntry(Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
+                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 12, -5, 7, 0, 9))
+        val statsUnderTest = baseStats.addEntries(expectedEntriesInStats2)
+        // Assume the correctness of addEntry is verified in other tests.
+        val expectedStats = testStats2
+                .addEntry(Entry(IFACE_VT, TEST_UID1, SET_DEFAULT, TAG_NONE,
+                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 12, -5, 7, 0, 9))
+        assertNetworkStatsEquals(expectedStats, statsUnderTest)
     }
 
     @Test
