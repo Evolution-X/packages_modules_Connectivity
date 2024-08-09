@@ -42,7 +42,6 @@ java_library {
         "net-utils-device-common-struct",
         "net-utils-device-common-struct-base",
         "net-utils-device-common-wear",
-        "net-utils-framework-connectivity",
         "modules-utils-build_system",
     ],
     lint: {
