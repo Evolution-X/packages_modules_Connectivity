@@ -310,6 +310,7 @@ package android.net {
   public final class NetworkStats implements java.lang.Iterable<android.net.NetworkStats.Entry> android.os.Parcelable {
     ctor public NetworkStats(long, int);
     method @NonNull public android.net.NetworkStats add(@NonNull android.net.NetworkStats);
+    method @FlaggedApi("com.android.net.flags.netstats_add_entries") @NonNull public android.net.NetworkStats addEntries(@NonNull java.util.List<android.net.NetworkStats.Entry>);
     method @NonNull public android.net.NetworkStats addEntry(@NonNull android.net.NetworkStats.Entry);
     method public android.net.NetworkStats clone();
     method public int describeContents();
