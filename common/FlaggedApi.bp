@@ -22,6 +22,16 @@ aconfig_declarations {
     visibility: ["//packages/modules/Connectivity:__subpackages__"],
 }
 
+java_aconfig_library {
+    name: "com.android.net.flags-aconfig-java",
+    aconfig_declarations: "com.android.net.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
+    apex_available: [
+        "com.android.tethering",
+    ],
+}
+
 aconfig_declarations {
     name: "com.android.net.thread.flags-aconfig",
     package: "com.android.net.thread.flags",
