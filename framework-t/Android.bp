@@ -137,6 +137,10 @@ java_sdk_library {
     // framework-connectivity-pre-jarjar match at runtime.
     jarjar_rules: ":framework-connectivity-jarjar-rules",
     stub_only_libs: [
+        // static_libs is not used to compile stubs. So libs which have
+        // been included in static_libs might still need to
+        // be in stub_only_libs to be usable when generating the API stubs.
+        "com.android.net.flags-aconfig-java",
         // Use prebuilt framework-connectivity stubs to avoid circular dependencies
         "sdk_module-lib_current_framework-connectivity",
     ],
