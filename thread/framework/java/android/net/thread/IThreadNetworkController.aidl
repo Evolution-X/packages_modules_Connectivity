@@ -28,9 +28,9 @@ import android.net.thread.PendingOperationalDataset;
 import android.net.thread.ThreadConfiguration;
 
 /**
-* Interface for communicating with ThreadNetworkControllerService.
-* @hide
-*/
+ * Interface for communicating with ThreadNetworkControllerService.
+ * @hide
+ */
 interface IThreadNetworkController {
     void registerStateCallback(in IStateCallback callback);
     void unregisterStateCallback(in IStateCallback callback);
@@ -38,10 +38,12 @@ interface IThreadNetworkController {
     void unregisterOperationalDatasetCallback(in IOperationalDatasetCallback callback);
 
     void join(in ActiveOperationalDataset activeOpDataset, in IOperationReceiver receiver);
-    void scheduleMigration(in PendingOperationalDataset pendingOpDataset, in IOperationReceiver receiver);
+    void scheduleMigration(
+            in PendingOperationalDataset pendingOpDataset, in IOperationReceiver receiver);
     void leave(in IOperationReceiver receiver);
 
-    void setTestNetworkAsUpstream(in String testNetworkInterfaceName, in IOperationReceiver receiver);
+    void setTestNetworkAsUpstream(
+            in String testNetworkInterfaceName, in IOperationReceiver receiver);
     void setChannelMaxPowers(in ChannelMaxPower[] channelMaxPowers, in IOperationReceiver receiver);
 
     int getThreadVersion();
