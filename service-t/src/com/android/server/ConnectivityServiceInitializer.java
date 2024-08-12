@@ -28,6 +28,7 @@ import com.android.server.connectivity.ConnectivityNativeService;
 import com.android.server.ethernet.EthernetService;
 import com.android.server.ethernet.EthernetServiceImpl;
 import com.android.server.nearby.NearbyService;
+import com.android.server.net.ct.CertificateTransparencyService;
 import com.android.server.thread.ThreadNetworkService;
 
 /**
@@ -43,6 +44,7 @@ public final class ConnectivityServiceInitializer extends SystemService {
     private final NearbyService mNearbyService;
     private final EthernetServiceImpl mEthernetServiceImpl;
     private final ThreadNetworkService mThreadNetworkService;
+    private final CertificateTransparencyService mCertificateTransparencyService;
 
     public ConnectivityServiceInitializer(Context context) {
         super(context);
@@ -55,6 +57,7 @@ public final class ConnectivityServiceInitializer extends SystemService {
         mNsdService = createNsdService(context);
         mNearbyService = createNearbyService(context);
         mThreadNetworkService = createThreadNetworkService(context);
+        mCertificateTransparencyService = createCertificateTransparencyService(context);
     }
 
     @Override
@@ -110,6 +113,10 @@ public final class ConnectivityServiceInitializer extends SystemService {
 
         if (mThreadNetworkService != null) {
             mThreadNetworkService.onBootPhase(phase);
+        }
+
+        if (SdkLevel.isAtLeastV() && mCertificateTransparencyService != null) {
+            mCertificateTransparencyService.onBootPhase(phase);
         }
     }
 
@@ -185,5 +192,14 @@ public final class ConnectivityServiceInitializer extends SystemService {
             return null;
         }
         return new ThreadNetworkService(context);
+    }
+
+    /** Return CertificateTransparencyService instance if enable, otherwise null. */
+    @Nullable
+    private CertificateTransparencyService createCertificateTransparencyService(
+            final Context context) {
+        return SdkLevel.isAtLeastV() && CertificateTransparencyService.enabled(context)
+                ? new CertificateTransparencyService(context)
+                : null;
     }
 }

@@ -13,16 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.net.ct;
 
-package android.net.thread;
+import android.annotation.FlaggedApi;
+import android.annotation.SystemService;
+
+import com.android.net.ct.flags.Flags;
 
 /**
- * Mapping from a channel to its max power.
+ * Provides the primary API for the Certificate Transparency Manager.
  *
- * {@hide}
+ * @hide
  */
-parcelable ChannelMaxPower {
-    int channel; // The Thread radio channel.
-    int maxPower; // The max power in the unit of 0.01dBm. Passing INT16_MAX(32767) will
-                  // disable the channel.
+@FlaggedApi(Flags.FLAG_CERTIFICATE_TRANSPARENCY_SERVICE)
+@SystemService(CertificateTransparencyManager.SERVICE_NAME)
+public final class CertificateTransparencyManager {
+
+    public static final String SERVICE_NAME = "certificate_transparency";
+
+    /**
+     * Creates a new CertificateTransparencyManager instance.
+     *
+     * @hide
+     */
+    public CertificateTransparencyManager() {}
 }
