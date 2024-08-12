@@ -137,9 +137,6 @@ inline bool isUserdebug() {
 // Size of the BPF log buffer for verifier logging
 #define BPF_LOAD_LOG_SZ 0xfffff
 
-// Unspecified attach type is 0 which is BPF_CGROUP_INET_INGRESS.
-#define BPF_ATTACH_TYPE_UNSPEC BPF_CGROUP_INET_INGRESS
-
 static unsigned int page_size = static_cast<unsigned int>(getpagesize());
 
 constexpr const char* lookupSelinuxContext(const domain d) {
@@ -201,7 +198,7 @@ static string pathToObjName(const string& path) {
 typedef struct {
     const char* name;
     enum bpf_prog_type type;
-    enum bpf_attach_type expected_attach_type;
+    enum bpf_attach_type attach_type;
 } sectionType;
 
 /*
@@ -221,8 +218,8 @@ typedef struct {
 sectionType sectionNameTypes[] = {
         {"bind4/",             BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_INET4_BIND},
         {"bind6/",             BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_INET6_BIND},
-        {"cgroupskb/",         BPF_PROG_TYPE_CGROUP_SKB,       BPF_ATTACH_TYPE_UNSPEC},
-        {"cgroupsock/",        BPF_PROG_TYPE_CGROUP_SOCK,      BPF_ATTACH_TYPE_UNSPEC},
+        {"cgroupskb/",         BPF_PROG_TYPE_CGROUP_SKB},
+        {"cgroupsock/",        BPF_PROG_TYPE_CGROUP_SOCK},
         {"cgroupsockcreate/",  BPF_PROG_TYPE_CGROUP_SOCK,      BPF_CGROUP_INET_SOCK_CREATE},
         {"cgroupsockrelease/", BPF_PROG_TYPE_CGROUP_SOCK,      BPF_CGROUP_INET_SOCK_RELEASE},
         {"connect4/",          BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_INET4_CONNECT},
@@ -230,28 +227,24 @@ sectionType sectionNameTypes[] = {
         {"egress/",            BPF_PROG_TYPE_CGROUP_SKB,       BPF_CGROUP_INET_EGRESS},
         {"getsockopt/",        BPF_PROG_TYPE_CGROUP_SOCKOPT,   BPF_CGROUP_GETSOCKOPT},
         {"ingress/",           BPF_PROG_TYPE_CGROUP_SKB,       BPF_CGROUP_INET_INGRESS},
-        {"lwt_in/",            BPF_PROG_TYPE_LWT_IN,           BPF_ATTACH_TYPE_UNSPEC},
-        {"lwt_out/",           BPF_PROG_TYPE_LWT_OUT,          BPF_ATTACH_TYPE_UNSPEC},
-        {"lwt_seg6local/",     BPF_PROG_TYPE_LWT_SEG6LOCAL,    BPF_ATTACH_TYPE_UNSPEC},
-        {"lwt_xmit/",          BPF_PROG_TYPE_LWT_XMIT,         BPF_ATTACH_TYPE_UNSPEC},
         {"postbind4/",         BPF_PROG_TYPE_CGROUP_SOCK,      BPF_CGROUP_INET4_POST_BIND},
         {"postbind6/",         BPF_PROG_TYPE_CGROUP_SOCK,      BPF_CGROUP_INET6_POST_BIND},
         {"recvmsg4/",          BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_UDP4_RECVMSG},
         {"recvmsg6/",          BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_UDP6_RECVMSG},
-        {"schedact/",          BPF_PROG_TYPE_SCHED_ACT,        BPF_ATTACH_TYPE_UNSPEC},
-        {"schedcls/",          BPF_PROG_TYPE_SCHED_CLS,        BPF_ATTACH_TYPE_UNSPEC},
+        {"schedact/",          BPF_PROG_TYPE_SCHED_ACT},
+        {"schedcls/",          BPF_PROG_TYPE_SCHED_CLS},
         {"sendmsg4/",          BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_UDP4_SENDMSG},
         {"sendmsg6/",          BPF_PROG_TYPE_CGROUP_SOCK_ADDR, BPF_CGROUP_UDP6_SENDMSG},
         {"setsockopt/",        BPF_PROG_TYPE_CGROUP_SOCKOPT,   BPF_CGROUP_SETSOCKOPT},
-        {"skfilter/",          BPF_PROG_TYPE_SOCKET_FILTER,    BPF_ATTACH_TYPE_UNSPEC},
+        {"skfilter/",          BPF_PROG_TYPE_SOCKET_FILTER},
         {"sockops/",           BPF_PROG_TYPE_SOCK_OPS,         BPF_CGROUP_SOCK_OPS},
         {"sysctl",             BPF_PROG_TYPE_CGROUP_SYSCTL,    BPF_CGROUP_SYSCTL},
-        {"xdp/",               BPF_PROG_TYPE_XDP,              BPF_ATTACH_TYPE_UNSPEC},
+        {"xdp/",               BPF_PROG_TYPE_XDP},
 };
 
 typedef struct {
     enum bpf_prog_type type;
-    enum bpf_attach_type expected_attach_type;
+    enum bpf_attach_type attach_type;
     string name;
     vector<char> data;
     vector<char> rel_data;
@@ -435,12 +428,6 @@ static enum bpf_prog_type getSectionType(string& name) {
     return BPF_PROG_TYPE_UNSPEC;
 }
 
-static enum bpf_attach_type getExpectedAttachType(string& name) {
-    for (auto& snt : sectionNameTypes)
-        if (StartsWith(name, snt.name)) return snt.expected_attach_type;
-    return BPF_ATTACH_TYPE_UNSPEC;
-}
-
 /*
 static string getSectionName(enum bpf_prog_type type)
 {
@@ -556,7 +543,8 @@ static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs, size_t s
         if (ptype == BPF_PROG_TYPE_UNSPEC) continue;
 
         // This must be done before '/' is replaced with '_'.
-        cs_temp.expected_attach_type = getExpectedAttachType(name);
+        for (auto& snt : sectionNameTypes)
+            if (StartsWith(name, snt.name)) cs_temp.attach_type = snt.attach_type;
 
         string oldName = name;
 
@@ -1062,7 +1050,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
               .log_level = 1,
               .log_buf = ptr_to_u64(log_buf.data()),
               .log_size = static_cast<__u32>(log_buf.size()),
-              .expected_attach_type = cs[i].expected_attach_type,
+              .expected_attach_type = cs[i].attach_type,
             };
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.prog_name, cs[i].name.c_str(), sizeof(req.prog_name));
