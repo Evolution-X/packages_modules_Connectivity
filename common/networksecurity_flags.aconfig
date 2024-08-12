@@ -1,0 +1,9 @@
+package: "com.android.net.ct.flags"
+container: "com.android.tethering"
+flag {
+    name: "certificate_transparency_service"
+    is_exported: true
+    namespace: "network_security"
+    description: "Enable service for certificate transparency log list data"
+    bug: "319829948"
+}
