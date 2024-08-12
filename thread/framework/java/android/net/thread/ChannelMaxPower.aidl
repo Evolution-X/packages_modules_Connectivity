@@ -16,11 +16,11 @@
 
 package android.net.thread;
 
- /**
-  * Mapping from a channel to its max power.
-  *
-  * {@hide}
-  */
+/**
+ * Mapping from a channel to its max power.
+ *
+ * {@hide}
+ */
 parcelable ChannelMaxPower {
     int channel; // The Thread radio channel.
     int maxPower; // The max power in the unit of 0.01dBm. Passing INT16_MAX(32767) will

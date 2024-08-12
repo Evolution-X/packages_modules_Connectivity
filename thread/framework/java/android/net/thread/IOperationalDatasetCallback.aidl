@@ -23,6 +23,8 @@ import android.net.thread.PendingOperationalDataset;
  * @hide
  */
 oneway interface IOperationalDatasetCallback {
-    void onActiveOperationalDatasetChanged(in @nullable ActiveOperationalDataset activeOpDataset);
-    void onPendingOperationalDatasetChanged(in @nullable PendingOperationalDataset pendingOpDataset);
+    void onActiveOperationalDatasetChanged(
+            in @nullable ActiveOperationalDataset activeOpDataset);
+    void onPendingOperationalDatasetChanged(
+            in @nullable PendingOperationalDataset pendingOpDataset);
 }
