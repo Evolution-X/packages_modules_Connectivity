@@ -17,13 +17,13 @@
 package com.android.net.module.util
 
 import android.net.NetworkStats
-import android.text.TextUtils
 import androidx.test.filters.SmallTest
 import androidx.test.runner.AndroidJUnit4
-import org.junit.Test
-import org.junit.runner.RunWith
+import com.android.testutils.assertEntryEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
 
@@ -90,8 +90,6 @@ class NetworkStatsUtilsTest {
             NetworkStats.ROAMING_NO, NetworkStats.DEFAULT_NETWORK_ALL, 1024, 8, 2048, 12,
             0 /* operations */)
 
-        // TODO: Use assertEquals once all downstreams accept null iface in
-        // NetworkStats.Entry#equals.
         assertEntryEquals(expectedEntry, entry)
     }
 
@@ -120,23 +118,5 @@ class NetworkStatsUtilsTest {
         doReturn(txBytes).`when`(ret).getTxBytes()
         doReturn(txPackets).`when`(ret).getTxPackets()
         return ret
-    }
-
-    /**
-     * Assert that the two {@link NetworkStats.Entry} are equals.
-     */
-    private fun assertEntryEquals(left: NetworkStats.Entry, right: NetworkStats.Entry) {
-        TextUtils.equals(left.iface, right.iface)
-        assertEquals(left.uid, right.uid)
-        assertEquals(left.set, right.set)
-        assertEquals(left.tag, right.tag)
-        assertEquals(left.metered, right.metered)
-        assertEquals(left.roaming, right.roaming)
-        assertEquals(left.defaultNetwork, right.defaultNetwork)
-        assertEquals(left.rxBytes, right.rxBytes)
-        assertEquals(left.rxPackets, right.rxPackets)
-        assertEquals(left.txBytes, right.txBytes)
-        assertEquals(left.txPackets, right.txPackets)
-        assertEquals(left.operations, right.operations)
     }
 }
