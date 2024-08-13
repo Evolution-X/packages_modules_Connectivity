@@ -31,7 +31,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 private const val TEST_IFACE = "test0"
-private const val TEST_IFACE2 = "test2"
+private val TEST_IFACE2: String? = null
 private const val TEST_START = 1194220800000L
 
 @RunWith(JUnit4::class)

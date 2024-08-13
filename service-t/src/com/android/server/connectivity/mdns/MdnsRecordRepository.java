@@ -228,12 +228,12 @@ public class MdnsRecordRepository {
          * Create a ServiceRegistration with only update the subType.
          */
         ServiceRegistration withSubtypes(@NonNull Set<String> newSubtypes,
-                boolean avoidEmptyTxtRecords) {
+                @NonNull MdnsFeatureFlags featureFlags) {
             NsdServiceInfo newServiceInfo = new NsdServiceInfo(serviceInfo);
             newServiceInfo.setSubtypes(newSubtypes);
             return new ServiceRegistration(srvRecord.record.getServiceHost(), newServiceInfo,
                     repliedServiceCount, sentPacketCount, exiting, isProbing, ttl,
-                    avoidEmptyTxtRecords);
+                    featureFlags);
         }
 
         /**
@@ -241,7 +241,7 @@ public class MdnsRecordRepository {
          */
         ServiceRegistration(@NonNull String[] deviceHostname, @NonNull NsdServiceInfo serviceInfo,
                 int repliedServiceCount, int sentPacketCount, boolean exiting, boolean isProbing,
-                @Nullable Duration ttl, boolean avoidEmptyTxtRecords) {
+                @Nullable Duration ttl, @NonNull MdnsFeatureFlags featureFlags) {
             this.serviceInfo = serviceInfo;
 
             final long nonNameRecordsTtlMillis;
@@ -313,7 +313,7 @@ public class MdnsRecordRepository {
                                 true /* cacheFlush */,
                                 nonNameRecordsTtlMillis,
                                 attrsToTextEntries(
-                                        serviceInfo.getAttributes(), avoidEmptyTxtRecords)),
+                                        serviceInfo.getAttributes(), featureFlags)),
                         false /* sharedName */);
 
                 allRecords.addAll(ptrRecords);
@@ -397,9 +397,9 @@ public class MdnsRecordRepository {
          */
         ServiceRegistration(@NonNull String[] deviceHostname, @NonNull NsdServiceInfo serviceInfo,
                 int repliedServiceCount, int sentPacketCount, @Nullable Duration ttl,
-                boolean avoidEmptyTxtRecords) {
+                @NonNull MdnsFeatureFlags featureFlags) {
             this(deviceHostname, serviceInfo,repliedServiceCount, sentPacketCount,
-                    false /* exiting */, true /* isProbing */, ttl, avoidEmptyTxtRecords);
+                    false /* exiting */, true /* isProbing */, ttl, featureFlags);
         }
 
         void setProbing(boolean probing) {
@@ -450,7 +450,7 @@ public class MdnsRecordRepository {
                     "Service ID must already exist for an update request: " + serviceId);
         }
         final ServiceRegistration updatedRegistration = existingRegistration.withSubtypes(
-                subtypes, mMdnsFeatureFlags.avoidAdvertisingEmptyTxtRecords());
+                subtypes, mMdnsFeatureFlags);
         mServices.put(serviceId, updatedRegistration);
     }
 
@@ -482,7 +482,7 @@ public class MdnsRecordRepository {
         final ServiceRegistration registration = new ServiceRegistration(
                 mDeviceHostname, serviceInfo, NO_PACKET /* repliedServiceCount */,
                 NO_PACKET /* sentPacketCount */, ttl,
-                mMdnsFeatureFlags.avoidAdvertisingEmptyTxtRecords());
+                mMdnsFeatureFlags);
         mServices.put(serviceId, registration);
 
         // Remove existing exiting service
@@ -553,14 +553,14 @@ public class MdnsRecordRepository {
         return new MdnsProber.ProbingInfo(serviceId, probingRecords);
     }
 
-    private static List<MdnsServiceInfo.TextEntry> attrsToTextEntries(Map<String, byte[]> attrs,
-            boolean avoidEmptyTxtRecords) {
+    private static List<MdnsServiceInfo.TextEntry> attrsToTextEntries(
+            @NonNull Map<String, byte[]> attrs, @NonNull MdnsFeatureFlags featureFlags) {
         final List<MdnsServiceInfo.TextEntry> out = new ArrayList<>(
                 attrs.size() == 0 ? 1 : attrs.size());
-        if (avoidEmptyTxtRecords && attrs.size() == 0) {
+        if (featureFlags.avoidAdvertisingEmptyTxtRecords() && attrs.size() == 0) {
             // As per RFC6763 6.1, empty TXT records are not allowed, but records containing a
             // single empty String must be treated as equivalent.
-            out.add(new MdnsServiceInfo.TextEntry("", (byte[]) null));
+            out.add(new MdnsServiceInfo.TextEntry("", MdnsServiceInfo.TextEntry.VALUE_NONE));
             return out;
         }
 
@@ -1418,7 +1418,7 @@ public class MdnsRecordRepository {
 
         final ServiceRegistration newService = new ServiceRegistration(mDeviceHostname, newInfo,
                 existing.repliedServiceCount, existing.sentPacketCount, existing.ttl,
-                mMdnsFeatureFlags.avoidAdvertisingEmptyTxtRecords());
+                mMdnsFeatureFlags);
         mServices.put(serviceId, newService);
         return makeProbingInfo(serviceId, newService);
     }

@@ -56,7 +56,7 @@ class BpfBasicTest : public NetNativeTestBase {
 
 TEST_F(BpfBasicTest, TestCgroupMounted) {
     std::string cg2_path;
-    ASSERT_EQ(true, CgroupGetControllerPath(CGROUPV2_CONTROLLER_NAME, &cg2_path));
+    ASSERT_EQ(true, CgroupGetControllerPath(CGROUPV2_HIERARCHY_NAME, &cg2_path));
     ASSERT_EQ(0, access(cg2_path.c_str(), R_OK));
     ASSERT_EQ(0, access((cg2_path + "/cgroup.controllers").c_str(), R_OK));
 }
