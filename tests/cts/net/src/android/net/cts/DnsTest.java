@@ -16,6 +16,10 @@
 
 package android.net.cts;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
@@ -23,10 +27,16 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkInfo;
 import android.os.SystemClock;
-import android.test.AndroidTestCase;
 import android.util.Log;
 
 import androidx.test.filters.RequiresDevice;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import com.android.testutils.DevSdkIgnoreRunner;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -36,7 +46,9 @@ import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-public class DnsTest extends AndroidTestCase {
+@RunWith(DevSdkIgnoreRunner.class)
+@DevSdkIgnoreRunner.RestoreDefaultNetwork
+public class DnsTest {
 
     static {
         System.loadLibrary("nativedns_jni");
@@ -46,10 +58,13 @@ public class DnsTest extends AndroidTestCase {
     private static final String TAG = "DnsTest";
     private static final String PROXY_NETWORK_TYPE = "PROXY";
 
+    private Context mContext;
     private ConnectivityManager mCm;
 
+    @Before
     public void setUp() {
-        mCm = getContext().getSystemService(ConnectivityManager.class);
+        mContext = InstrumentationRegistry.getInstrumentation().getContext();
+        mCm = mContext.getSystemService(ConnectivityManager.class);
     }
 
     /**
@@ -69,6 +84,7 @@ public class DnsTest extends AndroidTestCase {
      * Perf - measure size of first and second tier caches and their effect
      * Assert requires network permission
      */
+    @Test
     @RequiresDevice // IPv6 support may be missing on presubmit virtual hardware
     public void testDnsWorks() throws Exception {
         ensureIpv6Connectivity();
@@ -91,7 +107,7 @@ public class DnsTest extends AndroidTestCase {
 
         // Skip the rest of the test if the active network for watch is PROXY.
         // TODO: Check NetworkInfo type in addition to type name once ag/601257 is merged.
-        if (getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
+        if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
                 && activeNetworkInfoIsProxy()) {
             Log.i(TAG, "Skipping test because the active network type name is PROXY.");
             return;
