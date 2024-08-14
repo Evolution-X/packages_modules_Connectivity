@@ -22,6 +22,12 @@ import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_LOWPAN;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI_AWARE;
+import static android.net.NetworkStats.DEFAULT_NETWORK_YES;
+import static android.net.NetworkStats.METERED_YES;
+import static android.net.NetworkTemplate.MATCH_BLUETOOTH;
+import static android.net.NetworkTemplate.MATCH_ETHERNET;
+import static android.net.NetworkTemplate.MATCH_MOBILE;
+import static android.net.NetworkTemplate.MATCH_WIFI;
 import static android.net.TetheringManager.TETHERING_BLUETOOTH;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringManager.TETHERING_NCM;
@@ -48,6 +54,7 @@ import static android.net.TetheringManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.net.NetworkCapabilities;
+import android.net.NetworkTemplate;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
 import android.stats.connectivity.UpstreamType;
@@ -418,5 +425,47 @@ public class TetheringMetrics {
                 break;
         }
         return false;
+    }
+
+    /**
+     * Build NetworkTemplate for the given upstream type.
+     *
+     * <p> NetworkTemplate.Builder API was introduced in Android T.
+     *
+     * @param type the upstream type
+     * @return A NetworkTemplate object with a corresponding match rule or null if tethering
+     * metrics' data usage cannot be collected for a given upstream type.
+     */
+    @Nullable
+    public static NetworkTemplate buildNetworkTemplateForUpstreamType(@NonNull UpstreamType type) {
+        if (!isUsageSupportedForUpstreamType(type)) return null;
+
+        switch (type) {
+            case UT_CELLULAR:
+                // TODO: Handle the DUN connection, which is not a default network.
+                return new NetworkTemplate.Builder(MATCH_MOBILE)
+                        .setMeteredness(METERED_YES)
+                        .setDefaultNetworkStatus(DEFAULT_NETWORK_YES)
+                        .build();
+            case UT_WIFI:
+                return new NetworkTemplate.Builder(MATCH_WIFI)
+                        .setMeteredness(METERED_YES)
+                        .setDefaultNetworkStatus(DEFAULT_NETWORK_YES)
+                        .build();
+            case UT_BLUETOOTH:
+                return new NetworkTemplate.Builder(MATCH_BLUETOOTH)
+                        .setMeteredness(METERED_YES)
+                        .setDefaultNetworkStatus(DEFAULT_NETWORK_YES)
+                        .build();
+            case UT_ETHERNET:
+                return new NetworkTemplate.Builder(MATCH_ETHERNET)
+                        .setMeteredness(METERED_YES)
+                        .setDefaultNetworkStatus(DEFAULT_NETWORK_YES)
+                        .build();
+            default:
+                Log.e(TAG, "Unsupported UpstreamType: " + type.name());
+                break;
+        }
+        return null;
     }
 }
