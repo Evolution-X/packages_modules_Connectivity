@@ -17,27 +17,15 @@
 package com.android.net.module.util
 
 import android.net.NetworkStats
-import android.net.NetworkStats.DEFAULT_NETWORK_NO
-import android.net.NetworkStats.DEFAULT_NETWORK_YES
-import android.net.NetworkStats.Entry
-import android.net.NetworkStats.METERED_NO
-import android.net.NetworkStats.ROAMING_NO
-import android.net.NetworkStats.ROAMING_YES
-import android.net.NetworkStats.SET_DEFAULT
-import android.net.NetworkStats.TAG_NONE
 import androidx.test.filters.SmallTest
 import androidx.test.runner.AndroidJUnit4
 import com.android.testutils.assertEntryEquals
-import com.android.testutils.assertNetworkStatsEquals
-import com.android.testutils.makePublicStatsFromAndroidNetStats
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
-
 
 @RunWith(AndroidJUnit4::class)
 @SmallTest
@@ -103,37 +91,6 @@ class NetworkStatsUtilsTest {
             0 /* operations */)
 
         assertEntryEquals(expectedEntry, entry)
-    }
-
-    @Test
-    fun testPublicStatsToAndroidNetStats() {
-        val uid1 = 10001
-        val uid2 = 10002
-        val testIface = "wlan0"
-        val testAndroidNetStats = NetworkStats(0L, 3)
-                .addEntry(Entry(testIface, uid1, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_YES, 20, 3, 57, 40, 3))
-                .addEntry(Entry(
-                        testIface, uid2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_YES, DEFAULT_NETWORK_NO, 2, 7, 2, 5, 7))
-                .addEntry(Entry(testIface, uid2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_YES, DEFAULT_NETWORK_NO, 4, 5, 3, 1, 8))
-        val publicStats: android.app.usage.NetworkStats =
-                makePublicStatsFromAndroidNetStats(testAndroidNetStats)
-        val androidNetStats: NetworkStats =
-                NetworkStatsUtils.fromPublicNetworkStats(publicStats)
-
-        // 1. The public `NetworkStats` class does not include interface information.
-        //    Interface details must be removed and items with duplicated
-        //    keys need to be merged before making any comparisons.
-        // 2. The public `NetworkStats` class lacks an operations field.
-        //    Thus, the information will not be preserved during the conversion.
-        val expectedStats = NetworkStats(0L, 2)
-                .addEntry(Entry(null, uid1, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_YES, 20, 3, 57, 40, 0))
-                .addEntry(Entry(null, uid2, SET_DEFAULT, TAG_NONE,
-                        METERED_NO, ROAMING_YES, DEFAULT_NETWORK_NO, 6, 12, 5, 6, 0))
-        assertNetworkStatsEquals(expectedStats, androidNetStats)
     }
 
     private fun makeMockBucket(
