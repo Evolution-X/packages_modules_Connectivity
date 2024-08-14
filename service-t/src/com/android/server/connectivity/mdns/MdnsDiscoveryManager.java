@@ -390,11 +390,17 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
      */
     public void dump(PrintWriter pw) {
         discoveryExecutor.checkAndRunOnHandlerThread(() -> {
-            pw.println();
+            pw.println("Clients:");
             // Dump ServiceTypeClients
             for (MdnsServiceTypeClient serviceTypeClient
                     : perSocketServiceTypeClients.getAllMdnsServiceTypeClient()) {
                 serviceTypeClient.dump(pw);
+            }
+            pw.println();
+            // Dump ServiceCache
+            pw.println("Cached services:");
+            if (serviceCache != null) {
+                serviceCache.dump(pw, "  ");
             }
         });
     }
