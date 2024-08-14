@@ -22,6 +22,10 @@ import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_LOWPAN;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI_AWARE;
+import static android.net.NetworkTemplate.MATCH_BLUETOOTH;
+import static android.net.NetworkTemplate.MATCH_ETHERNET;
+import static android.net.NetworkTemplate.MATCH_MOBILE;
+import static android.net.NetworkTemplate.MATCH_WIFI;
 import static android.net.TetheringManager.TETHERING_BLUETOOTH;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringManager.TETHERING_NCM;
@@ -47,11 +51,14 @@ import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.TetheringManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
 import android.content.Context;
 import android.net.NetworkCapabilities;
+import android.net.NetworkTemplate;
+import android.os.Build;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
 import android.stats.connectivity.UpstreamType;
@@ -62,8 +69,11 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.networkstack.tethering.UpstreamNetworkState;
 import com.android.networkstack.tethering.metrics.TetheringMetrics.Dependencies;
+import com.android.testutils.DevSdkIgnoreRule;
+import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -72,12 +82,15 @@ import org.mockito.MockitoAnnotations;
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 public final class TetheringMetricsTest {
+    @Rule public final DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
+
     private static final String TEST_CALLER_PKG = "com.test.caller.pkg";
     private static final String SETTINGS_PKG = "com.android.settings";
     private static final String SYSTEMUI_PKG = "com.android.systemui";
     private static final String GMS_PKG = "com.google.android.gms";
     private static final long TEST_START_TIME = 1670395936033L;
     private static final long SECOND_IN_MILLIS = 1_000L;
+    private static final int MATCH_NONE = -1;
 
     @Mock private Context mContext;
     @Mock private Dependencies mDeps;
@@ -391,5 +404,28 @@ public final class TetheringMetricsTest {
         runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_WIFI_AWARE, false /* isSupported */);
         runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_LOWPAN, false /* isSupported */);
         runUsageSupportedForUpstreamTypeTest(UpstreamType.UT_UNKNOWN, false /* isSupported */);
+    }
+
+    private void runBuildNetworkTemplateForUpstreamType(final UpstreamType upstreamType,
+            final int matchRule)  {
+        final NetworkTemplate template =
+                TetheringMetrics.buildNetworkTemplateForUpstreamType(upstreamType);
+        if (matchRule == MATCH_NONE) {
+            assertNull(template);
+        } else {
+            assertEquals(matchRule, template.getMatchRule());
+        }
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
+    public void testBuildNetworkTemplateForUpstreamType() {
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_CELLULAR, MATCH_MOBILE);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_WIFI, MATCH_WIFI);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_BLUETOOTH, MATCH_BLUETOOTH);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_ETHERNET, MATCH_ETHERNET);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_WIFI_AWARE, MATCH_NONE);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_LOWPAN, MATCH_NONE);
+        runBuildNetworkTemplateForUpstreamType(UpstreamType.UT_UNKNOWN, MATCH_NONE);
     }
 }
