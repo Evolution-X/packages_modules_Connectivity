@@ -19,6 +19,9 @@ package com.android.net.module.util;
 import android.app.usage.NetworkStats;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.build.SdkLevel;
+
+import java.util.ArrayList;
 
 /**
  * Various utilities used for NetworkStats related code.
@@ -105,12 +108,21 @@ public class NetworkStatsUtils {
      */
     public static android.net.NetworkStats fromPublicNetworkStats(
             NetworkStats publiceNetworkStats) {
-        android.net.NetworkStats stats = new android.net.NetworkStats(0L, 0);
+        final ArrayList<android.net.NetworkStats.Entry> entries = new ArrayList<>();
         while (publiceNetworkStats.hasNextBucket()) {
             NetworkStats.Bucket bucket = new NetworkStats.Bucket();
             publiceNetworkStats.getNextBucket(bucket);
-            final android.net.NetworkStats.Entry entry = fromBucket(bucket);
-            stats = stats.addEntry(entry);
+            entries.add(fromBucket(bucket));
+        }
+        android.net.NetworkStats stats = new android.net.NetworkStats(0L, 0);
+        // The new API is only supported on devices running the mainline version of `NetworkStats`.
+        // It should always be used when available for memory efficiency.
+        if (SdkLevel.isAtLeastT()) {
+            stats = stats.addEntries(entries);
+        } else {
+            for (android.net.NetworkStats.Entry entry : entries) {
+                stats = stats.addEntry(entry);
+            }
         }
         return stats;
     }
