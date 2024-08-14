@@ -296,9 +296,6 @@ java_library {
         "framework-connectivity-t.stubs.module_lib",
         "framework-location.stubs.module_lib",
     ],
-    static_libs: [
-        "modules-utils-build",
-    ],
     jarjar_rules: "jarjar-rules-shared.txt",
     visibility: [
         "//cts/tests/tests/net",
