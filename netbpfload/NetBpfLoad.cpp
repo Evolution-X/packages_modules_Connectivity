@@ -354,15 +354,15 @@ static int readSectionByName(const char* name, ifstream& elfFile, vector<char>& 
     return -2;
 }
 
-unsigned int readSectionUint(const char* name, ifstream& elfFile, unsigned int defVal) {
+unsigned int readSectionUint(const char* name, ifstream& elfFile) {
     vector<char> theBytes;
     int ret = readSectionByName(name, elfFile, theBytes);
     if (ret) {
-        ALOGD("Couldn't find section %s (defaulting to %u [0x%x]).", name, defVal, defVal);
-        return defVal;
+        ALOGE("Couldn't find section %s.", name);
+        abort();
     } else if (theBytes.size() < sizeof(unsigned int)) {
-        ALOGE("Section %s too short (defaulting to %u [0x%x]).", name, defVal, defVal);
-        return defVal;
+        ALOGE("Section %s is too short.", name);
+        abort();
     } else {
         // decode first 4 bytes as LE32 uint, there will likely be more bytes due to alignment.
         unsigned int value = static_cast<unsigned char>(theBytes[3]);
@@ -1104,11 +1104,8 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
               elfPath, (char*)license.data());
     }
 
-    // the following default values are for bpfloader V0.0 format which does not include them
-    unsigned int bpfLoaderMinVer =
-            readSectionUint("bpfloader_min_ver", elfFile, DEFAULT_BPFLOADER_MIN_VER);
-    unsigned int bpfLoaderMaxVer =
-            readSectionUint("bpfloader_max_ver", elfFile, DEFAULT_BPFLOADER_MAX_VER);
+    unsigned int bpfLoaderMinVer = readSectionUint("bpfloader_min_ver", elfFile);
+    unsigned int bpfLoaderMaxVer = readSectionUint("bpfloader_max_ver", elfFile);
 
     // inclusive lower bound check
     if (bpfloader_ver < bpfLoaderMinVer) {
