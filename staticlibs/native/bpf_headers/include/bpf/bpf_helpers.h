@@ -71,11 +71,11 @@
  * In which case it's just best to use the default.
  */
 #ifndef BPFLOADER_MIN_VER
-#define BPFLOADER_MIN_VER BPFLOADER_PLATFORM_VERSION
+#define BPFLOADER_MIN_VER BPFLOADER_PLATFORM_VERSION  // inclusive, ie. >=
 #endif
 
 #ifndef BPFLOADER_MAX_VER
-#define BPFLOADER_MAX_VER DEFAULT_BPFLOADER_MAX_VER
+#define BPFLOADER_MAX_VER 0x10000u  // exclusive, ie. < v1.0
 #endif
 
 /* place things in different elf sections */
