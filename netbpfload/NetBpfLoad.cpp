@@ -1126,8 +1126,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
             readSectionUint("bpfloader_min_ver", elfFile, DEFAULT_BPFLOADER_MIN_VER);
     unsigned int bpfLoaderMaxVer =
             readSectionUint("bpfloader_max_ver", elfFile, DEFAULT_BPFLOADER_MAX_VER);
-    unsigned int bpfLoaderMinRequiredVer =
-            readSectionUint("bpfloader_min_required_ver", elfFile, 0);
     size_t sizeOfBpfMapDef =
             readSectionUint("size_of_bpf_map_def", elfFile, DEFAULT_SIZEOF_BPF_MAP_DEF);
     size_t sizeOfBpfProgDef =
@@ -1145,12 +1143,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
         ALOGI("BpfLoader version 0x%05x ignoring ELF object %s with max ver 0x%05x",
               bpfloader_ver, elfPath, bpfLoaderMaxVer);
         return 0;
-    }
-
-    if (bpfloader_ver < bpfLoaderMinRequiredVer) {
-        ALOGI("BpfLoader version 0x%05x failing due to ELF object %s with required min ver 0x%05x",
-              bpfloader_ver, elfPath, bpfLoaderMinRequiredVer);
-        return -1;
     }
 
     ALOGI("BpfLoader version 0x%05x processing ELF object %s with ver [0x%05x,0x%05x)",
