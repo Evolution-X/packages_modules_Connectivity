@@ -29,7 +29,7 @@
  *                                                                            *
  *                          ! ! ! W A R N I N G ! ! !                         *
  *                                                                            *
- * CHANGES TO THESE STRUCTURE DEFINITIONS OUTSIDE OF AOSP/MASTER *WILL* BREAK *
+ * CHANGES TO THESE STRUCTURE DEFINITIONS OUTSIDE OF AOSP/MAIN *WILL* BREAK   *
  * MAINLINE MODULE COMPATIBILITY                                              *
  *                                                                            *
  * AND THUS MAY RESULT IN YOUR DEVICE BRICKING AT SOME ARBITRARY POINT IN     *
