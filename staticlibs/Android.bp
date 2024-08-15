@@ -531,6 +531,19 @@ java_library {
     ],
 }
 
+// net-utils-connectivity-apks is only for NetworkStack, CaptivePortalLogin and
+// Tethering.apk
+// It includes all the static libraries in this directory, which is safe because
+// these APKs use R8 to strip out unused code, and they do not depend on
+// bootclasspath jars that may have duplicate copies of the included classes
+// with the same jarjaring.
+// Tethering.apk does depend on a bootclasspath jar (framework-tethering.jar),
+// however it does not use any of the static libraries. If it did, Tethering.apk
+// would need to use another variant that excludes classes that are already
+// included in framework-tethering.jar (similarly to how framework-connectivity
+// and service-connectivity do it). Otherwise, static libs included in
+// framework-tethering and Tethering.apk and jarjared the same way would
+// conflict.
 java_library {
     name: "net-utils-connectivity-apks",
     srcs: [
