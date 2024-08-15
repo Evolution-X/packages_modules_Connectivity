@@ -1078,7 +1078,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
 }
 
 int loadProg(const char* const elfPath, bool* const isCritical, const unsigned int bpfloader_ver,
-             const Location& location) {
+             const char* const prefix) {
     vector<char> license;
     vector<char> critical;
     vector<codeSection> cs;
@@ -1130,7 +1130,7 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
         return ret;
     }
 
-    ret = createMaps(elfPath, elfFile, mapFds, location.prefix, bpfloader_ver);
+    ret = createMaps(elfPath, elfFile, mapFds, prefix, bpfloader_ver);
     if (ret) {
         ALOGE("Failed to create maps: (ret=%d) in %s", ret, elfPath);
         return ret;
@@ -1141,7 +1141,7 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
 
     applyMapRelo(elfFile, mapFds, cs);
 
-    ret = loadCodeSections(elfPath, cs, string(license.data()), location.prefix, bpfloader_ver);
+    ret = loadCodeSections(elfPath, cs, string(license.data()), prefix, bpfloader_ver);
     if (ret) ALOGE("Failed to load programs, loadCodeSections ret=%d", ret);
 
     return ret;
@@ -1200,7 +1200,7 @@ static int loadAllElfObjects(const unsigned int bpfloader_ver, const Location& l
             progPath += s;
 
             bool critical;
-            int ret = loadProg(progPath.c_str(), &critical, bpfloader_ver, location);
+            int ret = loadProg(progPath.c_str(), &critical, bpfloader_ver, location.prefix);
             if (ret) {
                 if (critical) retVal = ret;
                 ALOGE("Failed to load object: %s, ret: %s", progPath.c_str(), std::strerror(-ret));
