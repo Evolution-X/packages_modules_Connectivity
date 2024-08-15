@@ -414,19 +414,10 @@ static long (*bpf_get_current_comm)(void* buf, uint32_t buf_size) = (void*) BPF_
     SECTION(SECTION_NAME)                                                                \
     int the_prog
 
-#ifndef DEFAULT_BPF_PROG_SELINUX_CONTEXT
-#define DEFAULT_BPF_PROG_SELINUX_CONTEXT ""
-#endif
-
-#ifndef DEFAULT_BPF_PROG_PIN_SUBDIR
-#define DEFAULT_BPF_PROG_PIN_SUBDIR ""
-#endif
-
 #define DEFINE_BPF_PROG_KVER_RANGE_OPT(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, max_kv, \
                                        opt)                                                        \
     DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, max_kv,                \
-                        BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, opt,                                 \
-                        DEFAULT_BPF_PROG_SELINUX_CONTEXT, DEFAULT_BPF_PROG_PIN_SUBDIR,             \
+                        BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, opt, "", "",                         \
                         LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 // Programs (here used in the sense of functions/sections) marked optional are allowed to fail
