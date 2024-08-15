@@ -250,7 +250,7 @@ typedef struct {
     vector<char> rel_data;
     optional<struct bpf_prog_def> prog_def;
 
-    unique_fd prog_fd; /* fd after loading */
+    unique_fd prog_fd; // fd after loading
 } codeSection;
 
 static int readElfHeader(ifstream& elfFile, Elf64_Ehdr* eh) {
@@ -262,7 +262,7 @@ static int readElfHeader(ifstream& elfFile, Elf64_Ehdr* eh) {
     return 0;
 }
 
-/* Reads all section header tables into an Shdr array */
+// Reads all section header tables into an Shdr array
 static int readSectionHeadersAll(ifstream& elfFile, vector<Elf64_Shdr>& shTable) {
     Elf64_Ehdr eh;
     int ret = 0;
@@ -273,7 +273,7 @@ static int readSectionHeadersAll(ifstream& elfFile, vector<Elf64_Shdr>& shTable)
     elfFile.seekg(eh.e_shoff);
     if (elfFile.fail()) return -1;
 
-    /* Read shdr table entries */
+    // Read shdr table entries
     shTable.resize(eh.e_shnum);
 
     if (!elfFile.read((char*)shTable.data(), (eh.e_shnum * eh.e_shentsize))) return -ENOMEM;
@@ -281,7 +281,7 @@ static int readSectionHeadersAll(ifstream& elfFile, vector<Elf64_Shdr>& shTable)
     return 0;
 }
 
-/* Read a section by its index - for ex to get sec hdr strtab blob */
+// Read a section by its index - for ex to get sec hdr strtab blob
 static int readSectionByIdx(ifstream& elfFile, int id, vector<char>& sec) {
     vector<Elf64_Shdr> shTable;
     int ret = readSectionHeadersAll(elfFile, shTable);
@@ -296,7 +296,7 @@ static int readSectionByIdx(ifstream& elfFile, int id, vector<char>& sec) {
     return 0;
 }
 
-/* Read whole section header string table */
+// Read whole section header string table
 static int readSectionHeaderStrtab(ifstream& elfFile, vector<char>& strtab) {
     Elf64_Ehdr eh;
     int ret = readElfHeader(elfFile, &eh);
@@ -308,7 +308,7 @@ static int readSectionHeaderStrtab(ifstream& elfFile, vector<char>& strtab) {
     return 0;
 }
 
-/* Get name from offset in strtab */
+// Get name from offset in strtab
 static int getSymName(ifstream& elfFile, int nameOff, string& name) {
     int ret;
     vector<char> secStrTab;
@@ -322,7 +322,7 @@ static int getSymName(ifstream& elfFile, int nameOff, string& name) {
     return 0;
 }
 
-/* Reads a full section by name - example to get the GPL license */
+// Reads a full section by name - example to get the GPL license
 static int readSectionByName(const char* name, ifstream& elfFile, vector<char>& data) {
     vector<char> secStrTab;
     vector<Elf64_Shdr> shTable;
@@ -428,17 +428,6 @@ static enum bpf_prog_type getSectionType(string& name) {
     return BPF_PROG_TYPE_UNSPEC;
 }
 
-/*
-static string getSectionName(enum bpf_prog_type type)
-{
-    for (auto& snt : sectionNameTypes)
-        if (snt.type == type)
-            return string(snt.name);
-
-    return "UNKNOWN SECTION NAME " + std::to_string(type);
-}
-*/
-
 static int readProgDefs(ifstream& elfFile, vector<struct bpf_prog_def>& pd,
                         size_t sizeOfBpfProgDef) {
     vector<char> pdData;
@@ -479,7 +468,7 @@ static int getSectionSymNames(ifstream& elfFile, const string& sectionName, vect
     ret = readSymTab(elfFile, 1 /* sort */, symtab);
     if (ret) return ret;
 
-    /* Get index of section */
+    // Get index of section
     ret = readSectionHeadersAll(elfFile, shTable);
     if (ret) return ret;
 
@@ -494,7 +483,7 @@ static int getSectionSymNames(ifstream& elfFile, const string& sectionName, vect
         }
     }
 
-    /* No section found with matching name*/
+    // No section found with matching name
     if (sec_idx == -1) {
         ALOGW("No %s section could be found in elf object", sectionName.c_str());
         return -1;
@@ -514,7 +503,7 @@ static int getSectionSymNames(ifstream& elfFile, const string& sectionName, vect
     return 0;
 }
 
-/* Read a section by its index - for ex to get sec hdr strtab blob */
+// Read a section by its index - for ex to get sec hdr strtab blob
 static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs, size_t sizeOfBpfProgDef) {
     vector<Elf64_Shdr> shTable;
     int entries, ret = 0;
@@ -568,7 +557,7 @@ static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs, size_t s
             }
         }
 
-        /* Check for rel section */
+        // Check for rel section
         if (cs_temp.data.size() > 0 && i < entries) {
             ret = getSymName(elfFile, shTable[i + 1].sh_name, name);
             if (ret) return ret;
@@ -881,26 +870,6 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
     return ret;
 }
 
-/* For debugging, dump all instructions */
-static void dumpIns(char* ins, int size) {
-    for (int row = 0; row < size / 8; row++) {
-        ALOGE("%d: ", row);
-        for (int j = 0; j < 8; j++) {
-            ALOGE("%3x ", ins[(row * 8) + j]);
-        }
-        ALOGE("\n");
-    }
-}
-
-/* For debugging, dump all code sections from cs list */
-static void dumpAllCs(vector<codeSection>& cs) {
-    for (int i = 0; i < (int)cs.size(); i++) {
-        ALOGE("Dumping cs %d, name %s", int(i), cs[i].name.c_str());
-        dumpIns((char*)cs[i].data.data(), cs[i].data.size());
-        ALOGE("-----------");
-    }
-}
-
 static void applyRelo(void* insnsPtr, Elf64_Addr offset, int fd) {
     int insnIndex;
     struct bpf_insn *insn, *insns;
@@ -918,9 +887,7 @@ static void applyRelo(void* insnsPtr, Elf64_Addr offset, int fd) {
     }
 
     if (insn->code != (BPF_LD | BPF_IMM | BPF_DW)) {
-        ALOGE("Dumping all instructions till ins %d", insnIndex);
         ALOGE("invalid relo for insn %d: code 0x%x", insnIndex, insn->code);
-        dumpIns((char*)insnsPtr, (insnIndex + 3) * 8);
         return;
     }
 
@@ -945,7 +912,7 @@ static void applyMapRelo(ifstream& elfFile, vector<unique_fd> &mapFds, vector<co
             ret = getSymNameByIdx(elfFile, symIndex, symName);
             if (ret) return;
 
-            /* Find the map fd and apply relo */
+            // Find the map fd and apply relo
             for (int j = 0; j < (int)mapNames.size(); j++) {
                 if (!mapNames[j].compare(symName)) {
                     applyRelo(cs[k].data.data(), rel[i].r_offset, mapFds[j]);
@@ -1206,9 +1173,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
     }
-
-    /* Just for future debugging */
-    if (0) dumpAllCs(cs);
 
     ret = createMaps(elfPath, elfFile, mapFds, location.prefix, sizeOfBpfMapDef, bpfloader_ver);
     if (ret) {
