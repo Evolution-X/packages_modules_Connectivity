@@ -62,6 +62,8 @@ java_defaults {
     static_libs: [
         // Cannot go to framework-connectivity because mid_sdk checks require 31.
         "modules-utils-binary-xml",
+        "com.android.nearby.flags-aconfig-java",
+        "com.android.net.thread.flags-aconfig-java",
     ],
     impl_only_libs: [
         // The build system will use framework-bluetooth module_current stubs, because
@@ -127,6 +129,8 @@ java_sdk_library {
         // been included in static_libs might still need to
         // be in stub_only_libs to be usable when generating the API stubs.
         "com.android.net.flags-aconfig-java",
+        "com.android.nearby.flags-aconfig-java",
+        "com.android.net.thread.flags-aconfig-java",
         // Use prebuilt framework-connectivity stubs to avoid circular dependencies
         "sdk_module-lib_current_framework-connectivity",
     ],
