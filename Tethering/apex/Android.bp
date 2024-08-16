@@ -215,6 +215,7 @@ bootclasspath_fragment {
             "android.net.nsd",
             "android.net.thread",
             "android.net.wear",
+            "android.net.http.internal",
         ],
     },
 }

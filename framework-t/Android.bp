@@ -62,6 +62,8 @@ java_defaults {
     static_libs: [
         // Cannot go to framework-connectivity because mid_sdk checks require 31.
         "modules-utils-binary-xml",
+        "com.android.nearby.flags-aconfig-java",
+        "com.android.net.thread.flags-aconfig-java",
     ],
     impl_only_libs: [
         // The build system will use framework-bluetooth module_current stubs, because
@@ -97,20 +99,6 @@ filegroup {
     visibility: ["//packages/modules/Connectivity:__subpackages__"],
 }
 
-// The filegroup lists files that are necessary for verifying building mdns as a standalone,
-// for use with service-connectivity-mdns-standalone-build-test
-// This filegroup should never be included in anywhere in the module build. It is only used for
-// building service-connectivity-mdns-standalone-build-test target. The files will be renamed by
-// copybara to prevent them from being shadowed by the bootclasspath copies.
-filegroup {
-    name: "framework-connectivity-t-mdns-standalone-build-sources",
-    srcs: [
-        "src/android/net/nsd/OffloadEngine.java",
-        "src/android/net/nsd/OffloadServiceInfo.java",
-    ],
-    visibility: ["//packages/modules/Connectivity:__subpackages__"],
-}
-
 java_library {
     name: "framework-connectivity-t-pre-jarjar",
     defaults: ["framework-connectivity-t-defaults"],
@@ -141,6 +129,8 @@ java_sdk_library {
         // been included in static_libs might still need to
         // be in stub_only_libs to be usable when generating the API stubs.
         "com.android.net.flags-aconfig-java",
+        "com.android.nearby.flags-aconfig-java",
+        "com.android.net.thread.flags-aconfig-java",
         // Use prebuilt framework-connectivity stubs to avoid circular dependencies
         "sdk_module-lib_current_framework-connectivity",
     ],

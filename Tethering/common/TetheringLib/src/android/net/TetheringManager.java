@@ -38,6 +38,7 @@ import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.net.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -62,16 +63,6 @@ import java.util.function.Supplier;
  */
 @SystemApi
 public class TetheringManager {
-    // TODO : remove this class when udc-mainline-prod is abandoned and android.net.flags.Flags is
-    // available here
-    /** @hide */
-    public static class Flags {
-        static final String TETHERING_REQUEST_WITH_SOFT_AP_CONFIG =
-                "com.android.net.flags.tethering_request_with_soft_ap_config";
-        static final String TETHERING_REQUEST_VIRTUAL =
-                "com.android.net.flags.tethering_request_virtual";
-    }
-
     private static final String TAG = TetheringManager.class.getSimpleName();
     private static final int DEFAULT_TIMEOUT_MS = 60_000;
     private static final long CONNECTOR_POLL_INTERVAL_MILLIS = 200L;
@@ -204,7 +195,7 @@ public class TetheringManager {
      * AVF(Android Virtualization Framework).
      * @hide
      */
-    @FlaggedApi(Flags.TETHERING_REQUEST_VIRTUAL)
+    @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_VIRTUAL)
     @SystemApi
     public static final int TETHERING_VIRTUAL = 7;
 
@@ -705,7 +696,7 @@ public class TetheringManager {
         /**
          * @hide
          */
-        @FlaggedApi(Flags.TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
         public TetheringRequest(@NonNull final TetheringRequestParcel request) {
             mRequestParcel = request;
         }
@@ -714,7 +705,7 @@ public class TetheringManager {
             mRequestParcel = in.readParcelable(TetheringRequestParcel.class.getClassLoader());
         }
 
-        @FlaggedApi(Flags.TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
         @NonNull
         public static final Creator<TetheringRequest> CREATOR = new Creator<>() {
             @Override
@@ -728,13 +719,13 @@ public class TetheringManager {
             }
         };
 
-        @FlaggedApi(Flags.TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
         @Override
         public int describeContents() {
             return 0;
         }
 
-        @FlaggedApi(Flags.TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
         @Override
         public void writeToParcel(@NonNull Parcel dest, int flags) {
             dest.writeParcelable(mRequestParcel, flags);

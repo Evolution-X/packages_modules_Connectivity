@@ -41,6 +41,7 @@ import android.util.Range;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 import com.android.net.module.util.BitUtils;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.NetworkCapabilitiesUtils;
@@ -123,22 +124,6 @@ import java.util.StringJoiner;
  */
 public final class NetworkCapabilities implements Parcelable {
     private static final String TAG = "NetworkCapabilities";
-
-    // TODO : remove this class when udc-mainline-prod is abandoned and android.net.flags.Flags is
-    // available here
-    /** @hide */
-    public static class Flags {
-        static final String FLAG_FORBIDDEN_CAPABILITY =
-                "com.android.net.flags.forbidden_capability";
-        static final String FLAG_NET_CAPABILITY_LOCAL_NETWORK =
-                "com.android.net.flags.net_capability_local_network";
-        static final String REQUEST_RESTRICTED_WIFI =
-                "com.android.net.flags.request_restricted_wifi";
-        static final String SUPPORT_TRANSPORT_SATELLITE =
-                "com.android.net.flags.support_transport_satellite";
-        static final String NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED =
-                "com.android.net.flags.net_capability_not_bandwidth_constrained";
-    }
 
     /**
      * Mechanism to support redaction of fields in NetworkCapabilities that are guarded by specific
@@ -761,7 +746,7 @@ public final class NetworkCapabilities implements Parcelable {
      * usage on constrained networks, such as disabling network access to apps that are not in the
      * foreground.
      */
-    @FlaggedApi(Flags.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
+    @FlaggedApi(Flags.FLAG_NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
     public static final int NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED = 37;
 
     private static final int MAX_NET_CAPABILITY = NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED;
@@ -1374,7 +1359,7 @@ public final class NetworkCapabilities implements Parcelable {
     /**
      * Indicates this network uses a Satellite transport.
      */
-    @FlaggedApi(Flags.SUPPORT_TRANSPORT_SATELLITE)
+    @FlaggedApi(Flags.FLAG_SUPPORT_TRANSPORT_SATELLITE)
     public static final int TRANSPORT_SATELLITE = 10;
 
     /** @hide */
@@ -2864,7 +2849,7 @@ public final class NetworkCapabilities implements Parcelable {
      * @return
      */
     @NonNull
-    @FlaggedApi(Flags.REQUEST_RESTRICTED_WIFI)
+    @FlaggedApi(Flags.FLAG_REQUEST_RESTRICTED_WIFI)
     public Set<Integer> getSubscriptionIds() {
         return new ArraySet<>(mSubIds);
     }

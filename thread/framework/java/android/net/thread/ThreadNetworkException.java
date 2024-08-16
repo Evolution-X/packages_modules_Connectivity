@@ -23,6 +23,8 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
 
+import com.android.net.thread.flags.Flags;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
@@ -31,7 +33,7 @@ import java.lang.annotation.RetentionPolicy;
  *
  * @hide
  */
-@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED)
+@FlaggedApi(Flags.FLAG_THREAD_ENABLED)
 @SystemApi
 public class ThreadNetworkException extends Exception {
     /** @hide */

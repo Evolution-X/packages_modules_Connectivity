@@ -26,6 +26,8 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 
+import com.android.net.thread.flags.Flags;
+
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Objects;
@@ -37,7 +39,7 @@ import java.util.Objects;
  * @see PendingOperationalDataset
  * @hide
  */
-@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED)
+@FlaggedApi(Flags.FLAG_THREAD_ENABLED)
 @SystemApi
 public final class OperationalDatasetTimestamp {
     /** @hide */
