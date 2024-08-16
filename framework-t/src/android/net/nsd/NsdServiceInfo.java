@@ -30,6 +30,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 
+import com.android.net.flags.Flags;
 import com.android.net.module.util.InetAddressUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -527,7 +528,7 @@ public final class NsdServiceInfo implements Parcelable {
      * Only one subtype will be registered if multiple elements of {@code subtypes} have the same
      * case-insensitive value.
      */
-    @FlaggedApi(NsdManager.Flags.NSD_SUBTYPES_SUPPORT_ENABLED)
+    @FlaggedApi(Flags.FLAG_NSD_SUBTYPES_SUPPORT_ENABLED)
     public void setSubtypes(@NonNull Set<String> subtypes) {
         mSubtypes.clear();
         mSubtypes.addAll(subtypes);
@@ -540,7 +541,7 @@ public final class NsdServiceInfo implements Parcelable {
      * NsdManager.DiscoveryListener}), the return value may or may not include the subtypes of this
      * service.
      */
-    @FlaggedApi(NsdManager.Flags.NSD_SUBTYPES_SUPPORT_ENABLED)
+    @FlaggedApi(Flags.FLAG_NSD_SUBTYPES_SUPPORT_ENABLED)
     @NonNull
     public Set<String> getSubtypes() {
         return Collections.unmodifiableSet(mSubtypes);

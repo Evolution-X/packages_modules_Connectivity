@@ -34,6 +34,7 @@ import android.util.SparseIntArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.thread.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -51,7 +52,7 @@ import java.util.function.Consumer;
  *
  * @hide
  */
-@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED)
+@FlaggedApi(Flags.FLAG_THREAD_ENABLED)
 @SystemApi
 public final class ThreadNetworkController {
     private static final String TAG = "ThreadNetworkController";
@@ -626,7 +627,7 @@ public final class ThreadNetworkController {
      * @param callback the callback to receive Thread configuration changes
      * @throws IllegalArgumentException if {@code callback} has already been registered
      */
-    @FlaggedApi(ThreadNetworkFlags.FLAG_CONFIGURATION_ENABLED)
+    @FlaggedApi(Flags.FLAG_CONFIGURATION_ENABLED)
     @RequiresPermission(permission.THREAD_NETWORK_PRIVILEGED)
     public void registerConfigurationCallback(
             @NonNull @CallbackExecutor Executor executor,
@@ -656,7 +657,7 @@ public final class ThreadNetworkController {
      *     #registerConfigurationCallback}
      * @throws IllegalArgumentException if {@code callback} hasn't been registered
      */
-    @FlaggedApi(ThreadNetworkFlags.FLAG_CONFIGURATION_ENABLED)
+    @FlaggedApi(Flags.FLAG_CONFIGURATION_ENABLED)
     @RequiresPermission(permission.THREAD_NETWORK_PRIVILEGED)
     public void unregisterConfigurationCallback(@NonNull Consumer<ThreadConfiguration> callback) {
         requireNonNull(callback, "callback cannot be null");
