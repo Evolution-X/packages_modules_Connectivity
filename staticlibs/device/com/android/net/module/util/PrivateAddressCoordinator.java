@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.networkstack.tethering;
+package com.android.net.module.util;
 
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 import static android.net.TetheringManager.CONNECTIVITY_SCOPE_GLOBAL;
