@@ -78,6 +78,7 @@ import android.util.SparseIntArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 
 import libcore.net.event.NetworkEventDispatcher;
 
@@ -124,24 +125,6 @@ import java.util.concurrent.RejectedExecutionException;
 public class ConnectivityManager {
     private static final String TAG = "ConnectivityManager";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
-
-    // TODO : remove this class when udc-mainline-prod is abandoned and android.net.flags.Flags is
-    // available here
-    /** @hide */
-    public static class Flags {
-        static final String SET_DATA_SAVER_VIA_CM =
-                "com.android.net.flags.set_data_saver_via_cm";
-        static final String SUPPORT_IS_UID_NETWORKING_BLOCKED =
-                "com.android.net.flags.support_is_uid_networking_blocked";
-        static final String BASIC_BACKGROUND_RESTRICTIONS_ENABLED =
-                "com.android.net.flags.basic_background_restrictions_enabled";
-        static final String METERED_NETWORK_FIREWALL_CHAINS =
-                "com.android.net.flags.metered_network_firewall_chains";
-        static final String BLOCKED_REASON_OEM_DENY_CHAINS =
-                "com.android.net.flags.blocked_reason_oem_deny_chains";
-        static final String BLOCKED_REASON_NETWORK_RESTRICTED =
-                "com.android.net.flags.blocked_reason_network_restricted";
-    }
 
     /**
      * A change in network connectivity has occurred. A default connection has either
@@ -919,7 +902,7 @@ public class ConnectivityManager {
      *
      * @hide
      */
-    @FlaggedApi(Flags.BASIC_BACKGROUND_RESTRICTIONS_ENABLED)
+    @FlaggedApi(Flags.FLAG_BASIC_BACKGROUND_RESTRICTIONS_ENABLED)
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     public static final int BLOCKED_REASON_APP_BACKGROUND = 1 << 6;
 
@@ -932,7 +915,7 @@ public class ConnectivityManager {
      * @see #FIREWALL_CHAIN_OEM_DENY_3
      * @hide
      */
-    @FlaggedApi(Flags.BLOCKED_REASON_OEM_DENY_CHAINS)
+    @FlaggedApi(Flags.FLAG_BLOCKED_REASON_OEM_DENY_CHAINS)
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     public static final int BLOCKED_REASON_OEM_DENY = 1 << 7;
 
@@ -943,7 +926,7 @@ public class ConnectivityManager {
      *
      * @hide
      */
-    @FlaggedApi(Flags.BLOCKED_REASON_NETWORK_RESTRICTED)
+    @FlaggedApi(Flags.FLAG_BLOCKED_REASON_NETWORK_RESTRICTED)
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     public static final int BLOCKED_REASON_NETWORK_RESTRICTED = 1 << 8;
 
@@ -1052,7 +1035,7 @@ public class ConnectivityManager {
      * exempted for specific situations while in the background.
      * @hide
      */
-    @FlaggedApi(Flags.BASIC_BACKGROUND_RESTRICTIONS_ENABLED)
+    @FlaggedApi(Flags.FLAG_BASIC_BACKGROUND_RESTRICTIONS_ENABLED)
     @SystemApi(client = MODULE_LIBRARIES)
     public static final int FIREWALL_CHAIN_BACKGROUND = 6;
 
@@ -1120,7 +1103,7 @@ public class ConnectivityManager {
      * @hide
      */
     // TODO: Merge this chain with data saver and support setFirewallChainEnabled
-    @FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS)
+    @FlaggedApi(Flags.FLAG_METERED_NETWORK_FIREWALL_CHAINS)
     @SystemApi(client = MODULE_LIBRARIES)
     public static final int FIREWALL_CHAIN_METERED_ALLOW = 10;
 
@@ -1139,7 +1122,7 @@ public class ConnectivityManager {
      * @hide
      */
     // TODO: Support setFirewallChainEnabled to control this chain
-    @FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS)
+    @FlaggedApi(Flags.FLAG_METERED_NETWORK_FIREWALL_CHAINS)
     @SystemApi(client = MODULE_LIBRARIES)
     public static final int FIREWALL_CHAIN_METERED_DENY_USER = 11;
 
@@ -1158,7 +1141,7 @@ public class ConnectivityManager {
      * @hide
      */
     // TODO: Support setFirewallChainEnabled to control this chain
-    @FlaggedApi(Flags.METERED_NETWORK_FIREWALL_CHAINS)
+    @FlaggedApi(Flags.FLAG_METERED_NETWORK_FIREWALL_CHAINS)
     @SystemApi(client = MODULE_LIBRARIES)
     public static final int FIREWALL_CHAIN_METERED_DENY_ADMIN = 12;
 
@@ -6453,7 +6436,7 @@ public class ConnectivityManager {
      * @throws IllegalStateException if failed.
      * @hide
      */
-    @FlaggedApi(Flags.SET_DATA_SAVER_VIA_CM)
+    @FlaggedApi(Flags.FLAG_SET_DATA_SAVER_VIA_CM)
     @SystemApi(client = MODULE_LIBRARIES)
     @RequiresPermission(anyOf = {
             android.Manifest.permission.NETWORK_SETTINGS,
@@ -6714,7 +6697,7 @@ public class ConnectivityManager {
     // is provided by linux file group permission AID_NET_BW_ACCT and the
     // selinux context fs_bpf_net*.
     // Only the system server process and the network stack have access.
-    @FlaggedApi(Flags.SUPPORT_IS_UID_NETWORKING_BLOCKED)
+    @FlaggedApi(Flags.FLAG_SUPPORT_IS_UID_NETWORKING_BLOCKED)
     @SystemApi(client = MODULE_LIBRARIES)
     // Note b/326143935 kernel bug can trigger crash on some T device.
     @RequiresApi(VERSION_CODES.UPSIDE_DOWN_CAKE)

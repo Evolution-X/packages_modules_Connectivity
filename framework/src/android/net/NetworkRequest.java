@@ -50,6 +50,8 @@ import android.os.Process;
 import android.text.TextUtils;
 import android.util.Range;
 
+import com.android.net.flags.Flags;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -144,12 +146,6 @@ import java.util.Set;
  * Look up the specific capability to learn whether its usage requires this self-certification.
  */
 public class NetworkRequest implements Parcelable {
-
-    /** @hide */
-    public static class Flags {
-        static final String REQUEST_RESTRICTED_WIFI =
-                "com.android.net.flags.request_restricted_wifi";
-    }
     /**
      * The first requestId value that will be allocated.
      * @hide only used by ConnectivityService.
@@ -616,7 +612,7 @@ public class NetworkRequest implements Parcelable {
          * @param subIds A {@code Set} that represents subscription IDs.
          */
         @NonNull
-        @FlaggedApi(Flags.REQUEST_RESTRICTED_WIFI)
+        @FlaggedApi(Flags.FLAG_REQUEST_RESTRICTED_WIFI)
         public Builder setSubscriptionIds(@NonNull Set<Integer> subIds) {
             mNetworkCapabilities.setSubscriptionIds(subIds);
             return this;
@@ -880,7 +876,7 @@ public class NetworkRequest implements Parcelable {
      * @return Set of Integer values for this instance.
      */
     @NonNull
-    @FlaggedApi(Flags.REQUEST_RESTRICTED_WIFI)
+    @FlaggedApi(Flags.FLAG_REQUEST_RESTRICTED_WIFI)
     public Set<Integer> getSubscriptionIds() {
         // No need to make a defensive copy here as NC#getSubscriptionIds() already returns
         // a new set.

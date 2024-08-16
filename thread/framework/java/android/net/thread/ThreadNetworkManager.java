@@ -26,6 +26,7 @@ import android.content.Context;
 import android.os.RemoteException;
 
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.thread.flags.Flags;
 
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.List;
  *
  * @hide
  */
-@FlaggedApi(ThreadNetworkFlags.FLAG_THREAD_ENABLED)
+@FlaggedApi(Flags.FLAG_THREAD_ENABLED)
 @SystemApi
 @SystemService(ThreadNetworkManager.SERVICE_NAME)
 public final class ThreadNetworkManager {

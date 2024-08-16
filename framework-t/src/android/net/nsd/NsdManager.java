@@ -52,6 +52,7 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 import com.android.net.module.util.CollectionUtils;
 
 import java.lang.annotation.Retention;
@@ -147,22 +148,6 @@ import java.util.regex.Pattern;
 public final class NsdManager {
     private static final String TAG = NsdManager.class.getSimpleName();
     private static final boolean DBG = false;
-
-    // TODO : remove this class when udc-mainline-prod is abandoned and android.net.flags.Flags is
-    // available here
-    /** @hide */
-    public static class Flags {
-        static final String REGISTER_NSD_OFFLOAD_ENGINE_API =
-                "com.android.net.flags.register_nsd_offload_engine_api";
-        static final String NSD_SUBTYPES_SUPPORT_ENABLED =
-                "com.android.net.flags.nsd_subtypes_support_enabled";
-        static final String ADVERTISE_REQUEST_API =
-                "com.android.net.flags.advertise_request_api";
-        static final String NSD_CUSTOM_HOSTNAME_ENABLED =
-                "com.android.net.flags.nsd_custom_hostname_enabled";
-        static final String NSD_CUSTOM_TTL_ENABLED =
-                "com.android.net.flags.nsd_custom_ttl_enabled";
-    }
 
     /**
      * A regex for the acceptable format of a type or subtype label.
@@ -451,7 +436,7 @@ public final class NsdManager {
      *
      * @hide
      */
-    @FlaggedApi(NsdManager.Flags.REGISTER_NSD_OFFLOAD_ENGINE_API)
+    @FlaggedApi(Flags.FLAG_REGISTER_NSD_OFFLOAD_ENGINE_API)
     @SystemApi
     @RequiresPermission(anyOf = {NETWORK_SETTINGS, PERMISSION_MAINLINE_NETWORK_STACK,
             NETWORK_STACK})
@@ -489,7 +474,7 @@ public final class NsdManager {
      *
      * @hide
      */
-    @FlaggedApi(NsdManager.Flags.REGISTER_NSD_OFFLOAD_ENGINE_API)
+    @FlaggedApi(Flags.FLAG_REGISTER_NSD_OFFLOAD_ENGINE_API)
     @SystemApi
     @RequiresPermission(anyOf = {NETWORK_SETTINGS, PERMISSION_MAINLINE_NETWORK_STACK,
             NETWORK_STACK})
@@ -1506,7 +1491,7 @@ public final class NsdManager {
      * @param listener  The listener notifies of a successful discovery and is used
      * to stop discovery on this serviceType through a call on {@link #stopServiceDiscovery}.
      */
-    @FlaggedApi(Flags.NSD_SUBTYPES_SUPPORT_ENABLED)
+    @FlaggedApi(Flags.FLAG_NSD_SUBTYPES_SUPPORT_ENABLED)
     public void discoverServices(@NonNull DiscoveryRequest discoveryRequest,
             @NonNull Executor executor, @NonNull DiscoveryListener listener) {
         int key = putListener(listener, executor, discoveryRequest);
