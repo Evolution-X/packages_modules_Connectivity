@@ -16,6 +16,7 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.server.connectivity.mdns.MdnsSearchOptions.AGGRESSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsServiceCache.ServiceExpiredCallback;
 import static com.android.server.connectivity.mdns.MdnsServiceCache.findMatchedResponse;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.Clock;
@@ -182,7 +183,8 @@ public class MdnsServiceTypeClient {
                                     lastSentTime,
                                     sentResult.taskArgs.sessionId,
                                     searchOptions.getQueryMode(),
-                                    searchOptions.numOfQueriesBeforeBackoff()
+                                    searchOptions.numOfQueriesBeforeBackoff(),
+                                    false /* forceEnableBackoff */
                             );
                     dependencies.sendMessageDelayed(
                             handler,
@@ -396,11 +398,13 @@ public class MdnsServiceTypeClient {
         }
         // Remove the next scheduled periodical task.
         removeScheduledTask();
-        mdnsQueryScheduler.cancelScheduledRun();
-        // Keep tracking the ScheduledFuture for the task so we can cancel it if caller is not
-        // interested anymore.
-        final QueryTaskConfig taskConfig = new QueryTaskConfig(
-                searchOptions.getQueryMode());
+        final boolean forceEnableBackoff =
+                (searchOptions.getQueryMode() == AGGRESSIVE_QUERY_MODE && hadReply);
+        // Keep the latest scheduled run for rescheduling if there is a service in the cache.
+        if (!(forceEnableBackoff)) {
+            mdnsQueryScheduler.cancelScheduledRun();
+        }
+        final QueryTaskConfig taskConfig = new QueryTaskConfig(searchOptions.getQueryMode());
         final long now = clock.elapsedRealtime();
         if (lastSentTime == 0) {
             lastSentTime = now;
@@ -415,7 +419,8 @@ public class MdnsServiceTypeClient {
                             lastSentTime,
                             currentSessionId,
                             searchOptions.getQueryMode(),
-                            searchOptions.numOfQueriesBeforeBackoff()
+                            searchOptions.numOfQueriesBeforeBackoff(),
+                            forceEnableBackoff
                     );
             dependencies.sendMessageDelayed(
                     handler,
