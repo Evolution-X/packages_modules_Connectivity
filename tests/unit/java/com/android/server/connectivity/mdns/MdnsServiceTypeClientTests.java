@@ -2056,6 +2056,64 @@ public class MdnsServiceTypeClientTests {
         assertTrue(hasAnswer(knownAnswersQueryPacket, MdnsRecord.TYPE_PTR, subtypeLabels));
     }
 
+    @Test
+    public void sendQueries_AggressiveQueryMode_ServiceInCache() {
+        final int numOfQueriesBeforeBackoff = 11;
+        final MdnsSearchOptions searchOptions = MdnsSearchOptions.newBuilder()
+                .setQueryMode(AGGRESSIVE_QUERY_MODE)
+                .setNumOfQueriesBeforeBackoff(numOfQueriesBeforeBackoff)
+                .build();
+        startSendAndReceive(mockListenerOne, searchOptions);
+        verify(mockDeps, times(1)).removeMessages(any(), eq(EVENT_START_QUERYTASK));
+
+        int burstCounter = 0;
+        int betweenBurstTime = 0;
+        for (int i = 0; i < numOfQueriesBeforeBackoff; i += 3) {
+            verifyAndSendQuery(i, betweenBurstTime, /* expectsUnicastResponse= */ true);
+            verifyAndSendQuery(i + 1, /* timeInMs= */ 0, /* expectsUnicastResponse= */ false);
+            verifyAndSendQuery(i + 2, TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS,
+                    /* expectsUnicastResponse= */ false);
+            betweenBurstTime = Math.min(
+                    INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS * (int) Math.pow(2, burstCounter),
+                    MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS);
+            burstCounter++;
+        }
+        // In backoff mode, the current scheduled task will be canceled and reschedule if the
+        // 0.8 * smallestRemainingTtl is larger than time to next run.
+        long currentTime = TEST_TTL / 2 + TEST_ELAPSED_REALTIME;
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        doReturn(true).when(mockDeps).hasMessages(any(), eq(EVENT_START_QUERYTASK));
+        processResponse(createResponse(
+                "service-instance-1", "192.0.2.123", 5353,
+                SERVICE_TYPE_LABELS,
+                Collections.emptyMap(), TEST_TTL), socketKey);
+        verify(mockDeps, times(2)).removeMessages(any(), eq(EVENT_START_QUERYTASK));
+        assertNotNull(delayMessage);
+        assertEquals((long) (TEST_TTL / 2 * 0.8), latestDelayMs);
+
+        // Register another listener. There is a service in cache, the query time should be
+        // rescheduled with previous run.
+        currentTime += (long) ((TEST_TTL / 2 * 0.8) - 500L);
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        startSendAndReceive(mockListenerTwo, searchOptions);
+        verify(mockDeps, times(3)).removeMessages(any(), eq(EVENT_START_QUERYTASK));
+        assertNotNull(delayMessage);
+        assertEquals(500L, latestDelayMs);
+
+        // Stop all listeners
+        stopSendAndReceive(mockListenerOne);
+        stopSendAndReceive(mockListenerTwo);
+        verify(mockDeps, times(4)).removeMessages(any(), eq(EVENT_START_QUERYTASK));
+
+        // Register a new listener. There is a service in cache, the query time should be
+        // rescheduled with remaining ttl.
+        currentTime += 400L;
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        startSendAndReceive(mockListenerOne, searchOptions);
+        assertNotNull(delayMessage);
+        assertEquals(9680L, latestDelayMs);
+    }
+
     private static MdnsServiceInfo matchServiceName(String name) {
         return argThat(info -> info.getServiceInstanceName().equals(name));
     }
