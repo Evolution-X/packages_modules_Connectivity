@@ -46,7 +46,6 @@
 #define DEFAULT_BPFLOADER_MIN_VER 0u        // v0.0 (this is inclusive ie. >= v0.0)
 #define DEFAULT_BPFLOADER_MAX_VER 0x10000u  // v1.0 (this is exclusive ie. < v1.0)
 #define DEFAULT_SIZEOF_BPF_MAP_DEF 32       // v0.0 struct: enum (uint sized) + 7 uint
-#define DEFAULT_SIZEOF_BPF_PROG_DEF 20      // v0.0 struct: 4 uint + bool + 3 byte alignment pad
 
 /*
  * The bpf_{map,prog}_def structures are compiled for different architectures.

@@ -428,32 +428,24 @@ static enum bpf_prog_type getSectionType(string& name) {
     return BPF_PROG_TYPE_UNSPEC;
 }
 
-static int readProgDefs(ifstream& elfFile, vector<struct bpf_prog_def>& pd,
-                        size_t sizeOfBpfProgDef) {
+static int readProgDefs(ifstream& elfFile, vector<struct bpf_prog_def>& pd) {
     vector<char> pdData;
     int ret = readSectionByName("progs", elfFile, pdData);
     if (ret) return ret;
 
-    if (pdData.size() % sizeOfBpfProgDef) {
+    if (pdData.size() % sizeof(struct bpf_prog_def)) {
         ALOGE("readProgDefs failed due to improper sized progs section, %zu %% %zu != 0",
-              pdData.size(), sizeOfBpfProgDef);
+              pdData.size(), sizeof(struct bpf_prog_def));
         return -1;
     };
 
-    int progCount = pdData.size() / sizeOfBpfProgDef;
-    pd.resize(progCount);
-    size_t trimmedSize = std::min(sizeOfBpfProgDef, sizeof(struct bpf_prog_def));
+    pd.resize(pdData.size() / sizeof(struct bpf_prog_def));
 
     const char* dataPtr = pdData.data();
     for (auto& p : pd) {
-        // First we zero initialize
-        memset(&p, 0, sizeof(p));
-        // Then we set non-zero defaults
-        p.bpfloader_max_ver = DEFAULT_BPFLOADER_MAX_VER;  // v1.0
-        // Then we copy over the structure prefix from the ELF file.
-        memcpy(&p, dataPtr, trimmedSize);
-        // Move to next struct in the ELF file
-        dataPtr += sizeOfBpfProgDef;
+        // Copy the structure from the ELF file and move to the next one.
+        memcpy(&p, dataPtr, sizeof(struct bpf_prog_def));
+        dataPtr += sizeof(struct bpf_prog_def);
     }
     return 0;
 }
@@ -504,7 +496,7 @@ static int getSectionSymNames(ifstream& elfFile, const string& sectionName, vect
 }
 
 // Read a section by its index - for ex to get sec hdr strtab blob
-static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs, size_t sizeOfBpfProgDef) {
+static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs) {
     vector<Elf64_Shdr> shTable;
     int entries, ret = 0;
 
@@ -513,7 +505,7 @@ static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs, size_t s
     entries = shTable.size();
 
     vector<struct bpf_prog_def> pd;
-    ret = readProgDefs(elfFile, pd, sizeOfBpfProgDef);
+    ret = readProgDefs(elfFile, pd);
     if (ret) return ret;
     vector<string> progDefNames;
     ret = getSectionSymNames(elfFile, "progs", progDefNames);
@@ -1128,8 +1120,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
             readSectionUint("bpfloader_max_ver", elfFile, DEFAULT_BPFLOADER_MAX_VER);
     size_t sizeOfBpfMapDef =
             readSectionUint("size_of_bpf_map_def", elfFile, DEFAULT_SIZEOF_BPF_MAP_DEF);
-    size_t sizeOfBpfProgDef =
-            readSectionUint("size_of_bpf_prog_def", elfFile, DEFAULT_SIZEOF_BPF_PROG_DEF);
 
     // inclusive lower bound check
     if (bpfloader_ver < bpfLoaderMinVer) {
@@ -1154,13 +1144,7 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
         return -1;
     }
 
-    if (sizeOfBpfProgDef < DEFAULT_SIZEOF_BPF_PROG_DEF) {
-        ALOGE("sizeof(bpf_prog_def) of %zu is too small (< %d)", sizeOfBpfProgDef,
-              DEFAULT_SIZEOF_BPF_PROG_DEF);
-        return -1;
-    }
-
-    ret = readCodeSections(elfFile, cs, sizeOfBpfProgDef);
+    ret = readCodeSections(elfFile, cs);
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
