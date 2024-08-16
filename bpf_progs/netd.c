@@ -38,10 +38,6 @@ static const int DROP = 0;
 static const int PASS = 1;
 static const int DROP_UNLESS_DNS = 2;  // internal to our program
 
-// This is used for xt_bpf program only.
-static const int XTBPF_NOMATCH = 0;
-static const int XTBPF_MATCH = 1;
-
 // Used for 'bool enable_tracing'
 static const bool TRACE_ON = true;
 static const bool TRACE_OFF = false;

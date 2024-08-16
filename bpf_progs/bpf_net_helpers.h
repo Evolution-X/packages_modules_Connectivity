@@ -103,3 +103,7 @@ struct rawip_bool { bool rawip; };
 struct updatetime_bool { bool updatetime; };
 #define NO_UPDATETIME ((struct updatetime_bool){ .updatetime = false })
 #define UPDATETIME ((struct updatetime_bool){ .updatetime = true })
+
+// Return value for xt_bpf (netfilter match extension) programs
+static const int XTBPF_NOMATCH = 0;
+static const int XTBPF_MATCH = 1;
