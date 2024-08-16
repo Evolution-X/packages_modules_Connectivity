@@ -107,3 +107,6 @@ struct updatetime_bool { bool updatetime; };
 // Return value for xt_bpf (netfilter match extension) programs
 static const int XTBPF_NOMATCH = 0;
 static const int XTBPF_MATCH = 1;
+
+static const int BPF_DISALLOW = 0;
+static const int BPF_ALLOW = 1;

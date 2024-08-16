@@ -653,8 +653,7 @@ static __always_inline inline uint8_t get_app_permissions() {
 DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", AID_ROOT, AID_ROOT, inet_socket_create,
                           KVER_4_14)
 (__unused struct bpf_sock* sk) {
-    // A return value of 1 means allow, everything else means deny.
-    return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? 1 : 0;
+    return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? BPF_ALLOW : BPF_DISALLOW;
 }
 
 DEFINE_NETD_V_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT,
@@ -681,7 +680,7 @@ static __always_inline inline int check_localhost(__unused struct bpf_sock_addr 
     //   __u32 msg_src_ip6[4];	// BE, R: 1,2,4,8-byte, W: 4,8-byte
     //   __bpf_md_ptr(struct bpf_sock *, sk);
     // };
-    return 1;
+    return BPF_ALLOW;
 }
 
 DEFINE_NETD_V_BPF_PROG_KVER("connect4/inet4_connect", AID_ROOT, AID_ROOT, inet4_connect, KVER_4_14)
@@ -719,7 +718,7 @@ DEFINE_NETD_V_BPF_PROG_KVER("getsockopt/prog", AID_ROOT, AID_ROOT, getsockopt_pr
     // Tell kernel to return 'original' kernel reply (instead of the bpf modified buffer)
     // This is important if the answer is larger than PAGE_SIZE (max size this bpf hook can provide)
     ctx->optlen = 0;
-    return 1; // ALLOW
+    return BPF_ALLOW;
 }
 
 DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", AID_ROOT, AID_ROOT, setsockopt_prog, KVER_5_4)
@@ -727,7 +726,7 @@ DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", AID_ROOT, AID_ROOT, setsockopt_pr
     // Tell kernel to use/process original buffer provided by userspace.
     // This is important if it is larger than PAGE_SIZE (max size this bpf hook can handle).
     ctx->optlen = 0;
-    return 1; // ALLOW
+    return BPF_ALLOW;
 }
 
 LICENSE("Apache 2.0");
