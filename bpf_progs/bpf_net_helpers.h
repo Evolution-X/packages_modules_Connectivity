@@ -17,13 +17,22 @@
 #pragma once
 
 #include <linux/bpf.h>
+#include <linux/if.h>
+#include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <stdbool.h>
-#include <stdint.h>
-
+#include <linux/in.h>
+#include <linux/in6.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/pkt_cls.h>
+#include <linux/tcp.h>
 // bionic kernel uapi linux/udp.h header is munged...
 #define __kernel_udphdr udphdr
 #include <linux/udp.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "bpf_helpers.h"
 
 // Offsets from beginning of L4 (TCP/UDP) header
 #define TCP_OFFSET(field) offsetof(struct tcphdr, field)
