@@ -34,6 +34,20 @@
 
 #include "bpf_helpers.h"
 
+// IP flags. (from kernel's include/net/ip.h)
+#define IP_CE      0x8000  // Flag: "Congestion" (really reserved 'evil bit')
+#define IP_DF      0x4000  // Flag: "Don't Fragment"
+#define IP_MF      0x2000  // Flag: "More Fragments"
+#define IP_OFFSET  0x1FFF  // "Fragment Offset" part
+
+// IPv6 fragmentation header. (from kernel's include/net/ipv6.h)
+struct frag_hdr {
+    __u8   nexthdr;
+    __u8   reserved;        // always zero
+    __be16 frag_off;        // 13 bit offset, 2 bits zero, 1 bit "More Fragments"
+    __be32 identification;
+};
+
 // Offsets from beginning of L4 (TCP/UDP) header
 #define TCP_OFFSET(field) offsetof(struct tcphdr, field)
 #define UDP_OFFSET(field) offsetof(struct udphdr, field)
