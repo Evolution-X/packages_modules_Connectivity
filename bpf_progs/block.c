@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-#include <linux/in.h>
-
 // The resulting .o needs to load on Android T+
 #define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 
 DEFINE_BPF_MAP_GRW(blocked_ports_map, ARRAY, int, uint64_t,

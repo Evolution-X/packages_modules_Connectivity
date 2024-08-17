@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-
 #ifdef MAINLINE
 // BTF is incompatible with bpfloaders < v0.10, hence for S (v0.2) we must
 // ship a different file than for later versions, but we need bpfloader v0.25+
@@ -38,7 +34,6 @@
 // Needed because the bitmap array definition is non-kosher for pre-T OS devices.
 #define THIS_BPF_PROGRAM_IS_FOR_TEST_PURPOSES_ONLY
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 #include "offload.h"
 

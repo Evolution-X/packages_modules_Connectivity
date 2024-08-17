@@ -14,26 +14,9 @@
  * limitations under the License.
  */
 
-#include <linux/bpf.h>
-#include <linux/if.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/in6.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/pkt_cls.h>
-#include <linux/swab.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-// bionic kernel uapi linux/udp.h header is munged...
-#define __kernel_udphdr udphdr
-#include <linux/udp.h>
-
 // The resulting .o needs to load on Android T+
 #define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 #include "clatd.h"
 #include "clat_mark.h"
