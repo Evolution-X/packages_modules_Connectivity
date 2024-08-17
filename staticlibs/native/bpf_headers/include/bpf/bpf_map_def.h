@@ -29,7 +29,7 @@
  *                                                                            *
  *                          ! ! ! W A R N I N G ! ! !                         *
  *                                                                            *
- * CHANGES TO THESE STRUCTURE DEFINITIONS OUTSIDE OF AOSP/MASTER *WILL* BREAK *
+ * CHANGES TO THESE STRUCTURE DEFINITIONS OUTSIDE OF AOSP/MAIN *WILL* BREAK   *
  * MAINLINE MODULE COMPATIBILITY                                              *
  *                                                                            *
  * AND THUS MAY RESULT IN YOUR DEVICE BRICKING AT SOME ARBITRARY POINT IN     *
@@ -41,12 +41,6 @@
  *  already shipped (which happens roughly monthly), then it's set in stone)  *
  *                                                                            *
  ******************************************************************************/
-
-// These are the values used if these fields are missing
-#define DEFAULT_BPFLOADER_MIN_VER 0u        // v0.0 (this is inclusive ie. >= v0.0)
-#define DEFAULT_BPFLOADER_MAX_VER 0x10000u  // v1.0 (this is exclusive ie. < v1.0)
-#define DEFAULT_SIZEOF_BPF_MAP_DEF 32       // v0.0 struct: enum (uint sized) + 7 uint
-#define DEFAULT_SIZEOF_BPF_PROG_DEF 20      // v0.0 struct: 4 uint + bool + 3 byte alignment pad
 
 /*
  * The bpf_{map,prog}_def structures are compiled for different architectures.

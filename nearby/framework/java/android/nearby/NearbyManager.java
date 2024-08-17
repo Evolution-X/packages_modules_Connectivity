@@ -37,6 +37,7 @@ import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.Preconditions;
+import com.android.nearby.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -84,7 +85,7 @@ public class NearbyManager {
      * Return value of {@link #getPoweredOffFindingMode()} when this powered off finding is not
      * supported the device.
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     public static final int POWERED_OFF_FINDING_MODE_UNSUPPORTED = 0;
 
     /**
@@ -92,7 +93,7 @@ public class NearbyManager {
      * #setPoweredOffFindingMode(int)} when powered off finding is supported but disabled. The
      * device will not start to advertise when powered off.
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     public static final int POWERED_OFF_FINDING_MODE_DISABLED = 1;
 
     /**
@@ -100,7 +101,7 @@ public class NearbyManager {
      * #setPoweredOffFindingMode(int)} when powered off finding is enabled. The device will start to
      * advertise when powered off.
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     public static final int POWERED_OFF_FINDING_MODE_ENABLED = 2;
 
     /**
@@ -526,7 +527,7 @@ public class NearbyManager {
      *
      * @throws IllegalArgumentException if the length of one of the EIDs is not 20 bytes
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)
     public void setPoweredOffFindingEphemeralIds(@NonNull List<byte[]> eids) {
         Objects.requireNonNull(eids);
@@ -570,7 +571,7 @@ public class NearbyManager {
      * @throws IllegalStateException if called with {@link #POWERED_OFF_FINDING_MODE_ENABLED} when
      * Bluetooth or location services are disabled
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)
     public void setPoweredOffFindingMode(@PoweredOffFindingMode int poweredOffFindingMode) {
         Preconditions.checkArgument(
@@ -602,7 +603,7 @@ public class NearbyManager {
      * #POWERED_OFF_FINDING_MODE_ENABLED} if this was the last value set by {@link
      * #setPoweredOffFindingMode(int)}
      */
-    @FlaggedApi("com.android.nearby.flags.powered_off_finding")
+    @FlaggedApi(Flags.FLAG_POWERED_OFF_FINDING)
     @RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)
     public @PoweredOffFindingMode int getPoweredOffFindingMode() {
         if (!isPoweredOffFindingSupported()) {

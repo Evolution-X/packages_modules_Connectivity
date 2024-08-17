@@ -7,7 +7,7 @@
 #include "bpf_map_def.h"
 
 /******************************************************************************
- * WARNING: CHANGES TO THIS FILE OUTSIDE OF AOSP/MASTER ARE LIKELY TO BREAK   *
+ * WARNING: CHANGES TO THIS FILE OUTSIDE OF AOSP/MAIN ARE LIKELY TO BREAK     *
  * DEVICE COMPATIBILITY WITH MAINLINE MODULES SHIPPING EBPF CODE.             *
  *                                                                            *
  * THIS WILL LIKELY RESULT IN BRICKED DEVICES AT SOME ARBITRARY FUTURE TIME   *
@@ -71,11 +71,11 @@
  * In which case it's just best to use the default.
  */
 #ifndef BPFLOADER_MIN_VER
-#define BPFLOADER_MIN_VER BPFLOADER_PLATFORM_VERSION
+#define BPFLOADER_MIN_VER BPFLOADER_PLATFORM_VERSION  // inclusive, ie. >=
 #endif
 
 #ifndef BPFLOADER_MAX_VER
-#define BPFLOADER_MAX_VER DEFAULT_BPFLOADER_MAX_VER
+#define BPFLOADER_MAX_VER 0x10000u  // exclusive, ie. < v1.0
 #endif
 
 /* place things in different elf sections */
@@ -414,19 +414,10 @@ static long (*bpf_get_current_comm)(void* buf, uint32_t buf_size) = (void*) BPF_
     SECTION(SECTION_NAME)                                                                \
     int the_prog
 
-#ifndef DEFAULT_BPF_PROG_SELINUX_CONTEXT
-#define DEFAULT_BPF_PROG_SELINUX_CONTEXT ""
-#endif
-
-#ifndef DEFAULT_BPF_PROG_PIN_SUBDIR
-#define DEFAULT_BPF_PROG_PIN_SUBDIR ""
-#endif
-
 #define DEFINE_BPF_PROG_KVER_RANGE_OPT(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, max_kv, \
                                        opt)                                                        \
     DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, max_kv,                \
-                        BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, opt,                                 \
-                        DEFAULT_BPF_PROG_SELINUX_CONTEXT, DEFAULT_BPF_PROG_PIN_SUBDIR,             \
+                        BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, opt, "", "",                         \
                         LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 // Programs (here used in the sense of functions/sections) marked optional are allowed to fail
