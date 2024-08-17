@@ -14,24 +14,16 @@
  * limitations under the License.
  */
 
-#include <linux/types.h>
-#include <linux/bpf.h>
-#include <netinet/in.h>
-#include <stdint.h>
-
 // The resulting .o needs to load on Android T+
 #define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
 
-#include "bpf_helpers.h"
-
-static const int ALLOW = 1;
-static const int DISALLOW = 0;
+#include "bpf_net_helpers.h"
 
 DEFINE_BPF_MAP_GRW(blocked_ports_map, ARRAY, int, uint64_t,
         1024 /* 64K ports -> 1024 u64s */, AID_SYSTEM)
 
 static inline __always_inline int block_port(struct bpf_sock_addr *ctx) {
-    if (!ctx->user_port) return ALLOW;
+    if (!ctx->user_port) return BPF_ALLOW;
 
     switch (ctx->protocol) {
         case IPPROTO_TCP:
@@ -42,7 +34,7 @@ static inline __always_inline int block_port(struct bpf_sock_addr *ctx) {
         case IPPROTO_SCTP:
             break;
         default:
-            return ALLOW; // unknown protocols are allowed
+            return BPF_ALLOW; // unknown protocols are allowed
     }
 
     int key = ctx->user_port >> 6;
@@ -51,10 +43,10 @@ static inline __always_inline int block_port(struct bpf_sock_addr *ctx) {
     uint64_t *val = bpf_blocked_ports_map_lookup_elem(&key);
     // Lookup should never fail in reality, but if it does return here to keep the
     // BPF verifier happy.
-    if (!val) return ALLOW;
+    if (!val) return BPF_ALLOW;
 
-    if ((*val >> shift) & 1) return DISALLOW;
-    return ALLOW;
+    if ((*val >> shift) & 1) return BPF_DISALLOW;
+    return BPF_ALLOW;
 }
 
 // the program need to be accessible/loadable by netd (from netd updatable plugin)
@@ -75,4 +67,3 @@ DEFINE_NETD_RO_BPF_PROG("bind6/block_port", bind6_block_port, KVER_4_19)
 
 LICENSE("Apache 2.0");
 CRITICAL("ConnectivityNative");
-DISABLE_BTF_ON_USER_BUILDS();

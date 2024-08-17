@@ -14,43 +14,12 @@
  * limitations under the License.
  */
 
-#include <linux/bpf.h>
-#include <linux/if.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/in6.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/pkt_cls.h>
-#include <linux/swab.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-// bionic kernel uapi linux/udp.h header is munged...
-#define __kernel_udphdr udphdr
-#include <linux/udp.h>
-
 // The resulting .o needs to load on Android T+
 #define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 #include "clatd.h"
 #include "clat_mark.h"
-
-// IP flags. (from kernel's include/net/ip.h)
-#define IP_CE      0x8000  // Flag: "Congestion" (really reserved 'evil bit')
-#define IP_DF      0x4000  // Flag: "Don't Fragment"
-#define IP_MF      0x2000  // Flag: "More Fragments"
-#define IP_OFFSET  0x1FFF  // "Fragment Offset" part
-
-// from kernel's include/net/ipv6.h
-struct frag_hdr {
-    __u8   nexthdr;
-    __u8   reserved;        // always zero
-    __be16 frag_off;        // 13 bit offset, 2 bits zero, 1 bit "More Fragments"
-    __be32 identification;
-};
 
 DEFINE_BPF_MAP_GRW(clat_ingress6_map, HASH, ClatIngress6Key, ClatIngress6Value, 16, AID_SYSTEM)
 
@@ -430,4 +399,3 @@ DEFINE_BPF_PROG("schedcls/egress4/clat_rawip", AID_ROOT, AID_SYSTEM, sched_cls_e
 
 LICENSE("Apache 2.0");
 CRITICAL("Connectivity");
-DISABLE_BTF_ON_USER_BUILDS();

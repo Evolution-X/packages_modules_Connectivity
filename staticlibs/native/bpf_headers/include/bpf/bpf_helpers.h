@@ -99,23 +99,19 @@
  *
  * If missing, bpfloader_{min/max}_ver default to 0/0x10000 ie. [v0.0, v1.0),
  * while size_of_bpf_{map/prog}_def default to 32/20 which are the v0.0 sizes.
- */
-#define LICENSE(NAME)                                                                           \
-    unsigned int _bpfloader_min_ver SECTION("bpfloader_min_ver") = BPFLOADER_MIN_VER;           \
-    unsigned int _bpfloader_max_ver SECTION("bpfloader_max_ver") = BPFLOADER_MAX_VER;           \
-    size_t _size_of_bpf_map_def SECTION("size_of_bpf_map_def") = sizeof(struct bpf_map_def);    \
-    size_t _size_of_bpf_prog_def SECTION("size_of_bpf_prog_def") = sizeof(struct bpf_prog_def); \
-    char _license[] SECTION("license") = (NAME)
-
-/* This macro disables loading BTF map debug information on Android <=U *and* all user builds.
  *
- * Note: Bpfloader v0.39+ honours 'btf_user_min_bpfloader_ver' on user builds,
- * and 'btf_min_bpfloader_ver' on non-user builds.
- * Older BTF capable versions unconditionally honour 'btf_min_bpfloader_ver'
+ * This macro also disables loading BTF map debug information, as versions
+ * of the platform bpfloader that support BTF require fork-exec of btfloader
+ * which causes a regression in boot time.
  */
-#define DISABLE_BTF_ON_USER_BUILDS() \
-    unsigned _btf_min_bpfloader_ver SECTION("btf_min_bpfloader_ver") = 39u; \
-    unsigned _btf_user_min_bpfloader_ver SECTION("btf_user_min_bpfloader_ver") = 0xFFFFFFFFu
+#define LICENSE(NAME)                                                                              \
+    unsigned int _bpfloader_min_ver SECTION("bpfloader_min_ver") = BPFLOADER_MIN_VER;              \
+    unsigned int _bpfloader_max_ver SECTION("bpfloader_max_ver") = BPFLOADER_MAX_VER;              \
+    size_t _size_of_bpf_map_def SECTION("size_of_bpf_map_def") = sizeof(struct bpf_map_def);       \
+    size_t _size_of_bpf_prog_def SECTION("size_of_bpf_prog_def") = sizeof(struct bpf_prog_def);    \
+    unsigned _btf_min_bpfloader_ver SECTION("btf_min_bpfloader_ver") = BPFLOADER_MAINLINE_VERSION; \
+    unsigned _btf_user_min_bpfloader_ver SECTION("btf_user_min_bpfloader_ver") = 0xFFFFFFFFu;      \
+    char _license[] SECTION("license") = (NAME)
 
 /* flag the resulting bpf .o file as critical to system functionality,
  * loading all kernel version appropriate programs in it must succeed

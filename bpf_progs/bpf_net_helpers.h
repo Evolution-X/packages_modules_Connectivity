@@ -17,21 +17,72 @@
 #pragma once
 
 #include <linux/bpf.h>
+#include <linux/if.h>
+#include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <stdbool.h>
-#include <stdint.h>
-
+#include <linux/in.h>
+#include <linux/in6.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/pkt_cls.h>
+#include <linux/tcp.h>
 // bionic kernel uapi linux/udp.h header is munged...
 #define __kernel_udphdr udphdr
 #include <linux/udp.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "bpf_helpers.h"
+
+// IP flags. (from kernel's include/net/ip.h)
+#define IP_CE      0x8000  // Flag: "Congestion" (really reserved 'evil bit')
+#define IP_DF      0x4000  // Flag: "Don't Fragment"
+#define IP_MF      0x2000  // Flag: "More Fragments"
+#define IP_OFFSET  0x1FFF  // "Fragment Offset" part
+
+// IPv6 fragmentation header. (from kernel's include/net/ipv6.h)
+struct frag_hdr {
+    __u8   nexthdr;
+    __u8   reserved;        // always zero
+    __be16 frag_off;        // 13 bit offset, 2 bits zero, 1 bit "More Fragments"
+    __be32 identification;
+};
+
+// ----- Helper functions for offsets to fields -----
+
+// They all assume simple IP packets:
+//   - no VLAN ethernet tags
+//   - no IPv4 options (see IPV4_HLEN/TCP4_OFFSET/UDP4_OFFSET)
+//   - no IPv6 extension headers
+//   - no TCP options (see TCP_HLEN)
+
+//#define ETH_HLEN sizeof(struct ethhdr)
+#define IP4_HLEN sizeof(struct iphdr)
+#define IP6_HLEN sizeof(struct ipv6hdr)
+#define TCP_HLEN sizeof(struct tcphdr)
+#define UDP_HLEN sizeof(struct udphdr)
 
 // Offsets from beginning of L4 (TCP/UDP) header
 #define TCP_OFFSET(field) offsetof(struct tcphdr, field)
 #define UDP_OFFSET(field) offsetof(struct udphdr, field)
 
-// Offsets from beginning of L3 (IPv4/IPv6) header
+// Offsets from beginning of L3 (IPv4) header
 #define IP4_OFFSET(field) offsetof(struct iphdr, field)
+#define IP4_TCP_OFFSET(field) (IP4_HLEN + TCP_OFFSET(field))
+#define IP4_UDP_OFFSET(field) (IP4_HLEN + UDP_OFFSET(field))
+
+// Offsets from beginning of L3 (IPv6) header
 #define IP6_OFFSET(field) offsetof(struct ipv6hdr, field)
+#define IP6_TCP_OFFSET(field) (IP6_HLEN + TCP_OFFSET(field))
+#define IP6_UDP_OFFSET(field) (IP6_HLEN + UDP_OFFSET(field))
+
+// Offsets from beginning of L2 (ie. Ethernet) header (which must be present)
+#define ETH_IP4_OFFSET(field) (ETH_HLEN + IP4_OFFSET(field))
+#define ETH_IP4_TCP_OFFSET(field) (ETH_HLEN + IP4_TCP_OFFSET(field))
+#define ETH_IP4_UDP_OFFSET(field) (ETH_HLEN + IP4_UDP_OFFSET(field))
+#define ETH_IP6_OFFSET(field) (ETH_HLEN + IP6_OFFSET(field))
+#define ETH_IP6_TCP_OFFSET(field) (ETH_HLEN + IP6_TCP_OFFSET(field))
+#define ETH_IP6_UDP_OFFSET(field) (ETH_HLEN + IP6_UDP_OFFSET(field))
 
 // this returns 0 iff skb->sk is NULL
 static uint64_t (*bpf_get_socket_cookie)(struct __sk_buff* skb) = (void*)BPF_FUNC_get_socket_cookie;
@@ -103,3 +154,10 @@ struct rawip_bool { bool rawip; };
 struct updatetime_bool { bool updatetime; };
 #define NO_UPDATETIME ((struct updatetime_bool){ .updatetime = false })
 #define UPDATETIME ((struct updatetime_bool){ .updatetime = true })
+
+// Return value for xt_bpf (netfilter match extension) programs
+static const int XTBPF_NOMATCH = 0;
+static const int XTBPF_MATCH = 1;
+
+static const int BPF_DISALLOW = 0;
+static const int BPF_ALLOW = 1;

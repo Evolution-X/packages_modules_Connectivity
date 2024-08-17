@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-
 #ifdef MAINLINE
 // BTF is incompatible with bpfloaders < v0.10, hence for S (v0.2) we must
 // ship a different file than for later versions, but we need bpfloader v0.25+
@@ -29,30 +25,24 @@
 #define BPFLOADER_MAX_VER BPFLOADER_T_VERSION
 #endif /* MAINLINE */
 
-// Warning: values other than AID_ROOT don't work for map uid on BpfLoader < v0.21
-#define TETHERING_UID AID_ROOT
-
-#define TETHERING_GID AID_NETWORK_STACK
-
 // This is non production code, only used for testing
 // Needed because the bitmap array definition is non-kosher for pre-T OS devices.
 #define THIS_BPF_PROGRAM_IS_FOR_TEST_PURPOSES_ONLY
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 #include "offload.h"
 
 // Used only by TetheringPrivilegedTests, not by production code.
 DEFINE_BPF_MAP_GRW(tether_downstream6_map, HASH, TetherDownstream6Key, Tether6Value, 16,
-                   TETHERING_GID)
+                   AID_NETWORK_STACK)
 DEFINE_BPF_MAP_GRW(tether2_downstream6_map, HASH, TetherDownstream6Key, Tether6Value, 16,
-                   TETHERING_GID)
+                   AID_NETWORK_STACK)
 DEFINE_BPF_MAP_GRW(tether3_downstream6_map, HASH, TetherDownstream6Key, Tether6Value, 16,
-                   TETHERING_GID)
+                   AID_NETWORK_STACK)
 // Used only by BpfBitmapTest, not by production code.
-DEFINE_BPF_MAP_GRW(bitmap, ARRAY, int, uint64_t, 2, TETHERING_GID)
+DEFINE_BPF_MAP_GRW(bitmap, ARRAY, int, uint64_t, 2, AID_NETWORK_STACK)
 
-DEFINE_BPF_PROG_KVER("xdp/drop_ipv4_udp_ether", TETHERING_UID, TETHERING_GID,
+DEFINE_BPF_PROG_KVER("xdp/drop_ipv4_udp_ether", AID_ROOT, AID_NETWORK_STACK,
                       xdp_test, KVER_5_9)
 (struct xdp_md *ctx) {
     void *data = (void *)(long)ctx->data;
@@ -71,4 +61,3 @@ DEFINE_BPF_PROG_KVER("xdp/drop_ipv4_udp_ether", TETHERING_UID, TETHERING_GID,
 }
 
 LICENSE("Apache 2.0");
-DISABLE_BTF_ON_USER_BUILDS();

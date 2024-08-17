@@ -14,27 +14,13 @@
  * limitations under the License.
  */
 
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/pkt_cls.h>
-#include <linux/tcp.h>
-#include <linux/types.h>
-#include <netinet/in.h>
-#include <netinet/udp.h>
-#include <stdint.h>
-#include <string.h>
-
 // The resulting .o needs to load on Android T+
 #define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
 
-#include "bpf_helpers.h"
+#include "bpf_net_helpers.h"
 #include "dscpPolicy.h"
 
 #define ECN_MASK 3
-#define IP4_OFFSET(field, header) ((header) + offsetof(struct iphdr, field))
 #define UPDATE_TOS(dscp, tos) ((dscp) << 2) | ((tos) & ECN_MASK)
 
 DEFINE_BPF_MAP_GRW(socket_policy_cache_map, HASH, uint64_t, RuleEntry, CACHE_MAP_SIZE, AID_SYSTEM)
@@ -131,9 +117,9 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, bool ipv4
         if (existing_rule->dscp_val < 0) return;
         if (ipv4) {
             uint8_t newTos = UPDATE_TOS(existing_rule->dscp_val, tos);
-            bpf_l3_csum_replace(skb, IP4_OFFSET(check, l2_header_size), htons(tos), htons(newTos),
+            bpf_l3_csum_replace(skb, l2_header_size + IP4_OFFSET(check), htons(tos), htons(newTos),
                                 sizeof(uint16_t));
-            bpf_skb_store_bytes(skb, IP4_OFFSET(tos, l2_header_size), &newTos, sizeof(newTos), 0);
+            bpf_skb_store_bytes(skb, l2_header_size + IP4_OFFSET(tos), &newTos, sizeof(newTos), 0);
         } else {
             __be32 new_first_be32 =
                 htonl(ntohl(old_first_be32) & 0xF03FFFFF | (existing_rule->dscp_val << 22));
@@ -211,8 +197,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, bool ipv4
     // Need to store bytes after updating map or program will not load.
     if (ipv4) {
         uint8_t new_tos = UPDATE_TOS(new_dscp, tos);
-        bpf_l3_csum_replace(skb, IP4_OFFSET(check, l2_header_size), htons(tos), htons(new_tos), 2);
-        bpf_skb_store_bytes(skb, IP4_OFFSET(tos, l2_header_size), &new_tos, sizeof(new_tos), 0);
+        bpf_l3_csum_replace(skb, l2_header_size + IP4_OFFSET(check), htons(tos), htons(new_tos), 2);
+        bpf_skb_store_bytes(skb, l2_header_size + IP4_OFFSET(tos), &new_tos, sizeof(new_tos), 0);
     } else {
         __be32 new_first_be32 = htonl(ntohl(old_first_be32) & 0xF03FFFFF | (new_dscp << 22));
         bpf_skb_store_bytes(skb, l2_header_size, &new_first_be32, sizeof(__be32),
@@ -238,4 +224,3 @@ DEFINE_BPF_PROG_KVER("schedcls/set_dscp_ether", AID_ROOT, AID_SYSTEM, schedcls_s
 
 LICENSE("Apache 2.0");
 CRITICAL("Connectivity");
-DISABLE_BTF_ON_USER_BUILDS();
