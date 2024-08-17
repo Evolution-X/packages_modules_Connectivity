@@ -718,4 +718,3 @@ DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", AID_ROOT, AID_ROOT, setsockopt_pr
 
 LICENSE("Apache 2.0");
 CRITICAL("Connectivity and netd");
-DISABLE_BTF_ON_USER_BUILDS();
