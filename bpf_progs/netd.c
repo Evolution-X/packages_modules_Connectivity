@@ -39,8 +39,8 @@ static const int PASS = 1;
 static const int DROP_UNLESS_DNS = 2;  // internal to our program
 
 // This is used for xt_bpf program only.
-static const int BPF_NOMATCH = 0;
-static const int BPF_MATCH = 1;
+static const int XTBPF_NOMATCH = 0;
+static const int XTBPF_MATCH = 1;
 
 // Used for 'bool enable_tracing'
 static const bool TRACE_ON = true;
@@ -579,12 +579,12 @@ DEFINE_XTBPF_PROG("skfilter/egress/xtbpf", AID_ROOT, AID_NET_ADMIN, xt_bpf_egres
     if (sock_uid == AID_SYSTEM) {
         uint64_t cookie = bpf_get_socket_cookie(skb);
         UidTagValue* utag = bpf_cookie_tag_map_lookup_elem(&cookie);
-        if (utag && utag->uid == AID_CLAT) return BPF_NOMATCH;
+        if (utag && utag->uid == AID_CLAT) return XTBPF_NOMATCH;
     }
 
     uint32_t key = skb->ifindex;
     update_iface_stats_map(skb, &key, EGRESS, KVER_NONE);
-    return BPF_MATCH;
+    return XTBPF_MATCH;
 }
 
 // WARNING: Android T's non-updatable netd depends on the name of this program.
@@ -597,7 +597,7 @@ DEFINE_XTBPF_PROG("skfilter/ingress/xtbpf", AID_ROOT, AID_NET_ADMIN, xt_bpf_ingr
 
     uint32_t key = skb->ifindex;
     update_iface_stats_map(skb, &key, INGRESS, KVER_NONE);
-    return BPF_MATCH;
+    return XTBPF_MATCH;
 }
 
 DEFINE_SYS_BPF_PROG("schedact/ingress/account", AID_ROOT, AID_NET_ADMIN,
@@ -615,7 +615,7 @@ DEFINE_SYS_BPF_PROG("schedact/ingress/account", AID_ROOT, AID_NET_ADMIN,
 DEFINE_XTBPF_PROG("skfilter/allowlist/xtbpf", AID_ROOT, AID_NET_ADMIN, xt_bpf_allowlist_prog)
 (struct __sk_buff* skb) {
     uint32_t sock_uid = bpf_get_socket_uid(skb);
-    if (is_system_uid(sock_uid)) return BPF_MATCH;
+    if (is_system_uid(sock_uid)) return XTBPF_MATCH;
 
     // kernel's DEFAULT_OVERFLOWUID is 65534, this is the overflow 'nobody' uid,
     // usually this being returned means that skb->sk is NULL during RX
@@ -623,11 +623,11 @@ DEFINE_XTBPF_PROG("skfilter/allowlist/xtbpf", AID_ROOT, AID_NET_ADMIN, xt_bpf_al
     // packets to an unconnected udp socket.
     // But it can also happen for egress from a timewait socket.
     // Let's treat such cases as 'root' which is_system_uid()
-    if (sock_uid == 65534) return BPF_MATCH;
+    if (sock_uid == 65534) return XTBPF_MATCH;
 
     UidOwnerValue* allowlistMatch = bpf_uid_owner_map_lookup_elem(&sock_uid);
-    if (allowlistMatch) return allowlistMatch->rule & HAPPY_BOX_MATCH ? BPF_MATCH : BPF_NOMATCH;
-    return BPF_NOMATCH;
+    if (allowlistMatch) return allowlistMatch->rule & HAPPY_BOX_MATCH ? XTBPF_MATCH : XTBPF_NOMATCH;
+    return XTBPF_NOMATCH;
 }
 
 // WARNING: Android T's non-updatable netd depends on the name of this program.
@@ -636,8 +636,8 @@ DEFINE_XTBPF_PROG("skfilter/denylist/xtbpf", AID_ROOT, AID_NET_ADMIN, xt_bpf_den
     uint32_t sock_uid = bpf_get_socket_uid(skb);
     UidOwnerValue* denylistMatch = bpf_uid_owner_map_lookup_elem(&sock_uid);
     uint32_t penalty_box = PENALTY_BOX_USER_MATCH | PENALTY_BOX_ADMIN_MATCH;
-    if (denylistMatch) return denylistMatch->rule & penalty_box ? BPF_MATCH : BPF_NOMATCH;
-    return BPF_NOMATCH;
+    if (denylistMatch) return denylistMatch->rule & penalty_box ? XTBPF_MATCH : XTBPF_NOMATCH;
+    return XTBPF_NOMATCH;
 }
 
 static __always_inline inline uint8_t get_app_permissions() {
