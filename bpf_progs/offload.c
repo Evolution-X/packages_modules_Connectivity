@@ -28,42 +28,6 @@
 #include "bpf_net_helpers.h"
 #include "offload.h"
 
-// ----- Helper functions for offsets to fields -----
-
-// They all assume simple IP packets:
-//   - no VLAN ethernet tags
-//   - no IPv4 options (see IPV4_HLEN/TCP4_OFFSET/UDP4_OFFSET)
-//   - no IPv6 extension headers
-//   - no TCP options (see TCP_HLEN)
-
-//#define ETH_HLEN sizeof(struct ethhdr)
-#define IP4_HLEN sizeof(struct iphdr)
-#define IP6_HLEN sizeof(struct ipv6hdr)
-#define TCP_HLEN sizeof(struct tcphdr)
-#define UDP_HLEN sizeof(struct udphdr)
-
-// Offsets from beginning of L4 (TCP/UDP) header
-#define TCP_OFFSET(field) offsetof(struct tcphdr, field)
-#define UDP_OFFSET(field) offsetof(struct udphdr, field)
-
-// Offsets from beginning of L3 (IPv4) header
-#define IP4_OFFSET(field) offsetof(struct iphdr, field)
-#define IP4_TCP_OFFSET(field) (IP4_HLEN + TCP_OFFSET(field))
-#define IP4_UDP_OFFSET(field) (IP4_HLEN + UDP_OFFSET(field))
-
-// Offsets from beginning of L3 (IPv6) header
-#define IP6_OFFSET(field) offsetof(struct ipv6hdr, field)
-#define IP6_TCP_OFFSET(field) (IP6_HLEN + TCP_OFFSET(field))
-#define IP6_UDP_OFFSET(field) (IP6_HLEN + UDP_OFFSET(field))
-
-// Offsets from beginning of L2 (ie. Ethernet) header (which must be present)
-#define ETH_IP4_OFFSET(field) (ETH_HLEN + IP4_OFFSET(field))
-#define ETH_IP4_TCP_OFFSET(field) (ETH_HLEN + IP4_TCP_OFFSET(field))
-#define ETH_IP4_UDP_OFFSET(field) (ETH_HLEN + IP4_UDP_OFFSET(field))
-#define ETH_IP6_OFFSET(field) (ETH_HLEN + IP6_OFFSET(field))
-#define ETH_IP6_TCP_OFFSET(field) (ETH_HLEN + IP6_TCP_OFFSET(field))
-#define ETH_IP6_UDP_OFFSET(field) (ETH_HLEN + IP6_UDP_OFFSET(field))
-
 // ----- Tethering Error Counters -----
 
 // Note that pre-T devices with Mediatek chipsets may have a kernel bug (bad patch
