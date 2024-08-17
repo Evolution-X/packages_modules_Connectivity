@@ -37,17 +37,6 @@
 // Returns 'a == b' as boolean
 #define v6_equal(a, b) (!v6_not_equal((a), (b)))
 
-// TODO: these are already defined in packages/modules/Connectivity/bpf_progs/bpf_net_helpers.h.
-// smove to common location in future.
-static uint64_t (*bpf_get_socket_cookie)(struct __sk_buff* skb) =
-        (void*)BPF_FUNC_get_socket_cookie;
-static int (*bpf_skb_store_bytes)(struct __sk_buff* skb, __u32 offset, const void* from, __u32 len,
-                                  __u64 flags) = (void*)BPF_FUNC_skb_store_bytes;
-static int (*bpf_l3_csum_replace)(struct __sk_buff* skb, __u32 offset, __u64 from, __u64 to,
-                                  __u64 flags) = (void*)BPF_FUNC_l3_csum_replace;
-static long (*bpf_skb_ecn_set_ce)(struct __sk_buff* skb) =
-        (void*)BPF_FUNC_skb_ecn_set_ce;
-
 typedef struct {
     struct in6_addr src_ip;
     struct in6_addr dst_ip;
