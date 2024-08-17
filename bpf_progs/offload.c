@@ -14,16 +14,6 @@
  * limitations under the License.
  */
 
-#include <linux/if.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/pkt_cls.h>
-#include <linux/tcp.h>
-
-// bionic kernel uapi linux/udp.h header is munged...
-#define __kernel_udphdr udphdr
-#include <linux/udp.h>
-
 #ifdef MAINLINE
 // BTF is incompatible with bpfloaders < v0.10, hence for S (v0.2) we must
 // ship a different file than for later versions, but we need bpfloader v0.25+
@@ -40,7 +30,6 @@
 
 #define TETHERING_GID AID_NETWORK_STACK
 
-#include "bpf_helpers.h"
 #include "bpf_net_helpers.h"
 #include "offload.h"
 
