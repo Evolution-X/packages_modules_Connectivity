@@ -28,9 +28,6 @@
 #include "bpf_net_helpers.h"
 #include "offload.h"
 
-// From kernel:include/net/ip.h
-#define IP_DF 0x4000  // Flag: "Don't Fragment"
-
 // ----- Helper functions for offsets to fields -----
 
 // They all assume simple IP packets:
