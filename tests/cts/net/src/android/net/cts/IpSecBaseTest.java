@@ -23,10 +23,13 @@ import static android.net.IpSecAlgorithm.AUTH_HMAC_SHA256;
 import static android.net.IpSecAlgorithm.AUTH_HMAC_SHA384;
 import static android.net.IpSecAlgorithm.AUTH_HMAC_SHA512;
 import static android.net.IpSecAlgorithm.CRYPT_AES_CBC;
+import static android.net.cts.PacketUtils.ICMP_HDRLEN;
+import static android.net.cts.PacketUtils.IP6_HDRLEN;
 import static android.system.OsConstants.FIONREAD;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
@@ -152,10 +155,17 @@ public class IpSecBaseTest {
         final IpSecTransformState transformState =
                 futureIpSecTransform.get(SOCK_TIMEOUT, TimeUnit.MILLISECONDS);
 
-        assertEquals(txHighestSeqNum, transformState.getTxHighestSequenceNumber());
+        // There might be ICMPv6(Router Solicitation) packets. Thus we can only check the lower
+        // bound of the outgoing traffic.
+        final long icmpV6RsCnt = transformState.getTxHighestSequenceNumber() - txHighestSeqNum;
+        assertTrue(icmpV6RsCnt >= 0);
+
+        final long adjustedPacketCnt = packetCnt + icmpV6RsCnt;
+        final long adjustedByteCnt = byteCnt + icmpV6RsCnt * (IP6_HDRLEN + ICMP_HDRLEN);
+
+        assertEquals(adjustedPacketCnt, transformState.getPacketCount());
+        assertEquals(adjustedByteCnt, transformState.getByteCount());
         assertEquals(rxHighestSeqNum, transformState.getRxHighestSequenceNumber());
-        assertEquals(packetCnt, transformState.getPacketCount());
-        assertEquals(byteCnt, transformState.getByteCount());
         assertArrayEquals(replayBitmap, transformState.getReplayBitmap());
     }
 
