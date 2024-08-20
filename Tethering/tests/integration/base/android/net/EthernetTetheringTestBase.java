@@ -26,7 +26,9 @@ import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringTester.buildTcpPacket;
 import static android.net.TetheringTester.buildUdpPacket;
+import static android.net.TetheringTester.buildUdpPackets;
 import static android.net.TetheringTester.isAddressIpv4;
+import static android.net.TetheringTester.isExpectedFragmentIpPacket;
 import static android.net.TetheringTester.isExpectedIcmpPacket;
 import static android.net.TetheringTester.isExpectedTcpPacket;
 import static android.net.TetheringTester.isExpectedUdpPacket;
@@ -58,12 +60,14 @@ import android.net.cts.util.CtsNetUtils;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.util.ArrayMap;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.net.module.util.Struct;
+import com.android.net.module.util.structs.FragmentHeader;
 import com.android.net.module.util.structs.Ipv6Header;
 import com.android.testutils.HandlerUtils;
 import com.android.testutils.TapPacketReader;
@@ -675,6 +679,57 @@ public abstract class EthernetTetheringTestBase {
         tester.verifyUpload(testPacket, p -> {
             Log.d(TAG, "Packet in upstream: " + dumpHexString(p));
             return isExpectedUdpPacket(p, false /* hasEther */, isIpv4, TX_PAYLOAD);
+        });
+    }
+
+    protected void sendDownloadFragmentedUdpPackets(@NonNull final Inet6Address srcIp,
+            @NonNull final Inet6Address dstIp, @NonNull final TetheringTester tester,
+            @NonNull final ByteBuffer payload, int l2mtu) throws Exception {
+        final List<ByteBuffer> testPackets = buildUdpPackets(null /* srcMac */, null /* dstMac */,
+                srcIp, dstIp, REMOTE_PORT, LOCAL_PORT, payload, l2mtu);
+        assertTrue("No packet fragmentation occurs", testPackets.size() > 1);
+
+        short id = 0;
+        final ArrayMap<Short, ByteBuffer> fragmentPayloads = new ArrayMap<>();
+        for (ByteBuffer testPacket : testPackets) {
+            Struct.parse(Ipv6Header.class, testPacket);
+            final FragmentHeader fragmentHeader = Struct.parse(FragmentHeader.class, testPacket);
+            // Conversion of IPv6's fragmentOffset field to IPv4's flagsAndFragmentOffset field.
+            // IPv6 Fragment Header:
+            //   '13 bits of offset in multiples of 8' + 2 zero bits + more fragment bit
+            //      0                   1                   2                   3
+            //      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            //     |  Next Header  |   Reserved    |      Fragment Offset    |Res|M|
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            //     |                         Identification                        |
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            // IPv4 Header:
+            //   zero bit + don't frag bit + more frag bit + '13 bits of offset in multiples of 8'
+            //      0                   1                   2                   3
+            //      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            //     |Version|  IHL  |Type of Service|          Total Length         |
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            //     |         Identification        |Flags|      Fragment Offset    |
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            //     +                           . . .                               +
+            //     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            short offset = (short) (((fragmentHeader.fragmentOffset & 0x1) << 13)
+                    | (fragmentHeader.fragmentOffset >> 3));
+            // RFC6145: for fragment id, copied from the low-order 16 bits in the identification
+            //          field in the Fragment Header.
+            id = (short) (fragmentHeader.identification & 0xffff);
+            final byte[] fragmentPayload = new byte[testPacket.remaining()];
+            testPacket.get(fragmentPayload);
+            testPacket.flip();
+            fragmentPayloads.put(offset, ByteBuffer.wrap(fragmentPayload));
+        }
+
+        final short fragId = id;
+        tester.verifyDownloadBatch(testPackets, p -> {
+            Log.d(TAG, "Packet in downstream: " + dumpHexString(p));
+            return isExpectedFragmentIpPacket(p, fragId, fragmentPayloads);
         });
     }
 
