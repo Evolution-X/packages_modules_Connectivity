@@ -6002,7 +6002,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // TODO : The only way out of this is to diff old defaults and new defaults, and only
             // remove ranges for those requests that won't have a replacement
             final NetworkAgentInfo satisfier = nri.getSatisfier();
-            if (null != satisfier) {
+            if (null != satisfier && !satisfier.isDestroyed()) {
                 try {
                     mNetd.networkRemoveUidRangesParcel(new NativeUidRangeConfig(
                             satisfier.network.getNetId(),
