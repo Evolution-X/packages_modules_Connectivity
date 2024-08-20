@@ -10,6 +10,7 @@ flag {
   namespace: "android_core_networking"
   description: "Set data saver through ConnectivityManager API"
   bug: "297836825"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -18,6 +19,7 @@ flag {
   namespace: "android_core_networking"
   description: "This flag controls whether isUidNetworkingBlocked is supported"
   bug: "297836825"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -26,6 +28,7 @@ flag {
   namespace: "android_core_networking"
   description: "Block network access for apps in a low importance background state"
   bug: "304347838"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -34,6 +37,7 @@ flag {
   namespace: "android_core_networking_ipsec"
   description: "The flag controls the access for getIpSecTransformState and IpSecTransformState"
   bug: "308011229"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -42,6 +46,7 @@ flag {
   namespace: "android_core_networking"
   description: "The flag controls the access for the parcelable TetheringRequest with getSoftApConfiguration/setSoftApConfiguration API"
   bug: "216524590"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -50,6 +55,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for API to support requesting restricted wifi"
   bug: "315835605"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -58,6 +64,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for local network capability API"
   bug: "313000440"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -66,6 +73,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for satellite transport API"
   bug: "320514105"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -74,6 +82,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for API to support nsd subtypes"
   bug: "265095929"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -82,6 +91,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for API to register nsd offload engine"
   bug: "301713539"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -90,6 +100,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for metered network firewall chain API"
   bug: "332628891"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -98,6 +109,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for oem deny chains blocked reasons API"
   bug: "328732146"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -106,6 +118,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for BLOCKED_REASON_NETWORK_RESTRICTED API"
   bug: "339559837"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -114,6 +127,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED API"
   bug: "343823469"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -122,6 +136,7 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for introducing TETHERING_VIRTUAL type"
   bug: "340376953"
+  is_fixed_read_only: true
 }
 
 flag {
@@ -130,4 +145,5 @@ flag {
   namespace: "android_core_networking"
   description: "Flag for NetworkStats#addEntries API"
   bug: "335680025"
+  is_fixed_read_only: true
 }
