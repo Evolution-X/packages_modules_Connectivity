@@ -49,7 +49,10 @@ java_sdk_library {
         "//packages/modules/NetworkStack/tests:__subpackages__",
         "//packages/modules/Wifi/service/tests/wifitests",
     ],
-    stub_only_libs: ["framework-connectivity.stubs.module_lib"],
+    stub_only_libs: [
+        "framework-connectivity.stubs.module_lib",
+        "sdk_module-lib_current_framework-wifi",
+    ],
 
     jarjar_rules: ":framework-tethering-jarjar-rules",
     installable: true,
@@ -97,13 +100,17 @@ java_defaults {
     srcs: [
         ":framework-tethering-srcs",
     ],
-    libs: ["framework-connectivity.stubs.module_lib"],
+    libs: [
+        "framework-connectivity.stubs.module_lib",
+        "sdk_module-lib_current_framework-wifi",
+    ],
     static_libs: [
         "com.android.net.flags-aconfig-java",
     ],
     aidl: {
         include_dirs: [
             "packages/modules/Connectivity/framework/aidl-export",
+            "packages/modules/Wifi/framework/aidl-export",
         ],
     },
     apex_available: ["com.android.tethering"],
