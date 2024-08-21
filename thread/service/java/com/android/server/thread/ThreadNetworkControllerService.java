@@ -43,6 +43,7 @@ import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_CHANNE
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 import static android.net.thread.ThreadNetworkManager.DISALLOW_THREAD_NETWORK;
 import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_PRIVILEGED;
+import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_TESTING;
 
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_ABORT;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_BUSY;
@@ -94,6 +95,7 @@ import android.net.thread.IActiveOperationalDatasetReceiver;
 import android.net.thread.IConfigurationReceiver;
 import android.net.thread.IOperationReceiver;
 import android.net.thread.IOperationalDatasetCallback;
+import android.net.thread.IOutputReceiver;
 import android.net.thread.IStateCallback;
 import android.net.thread.IThreadNetworkController;
 import android.net.thread.OperationalDatasetTimestamp;
@@ -124,6 +126,7 @@ import com.android.server.thread.openthread.DnsTxtAttribute;
 import com.android.server.thread.openthread.IChannelMasksReceiver;
 import com.android.server.thread.openthread.IOtDaemon;
 import com.android.server.thread.openthread.IOtDaemonCallback;
+import com.android.server.thread.openthread.IOtOutputReceiver;
 import com.android.server.thread.openthread.IOtStatusReceiver;
 import com.android.server.thread.openthread.InfraLinkState;
 import com.android.server.thread.openthread.Ipv6AddressInfo;
@@ -426,6 +429,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         LOG.w("OT daemon is dead, clean up...");
 
         OperationReceiverWrapper.onOtDaemonDied();
+        OutputReceiverWrapper.onOtDaemonDied();
         mOtDaemonCallbackProxy.onOtDaemonDied();
         mTunIfController.onOtDaemonDied();
         mNsdPublisher.onOtDaemonDied();
@@ -1042,6 +1046,25 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         };
     }
 
+    private IOtOutputReceiver newOtOutputReceiver(OutputReceiverWrapper receiver) {
+        return new IOtOutputReceiver.Stub() {
+            @Override
+            public void onOutput(String output) {
+                receiver.onOutput(output);
+            }
+
+            @Override
+            public void onComplete() {
+                receiver.onComplete();
+            }
+
+            @Override
+            public void onError(int otError, String message) {
+                receiver.onError(otErrorToAndroidError(otError), message);
+            }
+        };
+    }
+
     @ErrorCode
     private static int otErrorToAndroidError(int otError) {
         // See external/openthread/include/openthread/error.h for OT error definition
@@ -1315,6 +1338,31 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         // registered
         if (mNetworkAgent != null) {
             mNetworkAgent.sendLinkProperties(mTunIfController.getLinkProperties());
+        }
+    }
+
+    @RequiresPermission(
+            allOf = {PERMISSION_THREAD_NETWORK_PRIVILEGED, PERMISSION_THREAD_NETWORK_TESTING})
+    public void runOtCtlCommand(
+            @NonNull String command, boolean isInteractive, @NonNull IOutputReceiver receiver) {
+        enforceAllPermissionsGranted(
+                PERMISSION_THREAD_NETWORK_PRIVILEGED, PERMISSION_THREAD_NETWORK_TESTING);
+
+        mHandler.post(
+                () ->
+                        runOtCtlCommandInternal(
+                                command, isInteractive, new OutputReceiverWrapper(receiver)));
+    }
+
+    private void runOtCtlCommandInternal(
+            String command, boolean isInteractive, @NonNull OutputReceiverWrapper receiver) {
+        checkOnHandlerThread();
+
+        try {
+            getOtDaemon().runOtCtlCommand(command, isInteractive, newOtOutputReceiver(receiver));
+        } catch (RemoteException | ThreadNetworkException e) {
+            LOG.e("otDaemon.runOtCtlCommand failed", e);
+            receiver.onError(ERROR_INTERNAL_ERROR, "Thread stack error");
         }
     }
 
