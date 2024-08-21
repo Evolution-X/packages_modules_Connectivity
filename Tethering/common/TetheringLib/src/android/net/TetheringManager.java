@@ -26,6 +26,8 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.content.Context;
+import android.net.wifi.SoftApConfiguration;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.ConditionVariable;
 import android.os.IBinder;
@@ -744,6 +746,7 @@ public class TetheringManager {
                 mBuilderParcel.exemptFromEntitlementCheck = false;
                 mBuilderParcel.showProvisioningUi = true;
                 mBuilderParcel.connectivityScope = getDefaultConnectivityScope(type);
+                mBuilderParcel.softApConfig = null;
             }
 
             /**
@@ -800,6 +803,30 @@ public class TetheringManager {
                 }
 
                 mBuilderParcel.connectivityScope = scope;
+                return this;
+            }
+
+            /**
+             * Set the desired SoftApConfiguration for {@link #TETHERING_WIFI}. If this is null or
+             * not set, then the persistent tethering SoftApConfiguration from
+             * {@link WifiManager#getSoftApConfiguration()} will be used.
+             * </p>
+             * If TETHERING_WIFI is already enabled and a new request is made with a different
+             * SoftApConfiguration, the request will be accepted if the device can support an
+             * additional tethering Wi-Fi AP interface. Otherwise, the request will be rejected.
+             *
+             * @param softApConfig SoftApConfiguration to use.
+             * @throws IllegalArgumentException if the tethering type isn't TETHERING_WIFI.
+             */
+            @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+            @RequiresPermission(android.Manifest.permission.TETHER_PRIVILEGED)
+            @NonNull
+            public Builder setSoftApConfiguration(@Nullable SoftApConfiguration softApConfig) {
+                if (mBuilderParcel.tetheringType != TETHERING_WIFI) {
+                    throw new IllegalArgumentException(
+                            "SoftApConfiguration can only be set for TETHERING_WIFI");
+                }
+                mBuilderParcel.softApConfig = softApConfig;
                 return this;
             }
 
@@ -884,6 +911,15 @@ public class TetheringManager {
         }
 
         /**
+         * Get the desired SoftApConfiguration of the request, if one was specified.
+         */
+        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @Nullable
+        public SoftApConfiguration getSoftApConfiguration() {
+            return mRequestParcel.softApConfig;
+        }
+
+        /**
          * Get a TetheringRequestParcel from the configuration
          * @hide
          */
@@ -896,9 +932,10 @@ public class TetheringManager {
             return "TetheringRequest [ type= " + mRequestParcel.tetheringType
                     + ", localIPv4Address= " + mRequestParcel.localIPv4Address
                     + ", staticClientAddress= " + mRequestParcel.staticClientAddress
-                    + ", exemptFromEntitlementCheck= "
-                    + mRequestParcel.exemptFromEntitlementCheck + ", showProvisioningUi= "
-                    + mRequestParcel.showProvisioningUi + " ]";
+                    + ", exemptFromEntitlementCheck= " + mRequestParcel.exemptFromEntitlementCheck
+                    + ", showProvisioningUi= " + mRequestParcel.showProvisioningUi
+                    + ", softApConfig= " + mRequestParcel.softApConfig
+                    + " ]";
         }
 
         @Override
@@ -912,7 +949,8 @@ public class TetheringManager {
                     && Objects.equals(parcel.staticClientAddress, otherParcel.staticClientAddress)
                     && parcel.exemptFromEntitlementCheck == otherParcel.exemptFromEntitlementCheck
                     && parcel.showProvisioningUi == otherParcel.showProvisioningUi
-                    && parcel.connectivityScope == otherParcel.connectivityScope;
+                    && parcel.connectivityScope == otherParcel.connectivityScope
+                    && Objects.equals(parcel.softApConfig, otherParcel.softApConfig);
         }
 
         @Override
@@ -920,7 +958,7 @@ public class TetheringManager {
             TetheringRequestParcel parcel = getParcel();
             return Objects.hash(parcel.tetheringType, parcel.localIPv4Address,
                     parcel.staticClientAddress, parcel.exemptFromEntitlementCheck,
-                    parcel.showProvisioningUi, parcel.connectivityScope);
+                    parcel.showProvisioningUi, parcel.connectivityScope, parcel.softApConfig);
         }
     }
 
