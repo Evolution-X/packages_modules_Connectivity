@@ -19,7 +19,6 @@ import android.annotation.RequiresApi;
 import android.content.Context;
 import android.net.ct.ICertificateTransparencyManager;
 import android.os.Build;
-import android.util.Log;
 
 import com.android.net.ct.flags.Flags;
 import com.android.net.module.util.DeviceConfigUtils;
@@ -29,7 +28,6 @@ import com.android.server.SystemService;
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 public class CertificateTransparencyService extends ICertificateTransparencyManager.Stub {
 
-    private static final String TAG = "CertificateTransparency";
     private static final String CERTIFICATE_TRANSPARENCY_ENABLED =
             "certificate_transparency_service_enabled";
 
@@ -59,7 +57,6 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
 
         switch (phase) {
             case SystemService.PHASE_BOOT_COMPLETED:
-                Log.d(TAG, "setting up flags listeners");
                 mFlagsListener.initialize();
                 break;
             default:
