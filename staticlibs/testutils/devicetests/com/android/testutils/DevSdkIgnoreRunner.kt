@@ -61,8 +61,10 @@ class DevSdkIgnoreRunner(private val klass: Class<*>) : Runner(), Filterable, So
     private val shouldThreadLeakFailTest = klass.isAnnotationPresent(MonitorThreadLeak::class.java)
     private val restoreDefaultNetworkDesc =
             Description.createTestDescription(klass, "RestoreDefaultNetwork")
-    private val restoreDefaultNetwork = klass.isAnnotationPresent(RestoreDefaultNetwork::class.java)
     val ctx = ApplicationProvider.getApplicationContext<Context>()
+    private val restoreDefaultNetwork =
+            klass.isAnnotationPresent(RestoreDefaultNetwork::class.java) &&
+            !ctx.applicationInfo.isInstantApp()
 
     // Inference correctly infers Runner & Filterable & Sortable for |baseRunner|, but the
     // Java bytecode doesn't have a way to express this. Give this type a name by wrapping it.

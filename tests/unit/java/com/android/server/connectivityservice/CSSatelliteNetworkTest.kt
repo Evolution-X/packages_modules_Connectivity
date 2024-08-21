@@ -54,6 +54,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -160,6 +161,43 @@ class CSSatelliteNetworkTest : CSTest() {
     @Test @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     fun testSatelliteNeverBecomeDefaultNetwork_notRestricted() {
         doTestSatelliteNeverBecomeDefaultNetwork(restricted = false)
+    }
+
+    private fun doTestUnregisterAfterReplacementSatisfier(destroyed: Boolean) {
+        val satelliteAgent = createSatelliteAgent("satellite0")
+        satelliteAgent.connect()
+
+        val uids = setOf(TEST_PACKAGE_UID)
+        updateSatelliteNetworkFallbackUids(uids)
+
+        if (destroyed) {
+            satelliteAgent.unregisterAfterReplacement(timeoutMs = 5000)
+        }
+
+        updateSatelliteNetworkFallbackUids(setOf())
+        if (destroyed) {
+            // If the network is already destroyed, networkRemoveUidRangesParcel should not be
+            // called.
+            verify(netd, never()).networkRemoveUidRangesParcel(any())
+        } else {
+            verify(netd).networkRemoveUidRangesParcel(
+                    NativeUidRangeConfig(
+                            satelliteAgent.network.netId,
+                            toUidRangeStableParcels(uidRangesForUids(uids)),
+                            PREFERENCE_ORDER_SATELLITE_FALLBACK
+                    )
+            )
+        }
+    }
+
+    @Test
+    fun testUnregisterAfterReplacementSatisfier_destroyed() {
+        doTestUnregisterAfterReplacementSatisfier(destroyed = true)
+    }
+
+    @Test
+    fun testUnregisterAfterReplacementSatisfier_notDestroyed() {
+        doTestUnregisterAfterReplacementSatisfier(destroyed = false)
     }
 
     private fun assertCreateMultiLayerNrisFromSatelliteNetworkPreferredUids(uids: Set<Int>) {

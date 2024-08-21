@@ -33,6 +33,9 @@ import static com.android.net.module.util.ConnectivityUtils.isIPv6ULA;
 import static com.android.net.module.util.HexDump.dumpHexString;
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REPLY_TYPE;
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REQUEST_TYPE;
+import static com.android.net.module.util.NetworkStackConstants.IPV4_HEADER_MIN_LEN;
+import static com.android.net.module.util.NetworkStackConstants.IPV6_HEADER_LEN;
+import static com.android.net.module.util.NetworkStackConstants.UDP_HEADER_LEN;
 import static com.android.testutils.DeviceInfoUtils.KVersion;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
@@ -62,6 +65,10 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.net.module.util.BpfDump;
 import com.android.net.module.util.Ipv6Utils;
 import com.android.net.module.util.Struct;
+import com.android.net.module.util.bpf.ClatEgress4Key;
+import com.android.net.module.util.bpf.ClatEgress4Value;
+import com.android.net.module.util.bpf.ClatIngress6Key;
+import com.android.net.module.util.bpf.ClatIngress6Value;
 import com.android.net.module.util.bpf.Tether4Key;
 import com.android.net.module.util.bpf.Tether4Value;
 import com.android.net.module.util.bpf.TetherStatsKey;
@@ -122,6 +129,8 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
     private static final int TX_UDP_PACKET_SIZE = 30;
     private static final int TX_UDP_PACKET_COUNT = 123;
 
+    private static final String DUMPSYS_CLAT_RAWMAP_EGRESS4_ARG = "clatEgress4RawBpfMap";
+    private static final String DUMPSYS_CLAT_RAWMAP_INGRESS6_ARG = "clatIngress6RawBpfMap";
     private static final String DUMPSYS_TETHERING_RAWMAP_ARG = "bpfRawMap";
     private static final String DUMPSYS_RAWMAP_ARG_STATS = "--stats";
     private static final String DUMPSYS_RAWMAP_ARG_UPSTREAM4 = "--upstream4";
@@ -901,11 +910,10 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
     @NonNull
     private <K extends Struct, V extends Struct> HashMap<K, V> dumpAndParseRawMap(
-            Class<K> keyClass, Class<V> valueClass, @NonNull String mapArg)
+            Class<K> keyClass, Class<V> valueClass, @NonNull String service, @NonNull String[] args)
             throws Exception {
-        final String[] args = new String[] {DUMPSYS_TETHERING_RAWMAP_ARG, mapArg};
         final String rawMapStr = runAsShell(DUMP, () ->
-                DumpTestUtils.dumpService(Context.TETHERING_SERVICE, args));
+                DumpTestUtils.dumpService(service, args));
         final HashMap<K, V> map = new HashMap<>();
 
         for (final String line : rawMapStr.split(LINE_DELIMITER)) {
@@ -918,10 +926,10 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
     @Nullable
     private <K extends Struct, V extends Struct> HashMap<K, V> pollRawMapFromDump(
-            Class<K> keyClass, Class<V> valueClass, @NonNull String mapArg)
+            Class<K> keyClass, Class<V> valueClass, @NonNull String service, @NonNull String[] args)
             throws Exception {
         for (int retryCount = 0; retryCount < DUMP_POLLING_MAX_RETRY; retryCount++) {
-            final HashMap<K, V> map = dumpAndParseRawMap(keyClass, valueClass, mapArg);
+            final HashMap<K, V> map = dumpAndParseRawMap(keyClass, valueClass, service, args);
             if (!map.isEmpty()) return map;
 
             Thread.sleep(DUMP_POLLING_INTERVAL_MS);
@@ -977,8 +985,10 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         Thread.sleep(UDP_STREAM_SLACK_MS);
 
         // [1] Verify IPv4 upstream rule map.
+        final String[] upstreamArgs = new String[] {DUMPSYS_TETHERING_RAWMAP_ARG,
+                DUMPSYS_RAWMAP_ARG_UPSTREAM4};
         final HashMap<Tether4Key, Tether4Value> upstreamMap = pollRawMapFromDump(
-                Tether4Key.class, Tether4Value.class, DUMPSYS_RAWMAP_ARG_UPSTREAM4);
+                Tether4Key.class, Tether4Value.class, Context.TETHERING_SERVICE, upstreamArgs);
         assertNotNull(upstreamMap);
         assertEquals(1, upstreamMap.size());
 
@@ -1017,8 +1027,10 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         }
 
         // Dump stats map to verify.
+        final String[] statsArgs = new String[] {DUMPSYS_TETHERING_RAWMAP_ARG,
+                DUMPSYS_RAWMAP_ARG_STATS};
         final HashMap<TetherStatsKey, TetherStatsValue> statsMap = pollRawMapFromDump(
-                TetherStatsKey.class, TetherStatsValue.class, DUMPSYS_RAWMAP_ARG_STATS);
+                TetherStatsKey.class, TetherStatsValue.class, Context.TETHERING_SERVICE, statsArgs);
         assertNotNull(statsMap);
         assertEquals(1, statsMap.size());
 
@@ -1052,5 +1064,103 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         assumeKernelSupportBpfOffloadUdpV4();
 
         runUdp4Test();
+    }
+
+    private ClatEgress4Value getClatEgress4Value() throws Exception {
+        // Command: dumpsys connectivity clatEgress4RawBpfMap
+        final String[] args = new String[] {DUMPSYS_CLAT_RAWMAP_EGRESS4_ARG};
+        final HashMap<ClatEgress4Key, ClatEgress4Value> egress4Map = pollRawMapFromDump(
+                ClatEgress4Key.class, ClatEgress4Value.class, Context.CONNECTIVITY_SERVICE, args);
+        assertNotNull(egress4Map);
+        assertEquals(1, egress4Map.size());
+        return egress4Map.entrySet().iterator().next().getValue();
+    }
+
+    private ClatIngress6Value getClatIngress6Value() throws Exception {
+        // Command: dumpsys connectivity clatIngress6RawBpfMap
+        final String[] args = new String[] {DUMPSYS_CLAT_RAWMAP_INGRESS6_ARG};
+        final HashMap<ClatIngress6Key, ClatIngress6Value> ingress6Map = pollRawMapFromDump(
+                ClatIngress6Key.class, ClatIngress6Value.class, Context.CONNECTIVITY_SERVICE, args);
+        assertNotNull(ingress6Map);
+        assertEquals(1, ingress6Map.size());
+        return ingress6Map.entrySet().iterator().next().getValue();
+    }
+
+    /**
+     * Test network topology:
+     *
+     *            public network (rawip)                 private network
+     *                      |         UE (CLAT support)         |
+     * +---------------+    V    +------------+------------+    V    +------------+
+     * | NAT64 Gateway +---------+  Upstream  | Downstream +---------+   Client   |
+     * +---------------+         +------------+------------+         +------------+
+     * remote ip                 public ip                           private ip
+     * [64:ff9b::808:808]:443    [clat ipv6]:9876                    [TetheredDevice ipv4]:9876
+     *
+     * Note that CLAT IPv6 address is generated by ClatCoordinator. Get the CLAT IPv6 address by
+     * sending out an IPv4 packet and extracting the source address from CLAT translated IPv6
+     * packet.
+     */
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
+    public void testTetherClatBpfOffloadUdp() throws Exception {
+        assumeKernelSupportBpfOffloadUdpV4();
+
+        // CLAT only starts on IPv6 only network.
+        final TetheringTester tester = initTetheringTester(toList(TEST_IP6_ADDR),
+                toList(TEST_IP6_DNS));
+        final TetheredDevice tethered = tester.createTetheredDevice(TEST_MAC, true /* hasIpv6 */);
+
+        // Get CLAT IPv6 address.
+        final Inet6Address clatIp6 = getClatIpv6Address(tester, tethered);
+
+        // Get current values before sending packets.
+        final ClatEgress4Value oldEgress4 = getClatEgress4Value();
+        final ClatIngress6Value oldIngress6 = getClatIngress6Value();
+
+        // Send an IPv4 UDP packet in original direction.
+        // IPv4 packet -- CLAT translation --> IPv6 packet
+        for (int i = 0; i < TX_UDP_PACKET_COUNT; i++) {
+            sendUploadPacketUdp(tethered.macAddr, tethered.routerMacAddr, tethered.ipv4Addr,
+                    REMOTE_IP4_ADDR, tester, true /* is4To6 */);
+        }
+
+        // Send an IPv6 UDP packet in reply direction.
+        // IPv6 packet -- CLAT translation --> IPv4 packet
+        for (int i = 0; i < RX_UDP_PACKET_COUNT; i++) {
+            sendDownloadPacketUdp(REMOTE_NAT64_ADDR, clatIp6, tester, true /* is6To4 */);
+        }
+
+        // Send fragmented IPv6 UDP packets in the reply direction.
+        // IPv6 frament packet -- CLAT translation --> IPv4 fragment packet
+        final int payloadLen = 1500;
+        final int l2mtu = 1000;
+        final int fragPktCnt = 2; // 1500 bytes of UDP payload were fragmented into two packets.
+        final long fragRxBytes = payloadLen + UDP_HEADER_LEN + fragPktCnt * IPV4_HEADER_MIN_LEN;
+        final byte[] payload = new byte[payloadLen];
+        // Initialize the payload with random bytes.
+        Random random = new Random();
+        random.nextBytes(payload);
+        sendDownloadFragmentedUdpPackets(REMOTE_NAT64_ADDR, clatIp6, tester,
+                ByteBuffer.wrap(payload), l2mtu);
+
+        // After sending test packets, get stats again to verify their differences.
+        final ClatEgress4Value newEgress4 = getClatEgress4Value();
+        final ClatIngress6Value newIngress6 = getClatIngress6Value();
+
+        assertEquals(RX_UDP_PACKET_COUNT + fragPktCnt, newIngress6.packets - oldIngress6.packets);
+        assertEquals(RX_UDP_PACKET_COUNT * RX_UDP_PACKET_SIZE + fragRxBytes,
+                newIngress6.bytes - oldIngress6.bytes);
+        assertEquals(TX_UDP_PACKET_COUNT, newEgress4.packets - oldEgress4.packets);
+        // The increase in egress traffic equals the expected size of the translated UDP packets.
+        // Calculation:
+        // - Original UDP packet was TX_UDP_PACKET_SIZE bytes (IPv4 header + UDP header + payload).
+        // - After CLAT translation, each packet is now:
+        //     IPv6 header + unchanged UDP header + unchanged payload
+        // Therefore, the total size of the translated UDP packet should be:
+        //     TX_UDP_PACKET_SIZE + IPV6_HEADER_LEN - IPV4_HEADER_MIN_LEN
+        assertEquals(
+                TX_UDP_PACKET_COUNT * (TX_UDP_PACKET_SIZE + IPV6_HEADER_LEN - IPV4_HEADER_MIN_LEN),
+                newEgress4.bytes - oldEgress4.bytes);
     }
 }
