@@ -16,3 +16,7 @@ launch_cvd
 
 Open `https://localhost:8443/` in your web browser, you can find the Thread
 demoapp (with the Thread logo) in the cuttlefish instance. Open it and have fun with Thread!
+
+## More docs
+
+- [Make your Android Border Router](./docs/make-your-android-border-router.md)
