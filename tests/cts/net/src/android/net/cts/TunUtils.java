@@ -47,6 +47,8 @@ public class TunUtils {
     protected static final int IP4_PROTO_OFFSET = 9;
     protected static final int IP6_PROTO_OFFSET = 6;
 
+    private static final int SEQ_NUM_MATCH_NOT_REQUIRED = -1;
+
     private static final int DATA_BUFFER_LEN = 4096;
     private static final int TIMEOUT = 2000;
 
@@ -146,16 +148,30 @@ public class TunUtils {
         return espPkt; // We've found the packet we're looking for.
     }
 
+    /** Await the expected ESP packet */
     public byte[] awaitEspPacket(int spi, boolean useEncap) throws Exception {
-        return awaitPacket((pkt) -> isEsp(pkt, spi, useEncap));
+        return awaitEspPacket(spi, useEncap, SEQ_NUM_MATCH_NOT_REQUIRED);
     }
 
-    private static boolean isSpiEqual(byte[] pkt, int espOffset, int spi) {
+    /** Await the expected ESP packet with a matching sequence number */
+    public byte[] awaitEspPacket(int spi, boolean useEncap, int seqNum) throws Exception {
+        return awaitPacket((pkt) -> isEsp(pkt, spi, seqNum, useEncap));
+    }
+
+    private static boolean isMatchingEspPacket(byte[] pkt, int espOffset, int spi, int seqNum) {
         ByteBuffer buffer = ByteBuffer.wrap(pkt);
         buffer.get(new byte[espOffset]); // Skip IP, UDP header
         int actualSpi = buffer.getInt();
+        int actualSeqNum = buffer.getInt();
 
-        return actualSpi == spi;
+        if (actualSeqNum < 0) {
+            throw new UnsupportedOperationException(
+                    "actualSeqNum overflowed and needs to be converted to an unsigned integer");
+        }
+
+        boolean isSeqNumMatched = (seqNum == SEQ_NUM_MATCH_NOT_REQUIRED || seqNum == actualSeqNum);
+
+        return actualSpi == spi && isSeqNumMatched;
     }
 
     /**
@@ -173,28 +189,31 @@ public class TunUtils {
             fail("Banned plaintext packet found");
         }
 
-        return isEsp(pkt, spi, encap);
+        return isEsp(pkt, spi, SEQ_NUM_MATCH_NOT_REQUIRED, encap);
     }
 
-    private static boolean isEsp(byte[] pkt, int spi, boolean encap) {
+    private static boolean isEsp(byte[] pkt, int spi, int seqNum, boolean encap) {
         if (isIpv6(pkt)) {
             if (encap) {
                 return pkt[IP6_PROTO_OFFSET] == IPPROTO_UDP
-                        && isSpiEqual(pkt, IP6_HDRLEN + UDP_HDRLEN, spi);
+                        && isMatchingEspPacket(pkt, IP6_HDRLEN + UDP_HDRLEN, spi, seqNum);
             } else {
-                return pkt[IP6_PROTO_OFFSET] == IPPROTO_ESP && isSpiEqual(pkt, IP6_HDRLEN, spi);
+                return pkt[IP6_PROTO_OFFSET] == IPPROTO_ESP
+                        && isMatchingEspPacket(pkt, IP6_HDRLEN, spi, seqNum);
             }
 
         } else {
             // Use default IPv4 header length (assuming no options)
             if (encap) {
                 return pkt[IP4_PROTO_OFFSET] == IPPROTO_UDP
-                        && isSpiEqual(pkt, IP4_HDRLEN + UDP_HDRLEN, spi);
+                        && isMatchingEspPacket(pkt, IP4_HDRLEN + UDP_HDRLEN, spi, seqNum);
             } else {
-                return pkt[IP4_PROTO_OFFSET] == IPPROTO_ESP && isSpiEqual(pkt, IP4_HDRLEN, spi);
+                return pkt[IP4_PROTO_OFFSET] == IPPROTO_ESP
+                        && isMatchingEspPacket(pkt, IP4_HDRLEN, spi, seqNum);
             }
         }
     }
+
 
     public static boolean isIpv6(byte[] pkt) {
         // First nibble shows IP version. 0x60 for IPv6
