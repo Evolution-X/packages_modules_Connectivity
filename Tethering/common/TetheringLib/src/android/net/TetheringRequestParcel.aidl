@@ -17,6 +17,7 @@
 package android.net;
 
 import android.net.LinkAddress;
+import android.net.wifi.SoftApConfiguration;
 
 /**
  * Configuration details for requesting tethering.
@@ -29,4 +30,5 @@ parcelable TetheringRequestParcel {
     boolean exemptFromEntitlementCheck;
     boolean showProvisioningUi;
     int connectivityScope;
+    SoftApConfiguration softApConfig;
 }
