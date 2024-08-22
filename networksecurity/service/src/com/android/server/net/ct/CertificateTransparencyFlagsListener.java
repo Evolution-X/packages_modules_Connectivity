@@ -85,9 +85,9 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
             return;
         }
 
-        mDataStore.setProperty(Config.VERSION, newVersion);
-        mDataStore.setProperty(Config.CONTENT_URL, newContentUrl);
-        mDataStore.setProperty(Config.METADATA_URL, newMetadataUrl);
+        mDataStore.setProperty(Config.VERSION_PENDING, newVersion);
+        mDataStore.setProperty(Config.CONTENT_URL_PENDING, newContentUrl);
+        mDataStore.setProperty(Config.METADATA_URL_PENDING, newMetadataUrl);
         mDataStore.store();
 
         mCertificateTransparencyDownloader.startMetadataDownload(newMetadataUrl);
