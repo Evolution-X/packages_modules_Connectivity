@@ -1055,7 +1055,7 @@ public class ConnectivityManagerTest {
 
     @AppModeFull(reason = "WRITE_SECURE_SETTINGS permission can't be granted to instant apps")
     @Test @IgnoreUpTo(Build.VERSION_CODES.Q)
-    public void testIsPrivateDnsBroken() throws InterruptedException {
+    public void testIsPrivateDnsBroken() throws Exception {
         final String invalidPrivateDnsServer = "invalidhostname.example.com";
         final String goodPrivateDnsServer = "dns.google";
         mCtsNetUtils.storePrivateDnsSetting();
@@ -1077,11 +1077,9 @@ public class ConnectivityManagerTest {
                     .isPrivateDnsBroken()) && networkForPrivateDns.equals(entry.getNetwork()));
         } finally {
             mCtsNetUtils.restorePrivateDnsSetting();
-            // Toggle network to make sure it is re-validated
-            mCm.reportNetworkConnectivity(networkForPrivateDns, true);
-            cb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS,
-                    entry -> !(((CallbackEntry.CapabilitiesChanged) entry).getCaps()
-                    .isPrivateDnsBroken()) && networkForPrivateDns.equals(entry.getNetwork()));
+            // Toggle networks to make sure they are re-validated
+            mCtsNetUtils.reconnectWifiIfSupported();
+            mCtsNetUtils.reconnectCellIfSupported();
         }
     }
 
