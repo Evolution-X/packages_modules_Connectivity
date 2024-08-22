@@ -37,7 +37,6 @@ public class DataStoreTest {
     public void setUp() throws IOException {
         mTempFile = File.createTempFile("datastore-test", ".properties");
         mDataStore = new DataStore(mTempFile);
-        mDataStore.load();
     }
 
     @After
