@@ -34,9 +34,12 @@ final class Config {
     static final File PREFERENCES_FILE = new File(DEVICE_PROTECTED_DATA_DIR, PREFERENCES_FILE_NAME);
 
     // flags and properties names
+    static final String VERSION_PENDING = "version_pending";
     static final String VERSION = "version";
+    static final String CONTENT_URL_PENDING = "content_url_pending";
     static final String CONTENT_URL = "content_url";
     static final String CONTENT_URL_KEY = "content_url_key";
+    static final String METADATA_URL_PENDING = "metadata_url_pending";
     static final String METADATA_URL = "metadata_url";
     static final String METADATA_URL_KEY = "metadata_url_key";
 }
