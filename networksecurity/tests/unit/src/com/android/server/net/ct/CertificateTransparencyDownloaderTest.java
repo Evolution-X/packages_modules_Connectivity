@@ -40,7 +40,17 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.Signature;
 
 /** Tests for the {@link CertificateTransparencyDownloader}. */
 @RunWith(JUnit4.class)
@@ -49,14 +59,19 @@ public class CertificateTransparencyDownloaderTest {
     @Mock private DownloadHelper mDownloadHelper;
     @Mock private CertificateTransparencyInstaller mCertificateTransparencyInstaller;
 
+    private PrivateKey mPrivateKey;
     private Context mContext;
     private File mTempFile;
     private DataStore mDataStore;
     private CertificateTransparencyDownloader mCertificateTransparencyDownloader;
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() throws IOException, NoSuchAlgorithmException {
         MockitoAnnotations.initMocks(this);
+
+        KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
+        KeyPair keyPair = instance.generateKeyPair();
+        mPrivateKey = keyPair.getPrivate();
 
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
         mTempFile = File.createTempFile("datastore-test", ".properties");
@@ -65,7 +80,11 @@ public class CertificateTransparencyDownloaderTest {
 
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
-                        mContext, mDataStore, mDownloadHelper, mCertificateTransparencyInstaller);
+                        mContext,
+                        mDataStore,
+                        mDownloadHelper,
+                        mCertificateTransparencyInstaller,
+                        keyPair.getPublic().getEncoded());
     }
 
     @After
@@ -128,23 +147,16 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleContentCompleteInstallSuccessful() throws IOException {
+    public void testDownloader_handleContentCompleteInstallSuccessful() throws Exception {
         String version = "666";
-        mDataStore.setProperty(Config.VERSION_PENDING, version);
-
-        long metadataId = 123;
-        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-metadata", "txt"));
-        mDataStore.setProperty(Config.METADATA_URL_PENDING, metadataUri.toString());
-        when(mDownloadHelper.getUri(metadataId)).thenReturn(metadataUri);
-
         long contentId = 666;
-        mDataStore.setPropertyLong(Config.CONTENT_URL_KEY, contentId);
-        when(mDownloadHelper.isSuccessful(contentId)).thenReturn(true);
-        Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUri.toString());
-        when(mDownloadHelper.getUri(contentId)).thenReturn(contentUri);
+        File logListFile = File.createTempFile("log_list", "json");
+        Uri contentUri = Uri.fromFile(logListFile);
+        long metadataId = 123;
+        File metadataFile = sign(logListFile);
+        Uri metadataUri = Uri.fromFile(metadataFile);
 
+        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
         when(mCertificateTransparencyInstaller.install(any(), eq(version))).thenReturn(true);
 
         assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
@@ -161,23 +173,16 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleContentCompleteInstallFails() throws IOException {
+    public void testDownloader_handleContentCompleteInstallFails() throws Exception {
         String version = "666";
-        mDataStore.setProperty(Config.VERSION_PENDING, version);
-
-        long metadataId = 123;
-        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-metadata", "txt"));
-        mDataStore.setProperty(Config.METADATA_URL_PENDING, metadataUri.toString());
-        when(mDownloadHelper.getUri(metadataId)).thenReturn(metadataUri);
-
         long contentId = 666;
-        mDataStore.setPropertyLong(Config.CONTENT_URL_KEY, contentId);
-        when(mDownloadHelper.isSuccessful(contentId)).thenReturn(true);
-        Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUri.toString());
-        when(mDownloadHelper.getUri(contentId)).thenReturn(contentUri);
+        File logListFile = File.createTempFile("log_list", "json");
+        Uri contentUri = Uri.fromFile(logListFile);
+        long metadataId = 123;
+        File metadataFile = sign(logListFile);
+        Uri metadataUri = Uri.fromFile(metadataFile);
 
+        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
         when(mCertificateTransparencyInstaller.install(any(), eq(version))).thenReturn(false);
 
         mCertificateTransparencyDownloader.onReceive(
@@ -188,8 +193,56 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
     }
 
+    @Test
+    public void testDownloader_handleContentCompleteVerificationFails() throws IOException {
+        String version = "666";
+        long contentId = 666;
+        Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
+        long metadataId = 123;
+        Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-wrong_metadata", "sig"));
+
+        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(contentId));
+
+        verify(mCertificateTransparencyInstaller, never()).install(any(), eq(version));
+        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
+        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
+        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+    }
+
     private Intent makeDownloadCompleteIntent(long downloadId) {
         return new Intent(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
                 .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
+    }
+
+    private void setUpDownloadComplete(
+            String version, long metadataId, Uri metadataUri, long contentId, Uri contentUri)
+            throws IOException {
+        mDataStore.setProperty(Config.VERSION_PENDING, version);
+
+        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
+        mDataStore.setProperty(Config.METADATA_URL_PENDING, metadataUri.toString());
+        when(mDownloadHelper.getUri(metadataId)).thenReturn(metadataUri);
+
+        mDataStore.setPropertyLong(Config.CONTENT_URL_KEY, contentId);
+        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUri.toString());
+        when(mDownloadHelper.isSuccessful(contentId)).thenReturn(true);
+        when(mDownloadHelper.getUri(contentId)).thenReturn(contentUri);
+    }
+
+    private File sign(File file) throws IOException, GeneralSecurityException {
+        File signatureFile = File.createTempFile("log_list-metadata", "sig");
+        Signature signer = Signature.getInstance("SHA256withRSA");
+        signer.initSign(mPrivateKey);
+
+        try (InputStream fileStream = new FileInputStream(file);
+                OutputStream outputStream = new FileOutputStream(signatureFile)) {
+            signer.update(fileStream.readAllBytes());
+            outputStream.write(signer.sign());
+        }
+
+        return signatureFile;
     }
 }
