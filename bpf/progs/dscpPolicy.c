@@ -28,7 +28,7 @@ DEFINE_BPF_MAP_GRW(socket_policy_cache_map, HASH, uint64_t, RuleEntry, CACHE_MAP
 DEFINE_BPF_MAP_GRW(ipv4_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 DEFINE_BPF_MAP_GRW(ipv6_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 
-static inline __always_inline void match_policy(struct __sk_buff* skb, bool ipv4) {
+static inline __always_inline void match_policy(struct __sk_buff* skb, const bool ipv4) {
     void* data = (void*)(long)skb->data;
     const void* data_end = (void*)(long)skb->data_end;
 
@@ -145,8 +145,10 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, bool ipv4
             policy = bpf_ipv6_dscp_policies_map_lookup_elem(&key);
         }
 
-        // If the policy lookup failed, just continue (this should not ever happen)
-        if (!policy) continue;
+        // Lookup failure cannot happen on an array with MAX_POLICIES entries.
+        // While 'continue' would make logical sense here, 'return' should be
+        // easier for the verifier to analyze.
+        if (!policy) return;
 
         // If policy iface index does not match skb, then skip to next policy.
         if (policy->ifindex != skb->ifindex) continue;
