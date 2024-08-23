@@ -32,6 +32,7 @@ import android.net.MacAddress;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.net.module.util.Struct.Bool;
 import com.android.net.module.util.Struct.Field;
 import com.android.net.module.util.Struct.Type;
 
@@ -131,6 +132,29 @@ public class StructTest {
         final HeaderMsgWithConstructor msg = doParsingMessageTest(HDR_EMPTY,
                 HeaderMsgWithConstructor.class, ByteOrder.LITTLE_ENDIAN);
         verifyHeaderParsing(msg);
+    }
+
+    @Test
+    public void testBoolStruct() {
+        assertEquals(1, Struct.getSize(Bool.class));
+
+        assertEquals(false, Struct.parse(Bool.class, toByteBuffer("00")).val);
+        assertEquals(true,  Struct.parse(Bool.class, toByteBuffer("01")).val);
+        // maybe these should throw instead, but currently only 0 is false...
+        assertEquals(true,  Struct.parse(Bool.class, toByteBuffer("02")).val);
+        assertEquals(true,  Struct.parse(Bool.class, toByteBuffer("7F")).val);
+        assertEquals(true,  Struct.parse(Bool.class, toByteBuffer("80")).val);
+        assertEquals(true,  Struct.parse(Bool.class, toByteBuffer("FF")).val);
+
+        final var f = new Bool(false);
+        final var t = new Bool(true);
+        assertEquals(f.val, false);
+        assertEquals(t.val, true);
+
+        assertArrayEquals(toByteBuffer("00").array(), f.writeToBytes(ByteOrder.BIG_ENDIAN));
+        assertArrayEquals(toByteBuffer("00").array(), f.writeToBytes(ByteOrder.LITTLE_ENDIAN));
+        assertArrayEquals(toByteBuffer("01").array(), t.writeToBytes(ByteOrder.BIG_ENDIAN));
+        assertArrayEquals(toByteBuffer("01").array(), t.writeToBytes(ByteOrder.LITTLE_ENDIAN));
     }
 
     public static class HeaderMsgWithoutConstructor extends Struct {
