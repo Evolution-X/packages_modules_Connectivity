@@ -372,7 +372,7 @@ unsigned int readSectionUint(const char* name, ifstream& elfFile) {
         value += static_cast<unsigned char>(theBytes[1]);
         value <<= 8;
         value += static_cast<unsigned char>(theBytes[0]);
-        ALOGI("Section %s value is %u [0x%x]", name, value, value);
+        ALOGD("Section %s value is %u [0x%x]", name, value, value);
         return value;
     }
 }
@@ -673,28 +673,28 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
         if (md[i].zero != 0) abort();
 
         if (bpfloader_ver < md[i].bpfloader_min_ver) {
-            ALOGI("skipping map %s which requires bpfloader min ver 0x%05x", mapNames[i].c_str(),
+            ALOGD("skipping map %s which requires bpfloader min ver 0x%05x", mapNames[i].c_str(),
                   md[i].bpfloader_min_ver);
             mapFds.push_back(unique_fd());
             continue;
         }
 
         if (bpfloader_ver >= md[i].bpfloader_max_ver) {
-            ALOGI("skipping map %s which requires bpfloader max ver 0x%05x", mapNames[i].c_str(),
+            ALOGD("skipping map %s which requires bpfloader max ver 0x%05x", mapNames[i].c_str(),
                   md[i].bpfloader_max_ver);
             mapFds.push_back(unique_fd());
             continue;
         }
 
         if (kvers < md[i].min_kver) {
-            ALOGI("skipping map %s which requires kernel version 0x%x >= 0x%x",
+            ALOGD("skipping map %s which requires kernel version 0x%x >= 0x%x",
                   mapNames[i].c_str(), kvers, md[i].min_kver);
             mapFds.push_back(unique_fd());
             continue;
         }
 
         if (kvers >= md[i].max_kver) {
-            ALOGI("skipping map %s which requires kernel version 0x%x < 0x%x",
+            ALOGD("skipping map %s which requires kernel version 0x%x < 0x%x",
                   mapNames[i].c_str(), kvers, md[i].max_kver);
             mapFds.push_back(unique_fd());
             continue;
@@ -702,7 +702,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
 
         if ((md[i].ignore_on_eng && isEng()) || (md[i].ignore_on_user && isUser()) ||
             (md[i].ignore_on_userdebug && isUserdebug())) {
-            ALOGI("skipping map %s which is ignored on %s builds", mapNames[i].c_str(),
+            ALOGD("skipping map %s which is ignored on %s builds", mapNames[i].c_str(),
                   getBuildType().c_str());
             mapFds.push_back(unique_fd());
             continue;
@@ -713,7 +713,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             (isX86() && isKernel32Bit() && md[i].ignore_on_x86_32) ||
             (isX86() && isKernel64Bit() && md[i].ignore_on_x86_64) ||
             (isRiscV() && md[i].ignore_on_riscv64)) {
-            ALOGI("skipping map %s which is ignored on %s", mapNames[i].c_str(),
+            ALOGD("skipping map %s which is ignored on %s", mapNames[i].c_str(),
                   describeArch());
             mapFds.push_back(unique_fd());
             continue;
@@ -1109,19 +1109,19 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
 
     // inclusive lower bound check
     if (bpfloader_ver < bpfLoaderMinVer) {
-        ALOGI("BpfLoader version 0x%05x ignoring ELF object %s with min ver 0x%05x",
+        ALOGD("BpfLoader version 0x%05x ignoring ELF object %s with min ver 0x%05x",
               bpfloader_ver, elfPath, bpfLoaderMinVer);
         return 0;
     }
 
     // exclusive upper bound check
     if (bpfloader_ver >= bpfLoaderMaxVer) {
-        ALOGI("BpfLoader version 0x%05x ignoring ELF object %s with max ver 0x%05x",
+        ALOGD("BpfLoader version 0x%05x ignoring ELF object %s with max ver 0x%05x",
               bpfloader_ver, elfPath, bpfLoaderMaxVer);
         return 0;
     }
 
-    ALOGI("BpfLoader version 0x%05x processing ELF object %s with ver [0x%05x,0x%05x)",
+    ALOGD("BpfLoader version 0x%05x processing ELF object %s with ver [0x%05x,0x%05x)",
           bpfloader_ver, elfPath, bpfLoaderMinVer, bpfLoaderMaxVer);
 
     ret = readCodeSections(elfFile, cs);
