@@ -6,4 +6,5 @@ flag {
     namespace: "network_security"
     description: "Enable service for certificate transparency log list data"
     bug: "319829948"
+    is_fixed_read_only: true
 }
