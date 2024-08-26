@@ -120,7 +120,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceManagerWrapper;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.thread.openthread.BackboneRouterState;
-import com.android.server.thread.openthread.BorderRouterConfiguration;
 import com.android.server.thread.openthread.DnsTxtAttribute;
 import com.android.server.thread.openthread.IChannelMasksReceiver;
 import com.android.server.thread.openthread.IOtDaemon;
@@ -129,6 +128,7 @@ import com.android.server.thread.openthread.IOtStatusReceiver;
 import com.android.server.thread.openthread.Ipv6AddressInfo;
 import com.android.server.thread.openthread.MeshcopTxtAttributes;
 import com.android.server.thread.openthread.OnMeshPrefixConfig;
+import com.android.server.thread.openthread.OtDaemonConfiguration;
 import com.android.server.thread.openthread.OtDaemonState;
 
 import libcore.util.HexEncoding;
@@ -213,7 +213,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean mUserRestricted;
     private boolean mForceStopOtDaemonEnabled;
 
-    private BorderRouterConfiguration mBorderRouterConfig;
+    private OtDaemonConfiguration mOtDaemonConfig;
 
     @VisibleForTesting
     ThreadNetworkControllerService(
@@ -238,8 +238,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mInfraIfController = infraIfController;
         mUpstreamNetworkRequest = newUpstreamNetworkRequest();
         mNetworkToInterface = new HashMap<Network, String>();
-        mBorderRouterConfig =
-                new BorderRouterConfiguration.Builder()
+        mOtDaemonConfig =
+                new OtDaemonConfiguration.Builder()
                         .setIsBorderRoutingEnabled(true)
                         .setInfraInterfaceName(null)
                         .build();
@@ -1232,54 +1232,51 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
-    private void configureBorderRouter(BorderRouterConfiguration borderRouterConfig) {
-        if (mBorderRouterConfig.equals(borderRouterConfig)) {
+    private void configureBorderRouter(OtDaemonConfiguration otDaemonConfig) {
+        if (mOtDaemonConfig.equals(otDaemonConfig)) {
             return;
         }
-        Log.i(
-                TAG,
-                "Configuring Border Router: " + mBorderRouterConfig + " -> " + borderRouterConfig);
-        mBorderRouterConfig = borderRouterConfig;
+        Log.i(TAG, "Configuring Border Router: " + mOtDaemonConfig + " -> " + otDaemonConfig);
+        mOtDaemonConfig = otDaemonConfig;
         ParcelFileDescriptor infraIcmp6Socket = null;
-        if (mBorderRouterConfig.infraInterfaceName != null) {
+        if (mOtDaemonConfig.infraInterfaceName != null) {
             try {
                 infraIcmp6Socket =
-                        mInfraIfController.createIcmp6Socket(
-                                mBorderRouterConfig.infraInterfaceName);
+                        mInfraIfController.createIcmp6Socket(mOtDaemonConfig.infraInterfaceName);
             } catch (IOException e) {
                 Log.i(TAG, "Failed to create ICMPv6 socket on infra network interface", e);
             }
         }
         try {
             getOtDaemon()
-                    .configureBorderRouter(
-                            mBorderRouterConfig,
+                    .setConfiguration(
+                            mOtDaemonConfig,
                             infraIcmp6Socket,
                             new ConfigureBorderRouterStatusReceiver());
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.w(TAG, "Failed to configure border router " + mBorderRouterConfig, e);
+            Log.w(TAG, "Failed to configure border router " + mOtDaemonConfig, e);
         }
     }
 
     private void enableBorderRouting(String infraIfName) {
-        BorderRouterConfiguration borderRouterConfig =
-                newBorderRouterConfigBuilder(mBorderRouterConfig)
+        OtDaemonConfiguration otDaemonConfig =
+                newOtDaemonConfigBuilder(mOtDaemonConfig)
                         .setIsBorderRoutingEnabled(true)
                         .setInfraInterfaceName(infraIfName)
                         .build();
         Log.i(TAG, "Enable border routing on AIL: " + infraIfName);
-        configureBorderRouter(borderRouterConfig);
+        configureBorderRouter(otDaemonConfig);
     }
 
     private void disableBorderRouting() {
         mUpstreamNetwork = null;
-        BorderRouterConfiguration borderRouterConfig =
-                newBorderRouterConfigBuilder(mBorderRouterConfig)
+        OtDaemonConfiguration otDaemonConfig =
+                newOtDaemonConfigBuilder(mOtDaemonConfig)
                         .setIsBorderRoutingEnabled(false)
                         .setInfraInterfaceName(null)
                         .build();
         Log.i(TAG, "Disabling border routing");
-        configureBorderRouter(borderRouterConfig);
+        configureBorderRouter(otDaemonConfig);
     }
 
     private void handleThreadInterfaceStateChanged(boolean isUp) {
@@ -1380,9 +1377,9 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return builder.build();
     }
 
-    private static BorderRouterConfiguration.Builder newBorderRouterConfigBuilder(
-            BorderRouterConfiguration brConfig) {
-        return new BorderRouterConfiguration.Builder()
+    private static OtDaemonConfiguration.Builder newOtDaemonConfigBuilder(
+            OtDaemonConfiguration brConfig) {
+        return new OtDaemonConfiguration.Builder()
                 .setIsBorderRoutingEnabled(brConfig.isBorderRoutingEnabled)
                 .setInfraInterfaceName(brConfig.infraInterfaceName);
     }
