@@ -70,6 +70,7 @@ python_test_host {
     ],
     main: "host/python/run_tests.py",
     libs: [
+        "absl-py",
         "mobly",
         "net-tests-utils-host-python-common",
     ],
@@ -80,11 +81,5 @@ python_test_host {
     // MoblyBinaryHostTest doesn't support unit_test.
     test_options: {
         unit_test: false,
-    },
-    // Needed for applying VirtualEnv.
-    version: {
-        py3: {
-            embedded_launcher: false,
-        },
     },
 }
