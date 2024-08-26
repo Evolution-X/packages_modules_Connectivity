@@ -29,6 +29,7 @@ import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.VALID
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.VALIDATION_RESULT_SUCCESS;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -404,22 +405,11 @@ public class DnsManager {
             mPrivateDnsValidationMap.remove(netId);
         }
 
-        Log.d(TAG, String.format("sendDnsConfigurationForNetwork(%d, %s, %s, %d, %d, %d, %d, "
-                + "%d, %d, %s, %s, %s, %b, %s, %s, %s, %s, %d)", paramsParcel.netId,
-                Arrays.toString(paramsParcel.servers), Arrays.toString(paramsParcel.domains),
-                paramsParcel.sampleValiditySeconds, paramsParcel.successThreshold,
-                paramsParcel.minSamples, paramsParcel.maxSamples, paramsParcel.baseTimeoutMsec,
-                paramsParcel.retryCount, paramsParcel.tlsName,
-                Arrays.toString(paramsParcel.tlsServers),
-                Arrays.toString(paramsParcel.transportTypes), paramsParcel.meteredNetwork,
-                Arrays.toString(paramsParcel.interfaceNames),
-                paramsParcel.dohParams.name, Arrays.toString(paramsParcel.dohParams.ips),
-                paramsParcel.dohParams.dohpath, paramsParcel.dohParams.port));
+        Log.d(TAG, "sendDnsConfigurationForNetwork(" + paramsParcel + ")");
         try {
             mDnsResolver.setResolverConfiguration(paramsParcel);
         } catch (RemoteException | ServiceSpecificException e) {
             Log.e(TAG, "Error setting DNS configuration: " + e);
-            return;
         }
     }
 
@@ -509,9 +499,12 @@ public class DnsManager {
         return out;
     }
 
-    @NonNull
+    @Nullable
     private DohParamsParcel makeDohParamsParcel(@NonNull PrivateDnsConfig cfg,
             @NonNull LinkProperties lp) {
+        if (!cfg.ddrEnabled) {
+            return null;
+        }
         if (cfg.mode == PRIVATE_DNS_MODE_OFF) {
             return new DohParamsParcel.Builder().build();
         }
