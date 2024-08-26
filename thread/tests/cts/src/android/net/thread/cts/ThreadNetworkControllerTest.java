@@ -35,6 +35,7 @@ import static android.net.thread.ThreadNetworkException.ERROR_ABORTED;
 import static android.net.thread.ThreadNetworkException.ERROR_FAILED_PRECONDITION;
 import static android.net.thread.ThreadNetworkException.ERROR_REJECTED_BY_PEER;
 import static android.net.thread.ThreadNetworkException.ERROR_THREAD_DISABLED;
+import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
@@ -70,12 +71,15 @@ import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.os.Build;
 import android.os.HandlerThread;
 import android.os.OutcomeReceiver;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.util.SparseIntArray;
 
 import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 
 import com.android.net.module.util.ArrayTrackRecord;
+import com.android.net.thread.flags.Flags;
 import com.android.testutils.FunctionalUtils.ThrowingRunnable;
 
 import org.junit.After;
@@ -116,11 +120,20 @@ public class ThreadNetworkControllerTest {
     private static final int SET_CONFIGURATION_TIMEOUT_MILLIS = 1_000;
     private static final int SERVICE_DISCOVERY_TIMEOUT_MILLIS = 30_000;
     private static final int SERVICE_LOST_TIMEOUT_MILLIS = 20_000;
+    private static final int VALID_POWER = 32_767;
+    private static final int VALID_CHANNEL = 20;
+    private static final int INVALID_CHANNEL = 10;
     private static final String MESHCOP_SERVICE_TYPE = "_meshcop._udp";
     private static final String THREAD_NETWORK_PRIVILEGED =
             "android.permission.THREAD_NETWORK_PRIVILEGED";
     private static final ThreadConfiguration DEFAULT_CONFIG =
             new ThreadConfiguration.Builder().build();
+    private static final SparseIntArray CHANNEL_MAX_POWERS =
+            new SparseIntArray() {
+                {
+                    put(VALID_CHANNEL, VALID_POWER);
+                }
+            };
 
     @Rule public final ThreadFeatureCheckerRule mThreadRule = new ThreadFeatureCheckerRule();
 
@@ -1459,5 +1472,53 @@ public class ThreadNetworkControllerTest {
 
         @Override
         public void onServiceInfoCallbackUnregistered() {}
+    }
+
+    @Test
+    @RequiresFlagsEnabled({Flags.FLAG_CHANNEL_MAX_POWERS_ENABLED})
+    public void setChannelMaxPowers_withPrivilegedPermission_success() throws Exception {
+        CompletableFuture<Void> powerFuture = new CompletableFuture<>();
+
+        runAsShell(
+                THREAD_NETWORK_PRIVILEGED,
+                () ->
+                        mController.setChannelMaxPowers(
+                                CHANNEL_MAX_POWERS, mExecutor, newOutcomeReceiver(powerFuture)));
+
+        try {
+            assertThat(powerFuture.get()).isNull();
+        } catch (ExecutionException exception) {
+            ThreadNetworkException thrown = (ThreadNetworkException) exception.getCause();
+            assertThat(thrown.getErrorCode()).isEqualTo(ERROR_UNSUPPORTED_FEATURE);
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled({Flags.FLAG_CHANNEL_MAX_POWERS_ENABLED})
+    public void setChannelMaxPowers_withoutPrivilegedPermission_throwsSecurityException()
+            throws Exception {
+        dropAllPermissions();
+
+        assertThrows(
+                SecurityException.class,
+                () -> mController.setChannelMaxPowers(CHANNEL_MAX_POWERS, mExecutor, v -> {}));
+    }
+
+    @Test
+    @RequiresFlagsEnabled({Flags.FLAG_CHANNEL_MAX_POWERS_ENABLED})
+    public void setChannelMaxPowers_invalidChannel_throwsIllegalArgumentException() {
+        final SparseIntArray INVALID_CHANNEL_ARRAY =
+                new SparseIntArray() {
+                    {
+                        put(INVALID_CHANNEL, VALID_POWER);
+                    }
+                };
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> mController.setChannelMaxPowers(new SparseIntArray(), mExecutor, v -> {}));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> mController.setChannelMaxPowers(INVALID_CHANNEL_ARRAY, mExecutor, v -> {}));
     }
 }
