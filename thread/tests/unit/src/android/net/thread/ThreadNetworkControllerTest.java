@@ -19,7 +19,7 @@ package android.net.thread;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_CHILD;
 import static android.net.thread.ThreadNetworkException.ERROR_UNAVAILABLE;
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_CHANNEL;
-import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_OPERATION;
+import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 import static android.os.Process.SYSTEM_UID;
 
 import static com.google.common.io.BaseEncoding.base16;
@@ -394,7 +394,7 @@ public final class ThreadNetworkControllerTest {
         doAnswer(
                         invoke -> {
                             getSetChannelMaxPowersReceiver(invoke)
-                                    .onError(ERROR_UNSUPPORTED_OPERATION, "");
+                                    .onError(ERROR_UNSUPPORTED_FEATURE, "");
                             return null;
                         })
                 .when(mMockService)

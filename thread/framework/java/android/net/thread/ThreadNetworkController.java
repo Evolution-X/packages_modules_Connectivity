@@ -26,6 +26,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.Size;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.os.Binder;
 import android.os.OutcomeReceiver;
@@ -102,11 +103,12 @@ public final class ThreadNetworkController {
     /** Thread standard version 1.3. */
     public static final int THREAD_VERSION_1_3 = 4;
 
-    /** Minimum value of max power in unit of 0.01dBm. @hide */
-    private static final int POWER_LIMITATION_MIN = -32768;
-
-    /** Maximum value of max power in unit of 0.01dBm. @hide */
-    private static final int POWER_LIMITATION_MAX = 32767;
+    /** The value of max power to disable the Thread channel. */
+    // This constant can never change. It has "max" in the name not because it indicates
+    // maximum power, but because it's passed to an API that sets the maximum power to
+    // disabled the Thread channel.
+    @SuppressLint("MinMaxConstant")
+    public static final int MAX_POWER_CHANNEL_DISABLED = Integer.MIN_VALUE;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -704,6 +706,10 @@ public final class ThreadNetworkController {
     /**
      * Sets max power of each channel.
      *
+     * <p>This method sets the max power for the given channel. The platform sets the actual
+     * output power to be less than or equal to the {@code channelMaxPowers} and as close as
+     * possible to the {@code channelMaxPowers}.
+     *
      * <p>If not set, the default max power is set by the Thread HAL service or the Thread radio
      * chip firmware.
      *
@@ -712,22 +718,27 @@ public final class ThreadNetworkController {
      * OutcomeReceiver#onError} will be called with a specific error:
      *
      * <ul>
-     *   <li>{@link ThreadNetworkException#ERROR_UNSUPPORTED_OPERATION} the operation is no
-     *       supported by the platform.
+     *   <li>{@link ThreadNetworkException#ERROR_UNSUPPORTED_FEATURE} the feature is not supported
+     *       by the platform.
      * </ul>
      *
      * @param channelMaxPowers SparseIntArray (key: channel, value: max power) consists of channel
      *     and corresponding max power. Valid channel values should be between {@link
      *     ActiveOperationalDataset#CHANNEL_MIN_24_GHZ} and {@link
-     *     ActiveOperationalDataset#CHANNEL_MAX_24_GHZ}. The unit of the max power is 0.01dBm. Max
-     *     power values should be between INT16_MIN (-32768) and INT16_MAX (32767). If the max power
-     *     is set to INT16_MAX, the corresponding channel is not supported.
+     *     ActiveOperationalDataset#CHANNEL_MAX_24_GHZ}. The unit of the max power is 0.01dBm. For
+     *     example, 1000 means 0.01W and 2000 means 0.1W. If the power value of
+     *     {@code channelMaxPowers} is lower than the minimum output power supported by the
+     *     platform, the output power will be set to the minimum output power supported by the
+     *     platform. If the power value of {@code channelMaxPowers} is higher than the maximum
+     *     output power supported by the platform, the output power will be set to the maximum
+     *     output power supported by the platform. If the power value of {@code channelMaxPowers}
+     *     is set to {@link #MAX_POWER_CHANNEL_DISABLED}, the corresponding channel is disabled.
      * @param executor the executor to execute {@code receiver}.
      * @param receiver the receiver to receive the result of this operation.
      * @throws IllegalArgumentException if the size of {@code channelMaxPowers} is smaller than 1,
      *     or invalid channel or max power is configured.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_CHANNEL_MAX_POWERS_ENABLED)
     @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED")
     public final void setChannelMaxPowers(
             @NonNull @Size(min = 1) SparseIntArray channelMaxPowers,
@@ -754,19 +765,6 @@ public final class ThreadNetworkController {
                                 + ActiveOperationalDataset.CHANNEL_MIN_24_GHZ
                                 + ", "
                                 + ActiveOperationalDataset.CHANNEL_MAX_24_GHZ
-                                + "]");
-            }
-
-            if ((maxPower < POWER_LIMITATION_MIN) || (maxPower > POWER_LIMITATION_MAX)) {
-                throw new IllegalArgumentException(
-                        "Channel power ({channel: "
-                                + channel
-                                + ", maxPower: "
-                                + maxPower
-                                + "}) exceeds allowed range ["
-                                + POWER_LIMITATION_MIN
-                                + ", "
-                                + POWER_LIMITATION_MAX
                                 + "]");
             }
         }
