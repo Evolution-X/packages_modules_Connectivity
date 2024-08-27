@@ -4439,9 +4439,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         pw.println();
         pw.println("Multicast routing supported: " +
                 (mMulticastRoutingCoordinatorService != null));
-
-        pw.println();
         pw.println("Background firewall chain enabled: " + mBackgroundFirewallChainEnabled);
+        pw.println("IngressToVpnAddressFiltering: " + mIngressToVpnAddressFiltering);
     }
 
     private void dumpNetworks(IndentingPrintWriter pw) {
