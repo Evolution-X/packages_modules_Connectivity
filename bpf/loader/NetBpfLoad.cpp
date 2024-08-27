@@ -17,7 +17,6 @@
 #define LOG_TAG "NetBpfLoad"
 
 #include <arpa/inet.h>
-#include <cstdlib>
 #include <dirent.h>
 #include <elf.h>
 #include <errno.h>
@@ -26,8 +25,6 @@
 #include <fstream>
 #include <inttypes.h>
 #include <iostream>
-#include <linux/bpf.h>
-#include <linux/elf.h>
 #include <linux/unistd.h>
 #include <log/log.h>
 #include <net/if.h>
