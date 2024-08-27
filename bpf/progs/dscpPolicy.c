@@ -155,19 +155,19 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
 
         int score = 0;
 
-        if (policy->present_fields & PROTO_MASK_FLAG) {
+        if (policy->match_proto) {
             if (protocol != policy->proto) continue;
             score += 0xFFFF;
         }
-        if (policy->present_fields & SRC_IP_MASK_FLAG) {
+        if (policy->match_src_ip) {
             if (v6_not_equal(src_ip, policy->src_ip)) continue;
             score += 0xFFFF;
         }
-        if (policy->present_fields & DST_IP_MASK_FLAG) {
+        if (policy->match_dst_ip) {
             if (v6_not_equal(dst_ip, policy->dst_ip)) continue;
             score += 0xFFFF;
         }
-        if (policy->present_fields & SRC_PORT_MASK_FLAG) {
+        if (policy->match_src_port) {
             if (sport != policy->src_port) continue;
             score += 0xFFFF;
         }
