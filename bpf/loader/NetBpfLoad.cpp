@@ -990,13 +990,13 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
 
             union bpf_attr req = {
               .prog_type = cs[i].type,
-              .kern_version = kvers,
-              .license = ptr_to_u64(license.c_str()),
-              .insns = ptr_to_u64(cs[i].data.data()),
               .insn_cnt = static_cast<__u32>(cs[i].data.size() / sizeof(struct bpf_insn)),
+              .insns = ptr_to_u64(cs[i].data.data()),
+              .license = ptr_to_u64(license.c_str()),
               .log_level = 1,
-              .log_buf = ptr_to_u64(log_buf.data()),
               .log_size = static_cast<__u32>(log_buf.size()),
+              .log_buf = ptr_to_u64(log_buf.data()),
+              .kern_version = kvers,
               .expected_attach_type = cs[i].attach_type,
             };
             if (isAtLeastKernelVersion(4, 15, 0))
