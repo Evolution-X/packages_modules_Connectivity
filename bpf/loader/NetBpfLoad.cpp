@@ -1152,33 +1152,35 @@ static bool exists(const char* const path) {
     abort();  // can only hit this if permissions (likely selinux) are screwed up
 }
 
+#define APEXROOT "/apex/com.android.tethering"
+#define BPFROOT APEXROOT "/etc/bpf"
 
 const Location locations[] = {
         // S+ Tethering mainline module (network_stack): tether offload
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/",
+                .dir = BPFROOT "/",
                 .prefix = "tethering/",
         },
         // T+ Tethering mainline module (shared with netd & system server)
         // netutils_wrapper (for iptables xt_bpf) has access to programs
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/netd_shared/",
+                .dir = BPFROOT "/netd_shared/",
                 .prefix = "netd_shared/",
         },
         // T+ Tethering mainline module (shared with netd & system server)
         // netutils_wrapper has no access, netd has read only access
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/netd_readonly/",
+                .dir = BPFROOT "/netd_readonly/",
                 .prefix = "netd_readonly/",
         },
         // T+ Tethering mainline module (shared with system server)
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/net_shared/",
+                .dir = BPFROOT "/net_shared/",
                 .prefix = "net_shared/",
         },
         // T+ Tethering mainline module (not shared, just network_stack)
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/net_private/",
+                .dir = BPFROOT "/net_private/",
                 .prefix = "net_private/",
         },
 };
