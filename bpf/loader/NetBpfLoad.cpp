@@ -17,7 +17,6 @@
 #define LOG_TAG "NetBpfLoad"
 
 #include <arpa/inet.h>
-#include <cstdlib>
 #include <dirent.h>
 #include <elf.h>
 #include <errno.h>
@@ -26,8 +25,6 @@
 #include <fstream>
 #include <inttypes.h>
 #include <iostream>
-#include <linux/bpf.h>
-#include <linux/elf.h>
 #include <linux/unistd.h>
 #include <log/log.h>
 #include <net/if.h>
@@ -993,13 +990,13 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
 
             union bpf_attr req = {
               .prog_type = cs[i].type,
-              .kern_version = kvers,
-              .license = ptr_to_u64(license.c_str()),
-              .insns = ptr_to_u64(cs[i].data.data()),
               .insn_cnt = static_cast<__u32>(cs[i].data.size() / sizeof(struct bpf_insn)),
+              .insns = ptr_to_u64(cs[i].data.data()),
+              .license = ptr_to_u64(license.c_str()),
               .log_level = 1,
-              .log_buf = ptr_to_u64(log_buf.data()),
               .log_size = static_cast<__u32>(log_buf.size()),
+              .log_buf = ptr_to_u64(log_buf.data()),
+              .kern_version = kvers,
               .expected_attach_type = cs[i].attach_type,
             };
             if (isAtLeastKernelVersion(4, 15, 0))
@@ -1155,33 +1152,35 @@ static bool exists(const char* const path) {
     abort();  // can only hit this if permissions (likely selinux) are screwed up
 }
 
+#define APEXROOT "/apex/com.android.tethering"
+#define BPFROOT APEXROOT "/etc/bpf"
 
 const Location locations[] = {
         // S+ Tethering mainline module (network_stack): tether offload
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/",
+                .dir = BPFROOT "/",
                 .prefix = "tethering/",
         },
         // T+ Tethering mainline module (shared with netd & system server)
         // netutils_wrapper (for iptables xt_bpf) has access to programs
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/netd_shared/",
+                .dir = BPFROOT "/netd_shared/",
                 .prefix = "netd_shared/",
         },
         // T+ Tethering mainline module (shared with netd & system server)
         // netutils_wrapper has no access, netd has read only access
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/netd_readonly/",
+                .dir = BPFROOT "/netd_readonly/",
                 .prefix = "netd_readonly/",
         },
         // T+ Tethering mainline module (shared with system server)
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/net_shared/",
+                .dir = BPFROOT "/net_shared/",
                 .prefix = "net_shared/",
         },
         // T+ Tethering mainline module (not shared, just network_stack)
         {
-                .dir = "/apex/com.android.tethering/etc/bpf/net_private/",
+                .dir = BPFROOT "/net_private/",
                 .prefix = "net_private/",
         },
 };
