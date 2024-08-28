@@ -788,7 +788,11 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
             fd.reset(bpf(BPF_MAP_CREATE, req));
             saved_errno = errno;
-            ALOGD("bpf_create_map name %s, ret: %d", mapNames[i].c_str(), fd.get());
+            if (fd.ok()) {
+              ALOGD("bpf_create_map[%s] -> %d", mapNames[i].c_str(), fd.get());
+            } else {
+              ALOGE("bpf_create_map[%s] -> %d errno:%d", mapNames[i].c_str(), fd.get(), saved_errno);
+            }
         }
 
         if (!fd.ok()) return -saved_errno;
