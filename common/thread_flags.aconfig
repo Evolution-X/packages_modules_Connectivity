@@ -12,6 +12,7 @@ flag {
 flag {
     name: "configuration_enabled"
     is_exported: true
+    is_fixed_read_only: true
     namespace: "thread_network"
     description: "Controls whether the Android Thread configuration is enabled"
     bug: "342519412"
@@ -20,6 +21,7 @@ flag {
 flag {
     name: "channel_max_powers_enabled"
     is_exported: true
+    is_fixed_read_only: true
     namespace: "thread_network"
     description: "Controls whether the Android Thread setting max power of channel feature is enabled"
     bug: "346686506"
