@@ -39,7 +39,7 @@ void NetworkTracePoller::PollAndSchedule(perfetto::base::TaskRunner* runner,
                                          uint32_t poll_ms) {
   // Always schedule another run of ourselves to recursively poll periodically.
   // The task runner is sequential so these can't run on top of each other.
-  runner->PostDelayedTask([=]() { PollAndSchedule(runner, poll_ms); }, poll_ms);
+  runner->PostDelayedTask([=, this]() { PollAndSchedule(runner, poll_ms); }, poll_ms);
 
   if (mMutex.try_lock()) {
     ConsumeAllLocked();
