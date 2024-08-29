@@ -842,7 +842,8 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
 
         int mapId = bpfGetFdMapId(fd);
         if (mapId == -1) {
-            ALOGE("bpfGetFdMapId failed, ret: %d [%d]", mapId, errno);
+            if (isAtLeastKernelVersion(4, 14, 0))
+                ALOGE("bpfGetFdMapId failed, ret: %d [%d]", mapId, errno);
         } else {
             ALOGI("map %s id %d", mapPinLoc.c_str(), mapId);
         }
