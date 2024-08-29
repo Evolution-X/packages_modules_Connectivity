@@ -211,7 +211,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.SUCCEEDED, result);
     }
@@ -228,7 +228,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.SUCCEEDED, result);
     }
@@ -243,7 +243,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         assertThrows(SecurityException.class,
-                () -> mChecker.checkLocationPermissionWithDetailInfo(
+                () -> mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null));
     }
 
@@ -254,7 +254,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.ERROR_LOCATION_PERMISSION_MISSING, result);
     }
@@ -270,7 +270,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.ERROR_LOCATION_PERMISSION_MISSING, result);
         verify(mMockAppOps, never()).noteOp(anyInt(), anyInt(), anyString());
@@ -287,7 +287,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.ERROR_LOCATION_MODE_OFF, result);
     }
@@ -301,7 +301,7 @@ public class LocationPermissionCheckerTest {
         setupTestCase();
 
         final int result =
-                mChecker.checkLocationPermissionWithDetailInfo(
+                mChecker.checkLocationPermissionInternal(
                         TEST_PKG_NAME, TEST_FEATURE_ID, mUid, null);
         assertEquals(LocationPermissionChecker.SUCCEEDED, result);
     }
