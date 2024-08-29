@@ -1018,10 +1018,11 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                 ALOGW("BPF_PROG_LOAD - END log_buf contents.");
 
                 if (cs[i].prog_def->optional) {
-                    ALOGW("failed program is marked optional - continuing...");
+                    ALOGW("failed program %s is marked optional - continuing...",
+                          cs[i].name.c_str());
                     continue;
                 }
-                ALOGE("non-optional program failed to load.");
+                ALOGE("non-optional program %s failed to load.", cs[i].name.c_str());
             }
         }
 
