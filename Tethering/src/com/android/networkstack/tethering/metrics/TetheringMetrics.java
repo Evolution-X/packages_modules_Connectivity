@@ -60,6 +60,9 @@ import android.app.usage.NetworkStatsManager;
 import android.content.Context;
 import android.net.NetworkCapabilities;
 import android.net.NetworkTemplate;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.stats.connectivity.DownstreamType;
 import android.stats.connectivity.ErrorCode;
 import android.stats.connectivity.UpstreamType;
@@ -80,6 +83,10 @@ import java.util.Arrays;
 
 /**
  * Collection of utilities for tethering metrics.
+ *
+ *  <p>This class is thread-safe. All accesses to this class will be either posting to the internal
+ *  handler thread for processing or checking whether the access is from the internal handler
+ *  thread. However, the constructor is an exception, as it is called on another thread.
  *
  * To see if the logs are properly sent to statsd, execute following commands
  *
@@ -108,6 +115,7 @@ public class TetheringMetrics {
     private final Context mContext;
     private final Dependencies mDependencies;
     private final NetworkStatsManager mNetworkStatsManager;
+    private final Handler mHandler;
     private UpstreamType mCurrentUpstream = null;
     private Long mCurrentUpStreamStartTime = 0L;
 
@@ -146,6 +154,14 @@ public class TetheringMetrics {
             return SdkLevel.isAtLeastT() && DeviceConfigUtils.isTetheringFeatureNotChickenedOut(
                     context, TETHER_UPSTREAM_DATA_USAGE_METRICS);
         }
+
+        /**
+         * @see Handler
+         */
+        @NonNull
+        public Handler createHandler(Looper looper) {
+            return new Handler(looper);
+        }
     }
 
     /**
@@ -161,6 +177,9 @@ public class TetheringMetrics {
         mContext = context;
         mDependencies = dependencies;
         mNetworkStatsManager = mContext.getSystemService(NetworkStatsManager.class);
+        final HandlerThread thread = new HandlerThread(TAG);
+        thread.start();
+        mHandler = dependencies.createHandler(thread.getLooper());
     }
 
     @VisibleForTesting
@@ -226,6 +245,10 @@ public class TetheringMetrics {
      * @param callerPkg The package name of the caller.
      */
     public void createBuilder(final int downstreamType, final String callerPkg) {
+        mHandler.post(() -> handleCreateBuilder(downstreamType, callerPkg));
+    }
+
+    private void handleCreateBuilder(final int downstreamType, final String callerPkg) {
         NetworkTetheringReported.Builder statsBuilder = NetworkTetheringReported.newBuilder()
                 .setDownstreamType(downstreamTypeToEnum(downstreamType))
                 .setUserType(userTypeToEnum(callerPkg))
@@ -243,6 +266,10 @@ public class TetheringMetrics {
      * @param errCode The error code to set.
      */
     public void updateErrorCode(final int downstreamType, final int errCode) {
+        mHandler.post(() -> handleUpdateErrorCode(downstreamType, errCode));
+    }
+
+    private void handleUpdateErrorCode(final int downstreamType, final int errCode) {
         NetworkTetheringReported.Builder statsBuilder = mBuilderMap.get(downstreamType);
         if (statsBuilder == null) {
             Log.e(TAG, "Given downstreamType does not exist, this is a bug!");
@@ -279,6 +306,10 @@ public class TetheringMetrics {
      * @param ns The UpstreamNetworkState object representing the current upstream network state.
      */
     public void maybeUpdateUpstreamType(@Nullable final UpstreamNetworkState ns) {
+        mHandler.post(() -> handleMaybeUpdateUpstreamType(ns));
+    }
+
+    private void handleMaybeUpdateUpstreamType(@Nullable final UpstreamNetworkState ns) {
         UpstreamType upstream = transportTypeToUpstreamTypeEnum(ns);
         if (upstream.equals(mCurrentUpstream)) return;
 
@@ -360,6 +391,10 @@ public class TetheringMetrics {
      * @param downstreamType the type of downstream event to remove statistics for
      */
     public void sendReport(final int downstreamType) {
+        mHandler.post(() -> handleSendReport(downstreamType));
+    }
+
+    private void handleSendReport(final int downstreamType) {
         final NetworkTetheringReported.Builder statsBuilder = mBuilderMap.get(downstreamType);
         if (statsBuilder == null) {
             Log.e(TAG, "Given downstreamType does not exist, this is a bug!");
@@ -380,8 +415,7 @@ public class TetheringMetrics {
      *
      * @param reported a NetworkTetheringReported object containing statistics to write
      */
-    @VisibleForTesting
-    public void write(@NonNull final NetworkTetheringReported reported) {
+    private void write(@NonNull final NetworkTetheringReported reported) {
         final byte[] upstreamEvents = reported.getUpstreamEvents().toByteArray();
         mDependencies.write(reported);
         if (DBG) {
@@ -406,6 +440,10 @@ public class TetheringMetrics {
      * Initialize the upstream data usage baseline when tethering is turned on.
      */
     public void initUpstreamUsageBaseline() {
+        mHandler.post(() -> handleInitUpstreamUsageBaseline());
+    }
+
+    private void handleInitUpstreamUsageBaseline() {
         if (!(mDependencies.isUpstreamDataUsageMetricsEnabled(mContext)
                 && mUpstreamUsageBaseline.isEmpty())) {
             return;
@@ -420,6 +458,10 @@ public class TetheringMetrics {
     @VisibleForTesting
     @NonNull
     DataUsage getDataUsageFromUpstreamType(@NonNull UpstreamType type) {
+        if (mHandler.getLooper().getThread() != Thread.currentThread()) {
+            throw new IllegalStateException(
+                    "Not running on Handler thread: " + Thread.currentThread().getName());
+        }
         return mUpstreamUsageBaseline.getOrDefault(type, EMPTY);
     }
 
@@ -448,6 +490,10 @@ public class TetheringMetrics {
      * Cleans up the variables related to upstream events when tethering is turned off.
      */
     public void cleanup() {
+        mHandler.post(() -> handleCleanup());
+    }
+
+    private void handleCleanup() {
         mUpstreamEventList.clear();
         mCurrentUpstream = null;
         mCurrentUpStreamStartTime = 0L;
