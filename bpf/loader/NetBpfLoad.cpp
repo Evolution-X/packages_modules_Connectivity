@@ -1011,11 +1011,13 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                   cs[i].name.c_str(), fd.get(), (!fd.ok() ? std::strerror(errno) : "no error"));
 
             if (!fd.ok()) {
-                vector<string> lines = android::base::Split(log_buf.data(), "\n");
+                if (log_buf.size()) {
+                    vector<string> lines = android::base::Split(log_buf.data(), "\n");
 
-                ALOGW("BPF_PROG_LOAD - BEGIN log_buf contents:");
-                for (const auto& line : lines) ALOGW("%s", line.c_str());
-                ALOGW("BPF_PROG_LOAD - END log_buf contents.");
+                    ALOGW("BPF_PROG_LOAD - BEGIN log_buf contents:");
+                    for (const auto& line : lines) ALOGW("%s", line.c_str());
+                    ALOGW("BPF_PROG_LOAD - END log_buf contents.");
+                }
 
                 if (cs[i].prog_def->optional) {
                     ALOGW("failed program %s is marked optional - continuing...",
