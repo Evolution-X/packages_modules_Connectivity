@@ -32,7 +32,7 @@ android_app {
         "guava",
     ],
     libs: [
-        "framework-connectivity-t",
+        "framework-connectivity-t.stubs.module_lib",
     ],
     required: [
         "privapp-permissions-com.android.threadnetwork.demoapp",

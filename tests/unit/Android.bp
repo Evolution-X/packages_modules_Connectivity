@@ -104,9 +104,9 @@ java_defaults {
     ],
     libs: [
         "android.net.ipsec.ike.stubs.module_lib",
-        "android.test.runner",
-        "android.test.base",
-        "android.test.mock",
+        "android.test.runner.stubs",
+        "android.test.base.stubs",
+        "android.test.mock.stubs",
         "ServiceConnectivityResources",
     ],
     exclude_kotlinc_generated_files: false,

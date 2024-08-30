@@ -29,7 +29,7 @@ java_defaults {
 
     libs: [
         "voip-common",
-        "android.test.base",
+        "android.test.base.stubs",
     ],
 
     jni_libs: [

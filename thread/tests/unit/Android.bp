@@ -50,10 +50,10 @@ android_test {
         "service-thread-pre-jarjar",
     ],
     libs: [
-        "android.test.base",
-        "android.test.runner",
+        "android.test.base.stubs.system",
+        "android.test.runner.stubs.system",
         "ServiceConnectivityResources",
-        "framework-wifi",
+        "framework-wifi.stubs.module_lib",
     ],
     jni_libs: [
         "libservice-thread-jni",

@@ -33,7 +33,7 @@ android_test {
         "src/**/*.aidl",
     ],
     libs: [
-        "android.test.mock",
+        "android.test.mock.stubs",
         "ServiceConnectivityResources",
     ],
     static_libs: [

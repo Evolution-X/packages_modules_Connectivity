@@ -49,7 +49,7 @@ java_library {
     libs: [
         "androidx.annotation_annotation",
         "framework-annotations-lib",
-        "framework-bluetooth",
+        "framework-bluetooth.stubs.module_lib",
         "framework-location.stubs.module_lib",
     ],
     static_libs: [
