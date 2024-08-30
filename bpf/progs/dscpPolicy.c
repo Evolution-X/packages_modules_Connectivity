@@ -23,7 +23,10 @@
 #define ECN_MASK 3
 #define UPDATE_TOS(dscp, tos) ((dscp) << 2) | ((tos) & ECN_MASK)
 
-DEFINE_BPF_MAP_GRW(socket_policy_cache_map, HASH, uint64_t, RuleEntry, CACHE_MAP_SIZE, AID_SYSTEM)
+// The cache is never read nor written by userspace and is indexed by socket cookie % CACHE_MAP_SIZE
+#define CACHE_MAP_SIZE 32  // should be a power of two so we can % cheaply
+DEFINE_BPF_MAP_GRO(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry, CACHE_MAP_SIZE,
+                   AID_SYSTEM)
 
 DEFINE_BPF_MAP_GRW(ipv4_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 DEFINE_BPF_MAP_GRW(ipv6_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
@@ -42,6 +45,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
     // used for map lookup
     uint64_t cookie = bpf_get_socket_cookie(skb);
     if (!cookie) return;
+
+    uint32_t cacheid = cookie % CACHE_MAP_SIZE;
 
     __be16 sport = 0;
     uint16_t dport = 0;
@@ -105,7 +110,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
             return;
     }
 
-    RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cookie);
+    // this array lookup cannot actually fail
+    RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cacheid);
 
     if (existing_rule &&
         v6_equal(src_ip, existing_rule->src_ip) &&
@@ -192,7 +198,7 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
     };
 
     // Update cache with found policy.
-    bpf_socket_policy_cache_map_update_elem(&cookie, &value, BPF_ANY);
+    bpf_socket_policy_cache_map_update_elem(&cacheid, &value, BPF_ANY);
 
     if (new_dscp < 0) return;
 
