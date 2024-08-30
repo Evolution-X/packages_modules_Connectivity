@@ -113,8 +113,9 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
     // this array lookup cannot actually fail
     RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cacheid);
 
-    if (existing_rule &&
-        v6_equal(src_ip, existing_rule->src_ip) &&
+    if (!existing_rule) return; // impossible
+
+    if (v6_equal(src_ip, existing_rule->src_ip) &&
         v6_equal(dst_ip, existing_rule->dst_ip) &&
         skb->ifindex == existing_rule->ifindex &&
         sport == existing_rule->src_port &&
@@ -187,7 +188,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         }
     }
 
-    RuleEntry value = {
+    // Update cache with found policy.
+    *existing_rule = (RuleEntry){
         .src_ip = src_ip,
         .dst_ip = dst_ip,
         .ifindex = skb->ifindex,
@@ -196,9 +198,6 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         .proto = protocol,
         .dscp_val = new_dscp,
     };
-
-    // Update cache with found policy.
-    bpf_socket_policy_cache_map_update_elem(&cacheid, &value, BPF_ANY);
 
     if (new_dscp < 0) return;
 
