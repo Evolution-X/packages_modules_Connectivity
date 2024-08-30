@@ -37,6 +37,7 @@ public class FeatureVersions {
     public static final long VERSION_MASK = 0x00F_FFFF_FFFFL;
     public static final long CONNECTIVITY_MODULE_ID = 0x01L << MODULE_SHIFT;
     public static final long NETWORK_STACK_MODULE_ID = 0x02L << MODULE_SHIFT;
+    public static final long DNS_RESOLVER_MODULE_ID = 0x03L << MODULE_SHIFT;
     // CLAT_ADDRESS_TRANSLATE is a feature of the network stack, which doesn't throw when system
     // try to add a NAT-T keepalive packet filter with v6 address, introduced in version
     // M-2023-Sept on July 3rd, 2023.
@@ -48,4 +49,11 @@ public class FeatureVersions {
     // by BPF for the given uid and conditions, introduced in version M-2024-Feb on Nov 6, 2023.
     public static final long FEATURE_IS_UID_NETWORKING_BLOCKED =
             CONNECTIVITY_MODULE_ID + 34_14_00_000L;
+
+    // DDR is a feature implemented across NetworkStack, ConnectivityService and DnsResolver.
+    // The flag that enables this feature is in NetworkStack.
+    public static final long FEATURE_DDR_IN_CONNECTIVITY =
+            CONNECTIVITY_MODULE_ID + 35_11_00_000L;
+    public static final long FEATURE_DDR_IN_DNSRESOLVER =
+            DNS_RESOLVER_MODULE_ID + 35_11_00_000L;
 }
