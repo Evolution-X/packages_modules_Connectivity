@@ -22,6 +22,7 @@ import static android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY;
 import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 
 import static com.android.net.module.util.FeatureVersions.CONNECTIVITY_MODULE_ID;
+import static com.android.net.module.util.FeatureVersions.DNS_RESOLVER_MODULE_ID;
 import static com.android.net.module.util.FeatureVersions.MODULE_MASK;
 import static com.android.net.module.util.FeatureVersions.NETWORK_STACK_MODULE_ID;
 import static com.android.net.module.util.FeatureVersions.VERSION_MASK;
@@ -68,7 +69,8 @@ public final class DeviceConfigUtils {
     @VisibleForTesting
     public static void resetPackageVersionCacheForTest() {
         sPackageVersion = -1;
-        sModuleVersion = -1;
+        sTetheringModuleVersion = -1;
+        sResolvModuleVersion = -1;
         sNetworkStackModuleVersion = -1;
     }
 
@@ -243,23 +245,23 @@ public final class DeviceConfigUtils {
         }
     }
 
-    // Guess the tethering module name based on the package prefix of the connectivity resources
-    // Take the resource package name, cut it before "connectivity" and append "tethering".
+    // Guess an APEX module name based on the package prefix of the connectivity resources
+    // Take the resource package name, cut it before "connectivity" and append the module name.
     // Then resolve that package version number with packageManager.
-    // If that fails retry by appending "go.tethering" instead
-    private static long resolveTetheringModuleVersion(@NonNull Context context)
+    // If that fails retry by appending "go.<moduleName>" instead.
+    private static long resolveApexModuleVersion(@NonNull Context context, String moduleName)
             throws PackageManager.NameNotFoundException {
         final String pkgPrefix = resolvePkgPrefix(context);
         final PackageManager packageManager = context.getPackageManager();
         try {
-            return packageManager.getPackageInfo(pkgPrefix + "tethering",
+            return packageManager.getPackageInfo(pkgPrefix + moduleName,
                     PackageManager.MATCH_APEX).getLongVersionCode();
         } catch (PackageManager.NameNotFoundException e) {
             Log.d(TAG, "Device is using go modules");
             // fall through
         }
 
-        return packageManager.getPackageInfo(pkgPrefix + "go.tethering",
+        return packageManager.getPackageInfo(pkgPrefix + "go." + moduleName,
                 PackageManager.MATCH_APEX).getLongVersionCode();
     }
 
@@ -274,19 +276,35 @@ public final class DeviceConfigUtils {
         return connResourcesPackage.substring(0, pkgPrefixLen);
     }
 
-    private static volatile long sModuleVersion = -1;
+    private static volatile long sTetheringModuleVersion = -1;
+
     private static long getTetheringModuleVersion(@NonNull Context context) {
-        if (sModuleVersion >= 0) return sModuleVersion;
+        if (sTetheringModuleVersion >= 0) return sTetheringModuleVersion;
 
         try {
-            sModuleVersion = resolveTetheringModuleVersion(context);
+            sTetheringModuleVersion = resolveApexModuleVersion(context, "tethering");
         } catch (PackageManager.NameNotFoundException e) {
             // It's expected to fail tethering module version resolution on the devices with
             // flattened apex
             Log.e(TAG, "Failed to resolve tethering module version: " + e);
             return DEFAULT_PACKAGE_VERSION;
         }
-        return sModuleVersion;
+        return sTetheringModuleVersion;
+    }
+
+    private static volatile long sResolvModuleVersion = -1;
+    private static long getResolvModuleVersion(@NonNull Context context) {
+        if (sResolvModuleVersion >= 0) return sResolvModuleVersion;
+
+        try {
+            sResolvModuleVersion = resolveApexModuleVersion(context, "resolv");
+        } catch (PackageManager.NameNotFoundException e) {
+            // It's expected to fail resolv module version resolution on the devices with
+            // flattened apex
+            Log.e(TAG, "Failed to resolve resolv module version: " + e);
+            return DEFAULT_PACKAGE_VERSION;
+        }
+        return sResolvModuleVersion;
     }
 
     private static volatile long sNetworkStackModuleVersion = -1;
@@ -342,6 +360,8 @@ public final class DeviceConfigUtils {
             moduleVersion = getTetheringModuleVersion(context);
         } else if (moduleId == NETWORK_STACK_MODULE_ID) {
             moduleVersion = getNetworkStackModuleVersion(context);
+        } else if (moduleId == DNS_RESOLVER_MODULE_ID) {
+            moduleVersion = getResolvModuleVersion(context);
         } else {
             throw new IllegalArgumentException("Unknown module " + moduleId);
         }
