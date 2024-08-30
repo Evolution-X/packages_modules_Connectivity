@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#define CACHE_MAP_SIZE 1024
 #define MAX_POLICIES 16
 
 #define STRUCT_SIZE(name, size) _Static_assert(sizeof(name) == (size), "Incorrect struct size.")
