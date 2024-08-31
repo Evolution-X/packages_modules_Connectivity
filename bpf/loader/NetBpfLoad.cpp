@@ -604,6 +604,9 @@ static bool mapMatchesExpectations(const unique_fd& fd, const string& mapName,
     if (type == BPF_MAP_TYPE_DEVMAP || type == BPF_MAP_TYPE_DEVMAP_HASH)
         desired_map_flags |= BPF_F_RDONLY_PROG;
 
+    if (type == BPF_MAP_TYPE_LPM_TRIE)
+        desired_map_flags |= BPF_F_NO_PREALLOC;
+
     // The .h file enforces that this is a power of two, and page size will
     // also always be a power of two, so this logic is actually enough to
     // force it to be a multiple of the page size, as required by the kernel.
@@ -779,13 +782,17 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
               .key_size = md[i].key_size,
               .value_size = md[i].value_size,
               .max_entries = max_entries,
-              .map_flags = md[i].map_flags,
+              .map_flags = md[i].map_flags | (type == BPF_MAP_TYPE_LPM_TRIE ? BPF_F_NO_PREALLOC : 0),
             };
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
             fd.reset(bpf(BPF_MAP_CREATE, req));
             saved_errno = errno;
-            ALOGD("bpf_create_map name %s, ret: %d", mapNames[i].c_str(), fd.get());
+            if (fd.ok()) {
+              ALOGD("bpf_create_map[%s] -> %d", mapNames[i].c_str(), fd.get());
+            } else {
+              ALOGE("bpf_create_map[%s] -> %d errno:%d", mapNames[i].c_str(), fd.get(), saved_errno);
+            }
         }
 
         if (!fd.ok()) return -saved_errno;
@@ -839,7 +846,8 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
 
         int mapId = bpfGetFdMapId(fd);
         if (mapId == -1) {
-            ALOGE("bpfGetFdMapId failed, ret: %d [%d]", mapId, errno);
+            if (isAtLeastKernelVersion(4, 14, 0))
+                ALOGE("bpfGetFdMapId failed, ret: %d [%d]", mapId, errno);
         } else {
             ALOGI("map %s id %d", mapPinLoc.c_str(), mapId);
         }
@@ -1007,17 +1015,20 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                   cs[i].name.c_str(), fd.get(), (!fd.ok() ? std::strerror(errno) : "no error"));
 
             if (!fd.ok()) {
-                vector<string> lines = android::base::Split(log_buf.data(), "\n");
+                if (log_buf.size()) {
+                    vector<string> lines = android::base::Split(log_buf.data(), "\n");
 
-                ALOGW("BPF_PROG_LOAD - BEGIN log_buf contents:");
-                for (const auto& line : lines) ALOGW("%s", line.c_str());
-                ALOGW("BPF_PROG_LOAD - END log_buf contents.");
+                    ALOGW("BPF_PROG_LOAD - BEGIN log_buf contents:");
+                    for (const auto& line : lines) ALOGW("%s", line.c_str());
+                    ALOGW("BPF_PROG_LOAD - END log_buf contents.");
+                }
 
                 if (cs[i].prog_def->optional) {
-                    ALOGW("failed program is marked optional - continuing...");
+                    ALOGW("failed program %s is marked optional - continuing...",
+                          cs[i].name.c_str());
                     continue;
                 }
-                ALOGE("non-optional program failed to load.");
+                ALOGE("non-optional program %s failed to load.", cs[i].name.c_str());
             }
         }
 

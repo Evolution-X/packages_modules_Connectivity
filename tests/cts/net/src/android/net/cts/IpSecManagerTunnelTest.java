@@ -65,6 +65,7 @@ import android.platform.test.annotations.AppModeFull;
 import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.net.module.util.CollectionUtils;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 
@@ -119,7 +120,7 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
 
     private static final int TIMEOUT_MS = 500;
 
-    private static final int PACKET_COUNT = 5000;
+    private static final int PACKET_COUNT = 100;
 
     // Static state to reduce setup/teardown
     private static ConnectivityManager sCM;
@@ -1088,6 +1089,27 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
             UdpEncapsulationSocket encapSocket,
             IpSecTunnelTestRunnable test)
             throws Exception {
+        return buildTunnelNetworkAndRunTests(
+                localInner,
+                remoteInner,
+                localOuter,
+                remoteOuter,
+                spi,
+                encapSocket,
+                test,
+                true /* enableEncrypt */);
+    }
+
+    private int buildTunnelNetworkAndRunTests(
+            InetAddress localInner,
+            InetAddress remoteInner,
+            InetAddress localOuter,
+            InetAddress remoteOuter,
+            int spi,
+            UdpEncapsulationSocket encapSocket,
+            IpSecTunnelTestRunnable test,
+            boolean enableEncrypt)
+            throws Exception {
         int innerPrefixLen = localInner instanceof Inet6Address ? IP6_PREFIX_LEN : IP4_PREFIX_LEN;
         TestNetworkCallback testNetworkCb = null;
         int innerSocketPort;
@@ -1115,8 +1137,12 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
 
             // Configure Transform parameters
             IpSecTransform.Builder transformBuilder = new IpSecTransform.Builder(sContext);
-            transformBuilder.setEncryption(
-                    new IpSecAlgorithm(IpSecAlgorithm.CRYPT_AES_CBC, CRYPT_KEY));
+
+            if (enableEncrypt) {
+                transformBuilder.setEncryption(
+                        new IpSecAlgorithm(IpSecAlgorithm.CRYPT_AES_CBC, CRYPT_KEY));
+            }
+
             transformBuilder.setAuthentication(
                     new IpSecAlgorithm(
                             IpSecAlgorithm.AUTH_HMAC_SHA256, AUTH_KEY, AUTH_KEY.length * 4));
@@ -1167,8 +1193,8 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
         return innerSocketPort;
     }
 
-    private int buildTunnelNetworkAndRunTestsSimple(int spi, IpSecTunnelTestRunnable test)
-            throws Exception {
+    private int buildTunnelNetworkAndRunTestsSimple(
+            int spi, IpSecTunnelTestRunnable test, boolean enableEncrypt) throws Exception {
         return buildTunnelNetworkAndRunTests(
                 LOCAL_INNER_6,
                 REMOTE_INNER_6,
@@ -1176,7 +1202,8 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
                 REMOTE_OUTER_6,
                 spi,
                 null /* encapSocket */,
-                test);
+                test,
+                enableEncrypt);
     }
 
     private static void receiveAndValidatePacket(JavaUdpSocket socket) throws Exception {
@@ -1787,10 +1814,11 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
                             PACKET_COUNT,
                             PACKET_COUNT,
                             PACKET_COUNT * (long) innerPacketSize,
-                            newReplayBitmap(REPLAY_BITMAP_LEN_BYTE * 8));
+                            newReplayBitmap(PACKET_COUNT));
 
                     return innerSocketPort;
-                });
+                },
+                true /* enableEncrypt */);
     }
 
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -1814,17 +1842,22 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
                     ipsecNetwork.bindSocket(outSocket.mSocket);
                     int innerSocketPort = outSocket.getPort();
 
-                    int expectedPacketSize =
-                            getPacketSize(
-                                    AF_INET6,
-                                    AF_INET6,
-                                    false /* useEncap */,
-                                    false /* transportInTunnelMode */);
+                    int outSeqNum = 1;
+                    int receivedTestDataEspCnt = 0;
 
-                    for (int i = 0; i < PACKET_COUNT; i++) {
+                    while (receivedTestDataEspCnt < PACKET_COUNT) {
                         outSocket.sendTo(TEST_DATA, REMOTE_INNER_6, innerSocketPort);
-                        tunUtils.awaitEspPacketNoPlaintext(
-                                spi, TEST_DATA, false /* useEncap */, expectedPacketSize);
+
+                        byte[] pkt = null;
+
+                        // If it is an ESP that contains the TEST_DATA, move to the next
+                        // loop. Otherwise, the ESP may contain an ICMPv6(Router Solicitation).
+                        // In this case, just increase the expected sequence number and continue
+                        // waiting for the ESP with TEST_DATA
+                        do {
+                            pkt = tunUtils.awaitEspPacket(spi, false /* useEncap */, outSeqNum++);
+                        } while (CollectionUtils.indexOfSubArray(pkt, TEST_DATA) == -1);
+                        receivedTestDataEspCnt++;
                     }
 
                     final int innerPacketSize =
@@ -1838,6 +1871,7 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
                             newReplayBitmap(0));
 
                     return innerSocketPort;
-                });
+                },
+                false /* enableEncrypt */);
     }
 }

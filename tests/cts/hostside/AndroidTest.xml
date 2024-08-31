@@ -20,6 +20,9 @@
     <option name="config-descriptor:metadata" key="parameter" value="instant_app" />
     <option name="config-descriptor:metadata" key="parameter" value="not_multi_abi" />
     <option name="config-descriptor:metadata" key="parameter" value="secondary_user" />
+    <option name="config-descriptor:metadata" key="mainline-param" value="CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex" />
+    <option name="config-descriptor:metadata" key="mainline-param" value="CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk" />
+    <option name="config-descriptor:metadata" key="mainline-param" value="com.google.android.tethering.apex" />
 
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.LocationCheck" />
 
@@ -46,4 +49,21 @@
         <option name="directory-keys" value="/sdcard/CtsHostsideNetworkTests" />
         <option name="collect-on-run-ended-only" value="true" />
     </metrics_collector>
+
+<!-- When this test is run in a Mainline context (e.g. with `mts-tradefed`), only enable it if
+    one of the Mainline modules below is present on the device used for testing. -->
+<object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
+    <!-- Tethering Module (internal version). -->
+    <option name="mainline-module-package-name" value="com.google.android.tethering" />
+    <!-- Tethering Module (AOSP version). -->
+    <option name="mainline-module-package-name" value="com.android.tethering" />
+    <!-- NetworkStack Module (internal version). Should always be installed with CaptivePortalLogin. -->
+    <option name="mainline-module-package-name" value="com.google.android.networkstack" />
+    <!-- NetworkStack Module (AOSP version). Should always be installed with CaptivePortalLogin. -->
+    <option name="mainline-module-package-name" value="com.android.networkstack" />
+    <!-- Resolver Module (internal version). -->
+    <option name="mainline-module-package-name" value="com.google.android.resolv" />
+    <!-- Resolver Module (AOSP version). -->
+    <option name="mainline-module-package-name" value="com.android.resolv" />
+</object>
 </configuration>

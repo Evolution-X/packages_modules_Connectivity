@@ -49,6 +49,7 @@ public class PacketUtils {
     static final int TCP_HDRLEN = 20;
     static final int TCP_HDRLEN_WITH_TIMESTAMP_OPT = TCP_HDRLEN + 12;
     static final int ESP_HDRLEN = 8;
+    static final int ICMP_HDRLEN = 8;
     static final int ESP_BLK_SIZE = 4; // ESP has to be 4-byte aligned
     static final int ESP_TRAILER_LEN = 2;
 
