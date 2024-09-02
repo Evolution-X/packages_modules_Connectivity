@@ -78,6 +78,8 @@ import com.android.net.module.util.Struct.U32;
 import com.android.net.module.util.Struct.U8;
 import com.android.net.module.util.bpf.CookieTagMapKey;
 import com.android.net.module.util.bpf.CookieTagMapValue;
+import com.android.net.module.util.bpf.IngressDiscardKey;
+import com.android.net.module.util.bpf.IngressDiscardValue;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
@@ -139,11 +141,14 @@ public final class BpfNetMapsTest {
     private final IBpfMap<S32, U8> mUidPermissionMap = new TestBpfMap<>(S32.class, U8.class);
     private final IBpfMap<CookieTagMapKey, CookieTagMapValue> mCookieTagMap =
             spy(new TestBpfMap<>(CookieTagMapKey.class, CookieTagMapValue.class));
+    private final IBpfMap<IngressDiscardKey, IngressDiscardValue> mIngressDiscardMap =
+            new TestBpfMap<>(IngressDiscardKey.class, IngressDiscardValue.class);
 
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         doReturn(TEST_IF_INDEX).when(mDeps).getIfIndex(TEST_IF_NAME);
+        doReturn(TEST_IF_NAME).when(mDeps).getIfName(TEST_IF_INDEX);
         doReturn(0).when(mDeps).synchronizeKernelRCU();
         BpfNetMaps.setEnableJavaBpfMapForTest(true /* enable */);
         BpfNetMaps.setConfigurationMapForTest(mConfigurationMap);
@@ -153,6 +158,7 @@ public final class BpfNetMapsTest {
         BpfNetMaps.setUidOwnerMapForTest(mUidOwnerMap);
         BpfNetMaps.setUidPermissionMapForTest(mUidPermissionMap);
         BpfNetMaps.setCookieTagMapForTest(mCookieTagMap);
+        BpfNetMaps.setIngressDiscardMapForTest(mIngressDiscardMap);
         mBpfNetMaps = new BpfNetMaps(mContext, mNetd, mDeps);
     }
 
