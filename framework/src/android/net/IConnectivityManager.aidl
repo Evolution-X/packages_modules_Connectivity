@@ -262,4 +262,6 @@ interface IConnectivityManager
     IBinder getRoutingCoordinatorService();
 
     long getEnabledConnectivityManagerFeatures();
+
+    boolean isConnectivityServiceFeatureEnabledForTesting(String featureFlag);
 }
