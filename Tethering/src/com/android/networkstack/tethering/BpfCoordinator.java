@@ -33,10 +33,12 @@ import static com.android.net.module.util.ip.ConntrackMonitor.ConntrackEvent;
 import static com.android.networkstack.tethering.BpfUtils.DOWNSTREAM;
 import static com.android.networkstack.tethering.BpfUtils.UPSTREAM;
 import static com.android.networkstack.tethering.TetheringConfiguration.DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS;
+import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_ACTIVE_SESSIONS_METRICS;
 import static com.android.networkstack.tethering.UpstreamNetworkState.isVcnInterface;
 import static com.android.networkstack.tethering.util.TetheringUtils.getTetheringJniLibraryName;
 
 import android.app.usage.NetworkStatsManager;
+import android.content.Context;
 import android.net.INetd;
 import android.net.IpPrefix;
 import android.net.LinkProperties;
@@ -65,6 +67,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.BpfDump;
 import com.android.net.module.util.BpfMap;
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.IBpfMap;
 import com.android.net.module.util.InterfaceParams;
 import com.android.net.module.util.NetworkStackConstants;
@@ -314,11 +317,16 @@ public class BpfCoordinator {
         scheduleConntrackTimeoutUpdate();
     };
 
+    private final boolean mSupportActiveSessionsMetrics;
+
     // TODO: add BpfMap<TetherDownstream64Key, TetherDownstream64Value> retrieving function.
     @VisibleForTesting
     public abstract static class Dependencies {
         /** Get handler. */
         @NonNull public abstract Handler getHandler();
+
+        /** Get context. */
+        @NonNull public abstract Context getContext();
 
         /** Get netd. */
         @NonNull public abstract INetd getNetd();
@@ -472,6 +480,13 @@ public class BpfCoordinator {
                 return null;
             }
         }
+
+        /**
+         * @see DeviceConfigUtils#isTetheringFeatureEnabled
+         */
+        public boolean isFeatureEnabled(Context context, String name) {
+            return DeviceConfigUtils.isTetheringFeatureEnabled(context, name);
+        }
     }
 
     @VisibleForTesting
@@ -508,6 +523,10 @@ public class BpfCoordinator {
         if (!mBpfCoordinatorShim.isInitialized()) {
             mLog.e("Bpf shim not initialized");
         }
+
+        // BPF IPv4 forwarding only supports on S+.
+        mSupportActiveSessionsMetrics = mDeps.isAtLeastS()
+                && mDeps.isFeatureEnabled(mDeps.getContext(), TETHER_ACTIVE_SESSIONS_METRICS);
     }
 
     /**
@@ -533,6 +552,17 @@ public class BpfCoordinator {
         // Stop scheduled polling conntrack timeout.
         if (mHandler.hasCallbacks(mScheduledConntrackTimeoutUpdate)) {
             mHandler.removeCallbacks(mScheduledConntrackTimeoutUpdate);
+        }
+        // Clear counters in case there is any counter unsync problem
+        // previously due to possible bpf failures.
+        // Normally this won't happen because all clients are cleared before
+        // reaching here. See IpServer.BaseServingState#exit().
+        if (mSupportActiveSessionsMetrics) {
+            final int currentCount = mBpfConntrackEventConsumer.getCurrentConnectionCount();
+            if (currentCount != 0) {
+                Log.wtf(TAG, "Unexpected CurrentConnectionCount: " + currentCount);
+            }
+            mBpfConntrackEventConsumer.clearConnectionCounters();
         }
         // Stop scheduled polling stats and poll the latest stats from BPF maps.
         if (mHandler.hasCallbacks(mScheduledPollingStats)) {
@@ -1031,6 +1061,10 @@ public class BpfCoordinator {
         for (final Tether4Key k : deleteDownstreamRuleKeys) {
             mBpfCoordinatorShim.tetherOffloadRuleRemove(DOWNSTREAM, k);
         }
+        if (mSupportActiveSessionsMetrics) {
+            mBpfConntrackEventConsumer.decreaseCurrentConnectionCount(
+                    deleteUpstreamRuleKeys.size());
+        }
 
         // Cleanup each upstream interface by a set which avoids duplicated work on the same
         // upstream interface. Cleaning up the same interface twice (or more) here may raise
@@ -1300,6 +1334,13 @@ public class BpfCoordinator {
         pw.increaseIndent();
         dumpCounters(pw);
         pw.decreaseIndent();
+
+        pw.println();
+        pw.println("mSupportActiveSessionsMetrics: " + mSupportActiveSessionsMetrics);
+        pw.println("getLastMaxConnectionCount: "
+                + mBpfConntrackEventConsumer.getLastMaxConnectionCount());
+        pw.println("getCurrentConnectionCount: "
+                + mBpfConntrackEventConsumer.getCurrentConnectionCount());
     }
 
     private void dumpStats(@NonNull IndentingPrintWriter pw) {
@@ -1991,6 +2032,21 @@ public class BpfCoordinator {
     // while TCP status is established.
     @VisibleForTesting
     class BpfConntrackEventConsumer implements ConntrackEventConsumer {
+        /**
+         * Tracks the current number of tethering connections and the maximum
+         * observed since the last metrics collection. Used to provide insights
+         * into the distribution of active tethering sessions for metrics reporting.
+
+         * These variables are accessed on the handler thread, which includes:
+         *  1. ConntrackEvents signaling the addition or removal of an IPv4 rule.
+         *  2. ConntrackEvents indicating the removal of a tethering client,
+         *     triggering the removal of associated rules.
+         *  3. Removal of the last IpServer, which resets counters to handle
+         *     potential synchronization issues.
+         */
+        private int mLastMaxConnectionCount = 0;
+        private int mCurrentConnectionCount = 0;
+
         // The upstream4 and downstream4 rules are built as the following tables. Only raw ip
         // upstream interface is supported. Note that the field "lastUsed" is only updated by
         // BPF program which records the last used time for a given rule.
@@ -2124,6 +2180,10 @@ public class BpfCoordinator {
                     return;
                 }
 
+                if (mSupportActiveSessionsMetrics) {
+                    decreaseCurrentConnectionCount(1);
+                }
+
                 maybeClearLimit(upstreamIndex);
                 return;
             }
@@ -2136,8 +2196,50 @@ public class BpfCoordinator {
 
             maybeAddDevMap(upstreamIndex, tetherClient.downstreamIfindex);
             maybeSetLimit(upstreamIndex);
-            mBpfCoordinatorShim.tetherOffloadRuleAdd(UPSTREAM, upstream4Key, upstream4Value);
-            mBpfCoordinatorShim.tetherOffloadRuleAdd(DOWNSTREAM, downstream4Key, downstream4Value);
+
+            final boolean addedUpstream = mBpfCoordinatorShim.tetherOffloadRuleAdd(
+                    UPSTREAM, upstream4Key, upstream4Value);
+            final boolean addedDownstream = mBpfCoordinatorShim.tetherOffloadRuleAdd(
+                    DOWNSTREAM, downstream4Key, downstream4Value);
+            if (addedUpstream != addedDownstream) {
+                Log.wtf(TAG, "The bidirectional rules should be added concurrently ("
+                        + "upstream: " + addedUpstream
+                        + ", downstream: " + addedDownstream + ")");
+                return;
+            }
+            if (mSupportActiveSessionsMetrics && addedUpstream && addedDownstream) {
+                mCurrentConnectionCount++;
+                mLastMaxConnectionCount = Math.max(mCurrentConnectionCount,
+                        mLastMaxConnectionCount);
+            }
+        }
+
+        public int getLastMaxConnectionAndResetToCurrent() {
+            final int ret = mLastMaxConnectionCount;
+            mLastMaxConnectionCount = mCurrentConnectionCount;
+            return ret;
+        }
+
+        /** For dumping current state only. */
+        public int getLastMaxConnectionCount() {
+            return mLastMaxConnectionCount;
+        }
+
+        public int getCurrentConnectionCount() {
+            return mCurrentConnectionCount;
+        }
+
+        public void decreaseCurrentConnectionCount(int count) {
+            mCurrentConnectionCount -= count;
+            if (mCurrentConnectionCount < 0) {
+                Log.wtf(TAG, "Unexpected mCurrentConnectionCount: "
+                        + mCurrentConnectionCount);
+            }
+        }
+
+        public void clearConnectionCounters() {
+            mCurrentConnectionCount = 0;
+            mLastMaxConnectionCount = 0;
         }
     }
 

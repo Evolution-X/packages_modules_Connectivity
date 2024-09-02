@@ -144,6 +144,12 @@ public class TetheringConfiguration {
     /** A flag for using synchronous or asynchronous state machine. */
     public static boolean USE_SYNC_SM = false;
 
+    /**
+     * A feature flag to control whether the active sessions metrics should be enabled.
+     * Disabled by default.
+     */
+    public static final String TETHER_ACTIVE_SESSIONS_METRICS = "tether_active_sessions_metrics";
+
     public final String[] tetherableUsbRegexs;
     public final String[] tetherableWifiRegexs;
     public final String[] tetherableWigigRegexs;
