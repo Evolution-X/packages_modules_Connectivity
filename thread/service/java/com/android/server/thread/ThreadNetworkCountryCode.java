@@ -38,10 +38,10 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.ArrayMap;
-import android.util.Log;
 
 import com.android.connectivity.resources.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.SharedLog;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.FileDescriptor;
@@ -63,7 +63,9 @@ import java.util.Objects;
  */
 @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 public class ThreadNetworkCountryCode {
-    private static final String TAG = "ThreadNetworkCountryCode";
+    private static final String TAG = "CountryCode";
+    private static final SharedLog LOG = ThreadNetworkLogger.forSubComponent(TAG);
+
     // To be used when there is no country code available.
     @VisibleForTesting public static final String DEFAULT_COUNTRY_CODE = "WW";
 
@@ -280,11 +282,11 @@ public class ThreadNetworkCountryCode {
             String countryCode = addresses.get(0).getCountryCode();
 
             if (isValidCountryCode(countryCode)) {
-                Log.d(TAG, "Set location country code to: " + countryCode);
+                LOG.v("Set location country code to: " + countryCode);
                 mLocationCountryCodeInfo =
                         new CountryCodeInfo(countryCode, COUNTRY_CODE_SOURCE_LOCATION);
             } else {
-                Log.d(TAG, "Received invalid location country code");
+                LOG.v("Received invalid location country code");
                 mLocationCountryCodeInfo = null;
             }
 
@@ -296,8 +298,7 @@ public class ThreadNetworkCountryCode {
         if ((location == null) || (mGeocoder == null)) return;
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
-            Log.wtf(
-                    TAG,
+            LOG.wtf(
                     "Unexpected call to set country code from the Geocoding location, "
                             + "Thread code never runs under T or lower.");
             return;
@@ -320,13 +321,13 @@ public class ThreadNetworkCountryCode {
     private class WifiCountryCodeCallback implements ActiveCountryCodeChangedCallback {
         @Override
         public void onActiveCountryCodeChanged(String countryCode) {
-            Log.d(TAG, "Wifi country code is changed to " + countryCode);
+            LOG.v("Wifi country code is changed to " + countryCode);
             synchronized ("ThreadNetworkCountryCode.this") {
                 if (isValidCountryCode(countryCode)) {
                     mWifiCountryCodeInfo =
                             new CountryCodeInfo(countryCode, COUNTRY_CODE_SOURCE_WIFI);
                 } else {
-                    Log.w(TAG, "WiFi country code " + countryCode + " is invalid");
+                    LOG.w("WiFi country code " + countryCode + " is invalid");
                     mWifiCountryCodeInfo = null;
                 }
 
@@ -336,7 +337,7 @@ public class ThreadNetworkCountryCode {
 
         @Override
         public void onCountryCodeInactive() {
-            Log.d(TAG, "Wifi country code is inactived");
+            LOG.v("Wifi country code is inactived");
             synchronized ("ThreadNetworkCountryCode.this") {
                 mWifiCountryCodeInfo = null;
                 updateCountryCode(false /* forceUpdate */);
@@ -346,8 +347,7 @@ public class ThreadNetworkCountryCode {
 
     private synchronized void registerTelephonyCountryCodeCallback() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Log.wtf(
-                    TAG,
+            LOG.wtf(
                     "Unexpected call to register the telephony country code changed callback, "
                             + "Thread code never runs under T or lower.");
             return;
@@ -387,7 +387,7 @@ public class ThreadNetworkCountryCode {
                 mSubscriptionManager.getActiveSubscriptionInfoList();
 
         if (subscriptionInfoList == null) {
-            Log.d(TAG, "No SIM card is found");
+            LOG.v("No SIM card is found");
             return;
         }
 
@@ -399,11 +399,11 @@ public class ThreadNetworkCountryCode {
             try {
                 countryCode = mTelephonyManager.getNetworkCountryIso(slotIndex);
             } catch (IllegalArgumentException e) {
-                Log.e(TAG, "Failed to get country code for slot index:" + slotIndex, e);
+                LOG.e("Failed to get country code for slot index:" + slotIndex, e);
                 continue;
             }
 
-            Log.d(TAG, "Telephony slot " + slotIndex + " country code is " + countryCode);
+            LOG.v("Telephony slot " + slotIndex + " country code is " + countryCode);
             setTelephonyCountryCodeAndLastKnownCountryCode(
                     slotIndex, countryCode, null /* lastKnownCountryCode */);
         }
@@ -411,8 +411,7 @@ public class ThreadNetworkCountryCode {
 
     private synchronized void setTelephonyCountryCodeAndLastKnownCountryCode(
             int slotIndex, String countryCode, String lastKnownCountryCode) {
-        Log.d(
-                TAG,
+        LOG.v(
                 "Set telephony country code to: "
                         + countryCode
                         + ", last country code to: "
@@ -522,8 +521,7 @@ public class ThreadNetworkCountryCode {
 
             @Override
             public void onError(int otError, String message) {
-                Log.e(
-                        TAG,
+                LOG.e(
                         "Error "
                                 + otError
                                 + ": "
@@ -545,11 +543,11 @@ public class ThreadNetworkCountryCode {
         CountryCodeInfo countryCodeInfo = pickCountryCode();
 
         if (!forceUpdate && countryCodeInfo.isCountryCodeMatch(mCurrentCountryCodeInfo)) {
-            Log.i(TAG, "Ignoring already set country code " + countryCodeInfo.getCountryCode());
+            LOG.i("Ignoring already set country code " + countryCodeInfo.getCountryCode());
             return;
         }
 
-        Log.i(TAG, "Set country code: " + countryCodeInfo);
+        LOG.i("Set country code: " + countryCodeInfo);
         mThreadNetworkControllerService.setCountryCode(
                 countryCodeInfo.getCountryCode().toUpperCase(Locale.ROOT),
                 newOperationReceiver(countryCodeInfo));
