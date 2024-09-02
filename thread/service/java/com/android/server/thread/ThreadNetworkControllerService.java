@@ -1248,7 +1248,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                     .setInfraLinkState(
                             mInfraLinkState,
                             infraIcmp6Socket,
-                            new setInfraLinkStateStatusReceiver());
+                            new LoggingOtStatusReceiver("setInfraLinkState"));
         } catch (RemoteException | ThreadNetworkException e) {
             LOG.e("Failed to configure border router " + mOtDaemonConfig, e);
         }
@@ -1397,32 +1397,21 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
-    private static final class setOtDaemonConfigurationStatusReceiver
-            extends IOtStatusReceiver.Stub {
-        public setOtDaemonConfigurationStatusReceiver() {}
+    private static class LoggingOtStatusReceiver extends IOtStatusReceiver.Stub {
+        private final String mAction;
+
+        LoggingOtStatusReceiver(String action) {
+            mAction = action;
+        }
 
         @Override
         public void onSuccess() {
-            LOG.i("Configured border router successfully");
+            LOG.i("The action " + mAction + " succeeded");
         }
 
         @Override
         public void onError(int i, String s) {
-            LOG.w(String.format("Failed to set configurations: %d %s", i, s));
-        }
-    }
-
-    private static final class setInfraLinkStateStatusReceiver extends IOtStatusReceiver.Stub {
-        public setInfraLinkStateStatusReceiver() {}
-
-        @Override
-        public void onSuccess() {
-            LOG.i("Set the infra link state successfully");
-        }
-
-        @Override
-        public void onError(int i, String s) {
-            LOG.w(String.format("Failed to set the infra link state: %d %s", i, s));
+            LOG.w("The action " + mAction + " failed: " + i + " " + s);
         }
     }
 
