@@ -936,6 +936,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final Map<String, ApplicationSelfCertifiedNetworkCapabilities>
             mSelfCertifiedCapabilityCache = new HashMap<>();
 
+    // Flag to drop packets to VPN addresses ingressing via non-VPN interfaces.
+    private final boolean mIngressToVpnAddressFiltering;
+
     /**
      * Implements support for the legacy "one network per network type" model.
      *
@@ -1798,6 +1801,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             activityManager.registerUidFrozenStateChangedCallback(
                     (Runnable r) -> r.run(), frozenStateChangedCallback);
         }
+        mIngressToVpnAddressFiltering = mDeps.isAtLeastT();
     }
 
     /**
@@ -4776,6 +4780,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         if (mDscpPolicyTracker != null) {
             mDscpPolicyTracker.removeAllDscpPolicies(nai, false);
         }
+        updateIngressToVpnAddressFiltering(null, nai.linkProperties, nai);
         try {
             mNetd.networkDestroy(nai.network.getNetId());
         } catch (RemoteException | ServiceSpecificException e) {
@@ -8014,6 +8019,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // new interface (the interface name -> index map becomes initialized)
         updateVpnFiltering(newLp, oldLp, networkAgent);
 
+        updateIngressToVpnAddressFiltering(newLp, oldLp, networkAgent);
+
         updateMtu(newLp, oldLp);
         // TODO - figure out what to do for clat
 //        for (LinkProperties lp : newLp.getStackedLinks()) {
@@ -8334,6 +8341,87 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         if (needsFiltering) {
             mPermissionMonitor.onVpnUidRangesAdded(newIface, ranges, vpnAppUid);
+        }
+    }
+
+    /**
+     * Returns ingress discard rules to drop packets to VPN addresses ingressing via non-VPN
+     * interfaces.
+     * Ingress discard rule is added to the address iff
+     *   1. The address is not a link local address
+     *   2. The address is used by a single VPN interface and not used by any other
+     *      interfaces even non-VPN ones
+     * This method can be called during network disconnects, when nai has already been removed from
+     * mNetworkAgentInfos.
+     *
+     * @param nai This method generates rules assuming lp of this nai is the lp at the second
+     *            argument.
+     * @param lp  This method generates rules assuming lp of nai at the first argument is this lp.
+     *            Caller passes old lp to generate old rules and new lp to generate new rules.
+     * @return    ingress discard rules. Set of pairs of addresses and interface names
+     */
+    private Set<Pair<InetAddress, String>> generateIngressDiscardRules(
+            @NonNull final NetworkAgentInfo nai, @Nullable final LinkProperties lp) {
+        Set<NetworkAgentInfo> nais = new ArraySet<>(mNetworkAgentInfos);
+        nais.add(nai);
+        // Determine how many networks each IP address is currently configured on.
+        // Ingress rules are added only for IP addresses that are configured on single interface.
+        final Map<InetAddress, Integer> addressOwnerCounts = new ArrayMap<>();
+        for (final NetworkAgentInfo agent : nais) {
+            if (agent.isDestroyed()) {
+                continue;
+            }
+            final LinkProperties agentLp = (nai == agent) ? lp : agent.linkProperties;
+            if (agentLp == null) {
+                continue;
+            }
+            for (final InetAddress addr: agentLp.getAllAddresses()) {
+                addressOwnerCounts.put(addr, addressOwnerCounts.getOrDefault(addr, 0) + 1);
+            }
+        }
+
+        // Iterates all networks instead of only generating rule for nai that was passed in since
+        // lp of the nai change could cause/resolve address collision and result in affecting rule
+        // for different network.
+        final Set<Pair<InetAddress, String>> ingressDiscardRules = new ArraySet<>();
+        for (final NetworkAgentInfo agent : nais) {
+            if (!agent.isVPN() || agent.isDestroyed()) {
+                continue;
+            }
+            final LinkProperties agentLp = (nai == agent) ? lp : agent.linkProperties;
+            if (agentLp == null || agentLp.getInterfaceName() == null) {
+                continue;
+            }
+
+            for (final InetAddress addr: agentLp.getAllAddresses()) {
+                if (addressOwnerCounts.get(addr) == 1 && !addr.isLinkLocalAddress()) {
+                    ingressDiscardRules.add(new Pair<>(addr, agentLp.getInterfaceName()));
+                }
+            }
+        }
+        return ingressDiscardRules;
+    }
+
+    private void updateIngressToVpnAddressFiltering(@Nullable LinkProperties newLp,
+            @Nullable LinkProperties oldLp, @NonNull NetworkAgentInfo nai) {
+        // Having isAtleastT to avoid NewApi linter error (b/303382209)
+        if (!mIngressToVpnAddressFiltering || !mDeps.isAtLeastT()) {
+            return;
+        }
+        final CompareOrUpdateResult<InetAddress, Pair<InetAddress, String>> ruleDiff =
+                new CompareOrUpdateResult<>(
+                        generateIngressDiscardRules(nai, oldLp),
+                        generateIngressDiscardRules(nai, newLp),
+                        (rule) -> rule.first);
+        for (Pair<InetAddress, String> rule: ruleDiff.removed) {
+            mBpfNetMaps.removeIngressDiscardRule(rule.first);
+        }
+        for (Pair<InetAddress, String> rule: ruleDiff.added) {
+            mBpfNetMaps.setIngressDiscardRule(rule.first, rule.second);
+        }
+        // setIngressDiscardRule overrides the existing rule
+        for (Pair<InetAddress, String> rule: ruleDiff.updated) {
+            mBpfNetMaps.setIngressDiscardRule(rule.first, rule.second);
         }
     }
 
