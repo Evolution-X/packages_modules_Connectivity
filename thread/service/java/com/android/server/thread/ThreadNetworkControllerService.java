@@ -112,11 +112,11 @@ import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserManager;
-import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.connectivity.resources.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.SharedLog;
 import com.android.server.ServiceManagerWrapper;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.thread.openthread.BackboneRouterState;
@@ -160,7 +160,8 @@ import java.util.regex.Pattern;
  */
 @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 final class ThreadNetworkControllerService extends IThreadNetworkController.Stub {
-    private static final String TAG = "ThreadNetworkService";
+    private static final String TAG = "ControllerService";
+    private static final SharedLog LOG = ThreadNetworkLogger.forSubComponent(TAG);
 
     // The model name length in utf-8 bytes
     private static final int MAX_MODEL_NAME_UTF8_BYTES = 24;
@@ -303,12 +304,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             return;
         }
 
-        Log.i(TAG, "Starting OT daemon...");
+        LOG.i("Starting OT daemon...");
 
         try {
             getOtDaemon();
         } catch (RemoteException e) {
-            Log.e(TAG, "Failed to initialize ot-daemon", e);
+            LOG.e("Failed to initialize ot-daemon", e);
         } catch (ThreadNetworkException e) {
             // no ThreadNetworkException.ERROR_THREAD_DISABLED error should be thrown
             throw new AssertionError(e);
@@ -422,7 +423,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
     private void onOtDaemonDied() {
         checkOnHandlerThread();
-        Log.w(TAG, "OT daemon is dead, clean up...");
+        LOG.w("OT daemon is dead, clean up...");
 
         OperationReceiverWrapper.onOtDaemonDied();
         mOtDaemonCallbackProxy.onOtDaemonDied();
@@ -435,8 +436,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     public void initialize() {
         mHandler.post(
                 () -> {
-                    Log.d(
-                            TAG,
+                    LOG.v(
                             "Initializing Thread system service: Thread is "
                                     + (shouldEnableThread() ? "enabled" : "disabled"));
                     try {
@@ -493,7 +493,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             // become dead, so that it's guaranteed that ot-daemon is stopped when {@code
             // receiver} is completed
         } catch (RemoteException e) {
-            Log.e(TAG, "otDaemon.terminate failed", e);
+            LOG.e("otDaemon.terminate failed", e);
             receiver.onError(ERROR_INTERNAL_ERROR, "Thread stack error");
         } catch (ThreadNetworkException e) {
             // No ThreadNetworkException.ERROR_THREAD_DISABLED error will be thrown
@@ -524,7 +524,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             return;
         }
 
-        Log.i(TAG, "Set Thread enabled: " + isEnabled + ", persist: " + persist);
+        LOG.i("Set Thread enabled: " + isEnabled + ", persist: " + persist);
 
         if (persist) {
             // The persistent setting keeps the desired enabled state, thus it's set regardless
@@ -536,7 +536,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         try {
             getOtDaemon().setThreadEnabled(isEnabled, newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.setThreadEnabled failed", e);
+            LOG.e("otDaemon.setThreadEnabled failed", e);
             receiver.onError(e);
         }
     }
@@ -553,7 +553,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             @NonNull IOperationReceiver operationReceiver) {
         checkOnHandlerThread();
 
-        Log.i(TAG, "Set Thread configuration: " + configuration);
+        LOG.i("Set Thread configuration: " + configuration);
 
         final boolean changed = mPersistentSettings.putConfiguration(configuration);
         try {
@@ -631,8 +631,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         if (mUserRestricted == newUserRestrictedState) {
             return;
         }
-        Log.i(
-                TAG,
+        LOG.i(
                 "Thread user restriction changed: "
                         + mUserRestricted
                         + " -> "
@@ -644,16 +643,14 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new IOperationReceiver.Stub() {
                     @Override
                     public void onSuccess() {
-                        Log.d(
-                                TAG,
+                        LOG.v(
                                 (shouldEnableThread ? "Enabled" : "Disabled")
                                         + " Thread due to user restriction change");
                     }
 
                     @Override
                     public void onError(int errorCode, String errorMessage) {
-                        Log.e(
-                                TAG,
+                        LOG.e(
                                 "Failed to "
                                         + (shouldEnableThread ? "enable" : "disable")
                                         + " Thread for user restriction change");
@@ -702,13 +699,13 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         @Override
         public void onAvailable(@NonNull Network network) {
             checkOnHandlerThread();
-            Log.i(TAG, "Upstream network available: " + network);
+            LOG.i("Upstream network available: " + network);
         }
 
         @Override
         public void onLost(@NonNull Network network) {
             checkOnHandlerThread();
-            Log.i(TAG, "Upstream network lost: " + network);
+            LOG.i("Upstream network lost: " + network);
 
             // TODO: disable border routing when upsteam network disconnected
         }
@@ -723,7 +720,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             if (Objects.equals(existingIfName, newIfName)) {
                 return;
             }
-            Log.i(TAG, "Upstream network changed: " + existingIfName + " -> " + newIfName);
+            LOG.i("Upstream network changed: " + existingIfName + " -> " + newIfName);
             mNetworkToInterface.put(network, newIfName);
 
             // TODO: disable border routing if netIfName is null
@@ -737,13 +734,13 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         @Override
         public void onAvailable(@NonNull Network network) {
             checkOnHandlerThread();
-            Log.i(TAG, "Thread network is available: " + network);
+            LOG.i("Thread network is available: " + network);
         }
 
         @Override
         public void onLost(@NonNull Network network) {
             checkOnHandlerThread();
-            Log.i(TAG, "Thread network is lost: " + network);
+            LOG.i("Thread network is lost: " + network);
             disableBorderRouting();
         }
 
@@ -751,8 +748,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         public void onLocalNetworkInfoChanged(
                 @NonNull Network network, @NonNull LocalNetworkInfo localNetworkInfo) {
             checkOnHandlerThread();
-            Log.i(
-                    TAG,
+            LOG.i(
                     "LocalNetworkInfo of Thread network changed: {threadNetwork: "
                             + network
                             + ", localNetworkInfo: "
@@ -810,7 +806,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return new NetworkAgent(
                 mContext,
                 mHandler.getLooper(),
-                TAG,
+                LOG.getTag(),
                 netCaps,
                 mTunIfController.getLinkProperties(),
                 newLocalNetworkConfig(),
@@ -827,7 +823,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mNetworkAgent = newNetworkAgent();
         mNetworkAgent.register();
         mNetworkAgent.markConnected();
-        Log.i(TAG, "Registered Thread network");
+        LOG.i("Registered Thread network");
     }
 
     private void unregisterThreadNetwork() {
@@ -837,7 +833,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             return;
         }
 
-        Log.d(TAG, "Unregistering Thread network agent");
+        LOG.v("Unregistering Thread network agent");
 
         mNetworkAgent.unregister();
         mNetworkAgent = null;
@@ -863,7 +859,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         try {
             getOtDaemon().getChannelMasks(newChannelMasksReceiver(networkName, receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.getChannelMasks failed", e);
+            LOG.e("otDaemon.getChannelMasks failed", e);
             receiver.onError(e);
         }
     }
@@ -904,7 +900,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             now = clock.instant();
             authoritative = true;
         } catch (DateTimeException e) {
-            Log.w(TAG, "Failed to get authoritative time", e);
+            LOG.w("Failed to get authoritative time: " + e.getMessage());
         }
 
         int panId = random.nextInt(/* bound= */ 0xffff);
@@ -1095,7 +1091,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             // The otDaemon.join() will leave first if this device is currently attached
             getOtDaemon().join(activeDataset.toThreadTlvs(), newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.join failed", e);
+            LOG.e("otDaemon.join failed", e);
             receiver.onError(e);
         }
     }
@@ -1120,7 +1116,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                     .scheduleMigration(
                             pendingDataset.toThreadTlvs(), newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.scheduleMigration failed", e);
+            LOG.e("otDaemon.scheduleMigration failed", e);
             receiver.onError(e);
         }
     }
@@ -1138,7 +1134,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         try {
             getOtDaemon().leave(newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.leave failed", e);
+            LOG.e("otDaemon.leave failed", e);
             receiver.onError(e);
         }
     }
@@ -1171,7 +1167,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         try {
             getOtDaemon().setCountryCode(countryCode, newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.setCountryCode failed", e);
+            LOG.e("otDaemon.setCountryCode failed", e);
             receiver.onError(e);
         }
     }
@@ -1181,7 +1177,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             @Nullable String testNetworkInterfaceName, @NonNull IOperationReceiver receiver) {
         enforceAllPermissionsGranted(PERMISSION_THREAD_NETWORK_PRIVILEGED, NETWORK_SETTINGS);
 
-        Log.i(TAG, "setTestNetworkAsUpstream: " + testNetworkInterfaceName);
+        LOG.i("setTestNetworkAsUpstream: " + testNetworkInterfaceName);
         mHandler.post(() -> setTestNetworkAsUpstreamInternal(testNetworkInterfaceName, receiver));
     }
 
@@ -1227,7 +1223,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         try {
             getOtDaemon().setChannelMaxPowers(channelMaxPowers, newOtStatusReceiver(receiver));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.e(TAG, "otDaemon.setChannelMaxPowers failed", e);
+            LOG.e("otDaemon.setChannelMaxPowers failed", e);
             receiver.onError(ERROR_INTERNAL_ERROR, "Thread stack error");
         }
     }
@@ -1236,7 +1232,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         if (mInfraLinkState.equals(infraLinkState)) {
             return;
         }
-        Log.i(TAG, "Infra link state changed: " + mInfraLinkState + " -> " + infraLinkState);
+        LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + infraLinkState);
         mInfraLinkState = infraLinkState;
         ParcelFileDescriptor infraIcmp6Socket = null;
         if (mInfraLinkState.interfaceName != null) {
@@ -1244,7 +1240,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 infraIcmp6Socket =
                         mInfraIfController.createIcmp6Socket(mInfraLinkState.interfaceName);
             } catch (IOException e) {
-                Log.i(TAG, "Failed to create ICMPv6 socket on infra network interface", e);
+                LOG.e("Failed to create ICMPv6 socket on infra network interface", e);
             }
         }
         try {
@@ -1252,16 +1248,16 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                     .setInfraLinkState(
                             mInfraLinkState,
                             infraIcmp6Socket,
-                            new setInfraLinkStateStatusReceiver());
+                            new LoggingOtStatusReceiver("setInfraLinkState"));
         } catch (RemoteException | ThreadNetworkException e) {
-            Log.w(TAG, "Failed to configure border router " + mOtDaemonConfig, e);
+            LOG.e("Failed to configure border router " + mOtDaemonConfig, e);
         }
     }
 
     private void enableBorderRouting(String infraIfName) {
         InfraLinkState infraLinkState =
                 newInfraLinkStateBuilder(mInfraLinkState).setInterfaceName(infraIfName).build();
-        Log.i(TAG, "Enable border routing on AIL: " + infraIfName);
+        LOG.i("Enable border routing on AIL: " + infraIfName);
         setInfraLinkState(infraLinkState);
     }
 
@@ -1269,28 +1265,28 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mUpstreamNetwork = null;
         InfraLinkState infraLinkState =
                 newInfraLinkStateBuilder(mInfraLinkState).setInterfaceName(null).build();
-        Log.i(TAG, "Disabling border routing");
+        LOG.i("Disabling border routing");
         setInfraLinkState(infraLinkState);
     }
 
     private void handleThreadInterfaceStateChanged(boolean isUp) {
         try {
             mTunIfController.setInterfaceUp(isUp);
-            Log.i(TAG, "Thread TUN interface becomes " + (isUp ? "up" : "down"));
+            LOG.i("Thread TUN interface becomes " + (isUp ? "up" : "down"));
         } catch (IOException e) {
-            Log.e(TAG, "Failed to handle Thread interface state changes", e);
+            LOG.e("Failed to handle Thread interface state changes", e);
         }
     }
 
     private void handleDeviceRoleChanged(@DeviceRole int deviceRole) {
         if (ThreadNetworkController.isAttached(deviceRole)) {
-            Log.i(TAG, "Attached to the Thread network");
+            LOG.i("Attached to the Thread network");
 
             // This is an idempotent method which can be called for multiple times when the device
             // is already attached (e.g. going from Child to Router)
             registerThreadNetwork();
         } else {
-            Log.i(TAG, "Detached from the Thread network");
+            LOG.i("Detached from the Thread network");
 
             // This is an idempotent method which can be called for multiple times when the device
             // is already detached or stopped
@@ -1328,7 +1324,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
         final LocalNetworkConfig localNetworkConfig = newLocalNetworkConfig();
         mNetworkAgent.sendLocalNetworkConfig(localNetworkConfig);
-        Log.d(TAG, "Sent localNetworkConfig: " + localNetworkConfig);
+        LOG.v("Sent localNetworkConfig: " + localNetworkConfig);
     }
 
     private void handleMulticastForwardingChanged(BackboneRouterState state) {
@@ -1401,32 +1397,21 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
-    private static final class setOtDaemonConfigurationStatusReceiver
-            extends IOtStatusReceiver.Stub {
-        public setOtDaemonConfigurationStatusReceiver() {}
+    private static class LoggingOtStatusReceiver extends IOtStatusReceiver.Stub {
+        private final String mAction;
+
+        LoggingOtStatusReceiver(String action) {
+            mAction = action;
+        }
 
         @Override
         public void onSuccess() {
-            Log.i(TAG, "Configured border router successfully");
+            LOG.i("The action " + mAction + " succeeded");
         }
 
         @Override
         public void onError(int i, String s) {
-            Log.w(TAG, String.format("Failed to set configurations: %d %s", i, s));
-        }
-    }
-
-    private static final class setInfraLinkStateStatusReceiver extends IOtStatusReceiver.Stub {
-        public setInfraLinkStateStatusReceiver() {}
-
-        @Override
-        public void onSuccess() {
-            Log.i(TAG, "Set the infra link state successfully");
-        }
-
-        @Override
-        public void onError(int i, String s) {
-            Log.w(TAG, String.format("Failed to set the infra link state: %d %s", i, s));
+            LOG.w("The action " + mAction + " failed: " + i + " " + s);
         }
     }
 
@@ -1463,7 +1448,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             try {
                 getOtDaemon().registerStateCallback(this, callbackMetadata.id);
             } catch (RemoteException | ThreadNetworkException e) {
-                Log.e(TAG, "otDaemon.registerStateCallback failed", e);
+                LOG.e("otDaemon.registerStateCallback failed", e);
             }
         }
 
@@ -1495,7 +1480,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             try {
                 getOtDaemon().registerStateCallback(this, callbackMetadata.id);
             } catch (RemoteException | ThreadNetworkException e) {
-                Log.e(TAG, "otDaemon.registerStateCallback failed", e);
+                LOG.e("otDaemon.registerStateCallback failed", e);
             }
         }
 
@@ -1587,7 +1572,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 mActiveDataset = newActiveDataset;
             } catch (IllegalArgumentException e) {
                 // Is unlikely that OT will generate invalid Operational Dataset
-                Log.wtf(TAG, "Invalid Active Operational Dataset from OpenThread", e);
+                LOG.wtf("Invalid Active Operational Dataset from OpenThread", e);
             }
 
             PendingOperationalDataset newPendingDataset;
@@ -1602,7 +1587,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 mPendingDataset = newPendingDataset;
             } catch (IllegalArgumentException e) {
                 // Is unlikely that OT will generate invalid Operational Dataset
-                Log.wtf(TAG, "Invalid Pending Operational Dataset from OpenThread", e);
+                LOG.wtf("Invalid Pending Operational Dataset from OpenThread", e);
             }
         }
 
