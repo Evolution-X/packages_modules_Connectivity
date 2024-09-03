@@ -36,4 +36,5 @@ android_test_helper_app {
         "sts",
     ],
     sdk_version: "test_current",
+    min_sdk_version: "31",
 }
