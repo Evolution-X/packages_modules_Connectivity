@@ -23,8 +23,8 @@ package {
 // See https://android.googlesource.com/platform/system/core/+/HEAD/init/README.md#versioned-rc-files-within-apexs
 // for details of versioned rc files.
 prebuilt_etc {
-    name: "ot-daemon.init.34rc",
+    name: "ot-daemon.34rc",
     src: "ot-daemon.34rc",
-    filename: "init.34rc",
+    filename: "ot-daemon.34rc",
     installable: false,
 }
