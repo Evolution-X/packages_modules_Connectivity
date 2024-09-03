@@ -1492,30 +1492,30 @@ static int doLoad(char** argv, char * const envp[]) {
         }
     }
 
+    /* Android 14/U should only launch on 64-bit kernels
+     *   T launches on 5.10/5.15
+     *   U launches on 5.15/6.1
+     * So >=5.16 implies isKernel64Bit()
+     *
+     * We thus added a test to V VTS which requires 5.16+ devices to use 64-bit kernels.
+     *
+     * Starting with Android V, which is the first to support a post 6.1 Linux Kernel,
+     * we also require 64-bit userspace.
+     *
+     * There are various known issues with 32-bit userspace talking to various
+     * kernel interfaces (especially CAP_NET_ADMIN ones) on a 64-bit kernel.
+     * Some of these have userspace or kernel workarounds/hacks.
+     * Some of them don't...
+     * We're going to be removing the hacks.
+     * (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
+     * Note: this check/enforcement only applies to *system* userspace code,
+     * it does not affect unprivileged apps, the 32-on-64 compatibility
+     * problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
+     *
+     * Additionally the 32-bit kernel jit support is poor,
+     * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
+     */
     if (isUserspace32bit() && isAtLeastKernelVersion(6, 2, 0)) {
-        /* Android 14/U should only launch on 64-bit kernels
-         *   T launches on 5.10/5.15
-         *   U launches on 5.15/6.1
-         * So >=5.16 implies isKernel64Bit()
-         *
-         * We thus added a test to V VTS which requires 5.16+ devices to use 64-bit kernels.
-         *
-         * Starting with Android V, which is the first to support a post 6.1 Linux Kernel,
-         * we also require 64-bit userspace.
-         *
-         * There are various known issues with 32-bit userspace talking to various
-         * kernel interfaces (especially CAP_NET_ADMIN ones) on a 64-bit kernel.
-         * Some of these have userspace or kernel workarounds/hacks.
-         * Some of them don't...
-         * We're going to be removing the hacks.
-         * (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
-         * Note: this check/enforcement only applies to *system* userspace code,
-         * it does not affect unprivileged apps, the 32-on-64 compatibility
-         * problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
-         *
-         * Additionally the 32-bit kernel jit support is poor,
-         * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
-         */
         ALOGE("64-bit userspace required on 6.2+ kernels.");
         // Stuff won't work reliably, but exempt TVs & Arm Wear devices
         if (!isTV() && !(isWear() && isArm())) return 1;
