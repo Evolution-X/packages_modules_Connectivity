@@ -2086,6 +2086,86 @@ public class BpfCoordinatorTest {
         assertEquals(expectedCount, mConsumer.getLastMaxConnectionAndResetToCurrent());
     }
 
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS)
+    // BPF IPv4 forwarding only supports on S+.
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @Test
+    public void doTestMaxConnectionCount_removeClient_metricsEnabled() throws Exception {
+        doTestMaxConnectionCount_removeClient(true);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS, enabled = false)
+    @Test
+    public void doTestMaxConnectionCount_removeClient_metricsDisabled() throws Exception {
+        doTestMaxConnectionCount_removeClient(false);
+    }
+
+    private void doTestMaxConnectionCount_removeClient(final boolean supportActiveSessionsMetrics)
+            throws Exception {
+        final BpfCoordinator coordinator = makeBpfCoordinator();
+        initBpfCoordinatorForRule4(coordinator);
+        resetNetdAndBpfMaps();
+
+        // Add client information A and B on on the same downstream.
+        final ClientInfo clientA = new ClientInfo(DOWNSTREAM_IFINDEX, DOWNSTREAM_MAC,
+                PRIVATE_ADDR, MAC_A);
+        final ClientInfo clientB = new ClientInfo(DOWNSTREAM_IFINDEX, DOWNSTREAM_MAC,
+                PRIVATE_ADDR2, MAC_B);
+        coordinator.tetherOffloadClientAdd(mIpServer, clientA);
+        coordinator.tetherOffloadClientAdd(mIpServer, clientB);
+        assertClientInfoExists(mIpServer, clientA);
+        assertClientInfoExists(mIpServer, clientB);
+        assertEquals(0, mConsumer.getLastMaxConnectionAndResetToCurrent());
+
+        // Add some rules for both clients.
+        final int addr1RuleCount = 5;
+        final int addr2RuleCount = 3;
+
+        for (int i = 0; i < addr1RuleCount; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder()
+                    .setMsgType(IPCTNL_MSG_CT_NEW)
+                    .setProto(IPPROTO_TCP)
+                    .setRemotePort(i)
+                    .setPrivateAddress(PRIVATE_ADDR)
+                    .build());
+        }
+
+        for (int i = addr1RuleCount; i < addr1RuleCount + addr2RuleCount; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder()
+                    .setMsgType(IPCTNL_MSG_CT_NEW)
+                    .setProto(IPPROTO_TCP)
+                    .setRemotePort(i)
+                    .setPrivateAddress(PRIVATE_ADDR2)
+                    .build());
+        }
+
+        assertConsumerCountersEquals(
+                supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0);
+
+        // Remove 1 client. Since the 1st poll will return the LastMaxCounter and
+        // update it to the current, the max counter will be kept at 1st poll, while
+        // the current counter reflect the rule decreasing.
+        coordinator.tetherOffloadClientRemove(mIpServer, clientA);
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getCurrentConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionAndResetToCurrent());
+        // And all counters be updated at 2nd poll.
+        assertConsumerCountersEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0);
+
+        // Remove other client.
+        coordinator.tetherOffloadClientRemove(mIpServer, clientB);
+        assertEquals(0, mConsumer.getCurrentConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionAndResetToCurrent());
+        // All counters reach zero at 2nd poll.
+        assertConsumerCountersEquals(0);
+    }
+
     private void setElapsedRealtimeNanos(long nanoSec) {
         mElapsedRealtimeNanos = nanoSec;
     }
