@@ -48,6 +48,7 @@ import static com.android.net.module.util.netlink.NetlinkConstants.RTM_NEWNEIGH;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_FAILED;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_REACHABLE;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_STALE;
+import static com.android.networkstack.tethering.BpfCoordinator.CONNTRACK_METRICS_UPDATE_INTERVAL_MS;
 import static com.android.networkstack.tethering.BpfCoordinator.CONNTRACK_TIMEOUT_UPDATE_INTERVAL_MS;
 import static com.android.networkstack.tethering.BpfCoordinator.INVALID_MTU;
 import static com.android.networkstack.tethering.BpfCoordinator.NF_CONNTRACK_TCP_TIMEOUT_ESTABLISHED;
@@ -570,6 +571,11 @@ public class BpfCoordinatorTest {
                     @Nullable
                     public IBpfMap<S32, S32> getBpfErrorMap() {
                         return mBpfErrorMap;
+                    }
+
+                    @Override
+                    public void sendTetheringActiveSessionsReported(int lastMaxSessionCount) {
+                        // No-op.
                     }
 
                     @Override
@@ -2164,6 +2170,70 @@ public class BpfCoordinatorTest {
                 mConsumer.getLastMaxConnectionAndResetToCurrent());
         // All counters reach zero at 2nd poll.
         assertConsumerCountersEquals(0);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS)
+    // BPF IPv4 forwarding only supports on S+.
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @Test
+    public void testSendActiveSessionsReported_metricsEnabled() throws Exception {
+        doTestSendActiveSessionsReported(true);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS, enabled = false)
+    @Test
+    public void testSendActiveSessionsReported_metricsDisabled() throws Exception {
+        doTestSendActiveSessionsReported(false);
+    }
+
+    private void doTestSendActiveSessionsReported(final boolean supportActiveSessionsMetrics)
+            throws Exception {
+        final BpfCoordinator coordinator = makeBpfCoordinator();
+        initBpfCoordinatorForRule4(coordinator);
+        resetNetdAndBpfMaps();
+        assertConsumerCountersEquals(0);
+
+        // Prepare the counter value.
+        for (int i = 0; i < 5; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_NEW).setProto(IPPROTO_TCP).setRemotePort(i).build());
+        }
+
+        // Then delete some 3 rules, 2 rules remaining.
+        // The max count is 5 while current rules count is 2.
+        for (int i = 0; i < 3; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_DELETE).setProto(IPPROTO_TCP).setRemotePort(i).build());
+        }
+
+        // Verify the method is not invoked when timer is not expired.
+        waitForIdle();
+        verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+
+        // Verify metrics will be sent upon timer expiry.
+        mTestLooper.moveTimeForward(CONNTRACK_METRICS_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        if (supportActiveSessionsMetrics) {
+            verify(mDeps).sendTetheringActiveSessionsReported(5);
+        } else {
+            verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+        }
+
+        // Verify next uploaded metrics will reflect the decreased rules count.
+        mTestLooper.moveTimeForward(CONNTRACK_METRICS_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        if (supportActiveSessionsMetrics) {
+            verify(mDeps).sendTetheringActiveSessionsReported(2);
+        } else {
+            verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+        }
+
+        // Verify no metrics uploaded if polling stopped.
+        clearInvocations(mDeps);
+        coordinator.removeIpServer(mIpServer);
+        mTestLooper.moveTimeForward(CONNTRACK_TIMEOUT_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
     }
 
     private void setElapsedRealtimeNanos(long nanoSec) {
