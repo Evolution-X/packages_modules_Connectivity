@@ -63,6 +63,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkAgent;
 import android.net.NetworkProvider;
@@ -172,7 +173,7 @@ public final class ThreadNetworkControllerServiceTest {
     @Mock private IBinder mIBinder;
     @Mock Resources mResources;
     @Mock ConnectivityResources mConnectivityResources;
-    @Mock Map<Network, String> mMockNetworkToInterface;
+    @Mock Map<Network, LinkProperties> mMockNetworkToLinkProperties;
 
     private Context mContext;
     private TestLooper mTestLooper;
@@ -236,7 +237,7 @@ public final class ThreadNetworkControllerServiceTest {
                         mMockUserManager,
                         mConnectivityResources,
                         () -> DEFAULT_COUNTRY_CODE,
-                        mMockNetworkToInterface);
+                        mMockNetworkToLinkProperties);
         mService.setTestNetworkAgent(mMockNetworkAgent);
     }
 
