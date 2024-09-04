@@ -1397,6 +1397,7 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool isAtLeastT = (effective_api_level >= __ANDROID_API_T__);
     const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
     const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
+    const bool isAtLeastW = (effective_api_level >  __ANDROID_API_V__);  // TODO: switch to W
 
     // last in U QPR2 beta1
     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
@@ -1409,6 +1410,7 @@ static int doLoad(char** argv, char * const envp[]) {
     if (isAtLeastU) ++bpfloader_ver;     // [44] BPFLOADER_MAINLINE_U_VERSION
     if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
     if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
+    if (isAtLeastW) ++bpfloader_ver;     // [47] BPFLOADER_MAINLINE_W_VERSION
 
     ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
           bpfloader_ver, argv[0], android_get_device_api_level(), effective_api_level,
