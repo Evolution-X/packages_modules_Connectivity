@@ -16,6 +16,11 @@
 
 package android.net;
 
+import static android.net.IIpMemoryStore.NETWORK_EVENT_NUD_FAILURE_ROAM;
+import static android.net.IIpMemoryStore.NETWORK_EVENT_NUD_FAILURE_CONFIRM;
+import static android.net.IIpMemoryStore.NETWORK_EVENT_NUD_FAILURE_ORGANIC;
+import static android.net.IIpMemoryStore.NETWORK_EVENT_NUD_FAILURE_MAC_ADDRESS_CHANGED;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -68,6 +73,14 @@ public class IpMemoryStoreTest {
             -128, 0, 89, 112, 91, -34 };
     private static final NetworkAttributes TEST_NETWORK_ATTRIBUTES = buildTestNetworkAttributes(
             "hint", 219);
+    private static final long ONE_WEEK_IN_MS = 7 * 24 * 3600 * 1000;
+    private static final long ONE_DAY_IN_MS = 24 * 3600 * 1000;
+    private static final int[] NETWORK_EVENT_NUD_FAILURES = new int[] {
+        NETWORK_EVENT_NUD_FAILURE_ROAM,
+        NETWORK_EVENT_NUD_FAILURE_CONFIRM,
+        NETWORK_EVENT_NUD_FAILURE_ORGANIC,
+        NETWORK_EVENT_NUD_FAILURE_MAC_ADDRESS_CHANGED
+    };
 
     @Mock
     Context mMockContext;
@@ -332,5 +345,32 @@ public class IpMemoryStoreTest {
         startIpMemoryStore(true /* supplyService */);
         mStore.factoryReset();
         verify(mMockService, times(1)).factoryReset();
+    }
+
+    @Test
+    public void testNetworkEvents() throws Exception {
+        startIpMemoryStore(true /* supplyService */);
+        final String cluster = "cluster";
+
+        final long now = System.currentTimeMillis();
+        final long expiry = now + ONE_WEEK_IN_MS;
+        mStore.storeNetworkEvent(cluster, now, expiry, NETWORK_EVENT_NUD_FAILURE_ROAM,
+                status -> assertTrue("Store not successful : " + status.resultCode,
+                        status.isSuccess()));
+        verify(mMockService, times(1)).storeNetworkEvent(eq(cluster),
+                eq(now), eq(expiry), eq(NETWORK_EVENT_NUD_FAILURE_ROAM), any());
+
+        final long[] sinceTimes = new long[2];
+        sinceTimes[0] = now - ONE_WEEK_IN_MS;
+        sinceTimes[1] = now - ONE_DAY_IN_MS;
+        mStore.retrieveNetworkEventCount(cluster, sinceTimes, NETWORK_EVENT_NUD_FAILURES,
+                (status, counts) -> {
+                    assertTrue("Retrieve network event counts not successful : "
+                            + status.resultCode, status.isSuccess());
+                    assertEquals(new int[0], counts);
+                });
+
+        verify(mMockService, times(1)).retrieveNetworkEventCount(eq(cluster), eq(sinceTimes),
+                eq(NETWORK_EVENT_NUD_FAILURES), any());
     }
 }
