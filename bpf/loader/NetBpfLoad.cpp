@@ -1399,6 +1399,8 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
     const bool isAtLeastW = (effective_api_level >  __ANDROID_API_V__);  // TODO: switch to W
 
+    const int first_api_level = base::GetIntProperty("ro.board.first_api_level", effective_api_level);
+
     // last in U QPR2 beta1
     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
     // first in U QPR2 beta~2
@@ -1524,9 +1526,24 @@ static int doLoad(char** argv, char * const envp[]) {
      * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
      */
     if (isUserspace32bit() && isAtLeastKernelVersion(6, 2, 0)) {
-        ALOGE("64-bit userspace required on 6.2+ kernels.");
-        // Stuff won't work reliably, but exempt TVs & Arm Wear devices
-        if (!isTV() && !(isWear() && isArm())) return 1;
+        // Stuff won't work reliably, but...
+        if (isTV()) {
+            // exempt TVs... they don't really need functional advanced networking
+            ALOGW("[TV] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (isWear() && isArm()) {
+            // exempt Arm Wear devices (arm32 ABI is far less problematic than x86-32)
+            ALOGW("[Arm Wear] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (first_api_level <= __ANDROID_API_T__ && isArm()) {
+            // also exempt Arm devices upgrading with major kernel rev from T-
+            // might possibly be better for them to run with a newer kernel...
+            ALOGW("[Arm KernelUpRev] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (isArm()) {
+            ALOGE("[Arm] 64-bit userspace required on 6.2+ kernels (%d).", first_api_level);
+            return 1;
+        } else { // x86 since RiscV cannot be 32-bit
+            ALOGE("[x86] 64-bit userspace required on 6.2+ kernels.");
+            return 1;
+        }
     }
 
     // Note: 6.6 is highest version supported by Android V (sdk=35), so this is for sdk=36+
