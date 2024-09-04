@@ -392,6 +392,7 @@ static unsigned long long (*bpf_get_smp_processor_id)(void) = (void*) BPF_FUNC_g
 static long (*bpf_get_stackid)(void* ctx, void* map, uint64_t flags) = (void*) BPF_FUNC_get_stackid;
 static long (*bpf_get_current_comm)(void* buf, uint32_t buf_size) = (void*) BPF_FUNC_get_current_comm;
 
+// GPL only:
 static int (*bpf_trace_printk)(const char* fmt, int fmt_size, ...) = (void*) BPF_FUNC_trace_printk;
 #define bpf_printf(s, n...) bpf_trace_printk(s, sizeof(s), ## n)
 // Note: bpf only supports up to 3 arguments, log via: bpf_printf("msg %d %d %d", 1, 2, 3);
