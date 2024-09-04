@@ -1523,6 +1523,12 @@ static int doLoad(char** argv, char * const envp[]) {
         if (!isTV() && !(isWear() && isArm())) return 1;
     }
 
+    // Note: 6.6 is highest version supported by Android V (sdk=35), so this is for sdk=36+
+    if (isUserspace32bit() && isAtLeastKernelVersion(6, 7, 0)) {
+        ALOGE("64-bit userspace required on 6.7+ kernels.");
+        return 1;
+    }
+
     // Ensure we can determine the Android build type.
     if (!isEng() && !isUser() && !isUserdebug()) {
         ALOGE("Failed to determine the build type: got %s, want 'eng', 'user', or 'userdebug'",
