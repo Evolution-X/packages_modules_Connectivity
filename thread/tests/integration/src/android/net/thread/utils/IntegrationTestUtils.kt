@@ -550,4 +550,49 @@ object IntegrationTestUtils {
             deprecationTimeMillis, LinkAddress.LIFETIME_PERMANENT /* expirationTime */
         )
     }
+
+    @JvmStatic
+    @JvmOverloads
+    fun startInfraDeviceAndWaitForOnLinkAddr(
+        tapPacketReader: TapPacketReader,
+        macAddress: MacAddress = MacAddress.fromString("1:2:3:4:5:6")
+    ): InfraNetworkDevice {
+        val infraDevice = InfraNetworkDevice(macAddress, tapPacketReader)
+        infraDevice.runSlaac(Duration.ofSeconds(60))
+        requireNotNull(infraDevice.ipv6Addr)
+        return infraDevice
+    }
+
+    @JvmStatic
+    @Throws(java.lang.Exception::class)
+    fun setUpInfraNetwork(
+        context: Context, controller: ThreadNetworkControllerWrapper
+    ): TestNetworkTracker {
+        val lp = LinkProperties()
+
+        // TODO: use a fake DNS server
+        lp.setDnsServers(listOf(parseNumericAddress("8.8.8.8")))
+        // NAT64 feature requires the infra network to have an IPv4 default route.
+        lp.addRoute(
+            RouteInfo(
+                IpPrefix("0.0.0.0/0") /* destination */,
+                null /* gateway */,
+                null /* iface */,
+                RouteInfo.RTN_UNICAST, 1500 /* mtu */
+            )
+        )
+        val infraNetworkTracker: TestNetworkTracker =
+            runAsShell(
+                MANAGE_TEST_NETWORKS,
+                supplier = { initTestNetwork(context, lp, setupTimeoutMs = 5000) })
+        val infraNetworkName: String = infraNetworkTracker.testIface.getInterfaceName()
+        controller.setTestNetworkAsUpstreamAndWait(infraNetworkName)
+
+        return infraNetworkTracker
+    }
+
+    @JvmStatic
+    fun tearDownInfraNetwork(testNetworkTracker: TestNetworkTracker) {
+        runAsShell(MANAGE_TEST_NETWORKS) { testNetworkTracker.teardown() }
+    }
 }
