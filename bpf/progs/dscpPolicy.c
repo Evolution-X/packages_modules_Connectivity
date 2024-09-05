@@ -115,13 +115,28 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
 
     if (!existing_rule) return; // impossible
 
-    if (v6_equal(src_ip, existing_rule->src_ip) &&
-        v6_equal(dst_ip, existing_rule->dst_ip) &&
-        skb->ifindex == existing_rule->ifindex &&
-        sport == existing_rule->src_port &&
-        dport == existing_rule->dst_port &&
-        protocol == existing_rule->proto) {
-        if (existing_rule->dscp_val < 0) return;
+    uint64_t nomatch = 0;
+    nomatch |= v6_not_equal(src_ip, existing_rule->src_ip);
+    nomatch |= v6_not_equal(dst_ip, existing_rule->dst_ip);
+    nomatch |= (skb->ifindex ^ existing_rule->ifindex);
+    nomatch |= (sport ^ existing_rule->src_port);
+    nomatch |= (dport ^ existing_rule->dst_port);
+    nomatch |= (protocol ^ existing_rule->proto);
+    COMPILER_FORCE_CALCULATION(nomatch);
+
+    /*
+     * After the above funky bitwise arithmetic we have 'nomatch == 0' iff
+     *   src_ip == existing_rule->src_ip &&
+     *   dst_ip == existing_rule->dst_ip &&
+     *   skb->ifindex == existing_rule->ifindex &&
+     *   sport == existing_rule->src_port &&
+     *   dport == existing_rule->dst_port &&
+     *   protocol == existing_rule->proto
+     */
+
+    if (!nomatch) {
+        if (existing_rule->dscp_val < 0) return;  // cached no-op
+
         if (ipv4) {
             uint8_t newTos = UPDATE_TOS(existing_rule->dscp_val, tos);
             bpf_l3_csum_replace(skb, l2_header_size + IP4_OFFSET(check), htons(tos), htons(newTos),
@@ -133,7 +148,7 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
             bpf_skb_store_bytes(skb, l2_header_size, &new_first_be32, sizeof(__be32),
                 BPF_F_RECOMPUTE_CSUM);
         }
-        return;
+        return;  // cached DSCP mutation
     }
 
     // Linear scan ipv4_dscp_policies_map since no stored params match skb.
