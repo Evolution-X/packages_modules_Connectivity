@@ -568,6 +568,12 @@ public abstract class EthernetTetheringTestBase {
         return nif.getMTU();
     }
 
+    protected int getIndexByName(String ifaceName) throws SocketException {
+        NetworkInterface nif = NetworkInterface.getByName(ifaceName);
+        assertNotNull("Can't get NetworkInterface object for " + ifaceName, nif);
+        return nif.getIndex();
+    }
+
     protected TapPacketReader makePacketReader(final TestNetworkInterface iface) throws Exception {
         FileDescriptor fd = iface.getFileDescriptor().getFileDescriptor();
         return makePacketReader(fd, getMTU(iface));
@@ -966,6 +972,11 @@ public abstract class EthernetTetheringTestBase {
 
         // Above has guaranteed that the found packet is an IPv6 packet without ether header.
         return Struct.parse(Ipv6Header.class, ByteBuffer.wrap(expectedPacket)).srcIp;
+    }
+
+    protected String getUpstreamInterfaceName() {
+        if (mUpstreamReader == null) return null;
+        return mUpstreamTracker.getTestIface().getInterfaceName();
     }
 
     protected <T> List<T> toList(T... array) {
