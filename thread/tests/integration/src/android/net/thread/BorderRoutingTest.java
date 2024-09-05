@@ -34,7 +34,6 @@ import static android.system.OsConstants.ICMP_ECHO;
 
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REPLY_TYPE;
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REQUEST_TYPE;
-import static com.android.testutils.TestNetworkTrackerKt.initTestNetwork;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -49,11 +48,9 @@ import static java.util.Objects.requireNonNull;
 import android.content.Context;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
-import android.net.LinkProperties;
-import android.net.MacAddress;
-import android.net.RouteInfo;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.InfraNetworkDevice;
+import android.net.thread.utils.IntegrationTestUtils;
 import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresIpv6MulticastRouting;
@@ -634,32 +631,16 @@ public class BorderRoutingTest {
     }
 
     private void setUpInfraNetwork() throws Exception {
-        LinkProperties lp = new LinkProperties();
-        // NAT64 feature requires the infra network to have an IPv4 default route.
-        lp.addRoute(
-                new RouteInfo(
-                        new IpPrefix("0.0.0.0/0") /* destination */,
-                        null /* gateway */,
-                        null,
-                        RouteInfo.RTN_UNICAST,
-                        1500 /* mtu */));
-        mInfraNetworkTracker =
-                runAsShell(
-                        MANAGE_TEST_NETWORKS,
-                        () -> initTestNetwork(mContext, lp, 5000 /* timeoutMs */));
-        String infraNetworkName = mInfraNetworkTracker.getTestIface().getInterfaceName();
-        mController.setTestNetworkAsUpstreamAndWait(infraNetworkName);
+        mInfraNetworkTracker = IntegrationTestUtils.setUpInfraNetwork(mContext, mController);
     }
 
     private void tearDownInfraNetwork() {
-        runAsShell(MANAGE_TEST_NETWORKS, () -> mInfraNetworkTracker.teardown());
+        IntegrationTestUtils.tearDownInfraNetwork(mInfraNetworkTracker);
     }
 
-    private void startInfraDeviceAndWaitForOnLinkAddr() throws Exception {
+    private void startInfraDeviceAndWaitForOnLinkAddr() {
         mInfraDevice =
-                new InfraNetworkDevice(MacAddress.fromString("1:2:3:4:5:6"), mInfraNetworkReader);
-        mInfraDevice.runSlaac(Duration.ofSeconds(60));
-        assertNotNull(mInfraDevice.ipv6Addr);
+                IntegrationTestUtils.startInfraDeviceAndWaitForOnLinkAddr(mInfraNetworkReader);
     }
 
     private void assertInfraLinkMemberOfGroup(Inet6Address address) throws Exception {

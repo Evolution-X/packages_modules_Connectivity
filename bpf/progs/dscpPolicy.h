@@ -28,9 +28,6 @@
 #define v6_not_equal(a, b) ((v6_hi_be64(a) ^ v6_hi_be64(b)) \
                           | (v6_lo_be64(a) ^ v6_lo_be64(b)))
 
-// Returns 'a == b' as boolean
-#define v6_equal(a, b) (!v6_not_equal((a), (b)))
-
 typedef struct {
     struct in6_addr src_ip;
     struct in6_addr dst_ip;

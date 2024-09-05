@@ -117,7 +117,11 @@ public class LocationPermissionChecker {
     @VisibleForTesting(visibility = PRIVATE)
     public @LocationPermissionCheckStatus int checkLocationPermissionInternal(
             String pkgName, @Nullable String featureId, int uid, @Nullable String message) {
-        checkPackage(uid, pkgName);
+        try {
+            checkPackage(uid, pkgName);
+        } catch (SecurityException e) {
+            return ERROR_LOCATION_PERMISSION_MISSING;
+        }
 
         // Apps with NETWORK_SETTINGS, NETWORK_SETUP_WIZARD, NETWORK_STACK & MAINLINE_NETWORK_STACK
         // are granted a bypass.

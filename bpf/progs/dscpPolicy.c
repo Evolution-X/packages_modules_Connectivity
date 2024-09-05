@@ -25,8 +25,8 @@
 
 // The cache is never read nor written by userspace and is indexed by socket cookie % CACHE_MAP_SIZE
 #define CACHE_MAP_SIZE 32  // should be a power of two so we can % cheaply
-DEFINE_BPF_MAP_GRO(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry, CACHE_MAP_SIZE,
-                   AID_SYSTEM)
+DEFINE_BPF_MAP_KERNEL_INTERNAL(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry,
+                               CACHE_MAP_SIZE)
 
 DEFINE_BPF_MAP_GRW(ipv4_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 DEFINE_BPF_MAP_GRW(ipv6_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
@@ -113,14 +113,30 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
     // this array lookup cannot actually fail
     RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cacheid);
 
-    if (existing_rule &&
-        v6_equal(src_ip, existing_rule->src_ip) &&
-        v6_equal(dst_ip, existing_rule->dst_ip) &&
-        skb->ifindex == existing_rule->ifindex &&
-        sport == existing_rule->src_port &&
-        dport == existing_rule->dst_port &&
-        protocol == existing_rule->proto) {
-        if (existing_rule->dscp_val < 0) return;
+    if (!existing_rule) return; // impossible
+
+    uint64_t nomatch = 0;
+    nomatch |= v6_not_equal(src_ip, existing_rule->src_ip);
+    nomatch |= v6_not_equal(dst_ip, existing_rule->dst_ip);
+    nomatch |= (skb->ifindex ^ existing_rule->ifindex);
+    nomatch |= (sport ^ existing_rule->src_port);
+    nomatch |= (dport ^ existing_rule->dst_port);
+    nomatch |= (protocol ^ existing_rule->proto);
+    COMPILER_FORCE_CALCULATION(nomatch);
+
+    /*
+     * After the above funky bitwise arithmetic we have 'nomatch == 0' iff
+     *   src_ip == existing_rule->src_ip &&
+     *   dst_ip == existing_rule->dst_ip &&
+     *   skb->ifindex == existing_rule->ifindex &&
+     *   sport == existing_rule->src_port &&
+     *   dport == existing_rule->dst_port &&
+     *   protocol == existing_rule->proto
+     */
+
+    if (!nomatch) {
+        if (existing_rule->dscp_val < 0) return;  // cached no-op
+
         if (ipv4) {
             uint8_t newTos = UPDATE_TOS(existing_rule->dscp_val, tos);
             bpf_l3_csum_replace(skb, l2_header_size + IP4_OFFSET(check), htons(tos), htons(newTos),
@@ -132,7 +148,7 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
             bpf_skb_store_bytes(skb, l2_header_size, &new_first_be32, sizeof(__be32),
                 BPF_F_RECOMPUTE_CSUM);
         }
-        return;
+        return;  // cached DSCP mutation
     }
 
     // Linear scan ipv4_dscp_policies_map since no stored params match skb.
@@ -187,7 +203,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         }
     }
 
-    RuleEntry value = {
+    // Update cache with found policy.
+    *existing_rule = (RuleEntry){
         .src_ip = src_ip,
         .dst_ip = dst_ip,
         .ifindex = skb->ifindex,
@@ -196,9 +213,6 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         .proto = protocol,
         .dscp_val = new_dscp,
     };
-
-    // Update cache with found policy.
-    bpf_socket_policy_cache_map_update_elem(&cacheid, &value, BPF_ANY);
 
     if (new_dscp < 0) return;
 
