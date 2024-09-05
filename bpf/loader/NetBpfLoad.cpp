@@ -97,6 +97,8 @@ enum class domain : int {
     net_shared,         // (T+) fs_bpf_net_shared    /sys/fs/bpf/net_shared
     netd_readonly,      // (T+) fs_bpf_netd_readonly /sys/fs/bpf/netd_readonly
     netd_shared,        // (T+) fs_bpf_netd_shared   /sys/fs/bpf/netd_shared
+    loader,             // (U+) fs_bpf_loader        /sys/fs/bpf/loader
+                        // on T due to lack of sepolicy/genfscon rules it behaves simply as 'fs_bpf'
 };
 
 static constexpr domain AllDomains[] = {
@@ -106,6 +108,7 @@ static constexpr domain AllDomains[] = {
     domain::net_shared,
     domain::netd_readonly,
     domain::netd_shared,
+    domain::loader,
 };
 
 static constexpr bool specified(domain d) {
@@ -151,6 +154,7 @@ constexpr const char* lookupSelinuxContext(const domain d) {
         case domain::net_shared:    return "fs_bpf_net_shared";
         case domain::netd_readonly: return "fs_bpf_netd_readonly";
         case domain::netd_shared:   return "fs_bpf_netd_shared";
+        case domain::loader:        return "fs_bpf_loader";
     }
 }
 
@@ -174,6 +178,7 @@ constexpr const char* lookupPinSubdir(const domain d, const char* const unspecif
         case domain::net_shared:    return "net_shared/";
         case domain::netd_readonly: return "netd_readonly/";
         case domain::netd_shared:   return "netd_shared/";
+        case domain::loader:        return "loader/";
     }
 };
 
