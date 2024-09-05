@@ -25,8 +25,8 @@
 
 // The cache is never read nor written by userspace and is indexed by socket cookie % CACHE_MAP_SIZE
 #define CACHE_MAP_SIZE 32  // should be a power of two so we can % cheaply
-DEFINE_BPF_MAP_GRO(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry, CACHE_MAP_SIZE,
-                   AID_SYSTEM)
+DEFINE_BPF_MAP_KERNEL_INTERNAL(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry,
+                               CACHE_MAP_SIZE)
 
 DEFINE_BPF_MAP_GRW(ipv4_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 DEFINE_BPF_MAP_GRW(ipv6_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
