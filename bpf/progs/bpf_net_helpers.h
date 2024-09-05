@@ -139,6 +139,24 @@ static inline __always_inline void try_make_writable(struct __sk_buff* skb, unsi
     if (skb->data_end - skb->data < len) bpf_skb_pull_data(skb, len);
 }
 
+// anti-compiler-optimizer no-op: explicitly force full calculation of 'v'
+//
+// The use for this is to force full calculation of a complex arithmetic (likely binary
+// bitops) value, and then check the result only once (thus likely reducing the number
+// of required conditional jump instructions that badly affect bpf verifier runtime)
+//
+// The compiler cannot look into the assembly statement, so it doesn't know it does nothing.
+// Since the statement takes 'v' as both input and output in a register (+r),
+// the compiler must fully calculate the precise value of 'v' before this,
+// and must use the (possibly modified) value of 'v' afterwards (thus cannot
+// do funky optimizations to use partial results from before the asm).
+//
+// As this is not flagged 'volatile' this may still be moved out of a loop,
+// or even entirely optimized out if 'v' is never used afterwards.
+//
+// See: https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html
+#define COMPILER_FORCE_CALCULATION(v) asm ("" : "+r" (v))
+
 struct egress_bool { bool egress; };
 #define INGRESS ((struct egress_bool){ .egress = false })
 #define EGRESS ((struct egress_bool){ .egress = true })
