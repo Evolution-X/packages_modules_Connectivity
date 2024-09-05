@@ -252,6 +252,35 @@ public class RtNetlinkLinkMessage extends NetlinkMessage {
                                     isUp ? IFF_UP : 0, IFF_UP), DEFAULT_MTU, null, null);
     }
 
+    /**
+     * Create a link message to rename the network interface.
+     *
+     * @param interfaceName  The network interface name.
+     * @param sequenceNumber The sequence number to use for the Netlink message.
+     * @param newName        The new name of the network interface.
+     * @return A `RtNetlinkLinkMessage` instance configured to rename the network interface.
+     */
+    @Nullable
+    public static RtNetlinkLinkMessage createSetLinkNameMessage(@NonNull String interfaceName,
+            int sequenceNumber, @NonNull String newName) {
+        return createSetLinkNameMessage(interfaceName, sequenceNumber, newName, new OsAccess());
+    }
+
+    @VisibleForTesting
+    @Nullable
+    protected static RtNetlinkLinkMessage createSetLinkNameMessage(@NonNull String interfaceName,
+            int sequenceNumber, @NonNull String newName, OsAccess osAccess) {
+        final int interfaceIndex = osAccess.if_nametoindex(interfaceName);
+        if (interfaceIndex == OsAccess.INVALID_INTERFACE_INDEX) {
+            return null;
+        }
+
+        return RtNetlinkLinkMessage.build(
+                new StructNlMsgHdr(0, RTM_NEWLINK, NLM_F_REQUEST_ACK, sequenceNumber),
+                new StructIfinfoMsg((short) AF_UNSPEC, (short) 0, interfaceIndex, 0, 0),
+                DEFAULT_MTU, null, newName);
+    }
+
     @Override
     public String toString() {
         return "RtNetlinkLinkMessage{ "

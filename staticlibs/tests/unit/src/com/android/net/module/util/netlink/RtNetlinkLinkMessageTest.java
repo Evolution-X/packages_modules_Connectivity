@@ -242,6 +242,53 @@ public class RtNetlinkLinkMessageTest {
     }
 
     @Test
+    public void testCreateSetLinkNameMessage() {
+        final String expectedHexBytes =
+                "2C000000100005006824000000000000"   // struct nlmsghdr
+                + "00000000080000000000000000000000" // struct ifinfomsg
+                + "0A000300776C616E31000000";        // IFLA_IFNAME(wlan1)
+        final String interfaceName = "wlan0";
+        final int interfaceIndex = 8;
+        final int sequenceNumber = 0x2468;
+        final String newName = "wlan1";
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(interfaceIndex);
+
+        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkNameMessage(
+                interfaceName, sequenceNumber, newName, mOsAccess);
+        assertNotNull(msg);
+        final byte[] bytes = msg.pack(ByteOrder.LITTLE_ENDIAN);  // For testing.
+        assertEquals(expectedHexBytes, HexDump.toHexString(bytes));
+    }
+
+    @Test
+    public void testCreateSetLinkNameMessage_InterfaceNotFound() {
+        final String interfaceName = "wlan0";
+        final int sequenceNumber = 0x2468;
+        final String newName = "wlan1";
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(OsAccess.INVALID_INTERFACE_INDEX);
+
+        assertNull(RtNetlinkLinkMessage.createSetLinkNameMessage(
+                interfaceName, sequenceNumber, newName, mOsAccess));
+    }
+
+    @Test
+    public void testCreateSetLinkNameMessage_InvalidNewName() {
+        final String interfaceName = "wlan0";
+        final int interfaceIndex = 8;
+        final int sequenceNumber = 0x2468;
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(interfaceIndex);
+
+        final String[] invalidNames = {"", "interface_name_longer_than_limit"};
+        for (String invalidName : invalidNames) {
+            assertNull(RtNetlinkLinkMessage.createSetLinkNameMessage(
+                    interfaceName, sequenceNumber, invalidName, mOsAccess));
+        }
+    }
+
+    @Test
     public void testToString() {
         final ByteBuffer byteBuffer = toByteBuffer(RTM_NEWLINK_HEX);
         byteBuffer.order(ByteOrder.LITTLE_ENDIAN);  // For testing.
