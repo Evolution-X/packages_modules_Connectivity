@@ -1144,12 +1144,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
     ALOGD("BpfLoader version 0x%05x processing ELF object %s with ver [0x%05x,0x%05x)",
           bpfloader_ver, elfPath, bpfLoaderMinVer, bpfLoaderMaxVer);
 
-    ret = readCodeSections(elfFile, cs);
-    if (ret) {
-        ALOGE("Couldn't read all code sections in %s", elfPath);
-        return ret;
-    }
-
     ret = createMaps(elfPath, elfFile, mapFds, prefix, bpfloader_ver);
     if (ret) {
         ALOGE("Failed to create maps: (ret=%d) in %s", ret, elfPath);
@@ -1158,6 +1152,13 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
 
     for (int i = 0; i < (int)mapFds.size(); i++)
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
+
+    ret = readCodeSections(elfFile, cs);
+    if (ret == -ENOENT) return 0;  // no programs defined in this .o
+    if (ret) {
+        ALOGE("Couldn't read all code sections in %s", elfPath);
+        return ret;
+    }
 
     applyMapRelo(elfFile, mapFds, cs);
 
