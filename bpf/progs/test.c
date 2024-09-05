@@ -42,22 +42,12 @@ DEFINE_BPF_MAP_GRW(tether3_downstream6_map, HASH, TetherDownstream6Key, Tether6V
 // Used only by BpfBitmapTest, not by production code.
 DEFINE_BPF_MAP_GRW(bitmap, ARRAY, int, uint64_t, 2, AID_NETWORK_STACK)
 
-DEFINE_BPF_PROG_KVER("xdp/drop_ipv4_udp_ether", AID_ROOT, AID_NETWORK_STACK,
-                      xdp_test, KVER_5_9)
-(struct xdp_md *ctx) {
-    void *data = (void *)(long)ctx->data;
-    void *data_end = (void *)(long)ctx->data_end;
-
-    struct ethhdr *eth = data;
-    int hsize = sizeof(*eth);
-
-    struct iphdr *ip = data + hsize;
-    hsize += sizeof(struct iphdr);
-
-    if (data + hsize > data_end) return XDP_PASS;
-    if (eth->h_proto != htons(ETH_P_IP)) return XDP_PASS;
-    if (ip->protocol == IPPROTO_UDP) return XDP_DROP;
-    return XDP_PASS;
+// we need at least 1 bpf program in the final .o for Android S bpfloader compatibility
+// this program is trivial, and has a 'infinite' minimum kernel version number,
+// so will always be skipped
+DEFINE_BPF_PROG_KVER("skfilter/match", AID_ROOT, AID_ROOT, match, KVER_INF)
+(__unused struct __sk_buff* skb) {
+    return XTBPF_MATCH;
 }
 
 LICENSE("Apache 2.0");
