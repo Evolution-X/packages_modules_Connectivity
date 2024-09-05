@@ -291,6 +291,12 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
         bpf_ringbuf_submit_unsafe(v, 0);                                       \
     }
 
+#define DEFINE_BPF_RINGBUF(the_map, ValueType, size_bytes, usr, grp, md)                \
+    DEFINE_BPF_RINGBUF_EXT(the_map, ValueType, size_bytes, usr, grp, md,                \
+                           DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR, \
+                           PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,               \
+                           LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+
 /* There exist buggy kernels with pre-T OS, that due to
  * kernel patch "[ALPS05162612] bpf: fix ubsan error"
  * do not support userspace writes into non-zero index of bpf map arrays.
