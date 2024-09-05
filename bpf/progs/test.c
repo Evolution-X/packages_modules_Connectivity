@@ -61,3 +61,4 @@ DEFINE_BPF_PROG_KVER("xdp/drop_ipv4_udp_ether", AID_ROOT, AID_NETWORK_STACK,
 }
 
 LICENSE("Apache 2.0");
+CRITICAL("Networking xTS tests");
