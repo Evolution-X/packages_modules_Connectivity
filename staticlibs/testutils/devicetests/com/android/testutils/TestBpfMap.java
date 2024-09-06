@@ -65,10 +65,11 @@ public class TestBpfMap<K extends Struct, V extends Struct> implements IBpfMap<K
 
     @Override
     public void insertEntry(K key, V value) throws ErrnoException,
-            IllegalArgumentException {
-        // The entry is created if and only if it doesn't exist. See BpfMap#insertEntry.
+            IllegalStateException {
+        // The entry is created if and only if it doesn't exist.
+        // And throws exception if it exists. See BpfMap#insertEntry.
         if (mMap.get(key) != null) {
-            throw new IllegalArgumentException(key + " already exist");
+            throw new IllegalStateException(key + " already exist");
         }
         mMap.put(key, value);
     }
