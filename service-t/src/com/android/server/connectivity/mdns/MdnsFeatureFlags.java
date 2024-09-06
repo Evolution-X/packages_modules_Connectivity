@@ -111,6 +111,12 @@ public class MdnsFeatureFlags {
          * Indicates whether the flag should be force-enabled for testing purposes.
          */
         boolean isForceEnabledForTest(@NonNull String flag);
+
+
+        /**
+         * Get the int value of the flag for testing purposes.
+         */
+        int getIntValueForTest(@NonNull String flag);
     }
 
     /**
@@ -118,6 +124,18 @@ public class MdnsFeatureFlags {
      */
     private boolean isForceEnabledForTest(@NonNull String flag) {
         return mOverrideProvider != null && mOverrideProvider.isForceEnabledForTest(flag);
+    }
+
+    /**
+     * Get the int value of the flag for testing purposes.
+     *
+     * @return the test int value, or -1 if it is unset or the OverrideProvider doesn't exist.
+     */
+    private int getIntValueForTest(@NonNull String flag) {
+        if (mOverrideProvider == null) {
+            return -1;
+        }
+        return mOverrideProvider.getIntValueForTest(flag);
     }
 
     /**
