@@ -975,7 +975,7 @@ public abstract class EthernetTetheringTestBase {
     }
 
     protected String getUpstreamInterfaceName() {
-        if (mUpstreamReader == null) return null;
+        if (mUpstreamTracker == null) return null;
         return mUpstreamTracker.getTestIface().getInterfaceName();
     }
 
