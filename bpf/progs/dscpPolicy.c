@@ -23,10 +23,18 @@
 #define ECN_MASK 3
 #define UPDATE_TOS(dscp, tos) ((dscp) << 2) | ((tos) & ECN_MASK)
 
-DEFINE_BPF_MAP_GRW(socket_policy_cache_map, HASH, uint64_t, RuleEntry, CACHE_MAP_SIZE, AID_SYSTEM)
+// The cache is never read nor written by userspace and is indexed by socket cookie % CACHE_MAP_SIZE
+#define CACHE_MAP_SIZE 32  // should be a power of two so we can % cheaply
+DEFINE_BPF_MAP_KERNEL_INTERNAL(socket_policy_cache_map, PERCPU_ARRAY, uint32_t, RuleEntry,
+                               CACHE_MAP_SIZE)
 
 DEFINE_BPF_MAP_GRW(ipv4_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
 DEFINE_BPF_MAP_GRW(ipv6_dscp_policies_map, ARRAY, uint32_t, DscpPolicy, MAX_POLICIES, AID_SYSTEM)
+
+static inline __always_inline uint64_t calculate_u64(uint64_t v) {
+    COMPILER_FORCE_CALCULATION(v);
+    return v;
+}
 
 static inline __always_inline void match_policy(struct __sk_buff* skb, const bool ipv4) {
     void* data = (void*)(long)skb->data;
@@ -42,6 +50,8 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
     // used for map lookup
     uint64_t cookie = bpf_get_socket_cookie(skb);
     if (!cookie) return;
+
+    uint32_t cacheid = cookie % CACHE_MAP_SIZE;
 
     __be16 sport = 0;
     uint16_t dport = 0;
@@ -105,16 +115,33 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
             return;
     }
 
-    RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cookie);
+    // this array lookup cannot actually fail
+    RuleEntry* existing_rule = bpf_socket_policy_cache_map_lookup_elem(&cacheid);
 
-    if (existing_rule &&
-        v6_equal(src_ip, existing_rule->src_ip) &&
-        v6_equal(dst_ip, existing_rule->dst_ip) &&
-        skb->ifindex == existing_rule->ifindex &&
-        sport == existing_rule->src_port &&
-        dport == existing_rule->dst_port &&
-        protocol == existing_rule->proto) {
-        if (existing_rule->dscp_val < 0) return;
+    if (!existing_rule) return; // impossible
+
+    uint64_t nomatch = 0;
+    nomatch |= v6_not_equal(src_ip, existing_rule->src_ip);
+    nomatch |= v6_not_equal(dst_ip, existing_rule->dst_ip);
+    nomatch |= (skb->ifindex ^ existing_rule->ifindex);
+    nomatch |= (sport ^ existing_rule->src_port);
+    nomatch |= (dport ^ existing_rule->dst_port);
+    nomatch |= (protocol ^ existing_rule->proto);
+    COMPILER_FORCE_CALCULATION(nomatch);
+
+    /*
+     * After the above funky bitwise arithmetic we have 'nomatch == 0' iff
+     *   src_ip == existing_rule->src_ip &&
+     *   dst_ip == existing_rule->dst_ip &&
+     *   skb->ifindex == existing_rule->ifindex &&
+     *   sport == existing_rule->src_port &&
+     *   dport == existing_rule->dst_port &&
+     *   protocol == existing_rule->proto
+     */
+
+    if (!nomatch) {
+        if (existing_rule->dscp_val < 0) return;  // cached no-op
+
         if (ipv4) {
             uint8_t newTos = UPDATE_TOS(existing_rule->dscp_val, tos);
             bpf_l3_csum_replace(skb, l2_header_size + IP4_OFFSET(check), htons(tos), htons(newTos),
@@ -126,12 +153,12 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
             bpf_skb_store_bytes(skb, l2_header_size, &new_first_be32, sizeof(__be32),
                 BPF_F_RECOMPUTE_CSUM);
         }
-        return;
+        return;  // cached DSCP mutation
     }
 
-    // Linear scan ipv4_dscp_policies_map since no stored params match skb.
-    int best_score = 0;
-    int8_t new_dscp = -1;
+    // Linear scan ipv?_dscp_policies_map since stored params didn't match skb.
+    uint64_t best_score = 0;
+    int8_t new_dscp = -1;  // meaning no mutation
 
     for (register uint64_t i = 0; i < MAX_POLICIES; i++) {
         // Using a uint64 in for loop prevents infinite loop during BPF load,
@@ -150,38 +177,67 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         // easier for the verifier to analyze.
         if (!policy) return;
 
+        // Think of 'nomatch' as a 64-bit boolean: false iff zero, true iff non-zero.
+        // Start off with nomatch being false, ie. we assume things *are* matching.
+        uint64_t nomatch = 0;
+
+        // Due to 'a ^ b' being 0 iff a == b:
+        //   nomatch |= a ^ b
+        // should/can be read as:
+        //   nomatch ||= (a != b)
+        // which you can also think of as:
+        //   match &&= (a == b)
+
         // If policy iface index does not match skb, then skip to next policy.
-        if (policy->ifindex != skb->ifindex) continue;
+        nomatch |= (policy->ifindex ^ skb->ifindex);
 
-        int score = 0;
+        // policy->match_* are normal booleans, and should thus always be 0 or 1,
+        // thus you can think of these as:
+        //   if (policy->match_foo) match &&= (foo == policy->foo);
+        nomatch |= policy->match_proto * (protocol ^ policy->proto);
+        nomatch |= policy->match_src_ip * v6_not_equal(src_ip, policy->src_ip);
+        nomatch |= policy->match_dst_ip * v6_not_equal(dst_ip, policy->dst_ip);
+        nomatch |= policy->match_src_port * (sport ^ policy->src_port);
 
-        if (policy->present_fields & PROTO_MASK_FLAG) {
-            if (protocol != policy->proto) continue;
-            score += 0xFFFF;
-        }
-        if (policy->present_fields & SRC_IP_MASK_FLAG) {
-            if (v6_not_equal(src_ip, policy->src_ip)) continue;
-            score += 0xFFFF;
-        }
-        if (policy->present_fields & DST_IP_MASK_FLAG) {
-            if (v6_not_equal(dst_ip, policy->dst_ip)) continue;
-            score += 0xFFFF;
-        }
-        if (policy->present_fields & SRC_PORT_MASK_FLAG) {
-            if (sport != policy->src_port) continue;
-            score += 0xFFFF;
-        }
-        if (dport < policy->dst_port_start) continue;
-        if (dport > policy->dst_port_end) continue;
-        score += 0xFFFF + policy->dst_port_start - policy->dst_port_end;
+        // Since these values are u16s (<=63 bits), we can rely on u64 subtraction
+        // underflow setting the topmost bit.  Basically, you can think of:
+        //   nomatch |= (a - b) >> 63
+        // as:
+        //   match &&= (a >= b)
+        uint64_t dport64 = dport;  // Note: dst_port_{start_end} range is inclusive of both ends.
+        nomatch |= calculate_u64(dport64 - policy->dst_port_start) >> 63;
+        nomatch |= calculate_u64(policy->dst_port_end - dport64) >> 63;
 
-        if (score > best_score) {
-            best_score = score;
-            new_dscp = policy->dscp_val;
-        }
+        // score is 0x10000 for each matched field (proto, src_ip, dst_ip, src_port)
+        // plus 1..0x10000 for the dst_port range match (smaller for bigger ranges)
+        uint64_t score = 0;
+        score += policy->match_proto;  // reminder: match_* are boolean, thus 0 or 1
+        score += policy->match_src_ip;
+        score += policy->match_dst_ip;
+        score += policy->match_src_port;
+        score += 1;  // for a 1 element dst_port_{start,end} range
+        score <<= 16;  // scale up: ie. *= 0x10000
+        // now reduce score if the dst_port range is more than a single element
+        // we want to prioritize (ie. better score) matches of smaller ranges
+        score -= (policy->dst_port_end - policy->dst_port_start);  // -= 0..0xFFFF
+
+        // Here we need:
+        //   match &&= (score > best_score)
+        // which is the same as
+        //   match &&= (score >= best_score + 1)
+        // > not >= because we want equal score matches to prefer choosing earlier policies
+        nomatch |= calculate_u64(score - best_score - 1) >> 63;
+
+        COMPILER_FORCE_CALCULATION(nomatch);
+        if (nomatch) continue;
+
+        // only reachable if we matched the policy and (score > best_score)
+        best_score = score;
+        new_dscp = policy->dscp_val;
     }
 
-    RuleEntry value = {
+    // Update cache with found policy.
+    *existing_rule = (RuleEntry){
         .src_ip = src_ip,
         .dst_ip = dst_ip,
         .ifindex = skb->ifindex,
@@ -190,9 +246,6 @@ static inline __always_inline void match_policy(struct __sk_buff* skb, const boo
         .proto = protocol,
         .dscp_val = new_dscp,
     };
-
-    // Update cache with found policy.
-    bpf_socket_policy_cache_map_update_elem(&cookie, &value, BPF_ANY);
 
     if (new_dscp < 0) return;
 

@@ -50,17 +50,20 @@
 // Note: this value (and the following +1u's) are hardcoded in NetBpfLoad.cpp
 #define BPFLOADER_MAINLINE_VERSION 42u
 
-// Android Mainline BpfLoader when running on Android T
+// Android Mainline BpfLoader when running on Android T (sdk=33)
 #define BPFLOADER_MAINLINE_T_VERSION (BPFLOADER_MAINLINE_VERSION + 1u)
 
-// Android Mainline BpfLoader when running on Android U
+// Android Mainline BpfLoader when running on Android U (sdk=34)
 #define BPFLOADER_MAINLINE_U_VERSION (BPFLOADER_MAINLINE_T_VERSION + 1u)
 
 // Android Mainline BpfLoader when running on Android U QPR3
 #define BPFLOADER_MAINLINE_U_QPR3_VERSION (BPFLOADER_MAINLINE_U_VERSION + 1u)
 
-// Android Mainline BpfLoader when running on Android V
+// Android Mainline BpfLoader when running on Android V (sdk=35)
 #define BPFLOADER_MAINLINE_V_VERSION (BPFLOADER_MAINLINE_U_QPR3_VERSION + 1u)
+
+// Android Mainline BpfLoader when running on Android W (sdk=36)
+#define BPFLOADER_MAINLINE_W_VERSION (BPFLOADER_MAINLINE_V_VERSION + 1u)
 
 /* For mainline module use, you can #define BPFLOADER_{MIN/MAX}_VER
  * before #include "bpf_helpers.h" to change which bpfloaders will
@@ -288,6 +291,12 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
         bpf_ringbuf_submit_unsafe(v, 0);                                       \
     }
 
+#define DEFINE_BPF_RINGBUF(the_map, ValueType, size_bytes, usr, grp, md)                \
+    DEFINE_BPF_RINGBUF_EXT(the_map, ValueType, size_bytes, usr, grp, md,                \
+                           DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR, \
+                           PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,               \
+                           LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+
 /* There exist buggy kernels with pre-T OS, that due to
  * kernel patch "[ALPS05162612] bpf: fix ubsan error"
  * do not support userspace writes into non-zero index of bpf map arrays.
@@ -346,11 +355,17 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 #error "Bpf Map UID must be left at default of AID_ROOT for BpfLoader prior to v0.28"
 #endif
 
-#define DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md)     \
-    DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md,         \
-                       DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR, PRIVATE, \
-                       BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, LOAD_ON_ENG,                    \
-                       LOAD_ON_USER, LOAD_ON_USERDEBUG)
+// for maps not meant to be accessed from userspace
+#define DEFINE_BPF_MAP_KERNEL_INTERNAL(the_map, TYPE, KeyType, ValueType, num_entries)           \
+    DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, AID_ROOT, AID_ROOT,       \
+                       0000, "fs_bpf_loader", "", PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, \
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+
+#define DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md) \
+    DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md,     \
+                       DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR,      \
+                       PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,                    \
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 #define DEFINE_BPF_MAP(the_map, TYPE, KeyType, ValueType, num_entries) \
     DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, \
@@ -383,12 +398,17 @@ static int (*bpf_probe_read_user)(void* dst, int size, const void* unsafe_ptr) =
 static int (*bpf_probe_read_user_str)(void* dst, int size, const void* unsafe_ptr) = (void*) BPF_FUNC_probe_read_user_str;
 static unsigned long long (*bpf_ktime_get_ns)(void) = (void*) BPF_FUNC_ktime_get_ns;
 static unsigned long long (*bpf_ktime_get_boot_ns)(void) = (void*)BPF_FUNC_ktime_get_boot_ns;
-static int (*bpf_trace_printk)(const char* fmt, int fmt_size, ...) = (void*) BPF_FUNC_trace_printk;
 static unsigned long long (*bpf_get_current_pid_tgid)(void) = (void*) BPF_FUNC_get_current_pid_tgid;
 static unsigned long long (*bpf_get_current_uid_gid)(void) = (void*) BPF_FUNC_get_current_uid_gid;
 static unsigned long long (*bpf_get_smp_processor_id)(void) = (void*) BPF_FUNC_get_smp_processor_id;
 static long (*bpf_get_stackid)(void* ctx, void* map, uint64_t flags) = (void*) BPF_FUNC_get_stackid;
 static long (*bpf_get_current_comm)(void* buf, uint32_t buf_size) = (void*) BPF_FUNC_get_current_comm;
+
+// GPL only:
+static int (*bpf_trace_printk)(const char* fmt, int fmt_size, ...) = (void*) BPF_FUNC_trace_printk;
+#define bpf_printf(s, n...) bpf_trace_printk(s, sizeof(s), ## n)
+// Note: bpf only supports up to 3 arguments, log via: bpf_printf("msg %d %d %d", 1, 2, 3);
+// and read via the blocking: sudo cat /sys/kernel/debug/tracing/trace_pipe
 
 #define DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, max_kv,  \
                             min_loader, max_loader, opt, selinux, pindir, ignore_eng,    \

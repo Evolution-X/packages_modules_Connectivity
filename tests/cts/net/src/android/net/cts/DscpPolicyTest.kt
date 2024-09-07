@@ -298,7 +298,8 @@ class DscpPolicyTest {
     fun sendPacket(
         agent: TestableNetworkAgent,
         sendV6: Boolean,
-        dstPort: Int = 0
+        dstPort: Int = 0,
+        times: Int = 1
     ) {
         val testString = "test string"
         val testPacket = ByteBuffer.wrap(testString.toByteArray(Charsets.UTF_8))
@@ -308,9 +309,11 @@ class DscpPolicyTest {
                 IPPROTO_UDP)
         checkNotNull(agent.network).bindSocket(socket)
 
-        val originalPacket = testPacket.readAsArray()
-        Os.sendto(socket, originalPacket, 0 /* bytesOffset */, originalPacket.size, 0 /* flags */,
+        val origPacket = testPacket.readAsArray()
+        repeat(times) {
+            Os.sendto(socket, origPacket, 0 /* bytesOffset */, origPacket.size, 0 /* flags */,
                 if (sendV6) TEST_TARGET_IPV6_ADDR else TEST_TARGET_IPV4_ADDR, dstPort)
+        }
         Os.close(socket)
     }
 
@@ -400,10 +403,11 @@ class DscpPolicyTest {
         agent: TestableNetworkAgent,
         sendV6: Boolean = false,
         dscpValue: Int = 0,
-        dstPort: Int = 0
+        dstPort: Int = 0,
+        times: Int = 1
     ) {
-        var packetFound = false
-        sendPacket(agent, sendV6, dstPort)
+        var packetFound = 0
+        sendPacket(agent, sendV6, dstPort, times)
         // TODO: grab source port from socket in sendPacket
 
         Log.e(TAG, "find DSCP value:" + dscpValue)
@@ -424,10 +428,23 @@ class DscpPolicyTest {
             if (parsePacketIp(buffer, sendV6) && parsePacketPort(buffer, 0, dstPort)) {
                 Log.e(TAG, "DSCP value found")
                 assertEquals(dscpValue, dscp)
-                packetFound = true
+                packetFound++
             }
         }
-        assertTrue(packetFound)
+        assertTrue(packetFound == times)
+    }
+
+    fun validatePackets(
+        agent: TestableNetworkAgent,
+        sendV6: Boolean = false,
+        dscpValue: Int = 0,
+        dstPort: Int = 0
+    ) {
+        // We send two packets from the same socket to verify
+        // socket caching works correctly.
+        validatePacket(agent, sendV6, dscpValue, dstPort, 2)
+        // Try one more time from a different socket.
+        validatePacket(agent, sendV6, dscpValue, dstPort, 1)
     }
 
     fun doRemovePolicyTest(
@@ -453,10 +470,7 @@ class DscpPolicyTest {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
         }
-        validatePacket(agent, dscpValue = 1, dstPort = 4444)
-        // Send a second packet to validate that the stored BPF policy
-        // is correct for subsequent packets.
-        validatePacket(agent, dscpValue = 1, dstPort = 4444)
+        validatePackets(agent, dscpValue = 1, dstPort = 4444)
 
         agent.sendRemoveDscpPolicy(1)
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
@@ -475,7 +489,7 @@ class DscpPolicyTest {
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
         }
 
-        validatePacket(agent, dscpValue = 4, dstPort = 5555)
+        validatePackets(agent, dscpValue = 4, dstPort = 5555)
 
         agent.sendRemoveDscpPolicy(1)
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
@@ -494,10 +508,7 @@ class DscpPolicyTest {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
         }
-        validatePacket(agent, true, dscpValue = 1, dstPort = 4444)
-        // Send a second packet to validate that the stored BPF policy
-        // is correct for subsequent packets.
-        validatePacket(agent, true, dscpValue = 1, dstPort = 4444)
+        validatePackets(agent, true, dscpValue = 1, dstPort = 4444)
 
         agent.sendRemoveDscpPolicy(1)
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
@@ -515,7 +526,7 @@ class DscpPolicyTest {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
         }
-        validatePacket(agent, true, dscpValue = 4, dstPort = 5555)
+        validatePackets(agent, true, dscpValue = 4, dstPort = 5555)
 
         agent.sendRemoveDscpPolicy(1)
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
@@ -533,7 +544,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 1111)
+            validatePackets(agent, dscpValue = 1, dstPort = 1111)
         }
 
         val policy2 = DscpPolicy.Builder(2, 1).setDestinationPortRange(Range(2222, 2222)).build()
@@ -541,7 +552,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(2, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 2222)
+            validatePackets(agent, dscpValue = 1, dstPort = 2222)
         }
 
         val policy3 = DscpPolicy.Builder(3, 1).setDestinationPortRange(Range(3333, 3333)).build()
@@ -549,16 +560,16 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(3, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 3333)
+            validatePackets(agent, dscpValue = 1, dstPort = 3333)
         }
 
         /* Remove Policies and check CE is no longer set */
         doRemovePolicyTest(agent, callback, 1)
-        validatePacket(agent, dscpValue = 0, dstPort = 1111)
+        validatePackets(agent, dscpValue = 0, dstPort = 1111)
         doRemovePolicyTest(agent, callback, 2)
-        validatePacket(agent, dscpValue = 0, dstPort = 2222)
+        validatePackets(agent, dscpValue = 0, dstPort = 2222)
         doRemovePolicyTest(agent, callback, 3)
-        validatePacket(agent, dscpValue = 0, dstPort = 3333)
+        validatePackets(agent, dscpValue = 0, dstPort = 3333)
     }
 
     @Test
@@ -569,7 +580,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 1111)
+            validatePackets(agent, dscpValue = 1, dstPort = 1111)
         }
         doRemovePolicyTest(agent, callback, 1)
 
@@ -578,7 +589,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(2, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 2222)
+            validatePackets(agent, dscpValue = 1, dstPort = 2222)
         }
         doRemovePolicyTest(agent, callback, 2)
 
@@ -587,7 +598,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(3, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 3333)
+            validatePackets(agent, dscpValue = 1, dstPort = 3333)
         }
         doRemovePolicyTest(agent, callback, 3)
     }
@@ -601,7 +612,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 1111)
+            validatePackets(agent, dscpValue = 1, dstPort = 1111)
         }
 
         val policy2 = DscpPolicy.Builder(2, 1).setDestinationPortRange(Range(2222, 2222)).build()
@@ -609,7 +620,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(2, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 2222)
+            validatePackets(agent, dscpValue = 1, dstPort = 2222)
         }
 
         val policy3 = DscpPolicy.Builder(3, 1).setDestinationPortRange(Range(3333, 3333)).build()
@@ -617,7 +628,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(3, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 3333)
+            validatePackets(agent, dscpValue = 1, dstPort = 3333)
         }
 
         /* Remove Policies and check CE is no longer set */
@@ -643,7 +654,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 1111)
+            validatePackets(agent, dscpValue = 1, dstPort = 1111)
         }
 
         val policy2 = DscpPolicy.Builder(2, 1)
@@ -652,7 +663,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(2, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 2222)
+            validatePackets(agent, dscpValue = 1, dstPort = 2222)
         }
 
         val policy3 = DscpPolicy.Builder(3, 1)
@@ -661,24 +672,24 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(3, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 3333)
+            validatePackets(agent, dscpValue = 1, dstPort = 3333)
         }
 
         agent.sendRemoveAllDscpPolicies()
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_DELETED, it.status)
-            validatePacket(agent, false, dstPort = 1111)
+            validatePackets(agent, false, dstPort = 1111)
         }
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(2, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_DELETED, it.status)
-            validatePacket(agent, false, dstPort = 2222)
+            validatePackets(agent, false, dstPort = 2222)
         }
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(3, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_DELETED, it.status)
-            validatePacket(agent, false, dstPort = 3333)
+            validatePackets(agent, false, dstPort = 3333)
         }
     }
 
@@ -690,7 +701,7 @@ class DscpPolicyTest {
         agent.expectCallback<OnDscpPolicyStatusUpdated>().let {
             assertEquals(1, it.policyId)
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
-            validatePacket(agent, dscpValue = 1, dstPort = 4444)
+            validatePackets(agent, dscpValue = 1, dstPort = 4444)
         }
 
         val policy2 = DscpPolicy.Builder(1, 1).setDestinationPortRange(Range(5555, 5555)).build()
@@ -700,8 +711,8 @@ class DscpPolicyTest {
             assertEquals(DSCP_POLICY_STATUS_SUCCESS, it.status)
 
             // Sending packet with old policy should fail
-            validatePacket(agent, dscpValue = 0, dstPort = 4444)
-            validatePacket(agent, dscpValue = 1, dstPort = 5555)
+            validatePackets(agent, dscpValue = 0, dstPort = 4444)
+            validatePackets(agent, dscpValue = 1, dstPort = 5555)
         }
 
         agent.sendRemoveDscpPolicy(1)

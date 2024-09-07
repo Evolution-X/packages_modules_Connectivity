@@ -55,13 +55,17 @@ public class DscpPolicyValue extends Struct {
     @Field(order = 7, type = Type.S8)
     public final byte dscp;
 
-    @Field(order = 8, type = Type.U8, padding = 3)
-    public final short mask;
+    @Field(order = 8, type = Type.Bool)
+    public final boolean match_src_ip;
 
-    private static final int SRC_IP_MASK = 0x1;
-    private static final int DST_IP_MASK = 0x02;
-    private static final int SRC_PORT_MASK = 0x4;
-    private static final int PROTO_MASK = 0x8;
+    @Field(order = 9, type = Type.Bool)
+    public final boolean match_dst_ip;
+
+    @Field(order = 10, type = Type.Bool)
+    public final boolean match_src_port;
+
+    @Field(order = 11, type = Type.Bool)
+    public final boolean match_proto;
 
     private boolean ipEmpty(final byte[] ip) {
         for (int i = 0; i < ip.length; i++) {
@@ -98,24 +102,6 @@ public class DscpPolicyValue extends Struct {
     private static final byte[] EMPTY_ADDRESS_FIELD =
             InetAddress.parseNumericAddress("::").getAddress();
 
-    private short makeMask(final byte[] src46, final byte[] dst46, final int srcPort,
-            final int dstPortStart, final short proto, final byte dscp) {
-        short mask = 0;
-        if (src46 != EMPTY_ADDRESS_FIELD) {
-            mask |= SRC_IP_MASK;
-        }
-        if (dst46 != EMPTY_ADDRESS_FIELD) {
-            mask |=  DST_IP_MASK;
-        }
-        if (srcPort != -1) {
-            mask |=  SRC_PORT_MASK;
-        }
-        if (proto != -1) {
-            mask |=  PROTO_MASK;
-        }
-        return mask;
-    }
-
     private DscpPolicyValue(final InetAddress src46, final InetAddress dst46, final int ifIndex,
             final int srcPort, final int dstPortStart, final int dstPortEnd, final short proto,
             final byte dscp) {
@@ -131,9 +117,10 @@ public class DscpPolicyValue extends Struct {
         this.proto = proto != -1 ? proto : 0;
 
         this.dscp = dscp;
-        // Use member variables for IP since byte[] is needed and api variables for everything else
-        // so -1 is passed into mask if parameter is not present.
-        this.mask = makeMask(this.src46, this.dst46, srcPort, dstPortStart, proto, dscp);
+        this.match_src_ip = (src46 != null);
+        this.match_dst_ip = (dst46 != null);
+        this.match_src_port = (srcPort != -1);
+        this.match_proto = (proto != -1);
     }
 
     public DscpPolicyValue(final InetAddress src46, final InetAddress dst46, final int ifIndex,

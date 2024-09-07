@@ -14,13 +14,7 @@
  * limitations under the License.
  */
 
-#define CACHE_MAP_SIZE 1024
 #define MAX_POLICIES 16
-
-#define SRC_IP_MASK_FLAG     1
-#define DST_IP_MASK_FLAG     2
-#define SRC_PORT_MASK_FLAG   4
-#define PROTO_MASK_FLAG      8
 
 #define STRUCT_SIZE(name, size) _Static_assert(sizeof(name) == (size), "Incorrect struct size.")
 
@@ -34,9 +28,6 @@
 #define v6_not_equal(a, b) ((v6_hi_be64(a) ^ v6_hi_be64(b)) \
                           | (v6_lo_be64(a) ^ v6_lo_be64(b)))
 
-// Returns 'a == b' as boolean
-#define v6_equal(a, b) (!v6_not_equal((a), (b)))
-
 typedef struct {
     struct in6_addr src_ip;
     struct in6_addr dst_ip;
@@ -46,10 +37,12 @@ typedef struct {
     uint16_t dst_port_end;
     uint8_t proto;
     int8_t dscp_val;  // -1 none, or 0..63 DSCP value
-    uint8_t present_fields;
-    uint8_t pad[3];
+    bool match_src_ip;
+    bool match_dst_ip;
+    bool match_src_port;
+    bool match_proto;
 } DscpPolicy;
-STRUCT_SIZE(DscpPolicy, 2 * 16 + 4 + 3 * 2 + 3 * 1 + 3);  // 48
+STRUCT_SIZE(DscpPolicy, 2 * 16 + 4 + 3 * 2 + 6 * 1);  // 48
 
 typedef struct {
     struct in6_addr src_ip;
@@ -61,4 +54,4 @@ typedef struct {
     int8_t dscp_val;  // -1 none, or 0..63 DSCP value
     uint8_t pad[2];
 } RuleEntry;
-STRUCT_SIZE(RuleEntry, 2 * 16 + 1 * 4 + 2 * 2 + 2 * 1 + 2);  // 44
+STRUCT_SIZE(RuleEntry, 2 * 16 + 4 + 2 * 2 + 4 * 1);  // 44
