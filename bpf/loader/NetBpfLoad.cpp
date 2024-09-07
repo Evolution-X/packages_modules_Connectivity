@@ -141,9 +141,6 @@ inline bool isUserdebug() {
 
 #define BPF_FS_PATH "/sys/fs/bpf/"
 
-// Size of the BPF log buffer for verifier logging
-#define BPF_LOAD_LOG_SZ 0xfffff
-
 static unsigned int page_size = static_cast<unsigned int>(getpagesize());
 
 constexpr const char* lookupSelinuxContext(const domain d) {
@@ -1006,7 +1003,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                   (!fd.ok() ? std::strerror(errno) : "no error"));
             reuse = true;
         } else {
-            vector<char> log_buf(BPF_LOAD_LOG_SZ, 0);
+            static char log_buf[1 << 20];  // 1 MiB logging buffer
 
             union bpf_attr req = {
               .prog_type = cs[i].type,
@@ -1014,8 +1011,8 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
               .insns = ptr_to_u64(cs[i].data.data()),
               .license = ptr_to_u64(license.c_str()),
               .log_level = 1,
-              .log_size = static_cast<__u32>(log_buf.size()),
-              .log_buf = ptr_to_u64(log_buf.data()),
+              .log_size = sizeof(log_buf),
+              .log_buf = ptr_to_u64(log_buf),
               .kern_version = kvers,
               .expected_attach_type = cs[i].attach_type,
             };
@@ -1023,12 +1020,23 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                 strlcpy(req.prog_name, cs[i].name.c_str(), sizeof(req.prog_name));
             fd.reset(bpf(BPF_PROG_LOAD, req));
 
-            ALOGD("BPF_PROG_LOAD call for %s (%s) returned fd: %d (%s)", elfPath,
-                  cs[i].name.c_str(), fd.get(), (!fd.ok() ? std::strerror(errno) : "no error"));
+            // Kernel should have NULL terminated the log buffer, but force it anyway for safety
+            log_buf[sizeof(log_buf) - 1] = 0;
+
+            // Strip out final newline if present
+            int log_chars = strlen(log_buf);
+            if (log_chars && log_buf[log_chars - 1] == '\n') log_buf[--log_chars] = 0;
+
+            bool log_oneline = !strchr(log_buf, '\n');
+
+            ALOGD("BPF_PROG_LOAD call for %s (%s) returned '%s' fd: %d (%s)", elfPath,
+                  cs[i].name.c_str(), log_oneline ? log_buf : "{multiline}",
+                  fd.get(), (!fd.ok() ? std::strerror(errno) : "ok"));
 
             if (!fd.ok()) {
-                if (log_buf.size()) {
-                    vector<string> lines = Split(log_buf.data(), "\n");
+                // kernel NULL terminates log_buf, so this checks for non-empty string
+                if (log_buf[0]) {
+                    vector<string> lines = Split(log_buf, "\n");
 
                     ALOGW("BPF_PROG_LOAD - BEGIN log_buf contents:");
                     for (const auto& line : lines) ALOGW("%s", line.c_str());
@@ -1144,12 +1152,6 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
     ALOGD("BpfLoader version 0x%05x processing ELF object %s with ver [0x%05x,0x%05x)",
           bpfloader_ver, elfPath, bpfLoaderMinVer, bpfLoaderMaxVer);
 
-    ret = readCodeSections(elfFile, cs);
-    if (ret) {
-        ALOGE("Couldn't read all code sections in %s", elfPath);
-        return ret;
-    }
-
     ret = createMaps(elfPath, elfFile, mapFds, prefix, bpfloader_ver);
     if (ret) {
         ALOGE("Failed to create maps: (ret=%d) in %s", ret, elfPath);
@@ -1158,6 +1160,13 @@ int loadProg(const char* const elfPath, bool* const isCritical, const unsigned i
 
     for (int i = 0; i < (int)mapFds.size(); i++)
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
+
+    ret = readCodeSections(elfFile, cs);
+    if (ret == -ENOENT) return 0;  // no programs defined in this .o
+    if (ret) {
+        ALOGE("Couldn't read all code sections in %s", elfPath);
+        return ret;
+    }
 
     applyMapRelo(elfFile, mapFds, cs);
 
