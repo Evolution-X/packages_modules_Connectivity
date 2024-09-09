@@ -50,7 +50,6 @@ import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_LOCK
 import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_NONE;
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_EXPORTED;
 import static com.android.testutils.Cleanup.testAndCleanup;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 import static com.android.testutils.RecorderCallback.CallbackEntry.BLOCKED_STATUS_INT;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
@@ -892,7 +891,7 @@ public class VpnTest {
                 entry -> entry.getCaps().hasTransport(TRANSPORT_VPN));
     }
 
-    @Test @IgnoreUpTo(SC_V2) // TODO: Use to Build.VERSION_CODES.SC_V2 when available
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testChangeUnderlyingNetworks() throws Exception {
         assumeTrue(mPackageManager.hasSystemFeature(FEATURE_WIFI));
         assumeTrue(mPackageManager.hasSystemFeature(FEATURE_TELEPHONY));
@@ -1138,12 +1137,12 @@ public class VpnTest {
         return null;
     }
 
-    @Test
+    @Test @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)  // Automatic keepalives were added in U.
     public void testAutomaticOnOffKeepaliveModeNoClose() throws Exception {
         doTestAutomaticOnOffKeepaliveMode(false);
     }
 
-    @Test
+    @Test @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)  // Automatic keepalives were added in U.
     public void testAutomaticOnOffKeepaliveModeClose() throws Exception {
         doTestAutomaticOnOffKeepaliveMode(true);
     }
