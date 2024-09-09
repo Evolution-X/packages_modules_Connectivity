@@ -996,6 +996,13 @@ public class VpnTest {
                             FIREWALL_CHAIN_BACKGROUND));
             otherUidCallback.expectAvailableCallbacks(defaultNetwork, false /* suspended */,
                     true /* validated */, isOtherUidBlocked, TIMEOUT_MS);
+        } else {
+            // R does not have per-UID callback or system default callback APIs, and sends an
+            // additional CAP_CHANGED callback.
+            registerDefaultNetworkCallback(myUidCallback);
+            myUidCallback.expectAvailableCallbacks(defaultNetwork, false /* suspended */,
+                    true /* validated */, false /* blocked */, TIMEOUT_MS);
+            myUidCallback.expect(CallbackEntry.NETWORK_CAPS_UPDATED, defaultNetwork);
         }
 
         FileDescriptor fd = openSocketFdInOtherApp(TEST_HOST, 80, TIMEOUT_MS);
@@ -1708,7 +1715,8 @@ public class VpnTest {
     }
 
     private void maybeExpectVpnTransportInfo(Network network) {
-        assumeTrue(SdkLevel.isAtLeastS());
+        // VpnTransportInfo was only added in S.
+        if (!SdkLevel.isAtLeastS()) return;
         final NetworkCapabilities vpnNc = mCM.getNetworkCapabilities(network);
         assertTrue(vpnNc.hasTransport(TRANSPORT_VPN));
         final TransportInfo ti = vpnNc.getTransportInfo();
