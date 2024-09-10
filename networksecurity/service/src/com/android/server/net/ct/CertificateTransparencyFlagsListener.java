@@ -17,17 +17,18 @@ package com.android.server.net.ct;
 
 import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 
+import android.annotation.RequiresApi;
 import android.content.Context;
+import android.os.Build;
 import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.android.modules.utils.build.SdkLevel;
-
 import java.util.concurrent.Executors;
 
 /** Listener class for the Certificate Transparency Phenotype flags. */
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesChangedListener {
 
     private static final String TAG = "CertificateTransparencyFlagsListener";
@@ -54,7 +55,7 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
 
     @Override
     public void onPropertiesChanged(Properties properties) {
-        if (!SdkLevel.isAtLeastV() || !NAMESPACE_TETHERING.equals(properties.getNamespace())) {
+        if (!NAMESPACE_TETHERING.equals(properties.getNamespace())) {
             return;
         }
 
@@ -84,6 +85,8 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
             Log.i(TAG, "No flag changed, ignoring update");
             return;
         }
+
+        // TODO: handle the case where there is already a pending download.
 
         mDataStore.setProperty(Config.VERSION_PENDING, newVersion);
         mDataStore.setProperty(Config.CONTENT_URL_PENDING, newContentUrl);
