@@ -17,8 +17,8 @@ android_library {
         "netd-client",
     ],
     libs: [
-        "android.test.runner",
-        "android.test.base",
+        "android.test.runner.stubs.system",
+        "android.test.base.stubs.system",
     ],
     visibility: [
         // Visible for Tethering and NetworkStack integration test and link NetdStaticLibTestsLib

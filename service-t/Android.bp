@@ -51,12 +51,12 @@ java_library {
     ],
     libs: [
         "framework-annotations-lib",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         "framework-connectivity-t-pre-jarjar",
         // TODO: use framework-tethering-pre-jarjar when it is separated from framework-tethering
         "framework-tethering.impl",
-        "framework-wifi",
+        "framework-wifi.stubs.module_lib",
         "service-connectivity-pre-jarjar",
         "service-nearby-pre-jarjar",
         "service-networksecurity-pre-jarjar",

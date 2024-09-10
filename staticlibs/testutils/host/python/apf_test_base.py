@@ -23,6 +23,11 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     super().setup_class()
 
     # Check test preconditions.
+    asserts.abort_class_if(
+        not self.client.isAtLeastV(),
+        "Do not enforce the test until V+ since chipset potential bugs are"
+        " expected to be fixed on V+ releases.",
+    )
     tether_utils.assume_hotspot_test_preconditions(
         self.serverDevice, self.clientDevice, UpstreamType.NONE
     )
@@ -34,13 +39,12 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     )
 
     # Fetch device properties and storing them locally for later use.
-    client = self.clientDevice.connectivity_multi_devices_snippet
     self.server_iface_name, client_network = (
         tether_utils.setup_hotspot_and_client_for_upstream_type(
             self.serverDevice, self.clientDevice, UpstreamType.NONE
         )
     )
-    self.client_iface_name = client.getInterfaceNameFromNetworkHandle(
+    self.client_iface_name = self.client.getInterfaceNameFromNetworkHandle(
         client_network
     )
     self.server_mac_address = apf_utils.get_hardware_address(

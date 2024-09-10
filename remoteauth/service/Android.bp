@@ -33,13 +33,13 @@ java_library {
     ],
     libs: [
         "androidx.annotation_annotation",
-        "framework-bluetooth",
-        "framework-connectivity",
+        "framework-bluetooth.stubs.module_lib",
+        "framework-connectivity.impl",
         "error_prone_annotations",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         "framework-connectivity-t-pre-jarjar",
-        "framework-statsd",
+        "framework-statsd.stubs.module_lib",
     ],
     static_libs: [
         "modules-utils-build",
