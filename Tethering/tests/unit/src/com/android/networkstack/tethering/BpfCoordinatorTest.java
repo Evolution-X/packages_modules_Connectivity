@@ -48,6 +48,7 @@ import static com.android.net.module.util.netlink.NetlinkConstants.RTM_NEWNEIGH;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_FAILED;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_REACHABLE;
 import static com.android.net.module.util.netlink.StructNdMsg.NUD_STALE;
+import static com.android.networkstack.tethering.BpfCoordinator.CONNTRACK_METRICS_UPDATE_INTERVAL_MS;
 import static com.android.networkstack.tethering.BpfCoordinator.CONNTRACK_TIMEOUT_UPDATE_INTERVAL_MS;
 import static com.android.networkstack.tethering.BpfCoordinator.INVALID_MTU;
 import static com.android.networkstack.tethering.BpfCoordinator.NF_CONNTRACK_TCP_TIMEOUT_ESTABLISHED;
@@ -60,6 +61,7 @@ import static com.android.networkstack.tethering.BpfCoordinator.toIpv4MappedAddr
 import static com.android.networkstack.tethering.BpfUtils.DOWNSTREAM;
 import static com.android.networkstack.tethering.BpfUtils.UPSTREAM;
 import static com.android.networkstack.tethering.TetheringConfiguration.DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS;
+import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_ACTIVE_SESSIONS_METRICS;
 import static com.android.testutils.MiscAsserts.assertSameElements;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -87,6 +89,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.app.usage.NetworkStatsManager;
+import android.content.Context;
 import android.net.INetd;
 import android.net.InetAddresses;
 import android.net.IpPrefix;
@@ -140,6 +143,8 @@ import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.TestBpfMap;
 import com.android.testutils.TestableNetworkStatsProviderCbBinder;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule.FeatureFlag;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -170,6 +175,16 @@ import java.util.Set;
 public class BpfCoordinatorTest {
     @Rule
     public final DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
+
+    final HashMap<String, Boolean> mFeatureFlags = new HashMap<>();
+    // This will set feature flags from @FeatureFlag annotations
+    // into the map before setUp() runs.
+    @Rule
+    public final SetFeatureFlagsRule mSetFeatureFlagsRule =
+            new SetFeatureFlagsRule((name, enabled) -> {
+                mFeatureFlags.put(name, enabled);
+                return null;
+            }, (name) -> mFeatureFlags.getOrDefault(name, false));
 
     private static final boolean IPV4 = true;
     private static final boolean IPV6 = false;
@@ -406,6 +421,11 @@ public class BpfCoordinatorTest {
                 return this;
             }
 
+            public Builder setPrivateAddress(Inet4Address privateAddr) {
+                mPrivateAddr = privateAddr;
+                return this;
+            }
+
             public Builder setRemotePort(int remotePort) {
                 mRemotePort = (short) remotePort;
                 return this;
@@ -429,6 +449,7 @@ public class BpfCoordinatorTest {
 
     @Mock private NetworkStatsManager mStatsManager;
     @Mock private INetd mNetd;
+    @Mock private Context mMockContext;
     @Mock private IpServer mIpServer;
     @Mock private IpServer mIpServer2;
     @Mock private TetheringConfiguration mTetherConfig;
@@ -472,6 +493,11 @@ public class BpfCoordinatorTest {
                     @NonNull
                     public Handler getHandler() {
                         return mHandler;
+                    }
+
+                    @NonNull
+                    public Context getContext() {
+                        return mMockContext;
                     }
 
                     @NonNull
@@ -545,6 +571,16 @@ public class BpfCoordinatorTest {
                     @Nullable
                     public IBpfMap<S32, S32> getBpfErrorMap() {
                         return mBpfErrorMap;
+                    }
+
+                    @Override
+                    public void sendTetheringActiveSessionsReported(int lastMaxSessionCount) {
+                        // No-op.
+                    }
+
+                    @Override
+                    public boolean isFeatureEnabled(Context context, String name) {
+                        return mFeatureFlags.getOrDefault(name, false);
                     }
             });
 
@@ -1975,6 +2011,229 @@ public class BpfCoordinatorTest {
                 .setProto(IPPROTO_UDP)
                 .build());
         verify(mBpfDevMap, never()).updateEntry(any(), any());
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS)
+    // BPF IPv4 forwarding only supports on S+.
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @Test
+    public void testMaxConnectionCount_metricsEnabled() throws Exception {
+        doTestMaxConnectionCount(true);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS, enabled = false)
+    @Test
+    public void testMaxConnectionCount_metricsDisabled() throws Exception {
+        doTestMaxConnectionCount(false);
+    }
+
+    private void doTestMaxConnectionCount(final boolean supportActiveSessionsMetrics)
+            throws Exception {
+        final BpfCoordinator coordinator = makeBpfCoordinator();
+        initBpfCoordinatorForRule4(coordinator);
+        resetNetdAndBpfMaps();
+        assertEquals(0, mConsumer.getLastMaxConnectionAndResetToCurrent());
+
+        // Prepare add/delete rule events.
+        final ArrayList<ConntrackEvent> addRuleEvents = new ArrayList<>();
+        final ArrayList<ConntrackEvent> delRuleEvents = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            final ConntrackEvent addEvent = new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_NEW).setProto(IPPROTO_TCP).setRemotePort(i).build();
+            addRuleEvents.add(addEvent);
+            final ConntrackEvent delEvent = new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_DELETE).setProto(IPPROTO_TCP).setRemotePort(i).build();
+            delRuleEvents.add(delEvent);
+        }
+
+        // Add rules, verify counter increases.
+        for (int i = 0; i < 5; i++) {
+            mConsumer.accept(addRuleEvents.get(i));
+            assertConsumerCountersEquals(supportActiveSessionsMetrics ? i + 1 : 0);
+        }
+
+        // Add the same events again should not increase the counter because
+        // all events are already exist.
+        for (final ConntrackEvent event : addRuleEvents) {
+            mConsumer.accept(event);
+            assertConsumerCountersEquals(supportActiveSessionsMetrics ? 5 : 0);
+        }
+
+        // Verify removing non-existent items won't change the counters.
+        for (int i = 5; i < 8; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_DELETE).setProto(IPPROTO_TCP).setRemotePort(i).build());
+            assertConsumerCountersEquals(supportActiveSessionsMetrics ? 5 : 0);
+        }
+
+        // Verify remove the rules decrease the counter.
+        // Note the max counter returns the max, so it returns the count before deleting.
+        for (int i = 0; i < 5; i++) {
+            mConsumer.accept(delRuleEvents.get(i));
+            assertEquals(supportActiveSessionsMetrics ? 4 - i : 0,
+                    mConsumer.getCurrentConnectionCount());
+            assertEquals(supportActiveSessionsMetrics ? 5 - i : 0,
+                    mConsumer.getLastMaxConnectionCount());
+            assertEquals(supportActiveSessionsMetrics ? 5 - i : 0,
+                    mConsumer.getLastMaxConnectionAndResetToCurrent());
+        }
+
+        // Verify remove these rules again doesn't decrease the counter.
+        for (int i = 0; i < 5; i++) {
+            mConsumer.accept(delRuleEvents.get(i));
+            assertConsumerCountersEquals(0);
+        }
+    }
+
+    // Helper method to assert all counter values inside consumer.
+    private void assertConsumerCountersEquals(int expectedCount) {
+        assertEquals(expectedCount, mConsumer.getCurrentConnectionCount());
+        assertEquals(expectedCount, mConsumer.getLastMaxConnectionCount());
+        assertEquals(expectedCount, mConsumer.getLastMaxConnectionAndResetToCurrent());
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS)
+    // BPF IPv4 forwarding only supports on S+.
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @Test
+    public void doTestMaxConnectionCount_removeClient_metricsEnabled() throws Exception {
+        doTestMaxConnectionCount_removeClient(true);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS, enabled = false)
+    @Test
+    public void doTestMaxConnectionCount_removeClient_metricsDisabled() throws Exception {
+        doTestMaxConnectionCount_removeClient(false);
+    }
+
+    private void doTestMaxConnectionCount_removeClient(final boolean supportActiveSessionsMetrics)
+            throws Exception {
+        final BpfCoordinator coordinator = makeBpfCoordinator();
+        initBpfCoordinatorForRule4(coordinator);
+        resetNetdAndBpfMaps();
+
+        // Add client information A and B on on the same downstream.
+        final ClientInfo clientA = new ClientInfo(DOWNSTREAM_IFINDEX, DOWNSTREAM_MAC,
+                PRIVATE_ADDR, MAC_A);
+        final ClientInfo clientB = new ClientInfo(DOWNSTREAM_IFINDEX, DOWNSTREAM_MAC,
+                PRIVATE_ADDR2, MAC_B);
+        coordinator.tetherOffloadClientAdd(mIpServer, clientA);
+        coordinator.tetherOffloadClientAdd(mIpServer, clientB);
+        assertClientInfoExists(mIpServer, clientA);
+        assertClientInfoExists(mIpServer, clientB);
+        assertEquals(0, mConsumer.getLastMaxConnectionAndResetToCurrent());
+
+        // Add some rules for both clients.
+        final int addr1RuleCount = 5;
+        final int addr2RuleCount = 3;
+
+        for (int i = 0; i < addr1RuleCount; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder()
+                    .setMsgType(IPCTNL_MSG_CT_NEW)
+                    .setProto(IPPROTO_TCP)
+                    .setRemotePort(i)
+                    .setPrivateAddress(PRIVATE_ADDR)
+                    .build());
+        }
+
+        for (int i = addr1RuleCount; i < addr1RuleCount + addr2RuleCount; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder()
+                    .setMsgType(IPCTNL_MSG_CT_NEW)
+                    .setProto(IPPROTO_TCP)
+                    .setRemotePort(i)
+                    .setPrivateAddress(PRIVATE_ADDR2)
+                    .build());
+        }
+
+        assertConsumerCountersEquals(
+                supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0);
+
+        // Remove 1 client. Since the 1st poll will return the LastMaxCounter and
+        // update it to the current, the max counter will be kept at 1st poll, while
+        // the current counter reflect the rule decreasing.
+        coordinator.tetherOffloadClientRemove(mIpServer, clientA);
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getCurrentConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr1RuleCount + addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionAndResetToCurrent());
+        // And all counters be updated at 2nd poll.
+        assertConsumerCountersEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0);
+
+        // Remove other client.
+        coordinator.tetherOffloadClientRemove(mIpServer, clientB);
+        assertEquals(0, mConsumer.getCurrentConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionCount());
+        assertEquals(supportActiveSessionsMetrics ? addr2RuleCount : 0,
+                mConsumer.getLastMaxConnectionAndResetToCurrent());
+        // All counters reach zero at 2nd poll.
+        assertConsumerCountersEquals(0);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS)
+    // BPF IPv4 forwarding only supports on S+.
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @Test
+    public void testSendActiveSessionsReported_metricsEnabled() throws Exception {
+        doTestSendActiveSessionsReported(true);
+    }
+
+    @FeatureFlag(name = TETHER_ACTIVE_SESSIONS_METRICS, enabled = false)
+    @Test
+    public void testSendActiveSessionsReported_metricsDisabled() throws Exception {
+        doTestSendActiveSessionsReported(false);
+    }
+
+    private void doTestSendActiveSessionsReported(final boolean supportActiveSessionsMetrics)
+            throws Exception {
+        final BpfCoordinator coordinator = makeBpfCoordinator();
+        initBpfCoordinatorForRule4(coordinator);
+        resetNetdAndBpfMaps();
+        assertConsumerCountersEquals(0);
+
+        // Prepare the counter value.
+        for (int i = 0; i < 5; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_NEW).setProto(IPPROTO_TCP).setRemotePort(i).build());
+        }
+
+        // Then delete some 3 rules, 2 rules remaining.
+        // The max count is 5 while current rules count is 2.
+        for (int i = 0; i < 3; i++) {
+            mConsumer.accept(new TestConntrackEvent.Builder().setMsgType(
+                    IPCTNL_MSG_CT_DELETE).setProto(IPPROTO_TCP).setRemotePort(i).build());
+        }
+
+        // Verify the method is not invoked when timer is not expired.
+        waitForIdle();
+        verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+
+        // Verify metrics will be sent upon timer expiry.
+        mTestLooper.moveTimeForward(CONNTRACK_METRICS_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        if (supportActiveSessionsMetrics) {
+            verify(mDeps).sendTetheringActiveSessionsReported(5);
+        } else {
+            verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+        }
+
+        // Verify next uploaded metrics will reflect the decreased rules count.
+        mTestLooper.moveTimeForward(CONNTRACK_METRICS_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        if (supportActiveSessionsMetrics) {
+            verify(mDeps).sendTetheringActiveSessionsReported(2);
+        } else {
+            verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
+        }
+
+        // Verify no metrics uploaded if polling stopped.
+        clearInvocations(mDeps);
+        coordinator.removeIpServer(mIpServer);
+        mTestLooper.moveTimeForward(CONNTRACK_TIMEOUT_UPDATE_INTERVAL_MS);
+        waitForIdle();
+        verify(mDeps, never()).sendTetheringActiveSessionsReported(anyInt());
     }
 
     private void setElapsedRealtimeNanos(long nanoSec) {

@@ -54,6 +54,7 @@ java_defaults {
         "src/**/*.java",
         ":framework-connectivity-shared-srcs",
         ":services-tethering-shared-srcs",
+        ":statslog-connectivity-java-gen",
         ":statslog-tethering-java-gen",
     ],
     static_libs: [

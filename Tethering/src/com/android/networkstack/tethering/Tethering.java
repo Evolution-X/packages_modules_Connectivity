@@ -374,6 +374,11 @@ public class Tethering {
                     }
 
                     @NonNull
+                    public Context getContext() {
+                        return mContext;
+                    }
+
+                    @NonNull
                     public INetd getNetd() {
                         return mNetd;
                     }
