@@ -236,7 +236,7 @@ def assume_apf_version_support_at_least(
     ad: android_device.AndroidDevice, iface_name: str, expected_version: int
 ) -> None:
   caps = get_apf_capabilities(ad, iface_name)
-  asserts.skip_if(
+  asserts.abort_class_if(
       caps.apf_version_supported < expected_version,
       f"Supported apf version {caps.apf_version_supported} < expected version"
       f" {expected_version}",
