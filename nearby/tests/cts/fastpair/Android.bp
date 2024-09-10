@@ -30,9 +30,9 @@ android_test {
         "truth",
     ],
     libs: [
-        "android.test.base",
+        "android.test.base.stubs.system",
         "framework-bluetooth.stubs.module_lib",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-t.impl",
         "framework-location.stubs.module_lib",
     ],
