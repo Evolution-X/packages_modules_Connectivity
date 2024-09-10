@@ -26,6 +26,7 @@ python_test_host {
         "run_tests.py",
     ],
     libs: [
+        "absl-py",
         "mobly",
         "net-tests-utils-host-python-common",
     ],
