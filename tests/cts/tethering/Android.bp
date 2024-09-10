@@ -22,7 +22,7 @@ java_defaults {
     defaults: ["cts_defaults"],
 
     libs: [
-        "android.test.base",
+        "android.test.base.stubs.system",
     ],
 
     srcs: [

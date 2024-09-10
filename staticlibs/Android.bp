@@ -70,7 +70,7 @@ java_library {
     libs: [
         "androidx.annotation_annotation",
         "framework-annotations-lib",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
     ],
     lint: {
@@ -264,7 +264,7 @@ java_library {
     ],
     libs: [
         "framework-annotations-lib",
-        "framework-connectivity",
+        "framework-connectivity.stubs.module_lib",
     ],
     static_libs: [
         "net-utils-device-common",
@@ -342,7 +342,7 @@ java_library {
     min_sdk_version: "30",
     libs: [
         "framework-annotations-lib",
-        "framework-connectivity",
+        "framework-connectivity.stubs.module_lib",
         "modules-utils-build_system",
     ],
     // TODO: remove "apex_available:platform".
@@ -468,7 +468,7 @@ java_library {
     libs: [
         "androidx.annotation_annotation",
         "framework-annotations-lib",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
     ],
     lint: {
@@ -484,12 +484,11 @@ java_defaults {
     libs: [
         "androidx.annotation_annotation",
         "framework-annotations-lib",
-        "framework-configinfrastructure",
-        "framework-connectivity",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
         "framework-connectivity-t.stubs.module_lib",
         "framework-location.stubs.module_lib",
-        "framework-tethering",
+        "framework-tethering.stubs.module_lib",
         "unsupportedappusage",
     ],
     static_libs: [
@@ -522,6 +521,8 @@ java_library {
     ],
     libs: [
         "net-utils-framework-connectivity",
+        "framework-connectivity.impl",
+        "framework-tethering.impl",
     ],
     defaults: ["net-utils-non-bootclasspath-defaults"],
     jarjar_rules: "jarjar-rules-shared.txt",

@@ -27,7 +27,7 @@ java_library {
     ],
 
     libs: [
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         "service-connectivity-pre-jarjar",
     ],
