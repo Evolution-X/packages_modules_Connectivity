@@ -30,8 +30,8 @@ android_library {
         "net-utils-service-connectivity",
     ],
     libs: [
-        "android.test.runner",
-        "android.test.base",
+        "android.test.runner.stubs",
+        "android.test.base.stubs",
     ],
     visibility: [
         "//frameworks/base/packages/Tethering/tests/integration",

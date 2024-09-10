@@ -68,8 +68,8 @@ java_defaults {
     impl_only_libs: [
         // The build system will use framework-bluetooth module_current stubs, because
         // of sdk_version: "module_current" above.
-        "framework-bluetooth",
-        "framework-wifi",
+        "framework-bluetooth.stubs.module_lib",
+        "framework-wifi.stubs.module_lib",
         // Compile against the entire implementation of framework-connectivity,
         // including hidden methods. This is safe because if framework-connectivity-t is
         // on the bootclasspath (i.e., T), then framework-connectivity is also on the
@@ -103,8 +103,8 @@ java_library {
     name: "framework-connectivity-t-pre-jarjar",
     defaults: ["framework-connectivity-t-defaults"],
     libs: [
-        "framework-bluetooth",
-        "framework-wifi",
+        "framework-bluetooth.stubs.module_lib",
+        "framework-wifi.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         "framework-location.stubs.module_lib",
     ],

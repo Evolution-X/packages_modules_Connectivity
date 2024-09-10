@@ -35,11 +35,11 @@ java_library {
     ],
     libs: [
         "androidx.annotation_annotation",
-        "framework-bluetooth",
+        "framework-bluetooth.stubs.module_lib",
         "error_prone_annotations",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-t.impl",
-        "framework-statsd",
+        "framework-statsd.stubs.module_lib",
     ],
     static_libs: [
         "androidx.core_core",

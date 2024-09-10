@@ -62,9 +62,9 @@ java_defaults {
     // remove framework-minus-apex, ext, and framework-res
     sdk_version: "core_platform",
     libs: [
-        "android.test.runner",
-        "android.test.base",
-        "android.test.mock",
+        "android.test.runner.stubs",
+        "android.test.base.stubs",
+        "android.test.mock.stubs",
         "ext",
         "framework-minus-apex",
         "framework-res",
