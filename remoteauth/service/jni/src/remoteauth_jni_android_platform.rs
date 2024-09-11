@@ -21,12 +21,11 @@ use jni::objects::{GlobalRef, JMethodID, JObject, JValue};
 use jni::signature::TypeSignature;
 use jni::sys::{jbyteArray, jint, jlong, jvalue};
 use jni::{JNIEnv, JavaVM};
-use lazy_static::lazy_static;
 use log::{debug, error, info};
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicI64, Ordering},
-    Arc, Mutex,
+    Arc, LazyLock, Mutex,
 };
 
 /// Macro capturing the name of the function calling this macro.
@@ -51,11 +50,9 @@ macro_rules! function_name {
     }};
 }
 
-lazy_static! {
-    static ref HANDLE_MAPPING: Mutex<HashMap<i64, Arc<Mutex<JavaPlatform>>>> =
-        Mutex::new(HashMap::new());
-    static ref HANDLE_RN: AtomicI64 = AtomicI64::new(0);
-}
+static HANDLE_MAPPING: LazyLock<Mutex<HashMap<i64, Arc<Mutex<JavaPlatform>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static HANDLE_RN: AtomicI64 = AtomicI64::new(0);
 
 fn generate_platform_handle() -> i64 {
     HANDLE_RN.fetch_add(1, Ordering::SeqCst)
