@@ -44,7 +44,6 @@ import android.text.TextUtils
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import androidx.test.runner.AndroidJUnit4
-import com.android.modules.utils.build.SdkLevel.isAtLeastR
 import com.android.net.module.util.NetworkStackConstants.TEST_CAPTIVE_PORTAL_HTTPS_URL
 import com.android.net.module.util.NetworkStackConstants.TEST_CAPTIVE_PORTAL_HTTP_URL
 import com.android.testutils.AutoReleaseNetworkCallbackRule
@@ -201,10 +200,7 @@ class CaptivePortalTest {
                     "access."
             assertNotEquals(network, cm.activeNetwork, wifiDefaultMessage)
 
-            val startPortalAppPermission =
-                    if (isAtLeastR()) NETWORK_SETTINGS
-                    else CONNECTIVITY_INTERNAL
-            runAsShell(startPortalAppPermission) { cm.startCaptivePortalApp(network) }
+            runAsShell(NETWORK_SETTINGS) { cm.startCaptivePortalApp(network) }
 
             // Expect the portal content to be fetched at some point after detecting the portal.
             // Some implementations may fetch the URL before startCaptivePortalApp is called.
