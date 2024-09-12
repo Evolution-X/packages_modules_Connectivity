@@ -24,8 +24,8 @@ import android.os.IBinder;
 import androidx.annotation.RequiresApi;
 
 /**
- * Utility providing limited access to module-internal APIs which are only available on Android T+,
- * as this class is only in the bootclasspath on T+ as part of framework-connectivity.
+ * Utility providing limited access to module-internal APIs which are only available on Android S+,
+ * as this class is only in the bootclasspath on S+ as part of framework-connectivity.
  *
  * R+ module components like Tethering cannot depend on all hidden symbols from
  * framework-connectivity. They only have access to stable API stubs where newer APIs can be
