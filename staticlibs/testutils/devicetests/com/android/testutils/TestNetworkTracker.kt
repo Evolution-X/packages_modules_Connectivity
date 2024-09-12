@@ -29,7 +29,6 @@ import android.net.TestNetworkManager
 import android.os.Binder
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.android.modules.utils.build.SdkLevel.isAtLeastR
 import com.android.modules.utils.build.SdkLevel.isAtLeastS
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -137,7 +136,6 @@ class TestNetworkTracker internal constructor(
 
         network = try {
             if (lp != null) {
-                assertTrue(isAtLeastR(), "Cannot specify TestNetwork LinkProperties before R")
                 tnm.setupTestNetwork(lp, true /* isMetered */, binder)
             } else {
                 tnm.setupTestNetwork(iface.interfaceName, binder)
