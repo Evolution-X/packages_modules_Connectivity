@@ -25,6 +25,8 @@ from net_tests_utils.host.python.apf_utils import (
     get_apf_capabilities,
     get_apf_counter,
     get_apf_counters_from_dumpsys,
+    get_ipv4_address,
+    get_ipv6_address,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
     send_raw_packet_downstream,
@@ -110,6 +112,46 @@ IpClient.wlan1
     mock_adb_shell.return_value = "Some output without MAC address"
     with asserts.assert_raises(PatternNotFoundException):
       get_hardware_address(self.mock_ad, "wlan0")
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_ipv4_address_success(
+      self, mock_adb_shell: MagicMock
+  ) -> None:
+    mock_adb_shell.return_value = """
+54: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+inet 192.168.195.162/24 brd 192.168.195.255 scope global wlan0
+valid_lft forever preferred_lft forever
+"""
+    ip_address = get_ipv4_address(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_address, "192.168.195.162")
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_ipv4_address_not_found(
+      self, mock_adb_shell: MagicMock
+  ) -> None:
+     mock_adb_shell.return_value = ""
+     with asserts.assert_raises(PatternNotFoundException):
+       get_ipv4_address(self.mock_ad, "wlan0")
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_ipv6_address_success(
+      self, mock_adb_shell: MagicMock
+  ) -> None:
+    mock_adb_shell.return_value = """
+54: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+inet6 fe80::10a3:5dff:fe52:de32/64 scope link
+valid_lft forever preferred_lft forever
+"""
+    ip_address = get_ipv6_address(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_address, "fe80::10a3:5dff:fe52:de32")
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_ipv6_address_not_found(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = ""
+      with asserts.assert_raises(PatternNotFoundException):
+          get_ipv6_address(self.mock_ad, "wlan0")
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_send_raw_packet_downstream_success(
