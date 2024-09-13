@@ -33,12 +33,7 @@ install_symlink {
 cc_binary {
     name: "netbpfload",
 
-    defaults: ["bpf_defaults"],
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wthread-safety",
-    ],
+    defaults: ["bpf_cc_defaults"],
     sanitize: {
         integer_overflow: true,
     },
