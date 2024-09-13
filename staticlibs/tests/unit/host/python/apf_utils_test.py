@@ -29,6 +29,10 @@ from net_tests_utils.host.python.apf_utils import (
     get_ipv6_addresses,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
+    is_packet_capture_supported,
+    start_capture_packets,
+    stop_capture_packets,
+    get_matched_packet_counts,
     send_raw_packet_downstream,
 )
 from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError
@@ -207,6 +211,144 @@ IpClient.wlan1
         is_send_raw_packet_downstream_supported(self.mock_ad),
         "Send raw packet should not be supported.",
     )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_start_capture_success(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = "success"  # Successful command output
+      start_capture_packets(
+          self.mock_ad, TEST_IFACE_NAME
+      )
+      mock_adb_shell.assert_called_once_with(
+          self.mock_ad,
+          "cmd network_stack capture start"
+          f" {TEST_IFACE_NAME}"
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_start_capture_failure(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = (  # Unexpected command output
+          "Any Unexpected Output"
+      )
+      with asserts.assert_raises(UnexpectedBehaviorError):
+          start_capture_packets(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_true(
+          is_packet_capture_supported(self.mock_ad),
+          "Start capturing packets should be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_start_capture_unsupported(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.side_effect = AdbError(
+          cmd="", stdout="Unknown command", stderr="", ret_code=3
+      )
+      with asserts.assert_raises(UnsupportedOperationException):
+          start_capture_packets(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_false(
+          is_packet_capture_supported(self.mock_ad),
+          "Start capturing packets should not be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_stop_capture_success(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = "success"  # Successful command output
+      stop_capture_packets(
+          self.mock_ad, TEST_IFACE_NAME
+      )
+      mock_adb_shell.assert_called_once_with(
+          self.mock_ad,
+          "cmd network_stack capture stop"
+          f" {TEST_IFACE_NAME}"
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_stop_capture_failure(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = (  # Unexpected command output
+          "Any Unexpected Output"
+      )
+      with asserts.assert_raises(UnexpectedBehaviorError):
+          stop_capture_packets(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_true(
+          is_packet_capture_supported(self.mock_ad),
+          "Stop capturing packets should be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_stop_capture_unsupported(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.side_effect = AdbError(
+          cmd="", stdout="Unknown command", stderr="", ret_code=3
+      )
+      with asserts.assert_raises(UnsupportedOperationException):
+          stop_capture_packets(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_false(
+          is_packet_capture_supported(self.mock_ad),
+          "Stop capturing packets should not be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_matched_packet_counts_success(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = "10"  # Successful command output
+      get_matched_packet_counts(
+          self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+      )
+      mock_adb_shell.assert_called_once_with(
+          self.mock_ad,
+          "cmd network_stack capture matched-packet-counts"
+          f" {TEST_IFACE_NAME} {TEST_PACKET_IN_HEX}"
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_matched_packet_counts_failure(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = (  # Unexpected command output
+          "Any Unexpected Output"
+      )
+      with asserts.assert_raises(UnexpectedBehaviorError):
+          get_matched_packet_counts(
+              self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+          )
+      asserts.assert_true(
+          is_packet_capture_supported(self.mock_ad),
+          "Get matched packet counts should be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_matched_packet_counts_unsupported(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.side_effect = AdbError(
+          cmd="", stdout="Unknown command", stderr="", ret_code=3
+      )
+      with asserts.assert_raises(UnsupportedOperationException):
+          get_matched_packet_counts(
+              self.mock_ad, TEST_IFACE_NAME, TEST_PACKET_IN_HEX
+          )
+      asserts.assert_false(
+          is_packet_capture_supported(self.mock_ad),
+          "Get matched packet counts should not be supported.",
+      )
 
   @parameterized.parameters(
       ("2,2048,1", ApfCapabilities(2, 2048, 1)),  # Valid input
