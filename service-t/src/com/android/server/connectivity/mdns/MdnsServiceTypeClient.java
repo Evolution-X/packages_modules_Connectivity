@@ -456,6 +456,14 @@ public class MdnsServiceTypeClient {
         return executor;
     }
 
+    /**
+     * Get the cache key for this service type client.
+     */
+    @NonNull
+    public MdnsServiceCache.CacheKey getCacheKey() {
+        return cacheKey;
+    }
+
     private void removeScheduledTask() {
         dependencies.removeMessages(handler, EVENT_START_QUERYTASK);
         sharedLog.log("Remove EVENT_START_QUERYTASK"
