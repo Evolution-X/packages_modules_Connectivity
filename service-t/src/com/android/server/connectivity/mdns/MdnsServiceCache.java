@@ -49,7 +49,7 @@ import java.util.Objects;
  *  to their default value (0, false or null).
  */
 public class MdnsServiceCache {
-    static class CacheKey {
+    public static class CacheKey {
         @NonNull final String mUpperCaseServiceType;
         @NonNull final SocketKey mSocketKey;
 

@@ -26,7 +26,7 @@ android_test {
     target_sdk_version: "33",
 
     libs: [
-        "android.test.base",
+        "android.test.base.stubs",
     ],
 
     srcs: [

@@ -447,7 +447,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                     }
                     mConnectivityManager.registerNetworkProvider(mNetworkProvider);
                     requestUpstreamNetwork();
-                    requestThreadNetwork();
+                    registerThreadNetworkCallback();
                     mUserRestricted = isThreadUserRestricted();
                     registerUserRestrictionsReceiver();
                     maybeInitializeOtDaemon();
@@ -768,7 +768,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
-    private void requestThreadNetwork() {
+    private void registerThreadNetworkCallback() {
         mConnectivityManager.registerNetworkCallback(
                 new NetworkRequest.Builder()
                         // clearCapabilities() is needed to remove forbidden capabilities and UID

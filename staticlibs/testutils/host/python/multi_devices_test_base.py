@@ -52,3 +52,4 @@ class MultiDevicesTestBase(base_test.BaseTestClass):
         max_workers=2,
         raise_on_exception=True,
     )
+    self.client = self.clientDevice.connectivity_multi_devices_snippet

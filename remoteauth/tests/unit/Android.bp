@@ -30,9 +30,9 @@ android_test {
     srcs: [],
 
     libs: [
-        "android.test.base",
-        "android.test.mock",
-        "android.test.runner",
+        "android.test.base.stubs.test",
+        "android.test.mock.stubs.test",
+        "android.test.runner.stubs.test",
         "framework-annotations-lib",
     ],
     compile_multilib: "both",

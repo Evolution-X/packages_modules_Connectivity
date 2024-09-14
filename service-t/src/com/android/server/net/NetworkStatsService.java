@@ -51,12 +51,8 @@ import static android.net.NetworkTemplate.MATCH_TEST;
 import static android.net.NetworkTemplate.MATCH_WIFI;
 import static android.net.TrafficStats.KB_IN_BYTES;
 import static android.net.TrafficStats.MB_IN_BYTES;
-import static android.net.TrafficStats.TYPE_RX_BYTES;
-import static android.net.TrafficStats.TYPE_RX_PACKETS;
-import static android.net.TrafficStats.TYPE_TX_BYTES;
-import static android.net.TrafficStats.TYPE_TX_PACKETS;
 import static android.net.TrafficStats.UID_TETHERING;
-import static android.net.TrafficStats.UNSUPPORTED;
+import static android.net.TrafficStats.getValueForTypeFromFirstEntry;
 import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID_TAG;
@@ -308,9 +304,10 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
 
     static final String TRAFFIC_STATS_CACHE_EXPIRY_DURATION_NAME =
             "trafficstats_cache_expiry_duration_ms";
-    static final String TRAFFIC_STATS_CACHE_MAX_ENTRIES_NAME = "trafficstats_cache_max_entries";
+    static final String TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES_NAME =
+            "trafficstats_cache_max_entries";
     static final int DEFAULT_TRAFFIC_STATS_CACHE_EXPIRY_DURATION_MS = 1000;
-    static final int DEFAULT_TRAFFIC_STATS_CACHE_MAX_ENTRIES = 400;
+    static final int DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES = 400;
     /**
      * The delay time between to network stats update intents.
      * Added to fix intent spams (b/343844995)
@@ -491,13 +488,13 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     private final TrafficStatsRateLimitCache mTrafficStatsTotalCache;
     private final TrafficStatsRateLimitCache mTrafficStatsIfaceCache;
     private final TrafficStatsRateLimitCache mTrafficStatsUidCache;
-    static final String TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG =
+    static final String TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG =
             "trafficstats_rate_limit_cache_enabled_flag";
     static final String BROADCAST_NETWORK_STATS_UPDATED_RATE_LIMIT_ENABLED_FLAG =
             "broadcast_network_stats_updated_rate_limit_enabled_flag";
-    private final boolean mAlwaysUseTrafficStatsRateLimitCache;
+    private final boolean mAlwaysUseTrafficStatsServiceRateLimitCache;
     private final int mTrafficStatsRateLimitCacheExpiryDuration;
-    private final int mTrafficStatsRateLimitCacheMaxEntries;
+    private final int mTrafficStatsServiceRateLimitCacheMaxEntries;
     private final boolean mBroadcastNetworkStatsUpdatedRateLimitEnabled;
 
 
@@ -691,20 +688,23 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             mEventLogger = null;
         }
 
-        mAlwaysUseTrafficStatsRateLimitCache =
-                mDeps.alwaysUseTrafficStatsRateLimitCache(mContext);
+        mAlwaysUseTrafficStatsServiceRateLimitCache =
+                mDeps.alwaysUseTrafficStatsServiceRateLimitCache(mContext);
         mBroadcastNetworkStatsUpdatedRateLimitEnabled =
                 mDeps.enabledBroadcastNetworkStatsUpdatedRateLimiting(mContext);
         mTrafficStatsRateLimitCacheExpiryDuration =
                 mDeps.getTrafficStatsRateLimitCacheExpiryDuration();
-        mTrafficStatsRateLimitCacheMaxEntries =
-                mDeps.getTrafficStatsRateLimitCacheMaxEntries();
+        mTrafficStatsServiceRateLimitCacheMaxEntries =
+                mDeps.getTrafficStatsServiceRateLimitCacheMaxEntries();
         mTrafficStatsTotalCache = new TrafficStatsRateLimitCache(mClock,
-                mTrafficStatsRateLimitCacheExpiryDuration, mTrafficStatsRateLimitCacheMaxEntries);
+                mTrafficStatsRateLimitCacheExpiryDuration,
+                mTrafficStatsServiceRateLimitCacheMaxEntries);
         mTrafficStatsIfaceCache = new TrafficStatsRateLimitCache(mClock,
-                mTrafficStatsRateLimitCacheExpiryDuration, mTrafficStatsRateLimitCacheMaxEntries);
+                mTrafficStatsRateLimitCacheExpiryDuration,
+                mTrafficStatsServiceRateLimitCacheMaxEntries);
         mTrafficStatsUidCache = new TrafficStatsRateLimitCache(mClock,
-                mTrafficStatsRateLimitCacheExpiryDuration, mTrafficStatsRateLimitCacheMaxEntries);
+                mTrafficStatsRateLimitCacheExpiryDuration,
+                mTrafficStatsServiceRateLimitCacheMaxEntries);
 
         // TODO: Remove bpfNetMaps creation and always start SkDestroyListener
         // Following code is for the experiment to verify the SkDestroyListener refactoring. Based
@@ -964,14 +964,14 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         }
 
         /**
-         * Get whether TrafficStats rate-limit cache is always applied.
+         * Get whether TrafficStats service side rate-limit cache is always applied.
          *
          * This method should only be called once in the constructor,
          * to ensure that the code does not need to deal with flag values changing at runtime.
          */
-        public boolean alwaysUseTrafficStatsRateLimitCache(@NonNull Context ctx) {
+        public boolean alwaysUseTrafficStatsServiceRateLimitCache(@NonNull Context ctx) {
             return SdkLevel.isAtLeastV() && DeviceConfigUtils.isTetheringFeatureNotChickenedOut(
-                    ctx, TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG);
+                    ctx, TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG);
         }
 
         /**
@@ -987,15 +987,15 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         }
 
         /**
-         * Get TrafficStats rate-limit cache max entries.
+         * Get TrafficStats service side rate-limit cache max entries.
          *
          * This method should only be called once in the constructor,
          * to ensure that the code does not need to deal with flag values changing at runtime.
          */
-        public int getTrafficStatsRateLimitCacheMaxEntries() {
+        public int getTrafficStatsServiceRateLimitCacheMaxEntries() {
             return getDeviceConfigPropertyInt(
-                    NAMESPACE_TETHERING, TRAFFIC_STATS_CACHE_MAX_ENTRIES_NAME,
-                    DEFAULT_TRAFFIC_STATS_CACHE_MAX_ENTRIES);
+                    NAMESPACE_TETHERING, TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES_NAME,
+                    DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES);
         }
 
         /**
@@ -2135,20 +2135,28 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
 
     @Override
     public long getUidStats(int uid, int type) {
+        return getValueForTypeFromFirstEntry(getTypelessUidStats(uid), type);
+    }
+
+    @NonNull
+    @Override
+    public NetworkStats getTypelessUidStats(int uid) {
+        final NetworkStats stats = new NetworkStats(0, 0);
         final int callingUid = Binder.getCallingUid();
         if (callingUid != android.os.Process.SYSTEM_UID && callingUid != uid) {
-            return UNSUPPORTED;
+            return stats;
         }
-        if (!isEntryValueTypeValid(type)) return UNSUPPORTED;
-
-        if (mAlwaysUseTrafficStatsRateLimitCache
+        final NetworkStats.Entry entry;
+        if (mAlwaysUseTrafficStatsServiceRateLimitCache
                 || mDeps.isChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, callingUid)) {
-            final NetworkStats.Entry entry = mTrafficStatsUidCache.getOrCompute(IFACE_ALL, uid,
+            entry = mTrafficStatsUidCache.getOrCompute(IFACE_ALL, uid,
                     () -> mDeps.nativeGetUidStat(uid));
-            return getEntryValueForType(entry, type);
-        }
+        } else entry = mDeps.nativeGetUidStat(uid);
 
-        return getEntryValueForType(mDeps.nativeGetUidStat(uid), type);
+        if (entry != null) {
+            stats.insertEntry(entry);
+        }
+        return stats;
     }
 
     @Nullable
@@ -2165,50 +2173,24 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         return entry;
     }
 
+    @NonNull
     @Override
-    public long getIfaceStats(@NonNull String iface, int type) {
+    public NetworkStats getTypelessIfaceStats(@NonNull String iface) {
         Objects.requireNonNull(iface);
-        if (!isEntryValueTypeValid(type)) return UNSUPPORTED;
 
-        if (mAlwaysUseTrafficStatsRateLimitCache
+        final NetworkStats.Entry entry;
+        if (mAlwaysUseTrafficStatsServiceRateLimitCache
                 || mDeps.isChangeEnabled(
                         ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, Binder.getCallingUid())) {
-            final NetworkStats.Entry entry = mTrafficStatsIfaceCache.getOrCompute(iface, UID_ALL,
+            entry = mTrafficStatsIfaceCache.getOrCompute(iface, UID_ALL,
                     () -> getIfaceStatsInternal(iface));
-            return getEntryValueForType(entry, type);
-        }
+        } else entry = getIfaceStatsInternal(iface);
 
-        return getEntryValueForType(getIfaceStatsInternal(iface), type);
-    }
-
-    private long getEntryValueForType(@Nullable NetworkStats.Entry entry, int type) {
-        if (entry == null) return UNSUPPORTED;
-        if (!isEntryValueTypeValid(type)) return UNSUPPORTED;
-        switch (type) {
-            case TYPE_RX_BYTES:
-                return entry.rxBytes;
-            case TYPE_RX_PACKETS:
-                return entry.rxPackets;
-            case TYPE_TX_BYTES:
-                return entry.txBytes;
-            case TYPE_TX_PACKETS:
-                return entry.txPackets;
-            default:
-                throw new IllegalStateException("Bug: Invalid type: "
-                        + type + " should not reach here.");
+        NetworkStats stats = new NetworkStats(0, 0);
+        if (entry != null) {
+            stats.insertEntry(entry);
         }
-    }
-
-    private boolean isEntryValueTypeValid(int type) {
-        switch (type) {
-            case TYPE_RX_BYTES:
-            case TYPE_RX_PACKETS:
-            case TYPE_TX_BYTES:
-            case TYPE_TX_PACKETS:
-                return true;
-            default :
-                return false;
-        }
+        return stats;
     }
 
     @Nullable
@@ -2221,18 +2203,22 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         return entry;
     }
 
+    @NonNull
     @Override
-    public long getTotalStats(int type) {
-        if (!isEntryValueTypeValid(type)) return UNSUPPORTED;
-        if (mAlwaysUseTrafficStatsRateLimitCache
+    public NetworkStats getTypelessTotalStats() {
+        final NetworkStats.Entry entry;
+        if (mAlwaysUseTrafficStatsServiceRateLimitCache
                 || mDeps.isChangeEnabled(
                         ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, Binder.getCallingUid())) {
-            final NetworkStats.Entry entry = mTrafficStatsTotalCache.getOrCompute(
+            entry = mTrafficStatsTotalCache.getOrCompute(
                     IFACE_ALL, UID_ALL, () -> getTotalStatsInternal());
-            return getEntryValueForType(entry, type);
-        }
+        } else entry = getTotalStatsInternal();
 
-        return getEntryValueForType(getTotalStatsInternal(), type);
+        final NetworkStats stats = new NetworkStats(0, 0);
+        if (entry != null) {
+            stats.insertEntry(entry);
+        }
+        return stats;
     }
 
     @Override
@@ -3010,12 +2996,14 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             } catch (IOException e) {
                 pw.println("(failed to dump FastDataInput counters)");
             }
-            pw.print("trafficstats.cache.alwaysuse", mAlwaysUseTrafficStatsRateLimitCache);
+            pw.print("trafficstats.service.cache.alwaysuse",
+                    mAlwaysUseTrafficStatsServiceRateLimitCache);
             pw.println();
             pw.print(TRAFFIC_STATS_CACHE_EXPIRY_DURATION_NAME,
                     mTrafficStatsRateLimitCacheExpiryDuration);
             pw.println();
-            pw.print(TRAFFIC_STATS_CACHE_MAX_ENTRIES_NAME, mTrafficStatsRateLimitCacheMaxEntries);
+            pw.print(TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES_NAME,
+                    mTrafficStatsServiceRateLimitCacheMaxEntries);
             pw.println();
 
             pw.decreaseIndent();

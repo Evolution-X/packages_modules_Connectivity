@@ -102,6 +102,7 @@ public class MdnsDiscoveryManagerTests {
     @Mock MdnsServiceBrowserListener mockListenerOne;
     @Mock MdnsServiceBrowserListener mockListenerTwo;
     @Mock SharedLog sharedLog;
+    @Mock MdnsServiceCache mockServiceCache;
     private MdnsDiscoveryManager discoveryManager;
     private HandlerThread thread;
     private Handler handler;
@@ -145,7 +146,9 @@ public class MdnsDiscoveryManagerTests {
                         return null;
                     }
                 };
+        discoveryManager = makeDiscoveryManager(MdnsFeatureFlags.newBuilder().build());
         doReturn(mockExecutorService).when(mockServiceTypeClientType1NullNetwork).getExecutor();
+        doReturn(mockExecutorService).when(mockServiceTypeClientType1Network1).getExecutor();
     }
 
     @After
@@ -154,6 +157,40 @@ public class MdnsDiscoveryManagerTests {
             thread.quitSafely();
             thread.join();
         }
+    }
+
+    private MdnsDiscoveryManager makeDiscoveryManager(@NonNull MdnsFeatureFlags featureFlags) {
+        return new MdnsDiscoveryManager(executorProvider, socketClient, sharedLog, featureFlags) {
+            @Override
+            MdnsServiceTypeClient createServiceTypeClient(@NonNull String serviceType,
+                    @NonNull SocketKey socketKey) {
+                createdServiceTypeClientCount++;
+                final Pair<String, SocketKey> perSocketServiceType =
+                        Pair.create(serviceType, socketKey);
+                if (perSocketServiceType.equals(PER_SOCKET_SERVICE_TYPE_1_NULL_NETWORK)) {
+                    return mockServiceTypeClientType1NullNetwork;
+                } else if (perSocketServiceType.equals(
+                        PER_SOCKET_SERVICE_TYPE_1_NETWORK_1)) {
+                    return mockServiceTypeClientType1Network1;
+                } else if (perSocketServiceType.equals(
+                        PER_SOCKET_SERVICE_TYPE_2_NULL_NETWORK)) {
+                    return mockServiceTypeClientType2NullNetwork;
+                } else if (perSocketServiceType.equals(
+                        PER_SOCKET_SERVICE_TYPE_2_NETWORK_1)) {
+                    return mockServiceTypeClientType2Network1;
+                } else if (perSocketServiceType.equals(
+                        PER_SOCKET_SERVICE_TYPE_2_NETWORK_2)) {
+                    return mockServiceTypeClientType2Network2;
+                }
+                fail("Unexpected perSocketServiceType: " + perSocketServiceType);
+                return null;
+            }
+
+            @Override
+            MdnsServiceCache getServiceCache() {
+                return mockServiceCache;
+            }
+        };
     }
 
     private void runOnHandler(Runnable r) {
@@ -436,6 +473,57 @@ public class MdnsDiscoveryManagerTests {
         } finally {
             testableLooper.destroy();
         }
+    }
+
+    @Test
+    public void testRemoveServicesAfterAllListenersUnregistered() throws IOException {
+        final MdnsFeatureFlags mdnsFeatureFlags = MdnsFeatureFlags.newBuilder()
+                .setIsCachedServicesRemovalEnabled(true)
+                .setCachedServicesRetentionTime(0L)
+                .build();
+        discoveryManager = makeDiscoveryManager(mdnsFeatureFlags);
+
+        final MdnsSearchOptions options =
+                MdnsSearchOptions.newBuilder().setNetwork(NETWORK_1).build();
+        final SocketCreationCallback callback = expectSocketCreationCallback(
+                SERVICE_TYPE_1, mockListenerOne, options);
+        runOnHandler(() -> callback.onSocketCreated(SOCKET_KEY_NETWORK_1));
+        verify(mockServiceTypeClientType1Network1).startSendAndReceive(mockListenerOne, options);
+
+        final MdnsServiceCache.CacheKey cacheKey =
+                new MdnsServiceCache.CacheKey(SERVICE_TYPE_1, SOCKET_KEY_NETWORK_1);
+        doReturn(cacheKey).when(mockServiceTypeClientType1Network1).getCacheKey();
+        doReturn(true).when(mockServiceTypeClientType1Network1)
+                .stopSendAndReceive(mockListenerOne);
+        runOnHandler(() -> discoveryManager.unregisterListener(SERVICE_TYPE_1, mockListenerOne));
+        verify(executorProvider).shutdownExecutorService(mockExecutorService);
+        verify(mockServiceTypeClientType1Network1).stopSendAndReceive(mockListenerOne);
+        verify(socketClient).stopDiscovery();
+        verify(mockServiceCache).removeServices(cacheKey);
+    }
+
+    @Test
+    public void testRemoveServicesAfterSocketDestroyed() throws IOException {
+        final MdnsFeatureFlags mdnsFeatureFlags = MdnsFeatureFlags.newBuilder()
+                .setIsCachedServicesRemovalEnabled(true)
+                .setCachedServicesRetentionTime(0L)
+                .build();
+        discoveryManager = makeDiscoveryManager(mdnsFeatureFlags);
+
+        final MdnsSearchOptions options =
+                MdnsSearchOptions.newBuilder().setNetwork(NETWORK_1).build();
+        final SocketCreationCallback callback = expectSocketCreationCallback(
+                SERVICE_TYPE_1, mockListenerOne, options);
+        runOnHandler(() -> callback.onSocketCreated(SOCKET_KEY_NETWORK_1));
+        verify(mockServiceTypeClientType1Network1).startSendAndReceive(mockListenerOne, options);
+
+        final MdnsServiceCache.CacheKey cacheKey =
+                new MdnsServiceCache.CacheKey(SERVICE_TYPE_1, SOCKET_KEY_NETWORK_1);
+        doReturn(cacheKey).when(mockServiceTypeClientType1Network1).getCacheKey();
+        runOnHandler(() -> callback.onSocketDestroyed(SOCKET_KEY_NETWORK_1));
+        verify(mockServiceTypeClientType1Network1).notifySocketDestroyed();
+        verify(executorProvider).shutdownExecutorService(mockExecutorService);
+        verify(mockServiceCache).removeServices(cacheKey);
     }
 
     private MdnsPacket createMdnsPacket(String serviceType) {

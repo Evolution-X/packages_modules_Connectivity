@@ -301,6 +301,17 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
                         serviceTypeClient.notifySocketDestroyed();
                         executorProvider.shutdownExecutorService(serviceTypeClient.getExecutor());
                         perSocketServiceTypeClients.remove(serviceTypeClient);
+                        // The cached services may not be reliable after the socket is disconnected,
+                        // the service type client won't receive any updates for them. Therefore,
+                        // remove these cached services after exceeding the retention time
+                        // (currently 10s) if no service type client requires them.
+                        if (mdnsFeatureFlags.isCachedServicesRemovalEnabled()) {
+                            final MdnsServiceCache.CacheKey cacheKey =
+                                    serviceTypeClient.getCacheKey();
+                            discoveryExecutor.executeDelayed(
+                                    () -> handleRemoveCachedServices(cacheKey),
+                                    mdnsFeatureFlags.getCachedServicesRetentionTime());
+                        }
                     }
                 });
     }
@@ -337,6 +348,42 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
                 // of the service type clients.
                 executorProvider.shutdownExecutorService(serviceTypeClient.getExecutor());
                 perSocketServiceTypeClients.remove(serviceTypeClient);
+                // The cached services may not be reliable after the socket is disconnected, the
+                // service type client won't receive any updates for them. Therefore, remove these
+                // cached services after exceeding the retention time (currently 10s) if no service
+                // type client requires them.
+                // Note: This removal is only called if the requested socket is still active for
+                // other requests. If the requested socket is no longer needed after the listener
+                // is unregistered, SocketCreationCallback#onSocketDestroyed callback will remove
+                // both the service type client and cached services there.
+                //
+                // List some multiple listener cases for the cached service removal flow.
+                //
+                // Case 1 - Same service type, different network requests
+                //  - Register Listener A (service type X, requesting all networks: Y and Z)
+                //  - Create service type clients X-Y and X-Z
+                //  - Register Listener B (service type X, requesting network Y)
+                //  - Reuse service type client X-Y
+                //  - Unregister Listener A
+                //  - Socket destroyed on network Z; remove the X-Z client. Unregister the listener
+                //    from the X-Y client and keep it, as it's still being used by Listener B.
+                //  - Remove cached services associated with the X-Z client after 10 seconds.
+                //
+                // Case 2 - Different service types, same network request
+                //  - Register Listener A (service type X, requesting network Y)
+                //  - Create service type client X-Y
+                //  - Register Listener B (service type Z, requesting network Y)
+                //  - Create service type client Z-Y
+                //  - Unregister Listener A
+                //  - No socket is destroyed because network Y is still being used by Listener B.
+                //  - Unregister the listener from the X-Y client, then remove it.
+                //  - Remove cached services associated with the X-Y client after 10 seconds.
+                if (mdnsFeatureFlags.isCachedServicesRemovalEnabled()) {
+                    final MdnsServiceCache.CacheKey cacheKey = serviceTypeClient.getCacheKey();
+                    discoveryExecutor.executeDelayed(
+                            () -> handleRemoveCachedServices(cacheKey),
+                            mdnsFeatureFlags.getCachedServicesRetentionTime());
+                }
             }
         }
         if (perSocketServiceTypeClients.isEmpty()) {
@@ -379,6 +426,26 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
         for (MdnsServiceTypeClient serviceTypeClient : getMdnsServiceTypeClient(socketKey)) {
             serviceTypeClient.onFailedToParseMdnsResponse(receivedPacketNumber, errorCode);
         }
+    }
+
+    private void handleRemoveCachedServices(@NonNull MdnsServiceCache.CacheKey cacheKey) {
+        // Check if there is an active service type client that requires the cached services. If so,
+        // do not remove associated services from cache.
+        for (MdnsServiceTypeClient client : getMdnsServiceTypeClient(cacheKey.mSocketKey)) {
+            if (client.getCacheKey().equals(cacheKey)) {
+                // Found a client that has same CacheKey.
+                return;
+            }
+        }
+        sharedLog.log("Remove cached services for " + cacheKey);
+        // No client has same CacheKey. Remove associated services.
+        getServiceCache().removeServices(cacheKey);
+    }
+
+    @VisibleForTesting
+    @NonNull
+    MdnsServiceCache getServiceCache() {
+        return serviceCache;
     }
 
     @VisibleForTesting

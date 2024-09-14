@@ -49,8 +49,8 @@ android_test {
         "truth",
     ],
     libs: [
-        "android.test.base",
-        "android.test.runner",
+        "android.test.base.stubs",
+        "android.test.runner.stubs",
         "framework-connectivity-module-api-stubs-including-flagged",
     ],
     // Test coverage system runs on different devices. Need to

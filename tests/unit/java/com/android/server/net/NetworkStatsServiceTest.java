@@ -56,6 +56,7 @@ import static android.net.NetworkTemplate.OEM_MANAGED_YES;
 import static android.net.TrafficStats.MB_IN_BYTES;
 import static android.net.TrafficStats.UID_REMOVED;
 import static android.net.TrafficStats.UID_TETHERING;
+import static android.net.TrafficStats.getValueForTypeFromFirstEntry;
 import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID_TAG;
@@ -72,13 +73,13 @@ import static com.android.server.net.NetworkStatsService.ACTION_NETWORK_STATS_PO
 import static com.android.server.net.NetworkStatsService.ACTION_NETWORK_STATS_UPDATED;
 import static com.android.server.net.NetworkStatsService.BROADCAST_NETWORK_STATS_UPDATED_RATE_LIMIT_ENABLED_FLAG;
 import static com.android.server.net.NetworkStatsService.DEFAULT_TRAFFIC_STATS_CACHE_EXPIRY_DURATION_MS;
-import static com.android.server.net.NetworkStatsService.DEFAULT_TRAFFIC_STATS_CACHE_MAX_ENTRIES;
+import static com.android.server.net.NetworkStatsService.DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES;
 import static com.android.server.net.NetworkStatsService.NETSTATS_FASTDATAINPUT_FALLBACKS_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_FASTDATAINPUT_SUCCESSES_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_ATTEMPTS_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_FALLBACKS_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_SUCCESSES_COUNTER_NAME;
-import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG;
+import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertEquals;
@@ -620,8 +621,9 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         }
 
         @Override
-        public boolean alwaysUseTrafficStatsRateLimitCache(Context ctx) {
-            return mFeatureFlags.getOrDefault(TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG, false);
+        public boolean alwaysUseTrafficStatsServiceRateLimitCache(Context ctx) {
+            return mFeatureFlags.getOrDefault(
+                    TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG, false);
         }
 
         @Override
@@ -636,8 +638,8 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         }
 
         @Override
-        public int getTrafficStatsRateLimitCacheMaxEntries() {
-            return DEFAULT_TRAFFIC_STATS_CACHE_MAX_ENTRIES;
+        public int getTrafficStatsServiceRateLimitCacheMaxEntries() {
+            return DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES;
         }
 
         @Override
@@ -2451,28 +2453,28 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         assertUidTotal(sTemplateWifi, UID_GREEN, 64L, 3L, 1024L, 8L, 0);
     }
 
-    @FeatureFlag(name = TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
+    @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
     @Test
     public void testTrafficStatsRateLimitCache_disabledWithCompatChangeEnabled() throws Exception {
         mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
         doTestTrafficStatsRateLimitCache(true /* expectCached */);
     }
 
-    @FeatureFlag(name = TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG)
     @Test
     public void testTrafficStatsRateLimitCache_enabledWithCompatChangeEnabled() throws Exception {
         mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
         doTestTrafficStatsRateLimitCache(true /* expectCached */);
     }
 
-    @FeatureFlag(name = TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
+    @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
     @Test
     public void testTrafficStatsRateLimitCache_disabledWithCompatChangeDisabled() throws Exception {
         mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, false);
         doTestTrafficStatsRateLimitCache(false /* expectCached */);
     }
 
-    @FeatureFlag(name = TRAFFICSTATS_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG)
     @Test
     public void testTrafficStatsRateLimitCache_enabledWithCompatChangeDisabled() throws Exception {
         mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, false);
@@ -2514,11 +2516,13 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
     private void assertTrafficStatsValues(String iface, int uid, long rxBytes, long rxPackets,
             long txBytes, long txPackets) {
         assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> mService.getTotalStats(type));
+                (type) -> getValueForTypeFromFirstEntry(mService.getTypelessTotalStats(), type));
         assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> mService.getIfaceStats(iface, type));
+                (type) -> getValueForTypeFromFirstEntry(
+                        mService.getTypelessIfaceStats(iface), type)
+        );
         assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> mService.getUidStats(uid, type));
+                (type) -> getValueForTypeFromFirstEntry(mService.getTypelessUidStats(uid), type));
     }
 
     private void assertTrafficStatsValuesThat(long rxBytes, long rxPackets, long txBytes,
