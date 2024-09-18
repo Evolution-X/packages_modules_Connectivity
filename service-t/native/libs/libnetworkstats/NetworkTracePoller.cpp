@@ -41,17 +41,13 @@ void NetworkTracePoller::PollAndSchedule(perfetto::base::TaskRunner* runner,
   // The task runner is sequential so these can't run on top of each other.
   runner->PostDelayedTask([=, this]() { PollAndSchedule(runner, poll_ms); }, poll_ms);
 
-  if (mBufferMutex.try_lock()) {
-    ConsumeAllLocked();
-    mBufferMutex.unlock();
-  }
+  ConsumeAll();
 }
 
 bool NetworkTracePoller::Start(uint32_t pollMs) {
   ALOGD("Starting datasource");
 
   std::scoped_lock<std::mutex> lock(mMutex);
-  std::scoped_lock<std::mutex> block(mBufferMutex);
   if (mSessionCount > 0) {
     if (mPollMs != pollMs) {
       // Nothing technical prevents mPollMs from changing, it's just unclear
@@ -77,7 +73,10 @@ bool NetworkTracePoller::Start(uint32_t pollMs) {
     return false;
   }
 
-  mRingBuffer = std::move(*rb);
+  {
+    std::scoped_lock<std::mutex> block(mBufferMutex);
+    mRingBuffer = std::move(*rb);
+  }
 
   auto res = mConfigurationMap.writeValue(0, true, BPF_ANY);
   if (!res.ok()) {
@@ -98,7 +97,6 @@ bool NetworkTracePoller::Stop() {
   ALOGD("Stopping datasource");
 
   std::scoped_lock<std::mutex> lock(mMutex);
-  std::scoped_lock<std::mutex> block(mBufferMutex);
   if (mSessionCount == 0) return false;  // This should never happen
 
   // If this isn't the last session, don't clean up yet.
@@ -116,10 +114,14 @@ bool NetworkTracePoller::Stop() {
   // Drain remaining events from the ring buffer now that tracing is disabled.
   // This prevents the next trace from seeing stale events and allows writing
   // the last batch of events to Perfetto.
-  ConsumeAllLocked();
+  ConsumeAll();
 
   mTaskRunner.reset();
-  mRingBuffer.reset();
+
+  {
+    std::scoped_lock<std::mutex> block(mBufferMutex);
+    mRingBuffer.reset();
+  }
 
   return res.ok();
 }
@@ -148,10 +150,6 @@ void NetworkTracePoller::TraceIfaces(const std::vector<PacketTrace>& packets) {
 
 bool NetworkTracePoller::ConsumeAll() {
   std::scoped_lock<std::mutex> lock(mBufferMutex);
-  return ConsumeAllLocked();
-}
-
-bool NetworkTracePoller::ConsumeAllLocked() {
   if (mRingBuffer == nullptr) {
     ALOGW("Tracing is not active");
     return false;
