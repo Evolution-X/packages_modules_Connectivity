@@ -124,14 +124,14 @@ public class RtNetlinkLinkMessageTest {
     }
 
     private static final String RTM_NEWLINK_PACK_HEX =
-            "34000000100000000000000000000000"   // struct nlmsghr
+            "40000000100000000000000000000000"   // struct nlmsghr
             + "000001001E0000000210000000000000" // struct ifinfo
             + "08000400DC050000"                 // IFLA_MTU
             + "0A00010092C3E3C9374E0000"         // IFLA_ADDRESS
             + "0A000300776C616E30000000";        // IFLA_IFNAME(wlan0)
 
     @Test
-    public void testPackRtmNewLink() {
+    public void testParseAndPackRtmNewLink() {
         final ByteBuffer byteBuffer = toByteBuffer(RTM_NEWLINK_PACK_HEX);
         byteBuffer.order(ByteOrder.LITTLE_ENDIAN);  // For testing.
         final NetlinkMessage msg = NetlinkMessage.parse(byteBuffer, NETLINK_ROUTE);
@@ -143,6 +143,21 @@ public class RtNetlinkLinkMessageTest {
         packBuffer.order(ByteOrder.LITTLE_ENDIAN);  // For testing.
         linkMsg.pack(packBuffer);
         assertEquals(RTM_NEWLINK_PACK_HEX, HexDump.toHexString(packBuffer.array()));
+    }
+
+    @Test
+    public void testPackRtmNewLink() {
+        final RtNetlinkLinkMessage linkMsg = RtNetlinkLinkMessage.build(
+                // nlmsg_len will be updated inside create() method, so it's ok to set 0 here.
+                new StructNlMsgHdr(0 /*nlmsg_len*/, (short) 0x10, (short) 0, 0),
+                new StructIfinfoMsg((byte) 0, (short) 1, 0x1e, 0x1002, 0),
+                1500,
+                MacAddress.fromString("92:c3:e3:c9:37:4e"),
+                "wlan0");
+        assertNotNull(linkMsg);
+
+        final byte[] packBytes = linkMsg.pack(ByteOrder.LITTLE_ENDIAN);
+        assertEquals(RTM_NEWLINK_PACK_HEX, HexDump.toHexString(packBytes));
     }
 
     private static final String RTM_NEWLINK_TRUNCATED_HEX =
