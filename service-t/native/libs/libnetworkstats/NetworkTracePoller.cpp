@@ -149,18 +149,20 @@ void NetworkTracePoller::TraceIfaces(const std::vector<PacketTrace>& packets) {
 }
 
 bool NetworkTracePoller::ConsumeAll() {
-  std::scoped_lock<std::mutex> lock(mBufferMutex);
-  if (mRingBuffer == nullptr) {
-    ALOGW("Tracing is not active");
-    return false;
-  }
-
   std::vector<PacketTrace> packets;
-  base::Result<int> ret = mRingBuffer->ConsumeAll(
-      [&](const PacketTrace& pkt) { packets.push_back(pkt); });
-  if (!ret.ok()) {
-    ALOGW("Failed to poll ringbuf: %s", ret.error().message().c_str());
-    return false;
+  {
+    std::scoped_lock<std::mutex> lock(mBufferMutex);
+    if (mRingBuffer == nullptr) {
+      ALOGW("Tracing is not active");
+      return false;
+    }
+
+    base::Result<int> ret = mRingBuffer->ConsumeAll(
+        [&](const PacketTrace& pkt) { packets.push_back(pkt); });
+    if (!ret.ok()) {
+      ALOGW("Failed to poll ringbuf: %s", ret.error().message().c_str());
+      return false;
+    }
   }
 
   ATRACE_INT("NetworkTracePackets", packets.size());
