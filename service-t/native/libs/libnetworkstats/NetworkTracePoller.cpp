@@ -41,9 +41,9 @@ void NetworkTracePoller::PollAndSchedule(perfetto::base::TaskRunner* runner,
   // The task runner is sequential so these can't run on top of each other.
   runner->PostDelayedTask([=, this]() { PollAndSchedule(runner, poll_ms); }, poll_ms);
 
-  if (mMutex.try_lock()) {
+  if (mBufferMutex.try_lock()) {
     ConsumeAllLocked();
-    mMutex.unlock();
+    mBufferMutex.unlock();
   }
 }
 
@@ -51,6 +51,7 @@ bool NetworkTracePoller::Start(uint32_t pollMs) {
   ALOGD("Starting datasource");
 
   std::scoped_lock<std::mutex> lock(mMutex);
+  std::scoped_lock<std::mutex> block(mBufferMutex);
   if (mSessionCount > 0) {
     if (mPollMs != pollMs) {
       // Nothing technical prevents mPollMs from changing, it's just unclear
@@ -97,6 +98,7 @@ bool NetworkTracePoller::Stop() {
   ALOGD("Stopping datasource");
 
   std::scoped_lock<std::mutex> lock(mMutex);
+  std::scoped_lock<std::mutex> block(mBufferMutex);
   if (mSessionCount == 0) return false;  // This should never happen
 
   // If this isn't the last session, don't clean up yet.
@@ -145,7 +147,7 @@ void NetworkTracePoller::TraceIfaces(const std::vector<PacketTrace>& packets) {
 }
 
 bool NetworkTracePoller::ConsumeAll() {
-  std::scoped_lock<std::mutex> lock(mMutex);
+  std::scoped_lock<std::mutex> lock(mBufferMutex);
   return ConsumeAllLocked();
 }
 
