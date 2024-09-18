@@ -59,7 +59,6 @@ class NetworkTracePoller {
   // and thus a deadlock while resetting the TaskRunner. The runner pointer is
   // always valid within tasks run by that runner.
   void PollAndSchedule(perfetto::base::TaskRunner* runner, uint32_t poll_ms);
-  bool ConsumeAllLocked() REQUIRES(mBufferMutex);
 
   // Record sparse iface stats via atrace. This queries the per-iface stats maps
   // for any iface present in the vector of packets. This is inexact, but should
