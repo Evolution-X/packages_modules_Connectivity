@@ -19,17 +19,14 @@ import android.annotation.RequiresApi;
 import android.content.Context;
 import android.net.ct.ICertificateTransparencyManager;
 import android.os.Build;
+import android.provider.DeviceConfig;
 
 import com.android.net.ct.flags.Flags;
-import com.android.net.module.util.DeviceConfigUtils;
 import com.android.server.SystemService;
 
 /** Implementation of the Certificate Transparency service. */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 public class CertificateTransparencyService extends ICertificateTransparencyManager.Stub {
-
-    private static final String CERTIFICATE_TRANSPARENCY_ENABLED =
-            "certificate_transparency_service_enabled";
 
     private final CertificateTransparencyFlagsListener mFlagsListener;
 
@@ -37,9 +34,8 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
      * @return true if the CertificateTransparency service is enabled.
      */
     public static boolean enabled(Context context) {
-        // TODO: replace isTetheringFeatureEnabled with CT namespace flag.
-        return DeviceConfigUtils.isTetheringFeatureEnabled(
-                        context, CERTIFICATE_TRANSPARENCY_ENABLED)
+        return DeviceConfig.getBoolean(
+                        Config.NAMESPACE_NETWORK_SECURITY, Config.FLAG_SERVICE_ENABLED, false)
                 && Flags.certificateTransparencyService();
     }
 

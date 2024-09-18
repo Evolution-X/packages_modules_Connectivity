@@ -33,7 +33,15 @@ final class Config {
     private static final String PREFERENCES_FILE_NAME = "ct.preferences";
     static final File PREFERENCES_FILE = new File(DEVICE_PROTECTED_DATA_DIR, PREFERENCES_FILE_NAME);
 
-    // flags and properties names
+    // Phenotype flags
+    static final String NAMESPACE_NETWORK_SECURITY = "network_security";
+    private static final String FLAGS_PREFIX = "CertificateTransparencyLogList__";
+    static final String FLAG_SERVICE_ENABLED = FLAGS_PREFIX + "service_enabled";
+    static final String FLAG_CONTENT_URL = FLAGS_PREFIX + "content_url";
+    static final String FLAG_METADATA_URL = FLAGS_PREFIX + "metadata_url";
+    static final String FLAG_VERSION = FLAGS_PREFIX + "version";
+
+    // properties
     static final String VERSION_PENDING = "version_pending";
     static final String VERSION = "version";
     static final String CONTENT_URL_PENDING = "content_url_pending";
