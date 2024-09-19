@@ -43,7 +43,7 @@ public class ConnectivityNativeService extends ConnectivityNative.Stub {
     private static final String TAG = ConnectivityNativeService.class.getSimpleName();
 
     private static final String BLOCKED_PORTS_MAP_PATH =
-            "/sys/fs/bpf/net_shared/map_block_blocked_ports_map";
+            "/sys/fs/bpf/netd_shared/map_netd_blocked_ports_map";
 
     private final Context mContext;
 

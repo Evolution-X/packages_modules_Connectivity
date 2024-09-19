@@ -82,13 +82,13 @@ static const set<string> MAINLINE_FOR_S_PLUS = {
 
 // Provided by *current* mainline module for T+ devices
 static const set<string> MAINLINE_FOR_T_PLUS = {
-    SHARED "map_block_blocked_ports_map",
     SHARED "map_clatd_clat_egress4_map",
     SHARED "map_clatd_clat_ingress6_map",
     SHARED "map_dscpPolicy_ipv4_dscp_policies_map",
     SHARED "map_dscpPolicy_ipv6_dscp_policies_map",
     SHARED "map_dscpPolicy_socket_policy_cache_map",
     NETD "map_netd_app_uid_stats_map",
+    NETD "map_netd_blocked_ports_map",
     NETD "map_netd_configuration_map",
     NETD "map_netd_cookie_tag_map",
     NETD "map_netd_data_saver_enabled_map",
@@ -119,8 +119,8 @@ static const set<string> MAINLINE_FOR_T_4_14_PLUS = {
 
 // Provided by *current* mainline module for T+ devices with 5.4+ kernels
 static const set<string> MAINLINE_FOR_T_4_19_PLUS = {
-    NETD_RO "prog_block_bind4_block_port",
-    NETD_RO "prog_block_bind6_block_port",
+    NETD "prog_netd_bind4_inet4_bind",
+    NETD "prog_netd_bind6_inet6_bind",
 };
 
 // Provided by *current* mainline module for T+ devices with 5.15+ kernels

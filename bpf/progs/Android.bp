@@ -64,12 +64,6 @@ cc_library_headers {
 // bpf kernel programs
 //
 bpf {
-    name: "block.o",
-    srcs: ["block.c"],
-    sub_dir: "net_shared",
-}
-
-bpf {
     name: "dscpPolicy.o",
     srcs: ["dscpPolicy.c"],
     sub_dir: "net_shared",
