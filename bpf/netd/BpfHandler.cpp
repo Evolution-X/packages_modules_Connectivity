@@ -142,11 +142,9 @@ static Status initPrograms(const char* cg2_path) {
     }
 
     if (bpf::isAtLeastKernelVersion(4, 19, 0)) {
-        RETURN_IF_NOT_OK(attachProgramToCgroup(
-                "/sys/fs/bpf/netd_readonly/prog_block_bind4_block_port",
+        RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_BIND4_PROG_PATH,
                 cg_fd, BPF_CGROUP_INET4_BIND));
-        RETURN_IF_NOT_OK(attachProgramToCgroup(
-                "/sys/fs/bpf/netd_readonly/prog_block_bind6_block_port",
+        RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_BIND6_PROG_PATH,
                 cg_fd, BPF_CGROUP_INET6_BIND));
 
         // This should trivially pass, since we just attached up above,
