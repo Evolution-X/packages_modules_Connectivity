@@ -157,6 +157,8 @@ ASSERT_STRING_EQUAL(XT_BPF_DENYLIST_PROG_PATH,  BPF_NETD_PATH "prog_netd_skfilte
 
 #define CGROUP_INET_CREATE_PROG_PATH BPF_NETD_PATH "prog_netd_cgroupsock_inet_create"
 #define CGROUP_INET_RELEASE_PROG_PATH BPF_NETD_PATH "prog_netd_cgroupsockrelease_inet_release"
+#define CGROUP_BIND4_PROG_PATH BPF_NETD_PATH "prog_netd_bind4_inet4_bind"
+#define CGROUP_BIND6_PROG_PATH BPF_NETD_PATH "prog_netd_bind6_inet6_bind"
 #define CGROUP_CONNECT4_PROG_PATH BPF_NETD_PATH "prog_netd_connect4_inet4_connect"
 #define CGROUP_CONNECT6_PROG_PATH BPF_NETD_PATH "prog_netd_connect6_inet6_connect"
 #define CGROUP_UDP4_RECVMSG_PROG_PATH BPF_NETD_PATH "prog_netd_recvmsg4_udp4_recvmsg"
