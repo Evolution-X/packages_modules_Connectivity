@@ -215,7 +215,7 @@ typedef struct {
  * is the name of the program, and tracepoint is the type.
  *
  * However, be aware that you should not be directly using the SECTION() macro.
- * Instead use the DEFINE_(BPF|XDP)_(PROG|MAP)... & LICENSE/CRITICAL macros.
+ * Instead use the DEFINE_(BPF|XDP)_(PROG|MAP)... & LICENSE macros.
  *
  * Programs shipped inside the tethering apex should be limited to networking stuff,
  * as KPROBE, PERF_EVENT, TRACEPOINT are dangerous to use from mainline updatable code,
@@ -1105,30 +1105,22 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
     return 0;
 }
 
-int loadProg(const char* const elfPath, bool* const isCritical, const unsigned int bpfloader_ver,
+int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
              const char* const prefix) {
     vector<char> license;
-    vector<char> critical;
     vector<codeSection> cs;
     vector<unique_fd> mapFds;
     int ret;
 
-    if (!isCritical) return -1;
-    *isCritical = false;
-
     ifstream elfFile(elfPath, ios::in | ios::binary);
     if (!elfFile.is_open()) return -1;
-
-    ret = readSectionByName("critical", elfFile, critical);
-    *isCritical = !ret;
 
     ret = readSectionByName("license", elfFile, license);
     if (ret) {
         ALOGE("Couldn't find license in %s", elfPath);
         return ret;
     } else {
-        ALOGD("Loading %s%s ELF object %s with license %s",
-              *isCritical ? "critical for " : "optional", *isCritical ? (char*)critical.data() : "",
+        ALOGD("Loading ELF object %s with license %s",
               elfPath, (char*)license.data());
     }
 
@@ -1230,10 +1222,9 @@ static int loadAllElfObjects(const unsigned int bpfloader_ver, const Location& l
             string progPath(location.dir);
             progPath += s;
 
-            bool critical;
-            int ret = loadProg(progPath.c_str(), &critical, bpfloader_ver, location.prefix);
+            int ret = loadProg(progPath.c_str(), bpfloader_ver, location.prefix);
             if (ret) {
-                if (critical) retVal = ret;
+                retVal = ret;
                 ALOGE("Failed to load object: %s, ret: %s", progPath.c_str(), std::strerror(-ret));
             } else {
                 ALOGD("Loaded object: %s", progPath.c_str());
