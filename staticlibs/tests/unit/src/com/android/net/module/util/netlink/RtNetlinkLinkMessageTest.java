@@ -24,24 +24,29 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
 
+import android.annotation.SuppressLint;
 import android.net.MacAddress;
 import android.system.OsConstants;
 
 import androidx.test.filters.SmallTest;
-import androidx.test.runner.AndroidJUnit4;
 
 import com.android.net.module.util.HexDump;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(MockitoJUnitRunner.class)
 @SmallTest
 public class RtNetlinkLinkMessageTest {
+    @Mock
+    private OsAccess mOsAccess;
 
     // An example of the full RTM_NEWLINK message.
     private static final String RTM_NEWLINK_HEX =
@@ -183,6 +188,57 @@ public class RtNetlinkLinkMessageTest {
         assertNull(linkMsg.getHardwareAddress());
         assertEquals(ETHER_MTU, linkMsg.getMtu());
         assertTrue(linkMsg.getInterfaceName().equals("wlan0"));
+    }
+
+    @Test
+    public void testCreateSetLinkUpMessage() {
+        final String expectedHexBytes =
+                "20000000100005006824000000000000"     // struct nlmsghdr
+                + "00000000080000000100000001000000";  // struct ifinfomsg
+        final String interfaceName = "wlan0";
+        final int interfaceIndex = 8;
+        final int sequenceNumber = 0x2468;
+        final boolean isUp = true;
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(interfaceIndex);
+
+        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkStateMessage(
+                interfaceName, sequenceNumber, isUp, mOsAccess);
+        assertNotNull(msg);
+        final byte[] bytes = msg.pack(ByteOrder.LITTLE_ENDIAN);  // For testing.
+        assertEquals(expectedHexBytes, HexDump.toHexString(bytes));
+    }
+
+    @Test
+    public void testCreateSetLinkDownMessage() {
+        final String expectedHexBytes =
+                "20000000100005006824000000000000"     // struct nlmsghdr
+                        + "00000000080000000000000001000000";  // struct ifinfomsg
+        final String interfaceName = "wlan0";
+        final int interfaceIndex = 8;
+        final int sequenceNumber = 0x2468;
+        final boolean isUp = false;
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(interfaceIndex);
+
+        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkStateMessage(
+                interfaceName, sequenceNumber, isUp, mOsAccess);
+        assertNotNull(msg);
+        final byte[] bytes = msg.pack(ByteOrder.LITTLE_ENDIAN);  // For testing.
+        assertEquals(expectedHexBytes, HexDump.toHexString(bytes));
+    }
+
+    @Test
+    public void testCreateSetLinkStateMessage_InvalidInterface() {
+        final String interfaceName = "wlan0";
+        final int sequenceNumber = 0x2468;
+        final boolean isUp = false;
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(OsAccess.INVALID_INTERFACE_INDEX);
+
+        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkStateMessage(
+                interfaceName, sequenceNumber, isUp, mOsAccess);
+        assertNull(msg);
     }
 
     @Test
