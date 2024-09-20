@@ -19,8 +19,13 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
-java_defaults {
-    name: "CtsHostsideNetworkTestsAppDefaults",
+android_test_helper_app {
+    name: "CtsHostsideNetworkTestsApp",
+    defaults: [
+        "cts_support_defaults",
+        "framework-connectivity-test-defaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
+    ],
     static_libs: [
         "CtsHostsideNetworkTestsAidl",
         "androidx.test.ext.junit",
@@ -37,26 +42,5 @@ java_defaults {
     ],
     srcs: [
         "src/**/*.java",
-    ],
-}
-
-android_test_helper_app {
-    name: "CtsHostsideNetworkTestsApp",
-    defaults: [
-        "cts_support_defaults",
-        "framework-connectivity-test-defaults",
-        "CtsHostsideNetworkTestsAppDefaults",
-        "CtsHostsideNetworkTestsAllAppDefaults",
-    ],
-}
-
-android_test_helper_app {
-    name: "CtsHostsideNetworkTestsAppNext",
-    defaults: [
-        "cts_support_defaults",
-        "framework-connectivity-test-defaults",
-        "CtsHostsideNetworkTestsAppDefaults",
-        "CtsHostsideNetworkTestsAllAppDefaults",
-        "ConnectivityNextEnableDefaults",
     ],
 }
