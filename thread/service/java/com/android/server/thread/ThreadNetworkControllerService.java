@@ -212,7 +212,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private NetworkRequest mUpstreamNetworkRequest;
     private UpstreamNetworkCallback mUpstreamNetworkCallback;
     private TestNetworkSpecifier mUpstreamTestNetworkSpecifier;
-    private final Map<Network, String> mNetworkToInterface;
+    private final Map<Network, LinkProperties> mNetworkToLinkProperties;
     private final ThreadPersistentSettings mPersistentSettings;
     private final UserManager mUserManager;
     private boolean mUserRestricted;
@@ -235,7 +235,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             UserManager userManager,
             ConnectivityResources resources,
             Supplier<String> countryCodeSupplier,
-            Map<Network, String> networkToInterface) {
+            Map<Network, LinkProperties> networkToLinkProperties) {
         mContext = context;
         mHandler = handler;
         mNetworkProvider = networkProvider;
@@ -244,9 +244,9 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mTunIfController = tunIfController;
         mInfraIfController = infraIfController;
         mUpstreamNetworkRequest = newUpstreamNetworkRequest();
-        // TODO: mNetworkToInterface should be shared with NsdPublisher, add a test/assert to
+        // TODO: networkToLinkProperties should be shared with NsdPublisher, add a test/assert to
         // verify they are the same.
-        mNetworkToInterface = networkToInterface;
+        mNetworkToLinkProperties = networkToLinkProperties;
         mOtDaemonConfig = new OtDaemonConfiguration.Builder().build();
         mInfraLinkState = new InfraLinkState.Builder().build();
         mPersistentSettings = persistentSettings;
@@ -265,7 +265,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         Handler handler = new Handler(handlerThread.getLooper());
         NetworkProvider networkProvider =
                 new NetworkProvider(context, handlerThread.getLooper(), "ThreadNetworkProvider");
-        Map<Network, String> networkToInterface = new HashMap<Network, String>();
+        Map<Network, LinkProperties> networkToLinkProperties = new HashMap<>();
 
         return new ThreadNetworkControllerService(
                 context,
@@ -276,11 +276,11 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 new TunInterfaceController(TUN_IF_NAME),
                 new InfraInterfaceController(),
                 persistentSettings,
-                NsdPublisher.newInstance(context, handler, networkToInterface),
+                NsdPublisher.newInstance(context, handler, networkToLinkProperties),
                 context.getSystemService(UserManager.class),
                 new ConnectivityResources(context),
                 countryCodeSupplier,
-                networkToInterface);
+                networkToLinkProperties);
     }
 
     private NetworkRequest newUpstreamNetworkRequest() {
@@ -699,7 +699,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         if (mUpstreamNetworkCallback == null) {
             throw new AssertionError("The upstream network request null.");
         }
-        mNetworkToInterface.clear();
+        mNetworkToLinkProperties.clear();
         mConnectivityManager.unregisterNetworkCallback(mUpstreamNetworkCallback);
         mUpstreamNetworkCallback = null;
     }
@@ -721,20 +721,19 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
         @Override
         public void onLinkPropertiesChanged(
-                @NonNull Network network, @NonNull LinkProperties linkProperties) {
+                @NonNull Network network, @NonNull LinkProperties newLinkProperties) {
             checkOnHandlerThread();
 
-            String existingIfName = mNetworkToInterface.get(network);
-            String newIfName = linkProperties.getInterfaceName();
-            if (Objects.equals(existingIfName, newIfName)) {
+            LinkProperties oldLinkProperties = mNetworkToLinkProperties.get(network);
+            if (Objects.equals(oldLinkProperties, newLinkProperties)) {
                 return;
             }
-            LOG.i("Upstream network changed: " + existingIfName + " -> " + newIfName);
-            mNetworkToInterface.put(network, newIfName);
+            LOG.i("Upstream network changed: " + oldLinkProperties + " -> " + newLinkProperties);
+            mNetworkToLinkProperties.put(network, newLinkProperties);
 
             // TODO: disable border routing if netIfName is null
             if (network.equals(mUpstreamNetwork)) {
-                enableBorderRouting(mNetworkToInterface.get(mUpstreamNetwork));
+                setInfraLinkState(newInfraLinkStateBuilder(newLinkProperties).build());
             }
         }
     }
@@ -750,7 +749,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         public void onLost(@NonNull Network network) {
             checkOnHandlerThread();
             LOG.i("Thread network is lost: " + network);
-            disableBorderRouting();
+            setInfraLinkState(newInfraLinkStateBuilder().build());
         }
 
         @Override
@@ -764,13 +763,15 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                             + localNetworkInfo
                             + "}");
             if (localNetworkInfo.getUpstreamNetwork() == null) {
-                disableBorderRouting();
+                setInfraLinkState(newInfraLinkStateBuilder().build());
                 return;
             }
             if (!localNetworkInfo.getUpstreamNetwork().equals(mUpstreamNetwork)) {
                 mUpstreamNetwork = localNetworkInfo.getUpstreamNetwork();
-                if (mNetworkToInterface.containsKey(mUpstreamNetwork)) {
-                    enableBorderRouting(mNetworkToInterface.get(mUpstreamNetwork));
+                if (mNetworkToLinkProperties.containsKey(mUpstreamNetwork)) {
+                    setInfraLinkState(
+                            newInfraLinkStateBuilder(mNetworkToLinkProperties.get(mUpstreamNetwork))
+                                    .build());
                 }
                 mNsdPublisher.setNetworkForHostResolution(mUpstreamNetwork);
             }
@@ -1256,45 +1257,37 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
     }
 
-    private void setInfraLinkState(InfraLinkState infraLinkState) {
-        if (mInfraLinkState.equals(infraLinkState)) {
+    private void setInfraLinkState(InfraLinkState newInfraLinkState) {
+        if (mInfraLinkState.equals(newInfraLinkState)) {
             return;
         }
-        LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + infraLinkState);
-        mInfraLinkState = infraLinkState;
+        LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + newInfraLinkState);
+
+        setInfraLinkInterfaceName(newInfraLinkState.interfaceName);
+        mInfraLinkState = newInfraLinkState;
+    }
+
+    private void setInfraLinkInterfaceName(String newInfraLinkInterfaceName) {
+        if (Objects.equals(mInfraLinkState.interfaceName, newInfraLinkInterfaceName)) {
+            return;
+        }
         ParcelFileDescriptor infraIcmp6Socket = null;
-        if (mInfraLinkState.interfaceName != null) {
+        if (newInfraLinkInterfaceName != null) {
             try {
-                infraIcmp6Socket =
-                        mInfraIfController.createIcmp6Socket(mInfraLinkState.interfaceName);
+                infraIcmp6Socket = mInfraIfController.createIcmp6Socket(newInfraLinkInterfaceName);
             } catch (IOException e) {
                 LOG.e("Failed to create ICMPv6 socket on infra network interface", e);
             }
         }
         try {
             getOtDaemon()
-                    .setInfraLinkState(
-                            mInfraLinkState,
+                    .setInfraLinkInterfaceName(
+                            newInfraLinkInterfaceName,
                             infraIcmp6Socket,
-                            new LoggingOtStatusReceiver("setInfraLinkState"));
+                            new LoggingOtStatusReceiver("setInfraLinkInterfaceName"));
         } catch (RemoteException | ThreadNetworkException e) {
-            LOG.e("Failed to configure border router " + mOtDaemonConfig, e);
+            LOG.e("Failed to set infra link interface name " + newInfraLinkInterfaceName, e);
         }
-    }
-
-    private void enableBorderRouting(String infraIfName) {
-        InfraLinkState infraLinkState =
-                newInfraLinkStateBuilder(mInfraLinkState).setInterfaceName(infraIfName).build();
-        LOG.i("Enable border routing on AIL: " + infraIfName);
-        setInfraLinkState(infraLinkState);
-    }
-
-    private void disableBorderRouting() {
-        mUpstreamNetwork = null;
-        InfraLinkState infraLinkState =
-                newInfraLinkStateBuilder(mInfraLinkState).setInterfaceName(null).build();
-        LOG.i("Disabling border routing");
-        setInfraLinkState(infraLinkState);
     }
 
     private void handleThreadInterfaceStateChanged(boolean isUp) {
@@ -1425,8 +1418,16 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return new OtDaemonConfiguration.Builder();
     }
 
-    private static InfraLinkState.Builder newInfraLinkStateBuilder(InfraLinkState infraLinkState) {
-        return new InfraLinkState.Builder().setInterfaceName(infraLinkState.interfaceName);
+    private static InfraLinkState.Builder newInfraLinkStateBuilder() {
+        return new InfraLinkState.Builder().setInterfaceName("");
+    }
+
+    private static InfraLinkState.Builder newInfraLinkStateBuilder(
+            @Nullable LinkProperties linkProperties) {
+        if (linkProperties == null) {
+            return newInfraLinkStateBuilder();
+        }
+        return new InfraLinkState.Builder().setInterfaceName(linkProperties.getInterfaceName());
     }
 
     private static final class CallbackMetadata {
