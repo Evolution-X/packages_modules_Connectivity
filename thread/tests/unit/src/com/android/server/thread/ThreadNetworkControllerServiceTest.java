@@ -63,6 +63,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkAgent;
 import android.net.NetworkProvider;
 import android.net.NetworkRequest;
@@ -110,6 +111,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -170,6 +172,7 @@ public final class ThreadNetworkControllerServiceTest {
     @Mock private IBinder mIBinder;
     @Mock Resources mResources;
     @Mock ConnectivityResources mConnectivityResources;
+    @Mock Map<Network, String> mMockNetworkToInterface;
 
     private Context mContext;
     private TestLooper mTestLooper;
@@ -232,7 +235,8 @@ public final class ThreadNetworkControllerServiceTest {
                         mMockNsdPublisher,
                         mMockUserManager,
                         mConnectivityResources,
-                        () -> DEFAULT_COUNTRY_CODE);
+                        () -> DEFAULT_COUNTRY_CODE,
+                        mMockNetworkToInterface);
         mService.setTestNetworkAgent(mMockNetworkAgent);
     }
 
