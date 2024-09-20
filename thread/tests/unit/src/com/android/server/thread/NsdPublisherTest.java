@@ -34,6 +34,7 @@ import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 import android.net.DnsResolver;
 import android.net.InetAddresses;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.nsd.DiscoveryRequest;
 import android.net.nsd.NsdManager;
@@ -813,9 +814,10 @@ public final class NsdPublisherTest {
     private void prepareTest() {
         mTestLooper = new TestLooper();
         Handler handler = new Handler(mTestLooper.getLooper());
-        HashMap<Network, String> networkToInterface = new HashMap<>();
+        HashMap<Network, LinkProperties> networkToLinkProperties = new HashMap<>();
         mNsdPublisher =
-                new NsdPublisher(mMockNsdManager, mMockDnsResolver, handler, networkToInterface);
+                new NsdPublisher(
+                        mMockNsdManager, mMockDnsResolver, handler, networkToLinkProperties);
         mNsdPublisher.setNetworkForHostResolution(mNetwork);
     }
 }
