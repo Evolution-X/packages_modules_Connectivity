@@ -21,7 +21,6 @@ package {
 
 java_defaults {
     name: "CtsHostsideNetworkTestsAppDefaults",
-    platform_apis: true,
     static_libs: [
         "CtsHostsideNetworkTestsAidl",
         "androidx.test.ext.junit",
@@ -39,12 +38,6 @@ java_defaults {
     srcs: [
         "src/**/*.java",
     ],
-    // Tag this module as a cts test artifact
-    test_suites: [
-        "general-tests",
-        "sts",
-    ],
-    min_sdk_version: "30",
 }
 
 android_test_helper_app {
@@ -53,6 +46,7 @@ android_test_helper_app {
         "cts_support_defaults",
         "framework-connectivity-test-defaults",
         "CtsHostsideNetworkTestsAppDefaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
     ],
 }
 
@@ -62,6 +56,7 @@ android_test_helper_app {
         "cts_support_defaults",
         "framework-connectivity-test-defaults",
         "CtsHostsideNetworkTestsAppDefaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
         "ConnectivityNextEnableDefaults",
     ],
 }
