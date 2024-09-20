@@ -54,9 +54,6 @@ android_test_helper_app {
         "framework-connectivity-test-defaults",
         "CtsHostsideNetworkTestsAppDefaults",
     ],
-    static_libs: [
-        "NetworkStackApiStableShims",
-    ],
 }
 
 android_test_helper_app {
@@ -66,8 +63,5 @@ android_test_helper_app {
         "framework-connectivity-test-defaults",
         "CtsHostsideNetworkTestsAppDefaults",
         "ConnectivityNextEnableDefaults",
-    ],
-    static_libs: [
-        "NetworkStackApiCurrentShims",
     ],
 }
