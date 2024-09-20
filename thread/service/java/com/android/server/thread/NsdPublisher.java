@@ -30,6 +30,7 @@ import android.net.nsd.NsdServiceInfo;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.system.Os;
 import android.text.TextUtils;
 import android.util.SparseArray;
 
@@ -66,6 +67,7 @@ public final class NsdPublisher extends INsdPublisher.Stub {
 
     // TODO: b/321883491 - specify network for mDNS operations
     @Nullable private Network mNetwork;
+    private final Map<Network, String> mNetworkToInterface;
     private final NsdManager mNsdManager;
     private final DnsResolver mDnsResolver;
     private final Handler mHandler;
@@ -76,17 +78,26 @@ public final class NsdPublisher extends INsdPublisher.Stub {
     private final SparseArray<HostInfoListener> mHostInfoListeners = new SparseArray<>(0);
 
     @VisibleForTesting
-    public NsdPublisher(NsdManager nsdManager, DnsResolver dnsResolver, Handler handler) {
+    public NsdPublisher(
+            NsdManager nsdManager,
+            DnsResolver dnsResolver,
+            Handler handler,
+            Map<Network, String> networkToInterface) {
         mNetwork = null;
         mNsdManager = nsdManager;
         mDnsResolver = dnsResolver;
         mHandler = handler;
         mExecutor = runnable -> mHandler.post(runnable);
+        mNetworkToInterface = networkToInterface;
     }
 
-    public static NsdPublisher newInstance(Context context, Handler handler) {
+    public static NsdPublisher newInstance(
+            Context context, Handler handler, Map<Network, String> networkToInterface) {
         return new NsdPublisher(
-                context.getSystemService(NsdManager.class), DnsResolver.getInstance(), handler);
+                context.getSystemService(NsdManager.class),
+                DnsResolver.getInstance(),
+                handler,
+                networkToInterface);
     }
 
     // TODO: b/321883491 - NsdPublisher should be disabled when mNetwork is null
@@ -586,6 +597,11 @@ public final class NsdPublisher extends INsdPublisher.Stub {
                             + ", serviceInfo: "
                             + serviceInfo);
             List<String> addresses = new ArrayList<>();
+            int interfaceIndex = 0;
+            if (mNetworkToInterface.containsKey(serviceInfo.getNetwork())) {
+                interfaceIndex =
+                        Os.if_nametoindex(mNetworkToInterface.get(serviceInfo.getNetwork()));
+            }
             for (InetAddress address : serviceInfo.getHostAddresses()) {
                 if (address instanceof Inet6Address) {
                     addresses.add(address.getHostAddress());
@@ -602,6 +618,7 @@ public final class NsdPublisher extends INsdPublisher.Stub {
             try {
                 mResolveServiceCallback.onServiceResolved(
                         serviceInfo.getHostname(),
+                        interfaceIndex,
                         serviceInfo.getServiceName(),
                         serviceInfo.getServiceType(),
                         serviceInfo.getPort(),
