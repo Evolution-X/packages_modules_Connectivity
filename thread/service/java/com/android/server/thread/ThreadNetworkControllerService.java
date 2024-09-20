@@ -1241,6 +1241,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + newInfraLinkState);
 
         setInfraLinkInterfaceName(newInfraLinkState.interfaceName);
+        setInfraLinkNat64Prefix(newInfraLinkState.nat64Prefix);
         mInfraLinkState = newInfraLinkState;
     }
 
@@ -1264,6 +1265,19 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                             new LoggingOtStatusReceiver("setInfraLinkInterfaceName"));
         } catch (RemoteException | ThreadNetworkException e) {
             LOG.e("Failed to set infra link interface name " + newInfraLinkInterfaceName, e);
+        }
+    }
+
+    private void setInfraLinkNat64Prefix(@Nullable String newNat64Prefix) {
+        if (Objects.equals(mInfraLinkState.nat64Prefix, newNat64Prefix)) {
+            return;
+        }
+        try {
+            getOtDaemon()
+                    .setInfraLinkNat64Prefix(
+                            newNat64Prefix, new LoggingOtStatusReceiver("setInfraLinkNat64Prefix"));
+        } catch (RemoteException | ThreadNetworkException e) {
+            LOG.e("Failed to set infra link NAT64 prefix " + newNat64Prefix, e);
         }
     }
 
@@ -1379,7 +1393,13 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         if (linkProperties == null) {
             return newInfraLinkStateBuilder();
         }
-        return new InfraLinkState.Builder().setInterfaceName(linkProperties.getInterfaceName());
+        String nat64Prefix = null;
+        if (linkProperties.getNat64Prefix() != null) {
+            nat64Prefix = linkProperties.getNat64Prefix().toString();
+        }
+        return new InfraLinkState.Builder()
+                .setInterfaceName(linkProperties.getInterfaceName())
+                .setNat64Prefix(nat64Prefix);
     }
 
     private static final class CallbackMetadata {
