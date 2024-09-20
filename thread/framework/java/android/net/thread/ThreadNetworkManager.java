@@ -81,6 +81,19 @@ public final class ThreadNetworkManager {
             "android.permission.THREAD_NETWORK_PRIVILEGED";
 
     /**
+     * Permission allows accessing Thread network state and performing certain testing-related
+     * operations.
+     *
+     * <p>This is the same value as android.Manifest.permission.THREAD_NETWORK_TESTING. That symbol
+     * is not available on U while this feature needs to support Android U TV devices, so here is
+     * making a copy of android.Manifest.permission.THREAD_NETWORK_TESTING.
+     *
+     * @hide
+     */
+    public static final String PERMISSION_THREAD_NETWORK_TESTING =
+            "android.permission.THREAD_NETWORK_TESTING";
+
+    /**
      * This user restriction specifies if Thread network is disallowed on the device. If Thread
      * network is disallowed it cannot be turned on via Settings.
      *
