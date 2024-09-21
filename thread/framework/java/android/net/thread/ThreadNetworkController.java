@@ -706,9 +706,9 @@ public final class ThreadNetworkController {
     /**
      * Sets max power of each channel.
      *
-     * <p>This method sets the max power for the given channel. The platform sets the actual
-     * output power to be less than or equal to the {@code channelMaxPowers} and as close as
-     * possible to the {@code channelMaxPowers}.
+     * <p>This method sets the max power for the given channel. The platform sets the actual output
+     * power to be less than or equal to the {@code channelMaxPowers} and as close as possible to
+     * the {@code channelMaxPowers}.
      *
      * <p>If not set, the default max power is set by the Thread HAL service or the Thread radio
      * chip firmware.
@@ -726,13 +726,13 @@ public final class ThreadNetworkController {
      *     and corresponding max power. Valid channel values should be between {@link
      *     ActiveOperationalDataset#CHANNEL_MIN_24_GHZ} and {@link
      *     ActiveOperationalDataset#CHANNEL_MAX_24_GHZ}. The unit of the max power is 0.01dBm. For
-     *     example, 1000 means 0.01W and 2000 means 0.1W. If the power value of
-     *     {@code channelMaxPowers} is lower than the minimum output power supported by the
-     *     platform, the output power will be set to the minimum output power supported by the
-     *     platform. If the power value of {@code channelMaxPowers} is higher than the maximum
-     *     output power supported by the platform, the output power will be set to the maximum
-     *     output power supported by the platform. If the power value of {@code channelMaxPowers}
-     *     is set to {@link #MAX_POWER_CHANNEL_DISABLED}, the corresponding channel is disabled.
+     *     example, 1000 means 0.01W and 2000 means 0.1W. If the power value of {@code
+     *     channelMaxPowers} is lower than the minimum output power supported by the platform, the
+     *     output power will be set to the minimum output power supported by the platform. If the
+     *     power value of {@code channelMaxPowers} is higher than the maximum output power supported
+     *     by the platform, the output power will be set to the maximum output power supported by
+     *     the platform. If the power value of {@code channelMaxPowers} is set to {@link
+     *     #MAX_POWER_CHANNEL_DISABLED}, the corresponding channel is disabled.
      * @param executor the executor to execute {@code receiver}.
      * @param receiver the receiver to receive the result of this operation.
      * @throws IllegalArgumentException if the size of {@code channelMaxPowers} is smaller than 1,

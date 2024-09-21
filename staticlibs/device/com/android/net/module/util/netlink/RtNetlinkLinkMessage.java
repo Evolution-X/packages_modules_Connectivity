@@ -16,7 +16,12 @@
 
 package com.android.net.module.util.netlink;
 
+import static android.system.OsConstants.AF_UNSPEC;
+
 import static com.android.net.module.util.NetworkStackConstants.ETHER_ADDR_LEN;
+import static com.android.net.module.util.netlink.NetlinkConstants.IFF_UP;
+import static com.android.net.module.util.netlink.NetlinkConstants.RTM_NEWLINK;
+import static com.android.net.module.util.netlink.StructNlMsgHdr.NLM_F_REQUEST_ACK;
 
 import android.net.MacAddress;
 import android.system.OsConstants;
@@ -216,6 +221,64 @@ public class RtNetlinkLinkMessage extends NetlinkMessage {
         }
 
         return length;
+    }
+
+    /**
+     * Create a link message to set the operational state (up or down) of a network interface.
+     *
+     * @param interfaceName  The network interface name.
+     * @param sequenceNumber The sequence number to use for the Netlink message.
+     * @param isUp           {@code true} to set the interface up, {@code false} to set it down.
+     * @return A `RtNetlinkLinkMessage` instance configured to set the link state.
+     */
+    @Nullable
+    public static RtNetlinkLinkMessage createSetLinkStateMessage(@NonNull String interfaceName,
+            int sequenceNumber, boolean isUp) {
+        return createSetLinkStateMessage(interfaceName, sequenceNumber, isUp, new OsAccess());
+    }
+
+    @VisibleForTesting
+    @Nullable
+    protected static RtNetlinkLinkMessage createSetLinkStateMessage(@NonNull String interfaceName,
+            int sequenceNumber, boolean isUp, OsAccess osAccess) {
+        final int interfaceIndex = osAccess.if_nametoindex(interfaceName);
+        if (interfaceIndex == OsAccess.INVALID_INTERFACE_INDEX) {
+            return null;
+        }
+
+        return RtNetlinkLinkMessage.build(
+                new StructNlMsgHdr(0, RTM_NEWLINK, NLM_F_REQUEST_ACK, sequenceNumber),
+                new StructIfinfoMsg((short) AF_UNSPEC, (short) 0, interfaceIndex,
+                                    isUp ? IFF_UP : 0, IFF_UP), DEFAULT_MTU, null, null);
+    }
+
+    /**
+     * Create a link message to rename the network interface.
+     *
+     * @param interfaceName  The network interface name.
+     * @param sequenceNumber The sequence number to use for the Netlink message.
+     * @param newName        The new name of the network interface.
+     * @return A `RtNetlinkLinkMessage` instance configured to rename the network interface.
+     */
+    @Nullable
+    public static RtNetlinkLinkMessage createSetLinkNameMessage(@NonNull String interfaceName,
+            int sequenceNumber, @NonNull String newName) {
+        return createSetLinkNameMessage(interfaceName, sequenceNumber, newName, new OsAccess());
+    }
+
+    @VisibleForTesting
+    @Nullable
+    protected static RtNetlinkLinkMessage createSetLinkNameMessage(@NonNull String interfaceName,
+            int sequenceNumber, @NonNull String newName, OsAccess osAccess) {
+        final int interfaceIndex = osAccess.if_nametoindex(interfaceName);
+        if (interfaceIndex == OsAccess.INVALID_INTERFACE_INDEX) {
+            return null;
+        }
+
+        return RtNetlinkLinkMessage.build(
+                new StructNlMsgHdr(0, RTM_NEWLINK, NLM_F_REQUEST_ACK, sequenceNumber),
+                new StructIfinfoMsg((short) AF_UNSPEC, (short) 0, interfaceIndex, 0, 0),
+                DEFAULT_MTU, null, newName);
     }
 
     @Override

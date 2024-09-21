@@ -34,6 +34,7 @@ import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 import android.net.DnsResolver;
 import android.net.InetAddresses;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.nsd.DiscoveryRequest;
 import android.net.nsd.NsdManager;
@@ -61,6 +62,7 @@ import org.mockito.MockitoAnnotations;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -584,6 +586,7 @@ public final class NsdPublisherTest {
         verify(mResolveServiceCallback, times(1))
                 .onServiceResolved(
                         eq("test-host"),
+                        eq(0),
                         eq("test"),
                         eq("_test._tcp"),
                         eq(12345),
@@ -811,7 +814,10 @@ public final class NsdPublisherTest {
     private void prepareTest() {
         mTestLooper = new TestLooper();
         Handler handler = new Handler(mTestLooper.getLooper());
-        mNsdPublisher = new NsdPublisher(mMockNsdManager, mMockDnsResolver, handler);
+        HashMap<Network, LinkProperties> networkToLinkProperties = new HashMap<>();
+        mNsdPublisher =
+                new NsdPublisher(
+                        mMockNsdManager, mMockDnsResolver, handler, networkToLinkProperties);
         mNsdPublisher.setNetworkForHostResolution(mNetwork);
     }
 }

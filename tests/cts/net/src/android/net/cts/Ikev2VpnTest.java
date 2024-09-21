@@ -184,6 +184,8 @@ public class Ikev2VpnTest {
 
     // Static state to reduce setup/teardown
     private static final Context sContext = InstrumentationRegistry.getContext();
+    private static boolean sIsWatch =
+                sContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH);
     private static final ConnectivityManager sCM =
             (ConnectivityManager) sContext.getSystemService(Context.CONNECTIVITY_SERVICE);
     private static final VpnManager sVpnMgr =
@@ -205,12 +207,15 @@ public class Ikev2VpnTest {
 
     @Before
     public void setUp() {
-        assumeFalse("Skipping test because watches don't support VPN",
-            sContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH));
+        assumeFalse("Skipping test because watches don't support VPN", sIsWatch);
     }
 
     @After
     public void tearDown() {
+        if (sIsWatch) {
+            return; // Tests are skipped for watches.
+        }
+
         for (TestableNetworkCallback callback : mCallbacksToUnregister) {
             sCM.unregisterNetworkCallback(callback);
         }
