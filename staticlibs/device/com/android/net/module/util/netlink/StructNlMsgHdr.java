@@ -32,10 +32,11 @@ public class StructNlMsgHdr {
     // Already aligned.
     public static final int STRUCT_SIZE = 16;
 
-    public static final short NLM_F_REQUEST = 0x0001;
-    public static final short NLM_F_MULTI   = 0x0002;
-    public static final short NLM_F_ACK     = 0x0004;
-    public static final short NLM_F_ECHO    = 0x0008;
+    public static final short NLM_F_REQUEST     = 0x0001;
+    public static final short NLM_F_MULTI       = 0x0002;
+    public static final short NLM_F_ACK         = 0x0004;
+    public static final short NLM_F_ECHO        = 0x0008;
+    public static final short NLM_F_REQUEST_ACK = NLM_F_REQUEST | NLM_F_ACK;
     // Flags for a GET request.
     public static final short NLM_F_ROOT    = 0x0100;
     public static final short NLM_F_MATCH   = 0x0200;

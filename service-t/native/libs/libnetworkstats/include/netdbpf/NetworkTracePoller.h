@@ -50,7 +50,7 @@ class NetworkTracePoller {
   bool Stop() EXCLUDES(mMutex);
 
   // Consumes all available events from the ringbuffer.
-  bool ConsumeAll() EXCLUDES(mMutex);
+  bool ConsumeAll() EXCLUDES(mBufferMutex);
 
  private:
   // Poll the ring buffer for new data and schedule another run of ourselves
@@ -59,14 +59,18 @@ class NetworkTracePoller {
   // and thus a deadlock while resetting the TaskRunner. The runner pointer is
   // always valid within tasks run by that runner.
   void PollAndSchedule(perfetto::base::TaskRunner* runner, uint32_t poll_ms);
-  bool ConsumeAllLocked() REQUIRES(mMutex);
 
   // Record sparse iface stats via atrace. This queries the per-iface stats maps
   // for any iface present in the vector of packets. This is inexact, but should
   // have sufficient coverage given these are cumulative counters.
-  void TraceIfaces(const std::vector<PacketTrace>& packets) REQUIRES(mMutex);
+  static void TraceIfaces(const std::vector<PacketTrace>& packets);
 
   std::mutex mMutex;
+
+  // The mBufferMutex protects the ring buffer. This allows separate protected
+  // access of mTaskRunner in Stop (to terminate) and mRingBuffer in ConsumeAll.
+  // Without this separation, Stop() can deadlock.
+  std::mutex mBufferMutex;
 
   // Records the number of successfully started active sessions so that only the
   // first active session attempts setup and only the last cleans up. Note that
@@ -78,10 +82,10 @@ class NetworkTracePoller {
   uint32_t mPollMs GUARDED_BY(mMutex);
 
   // The function to process PacketTrace, typically a Perfetto sink.
-  EventSink mCallback GUARDED_BY(mMutex);
+  const EventSink mCallback;
 
   // The BPF ring buffer handle.
-  std::unique_ptr<BpfRingbuf<PacketTrace>> mRingBuffer GUARDED_BY(mMutex);
+  std::unique_ptr<BpfRingbuf<PacketTrace>> mRingBuffer GUARDED_BY(mBufferMutex);
 
   // The packet tracing config map (really a 1-element array).
   BpfMap<uint32_t, bool> mConfigurationMap GUARDED_BY(mMutex);

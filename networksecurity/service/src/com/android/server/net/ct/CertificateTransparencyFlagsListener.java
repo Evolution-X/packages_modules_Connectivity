@@ -15,8 +15,6 @@
  */
 package com.android.server.net.ct;
 
-import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
-
 import android.annotation.RequiresApi;
 import android.content.Context;
 import android.os.Build;
@@ -46,7 +44,7 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
         mDataStore.load();
         mCertificateTransparencyDownloader.registerReceiver();
         DeviceConfig.addOnPropertiesChangedListener(
-                NAMESPACE_TETHERING, Executors.newSingleThreadExecutor(), this);
+                Config.NAMESPACE_NETWORK_SECURITY, Executors.newSingleThreadExecutor(), this);
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyFlagsListener initialized successfully");
         }
@@ -55,14 +53,18 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
 
     @Override
     public void onPropertiesChanged(Properties properties) {
-        if (!NAMESPACE_TETHERING.equals(properties.getNamespace())) {
+        if (!Config.NAMESPACE_NETWORK_SECURITY.equals(properties.getNamespace())) {
             return;
         }
 
-        String newVersion = DeviceConfig.getString(NAMESPACE_TETHERING, Config.VERSION, "");
-        String newContentUrl = DeviceConfig.getString(NAMESPACE_TETHERING, Config.CONTENT_URL, "");
+        String newVersion =
+                DeviceConfig.getString(Config.NAMESPACE_NETWORK_SECURITY, Config.FLAG_VERSION, "");
+        String newContentUrl =
+                DeviceConfig.getString(
+                        Config.NAMESPACE_NETWORK_SECURITY, Config.FLAG_CONTENT_URL, "");
         String newMetadataUrl =
-                DeviceConfig.getString(NAMESPACE_TETHERING, Config.METADATA_URL, "");
+                DeviceConfig.getString(
+                        Config.NAMESPACE_NETWORK_SECURITY, Config.FLAG_METADATA_URL, "");
         if (TextUtils.isEmpty(newVersion)
                 || TextUtils.isEmpty(newContentUrl)
                 || TextUtils.isEmpty(newMetadataUrl)) {

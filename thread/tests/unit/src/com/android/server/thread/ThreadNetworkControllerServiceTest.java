@@ -30,6 +30,7 @@ import static android.net.thread.ThreadNetworkException.ERROR_INTERNAL_ERROR;
 import static android.net.thread.ThreadNetworkException.ERROR_THREAD_DISABLED;
 import static android.net.thread.ThreadNetworkManager.DISALLOW_THREAD_NETWORK;
 import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_PRIVILEGED;
+import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_TESTING;
 
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_INVALID_STATE;
@@ -63,12 +64,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
+import android.net.Network;
 import android.net.NetworkAgent;
 import android.net.NetworkProvider;
 import android.net.NetworkRequest;
 import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.IActiveOperationalDatasetReceiver;
 import android.net.thread.IOperationReceiver;
+import android.net.thread.IOutputReceiver;
 import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkException;
 import android.os.Handler;
@@ -110,6 +114,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -170,6 +175,7 @@ public final class ThreadNetworkControllerServiceTest {
     @Mock private IBinder mIBinder;
     @Mock Resources mResources;
     @Mock ConnectivityResources mConnectivityResources;
+    @Mock Map<Network, LinkProperties> mMockNetworkToLinkProperties;
 
     private Context mContext;
     private TestLooper mTestLooper;
@@ -190,6 +196,9 @@ public final class ThreadNetworkControllerServiceTest {
                 .when(mContext)
                 .enforceCallingOrSelfPermission(
                         eq(PERMISSION_THREAD_NETWORK_PRIVILEGED), anyString());
+        doNothing()
+                .when(mContext)
+                .enforceCallingOrSelfPermission(eq(PERMISSION_THREAD_NETWORK_TESTING), anyString());
         doNothing()
                 .when(mContext)
                 .enforceCallingOrSelfPermission(eq(NETWORK_SETTINGS), anyString());
@@ -232,7 +241,8 @@ public final class ThreadNetworkControllerServiceTest {
                         mMockNsdPublisher,
                         mMockUserManager,
                         mConnectivityResources,
-                        () -> DEFAULT_COUNTRY_CODE);
+                        () -> DEFAULT_COUNTRY_CODE,
+                        mMockNetworkToLinkProperties);
         mService.setTestNetworkAgent(mMockNetworkAgent);
     }
 
@@ -800,5 +810,32 @@ public final class ThreadNetworkControllerServiceTest {
         assertThat(networkRequest1.hasCapability(NET_CAPABILITY_NOT_VPN)).isTrue();
         assertThat(networkRequest2.getNetworkSpecifier()).isNull();
         assertThat(networkRequest2.hasCapability(NET_CAPABILITY_NOT_VPN)).isTrue();
+    }
+
+    @Test
+    public void runOtCtlCommand_noPermission_throwsSecurityException() {
+        doThrow(new SecurityException(""))
+                .when(mContext)
+                .enforceCallingOrSelfPermission(eq(PERMISSION_THREAD_NETWORK_PRIVILEGED), any());
+        doThrow(new SecurityException(""))
+                .when(mContext)
+                .enforceCallingOrSelfPermission(eq(PERMISSION_THREAD_NETWORK_TESTING), any());
+
+        assertThrows(
+                SecurityException.class,
+                () -> mService.runOtCtlCommand("", false, new IOutputReceiver.Default()));
+    }
+
+    @Test
+    public void runOtCtlCommand_otDaemonRemoteFailure_receiverOnErrorIsCalled() throws Exception {
+        mService.initialize();
+        final IOutputReceiver mockReceiver = mock(IOutputReceiver.class);
+        mFakeOtDaemon.setRunOtCtlCommandException(
+                new RemoteException("ot-daemon runOtCtlCommand() throws"));
+
+        mService.runOtCtlCommand("ot-ctl state", false, mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mockReceiver, times(1)).onError(eq(ERROR_INTERNAL_ERROR), anyString());
     }
 }

@@ -169,7 +169,7 @@ service vendor.threadnetwork_hal /apex/com.android.hardware.threadnetwork/bin/hw
     user thread_network
 ```
 
-For real RCP devices, it supports both SPI and UART interace and you can
+For real RCP devices, it supports both SPI and UART interfaces and you can
 specify the device with the schema `spinel+spi://`, `spinel+hdlc+uart://` and
 `spinel+socket://` respectively.
 

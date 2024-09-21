@@ -98,7 +98,6 @@ apex {
     ],
     canned_fs_config: "canned_fs_config",
     bpfs: [
-        "block.o",
         "clatd.o",
         "dscpPolicy.o",
         "netd.o",

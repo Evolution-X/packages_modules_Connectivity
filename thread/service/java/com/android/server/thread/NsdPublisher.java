@@ -23,6 +23,7 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.net.DnsResolver;
 import android.net.InetAddresses;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.nsd.DiscoveryRequest;
 import android.net.nsd.NsdManager;
@@ -30,6 +31,7 @@ import android.net.nsd.NsdServiceInfo;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.system.Os;
 import android.text.TextUtils;
 import android.util.SparseArray;
 
@@ -66,6 +68,7 @@ public final class NsdPublisher extends INsdPublisher.Stub {
 
     // TODO: b/321883491 - specify network for mDNS operations
     @Nullable private Network mNetwork;
+    private final Map<Network, LinkProperties> mNetworkToLinkProperties;
     private final NsdManager mNsdManager;
     private final DnsResolver mDnsResolver;
     private final Handler mHandler;
@@ -76,17 +79,28 @@ public final class NsdPublisher extends INsdPublisher.Stub {
     private final SparseArray<HostInfoListener> mHostInfoListeners = new SparseArray<>(0);
 
     @VisibleForTesting
-    public NsdPublisher(NsdManager nsdManager, DnsResolver dnsResolver, Handler handler) {
+    public NsdPublisher(
+            NsdManager nsdManager,
+            DnsResolver dnsResolver,
+            Handler handler,
+            Map<Network, LinkProperties> networkToLinkProperties) {
         mNetwork = null;
         mNsdManager = nsdManager;
         mDnsResolver = dnsResolver;
         mHandler = handler;
         mExecutor = runnable -> mHandler.post(runnable);
+        mNetworkToLinkProperties = networkToLinkProperties;
     }
 
-    public static NsdPublisher newInstance(Context context, Handler handler) {
+    public static NsdPublisher newInstance(
+            Context context,
+            Handler handler,
+            Map<Network, LinkProperties> networkToLinkProperties) {
         return new NsdPublisher(
-                context.getSystemService(NsdManager.class), DnsResolver.getInstance(), handler);
+                context.getSystemService(NsdManager.class),
+                DnsResolver.getInstance(),
+                handler,
+                networkToLinkProperties);
     }
 
     // TODO: b/321883491 - NsdPublisher should be disabled when mNetwork is null
@@ -586,6 +600,14 @@ public final class NsdPublisher extends INsdPublisher.Stub {
                             + ", serviceInfo: "
                             + serviceInfo);
             List<String> addresses = new ArrayList<>();
+            int interfaceIndex = 0;
+            if (mNetworkToLinkProperties.containsKey(serviceInfo.getNetwork())) {
+                interfaceIndex =
+                        Os.if_nametoindex(
+                                mNetworkToLinkProperties
+                                        .get(serviceInfo.getNetwork())
+                                        .getInterfaceName());
+            }
             for (InetAddress address : serviceInfo.getHostAddresses()) {
                 if (address instanceof Inet6Address) {
                     addresses.add(address.getHostAddress());
@@ -602,6 +624,7 @@ public final class NsdPublisher extends INsdPublisher.Stub {
             try {
                 mResolveServiceCallback.onServiceResolved(
                         serviceInfo.getHostname(),
+                        interfaceIndex,
                         serviceInfo.getServiceName(),
                         serviceInfo.getServiceType(),
                         serviceInfo.getPort(),
