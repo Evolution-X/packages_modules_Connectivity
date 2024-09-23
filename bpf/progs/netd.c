@@ -645,8 +645,8 @@ DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", AID_ROOT, AID_ROOT, inet_soc
     return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? BPF_ALLOW : BPF_DISALLOW;
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT,
-                            inet_socket_release, KVER_5_10)
+DEFINE_NETD_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT,
+                          inet_socket_release, KVER_5_10)
 (struct bpf_sock* sk) {
     uint64_t cookie = bpf_get_sk_cookie(sk);
     if (cookie) bpf_cookie_tag_map_delete_elem(&cookie);
