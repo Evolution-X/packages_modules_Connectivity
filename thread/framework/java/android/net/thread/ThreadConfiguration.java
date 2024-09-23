@@ -126,18 +126,29 @@ public final class ThreadConfiguration implements Parcelable {
      *
      * @hide
      */
+    @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+    @SystemApi
     public static final class Builder {
         private boolean mNat64Enabled = false;
         private boolean mDhcpv6PdEnabled = false;
 
-        /** Creates a new {@link Builder} object with all features disabled. */
+        /**
+         * Creates a new {@link Builder} object with all features disabled.
+         *
+         * @hide
+         */
+        @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+        @SystemApi
         public Builder() {}
 
         /**
          * Creates a new {@link Builder} object from a {@link ThreadConfiguration} object.
          *
          * @param config the Border Router configurations to be copied
+         * @hide
          */
+        @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+        @SystemApi
         public Builder(@NonNull ThreadConfiguration config) {
             Objects.requireNonNull(config);
 
@@ -150,7 +161,11 @@ public final class ThreadConfiguration implements Parcelable {
          *
          * <p>Enabling this feature will allow Thread devices to connect to the internet/cloud over
          * IPv4.
+         *
+         * @hide
          */
+        @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+        @SystemApi
         @NonNull
         public Builder setNat64Enabled(boolean enabled) {
             this.mNat64Enabled = enabled;
@@ -162,6 +177,8 @@ public final class ThreadConfiguration implements Parcelable {
          *
          * <p>Enabling this feature will allow Thread devices to connect to the internet/cloud over
          * IPv6.
+         *
+         * @hide
          */
         @NonNull
         public Builder setDhcpv6PdEnabled(boolean enabled) {
@@ -169,7 +186,13 @@ public final class ThreadConfiguration implements Parcelable {
             return this;
         }
 
-        /** Creates a new {@link ThreadConfiguration} object. */
+        /**
+         * Creates a new {@link ThreadConfiguration} object.
+         *
+         * @hide
+         */
+        @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+        @SystemApi
         @NonNull
         public ThreadConfiguration build() {
             return new ThreadConfiguration(this);
