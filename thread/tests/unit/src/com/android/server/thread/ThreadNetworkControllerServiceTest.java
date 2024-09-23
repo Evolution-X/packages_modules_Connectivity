@@ -741,10 +741,7 @@ public final class ThreadNetworkControllerServiceTest {
                         .setDhcpv6PdEnabled(false)
                         .build();
         ThreadConfiguration config2 =
-                new ThreadConfiguration.Builder()
-                        .setNat64Enabled(true)
-                        .setDhcpv6PdEnabled(true)
-                        .build();
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
         ThreadConfiguration config3 =
                 new ThreadConfiguration.Builder(config2).build(); // Same as config2
 
