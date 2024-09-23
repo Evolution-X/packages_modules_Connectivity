@@ -128,6 +128,12 @@ public final class OtDaemonController {
         return false;
     }
 
+    /** Adds a prefix in the Network Data. */
+    public void addPrefixInNetworkData(IpPrefix ipPrefix, String flags, String preference) {
+        executeCommand("prefix add " + ipPrefix + " " + flags + " " + preference);
+        executeCommand("netdata register");
+    }
+
     public String executeCommand(String cmd) {
         return SystemUtil.runShellCommand(OT_CTL + " " + cmd);
     }
