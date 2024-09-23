@@ -551,6 +551,22 @@ object IntegrationTestUtils {
         )
     }
 
+    private fun defaultLinkProperties(): LinkProperties {
+        val lp = LinkProperties()
+        // TODO: use a fake DNS server
+        lp.setDnsServers(listOf(parseNumericAddress("8.8.8.8")))
+        // NAT64 feature requires the infra network to have an IPv4 default route.
+        lp.addRoute(
+            RouteInfo(
+                IpPrefix("0.0.0.0/0") /* destination */,
+                null /* gateway */,
+                null /* iface */,
+                RouteInfo.RTN_UNICAST, 1500 /* mtu */
+            )
+        )
+        return lp
+    }
+
     @JvmStatic
     @JvmOverloads
     fun startInfraDeviceAndWaitForOnLinkAddr(
@@ -564,23 +580,13 @@ object IntegrationTestUtils {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(java.lang.Exception::class)
     fun setUpInfraNetwork(
-        context: Context, controller: ThreadNetworkControllerWrapper
+        context: Context,
+        controller: ThreadNetworkControllerWrapper,
+        lp: LinkProperties = defaultLinkProperties()
     ): TestNetworkTracker {
-        val lp = LinkProperties()
-
-        // TODO: use a fake DNS server
-        lp.setDnsServers(listOf(parseNumericAddress("8.8.8.8")))
-        // NAT64 feature requires the infra network to have an IPv4 default route.
-        lp.addRoute(
-            RouteInfo(
-                IpPrefix("0.0.0.0/0") /* destination */,
-                null /* gateway */,
-                null /* iface */,
-                RouteInfo.RTN_UNICAST, 1500 /* mtu */
-            )
-        )
         val infraNetworkTracker: TestNetworkTracker =
             runAsShell(
                 MANAGE_TEST_NETWORKS,
