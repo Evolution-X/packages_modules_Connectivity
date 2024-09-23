@@ -46,8 +46,11 @@ import static org.junit.Assert.assertNull;
 import static java.util.Objects.requireNonNull;
 
 import android.content.Context;
+import android.net.InetAddresses;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.RouteInfo;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.InfraNetworkDevice;
 import android.net.thread.utils.IntegrationTestUtils;
@@ -99,6 +102,11 @@ public class BorderRoutingTest {
     private static final Inet4Address IPV4_SERVER_ADDR =
             (Inet4Address) parseNumericAddress("8.8.8.8");
     private static final String NAT64_CIDR = "192.168.255.0/24";
+    private static final IpPrefix DHCP6_PD_PREFIX = new IpPrefix("2001:db8::/64");
+    private static final IpPrefix AIL_NAT64_PREFIX = new IpPrefix("2001:db8:1234::/96");
+    private static final Inet6Address AIL_NAT64_SYNTHESIZED_SERVER_ADDR =
+            (Inet6Address) parseNumericAddress("2001:db8:1234::8.8.8.8");
+    private static final Duration UPDATE_NAT64_PREFIX_TIMEOUT = Duration.ofSeconds(10);
 
     @Rule public final ThreadFeatureCheckerRule mThreadRule = new ThreadFeatureCheckerRule();
 
@@ -623,11 +631,48 @@ public class BorderRoutingTest {
         // TODO: enable NAT64 via ThreadNetworkController API instead of ot-ctl
         mOtCtl.setNat64Cidr(NAT64_CIDR);
         mOtCtl.setNat64Enabled(true);
-        waitFor(() -> mOtCtl.hasNat64PrefixInNetdata(), Duration.ofSeconds(10));
+        waitFor(() -> mOtCtl.hasNat64PrefixInNetdata(), UPDATE_NAT64_PREFIX_TIMEOUT);
 
         ftd.ping(IPV4_SERVER_ADDR);
 
         assertNotNull(pollForIcmpPacketOnInfraNetwork(ICMP_ECHO, null, IPV4_SERVER_ADDR));
+    }
+
+    @Test
+    public void nat64_withAilNat64Prefix_threadDevicePingIpv4InfraDevice_outboundPacketIsForwarded()
+            throws Exception {
+        tearDownInfraNetwork();
+        LinkProperties lp = new LinkProperties();
+        // NAT64 feature requires the infra network to have an IPv4 default route.
+        lp.addRoute(
+                new RouteInfo(
+                        new IpPrefix("0.0.0.0/0") /* destination */,
+                        null /* gateway */,
+                        null /* iface */,
+                        RouteInfo.RTN_UNICAST,
+                        1500 /* mtu */));
+        lp.addRoute(
+                new RouteInfo(
+                        new IpPrefix("::/0") /* destination */,
+                        null /* gateway */,
+                        null /* iface */,
+                        RouteInfo.RTN_UNICAST,
+                        1500 /* mtu */));
+        lp.setNat64Prefix(AIL_NAT64_PREFIX);
+        mInfraNetworkTracker = IntegrationTestUtils.setUpInfraNetwork(mContext, mController, lp);
+        mInfraNetworkReader = newPacketReader(mInfraNetworkTracker.getTestIface(), mHandler);
+        FullThreadDevice ftd = mFtds.get(0);
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET);
+        // TODO: enable NAT64 via ThreadNetworkController API instead of ot-ctl
+        mOtCtl.setNat64Enabled(true);
+        mOtCtl.addPrefixInNetworkData(DHCP6_PD_PREFIX, "paros", "med");
+        waitFor(() -> mOtCtl.hasNat64PrefixInNetdata(), UPDATE_NAT64_PREFIX_TIMEOUT);
+
+        ftd.ping(IPV4_SERVER_ADDR);
+
+        assertNotNull(
+                pollForIcmpPacketOnInfraNetwork(
+                        ICMPV6_ECHO_REQUEST_TYPE, null, AIL_NAT64_SYNTHESIZED_SERVER_ADDR));
     }
 
     private void setUpInfraNetwork() throws Exception {
