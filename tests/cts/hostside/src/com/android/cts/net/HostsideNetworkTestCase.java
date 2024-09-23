@@ -19,7 +19,6 @@ package com.android.cts.net;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import com.android.modules.utils.build.testing.DeviceSdkLevel;
 import com.android.tradefed.device.DeviceNotAvailableException;
 import com.android.tradefed.invoker.TestInformation;
 import com.android.tradefed.targetprep.BuildError;
@@ -36,17 +35,13 @@ import org.junit.runner.RunWith;
 abstract class HostsideNetworkTestCase extends BaseHostJUnit4Test {
     protected static final String TEST_PKG = "com.android.cts.net.hostside";
     protected static final String TEST_APK = "CtsHostsideNetworkTestsApp.apk";
-    protected static final String TEST_APK_NEXT = "CtsHostsideNetworkTestsAppNext.apk";
     protected static final String TEST_APP2_PKG = "com.android.cts.net.hostside.app2";
     protected static final String TEST_APP2_APK = "CtsHostsideNetworkTestsApp2.apk";
 
     @BeforeClassWithInfo
     public static void setUpOnceBase(TestInformation testInfo) throws Exception {
-        DeviceSdkLevel deviceSdkLevel = new DeviceSdkLevel(testInfo.getDevice());
-        String testApk = deviceSdkLevel.isDeviceAtLeastV() ? TEST_APK_NEXT : TEST_APK;
-
         uninstallPackage(testInfo, TEST_PKG, false);
-        installPackage(testInfo, testApk);
+        installPackage(testInfo, TEST_APK);
     }
 
     @AfterClassWithInfo

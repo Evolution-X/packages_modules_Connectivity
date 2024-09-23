@@ -29,9 +29,6 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.modules.utils.build.SdkLevel;
-import com.android.networkstack.apishim.VpnServiceBuilderShimImpl;
-import com.android.networkstack.apishim.common.UnsupportedApiLevelException;
-import com.android.networkstack.apishim.common.VpnServiceBuilderShim;
 import com.android.testutils.PacketReflector;
 
 import java.io.IOException;
@@ -102,8 +99,7 @@ public class MyVpnService extends VpnService {
     }
 
     private void start(String packageName, Intent intent) {
-        Builder builder = new Builder();
-        VpnServiceBuilderShim vpnServiceBuilderShim = VpnServiceBuilderShimImpl.newInstance();
+        VpnService.Builder builder = new VpnService.Builder();
 
         final String addresses = parseIpAndMaskListArgument(packageName, intent, "addresses",
                 builder::addAddress);
@@ -112,11 +108,7 @@ public class MyVpnService extends VpnService {
         if (SdkLevel.isAtLeastT() && intent.getBooleanExtra(packageName + ".addRoutesByIpPrefix",
                 false)) {
             addedRoutes = parseIpPrefixListArgument(packageName, intent, "routes", (prefix) -> {
-                try {
-                    vpnServiceBuilderShim.addRoute(builder, prefix);
-                } catch (UnsupportedApiLevelException e) {
-                    throw new RuntimeException(e);
-                }
+                builder.addRoute(prefix);
             });
         } else {
             addedRoutes = parseIpAndMaskListArgument(packageName, intent, "routes",
@@ -127,11 +119,7 @@ public class MyVpnService extends VpnService {
         if (SdkLevel.isAtLeastT()) {
             excludedRoutes = parseIpPrefixListArgument(packageName, intent, "excludedRoutes",
                     (prefix) -> {
-                        try {
-                            vpnServiceBuilderShim.excludeRoute(builder, prefix);
-                        } catch (UnsupportedApiLevelException e) {
-                            throw new RuntimeException(e);
-                        }
+                        builder.excludeRoute(prefix);
                     });
         }
 

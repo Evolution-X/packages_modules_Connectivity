@@ -19,9 +19,13 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
-java_defaults {
-    name: "CtsHostsideNetworkTestsAppDefaults",
-    platform_apis: true,
+android_test_helper_app {
+    name: "CtsHostsideNetworkTestsApp",
+    defaults: [
+        "cts_support_defaults",
+        "framework-connectivity-test-defaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
+    ],
     static_libs: [
         "CtsHostsideNetworkTestsAidl",
         "androidx.test.ext.junit",
@@ -38,36 +42,5 @@ java_defaults {
     ],
     srcs: [
         "src/**/*.java",
-    ],
-    // Tag this module as a cts test artifact
-    test_suites: [
-        "general-tests",
-        "sts",
-    ],
-    min_sdk_version: "30",
-}
-
-android_test_helper_app {
-    name: "CtsHostsideNetworkTestsApp",
-    defaults: [
-        "cts_support_defaults",
-        "framework-connectivity-test-defaults",
-        "CtsHostsideNetworkTestsAppDefaults",
-    ],
-    static_libs: [
-        "NetworkStackApiStableShims",
-    ],
-}
-
-android_test_helper_app {
-    name: "CtsHostsideNetworkTestsAppNext",
-    defaults: [
-        "cts_support_defaults",
-        "framework-connectivity-test-defaults",
-        "CtsHostsideNetworkTestsAppDefaults",
-        "ConnectivityNextEnableDefaults",
-    ],
-    static_libs: [
-        "NetworkStackApiCurrentShims",
     ],
 }

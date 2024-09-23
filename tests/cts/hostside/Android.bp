@@ -12,15 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-next_app_data = [":CtsHostsideNetworkTestsAppNext"]
-
-// The above line is put in place to prevent any future automerger merge conflict between aosp,
-// downstream branches. The CtsHostsideNetworkTestsAppNext target will not exist in
-// some downstream branches, but it should exist in aosp and some downstream branches.
-
 package {
     default_team: "trendy_team_fwk_core_networking",
     default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+java_defaults {
+    name: "CtsHostsideNetworkTestsAllAppDefaults",
+    platform_apis: true,
+    min_sdk_version: "30",
+    // Set target SDK to 10000 so that all the test helper apps are always subject to the most
+    // recent (and possibly most restrictive) target SDK behaviour. Also, this matches the target
+    // SDK of the tests themselves, and of other tests such as CtsNetTestCases.
+    // Note that some of the test helper apps (e.g., CtsHostsideNetworkCapTestsAppSdk33) override
+    // this with older SDK versions.
+    // Also note that unlike android_test targets, "current" does not work: the target SDK is set to
+    // something like "VanillaIceCream" instead of 100000. This means that the tests will not run on
+    // released devices with errors such as "Requires development platform VanillaIceCream but this
+    // is a release platform".
+    target_sdk_version: "10000",
 }
 
 java_test_host {
@@ -52,6 +62,6 @@ java_test_host {
         ":CtsHostsideNetworkCapTestsAppWithoutProperty",
         ":CtsHostsideNetworkCapTestsAppWithProperty",
         ":CtsHostsideNetworkCapTestsAppSdk33",
-    ] + next_app_data,
+    ],
     per_testcase_directory: true,
 }
