@@ -123,6 +123,11 @@ static const set<string> MAINLINE_FOR_T_4_19_PLUS = {
     NETD "prog_netd_bind6_inet6_bind",
 };
 
+// Provided by *current* mainline module for T+ devices with 5.10+ kernels
+static const set<string> MAINLINE_FOR_T_5_10_PLUS = {
+    NETD "prog_netd_cgroupsockrelease_inet_release",
+};
+
 // Provided by *current* mainline module for T+ devices with 5.15+ kernels
 static const set<string> MAINLINE_FOR_T_5_15_PLUS = {
     SHARED "prog_dscpPolicy_schedcls_set_dscp_ether",
@@ -152,11 +157,6 @@ static const set<string> MAINLINE_FOR_V_PLUS = {
 static const set<string> MAINLINE_FOR_V_5_4_PLUS = {
     NETD "prog_netd_getsockopt_prog",
     NETD "prog_netd_setsockopt_prog",
-};
-
-// Provided by *current* mainline module for V+ devices with 5.10+ kernels
-static const set<string> MAINLINE_FOR_V_5_10_PLUS = {
-    NETD "prog_netd_cgroupsockrelease_inet_release",
 };
 
 static void addAll(set<string>& a, const set<string>& b) {
@@ -196,6 +196,7 @@ TEST_F(BpfExistenceTest, TestPrograms) {
     DO_EXPECT(IsAtLeastT(), MAINLINE_FOR_T_PLUS);
     DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(4, 14, 0), MAINLINE_FOR_T_4_14_PLUS);
     DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(4, 19, 0), MAINLINE_FOR_T_4_19_PLUS);
+    DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_T_5_10_PLUS);
     DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(5, 15, 0), MAINLINE_FOR_T_5_15_PLUS);
 
     // U requires Linux Kernel 4.14+, but nothing (as yet) added or removed in U.
@@ -207,7 +208,6 @@ TEST_F(BpfExistenceTest, TestPrograms) {
     if (IsAtLeastV()) ASSERT_TRUE(isAtLeastKernelVersion(4, 19, 0));
     DO_EXPECT(IsAtLeastV(), MAINLINE_FOR_V_PLUS);
     DO_EXPECT(IsAtLeastV() && isAtLeastKernelVersion(5, 4, 0), MAINLINE_FOR_V_5_4_PLUS);
-    DO_EXPECT(IsAtLeastV() && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_V_5_10_PLUS);
 
     for (const auto& file : mustExist) {
         EXPECT_EQ(0, access(file.c_str(), R_OK)) << file << " does not exist";
