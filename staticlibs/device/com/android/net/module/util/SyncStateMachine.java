@@ -225,7 +225,8 @@ public class SyncStateMachine {
             consideredState = mStateInfo.get(consideredState.parent);
         }
         if (null == consideredState) {
-            Log.wtf(mName, "Message " + msg.what + " was not handled");
+            final String state = mCurrentState == null ? "null" : mCurrentState.getName();
+            Log.wtf(mName, "Message " + msg.what + " was not handled. Current state: " + state);
         }
 
         performTransitions();
