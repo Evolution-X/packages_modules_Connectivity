@@ -1,22 +1,3 @@
-# zygote-start is what officially starts netd (see //system/core/rootdir/init.rc)
-# However, on some hardware it's started from post-fs-data as well, which is just
-# a tad earlier.  There's no benefit to that though, since on 4.9+ P+ devices netd
-# will just block until bpfloader finishes and sets the bpf.progs_loaded property.
-#
-# It is important that we start bpfloader after:
-#   - /sys/fs/bpf is already mounted,
-#   - apex (incl. rollback) is initialized (so that in the future we can load bpf
-#     programs shipped as part of apex mainline modules)
-#   - logd is ready for us to log stuff
-#
-# At the same time we want to be as early as possible to reduce races and thus
-# failures (before memory is fragmented, and cpu is busy running tons of other
-# stuff) and we absolutely want to be before netd and the system boot slot is
-# considered to have booted successfully.
-#
-on load_bpf_programs
-    exec_start bpfloader
-
 # Note: This will actually execute /apex/com.android.tethering/bin/netbpfload
 # by virtue of 'service bpfloader' being overridden by the apex shipped .rc
 # Warning: most of the below settings are irrelevant unless the apex is missing.
