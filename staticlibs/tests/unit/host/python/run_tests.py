@@ -18,6 +18,7 @@ import sys
 from host.python.adb_utils_test import TestAdbUtils
 from host.python.apf_utils_test import TestApfUtils
 from host.python.assert_utils_test import TestAssertUtils
+from host.python.packet_utils_test import TestPacketUtils
 from mobly import suite_runner
 
 
@@ -31,5 +32,5 @@ if __name__ == "__main__":
   sys.argv.pop(1)
   # TODO: make the tests can be executed without manually list classes.
   suite_runner.run_suite(
-      [TestAssertUtils, TestAdbUtils, TestApfUtils], sys.argv
+      [TestAssertUtils, TestAdbUtils, TestApfUtils, TestPacketUtils], sys.argv
   )
