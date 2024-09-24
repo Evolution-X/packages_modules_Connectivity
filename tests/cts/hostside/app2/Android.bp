@@ -21,20 +21,14 @@ package {
 
 android_test_helper_app {
     name: "CtsHostsideNetworkTestsApp2",
-    defaults: ["cts_support_defaults"],
-    platform_apis: true,
+    defaults: [
+        "cts_support_defaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
+    ],
     static_libs: [
         "androidx.annotation_annotation",
         "CtsHostsideNetworkTestsAidl",
-        "NetworkStackApiStableShims",
     ],
     srcs: ["src/**/*.java"],
-    // Tag this module as a cts test artifact
-    test_suites: [
-        "cts",
-        "general-tests",
-        "sts",
-    ],
     sdk_version: "test_current",
-    min_sdk_version: "30",
 }
