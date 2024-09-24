@@ -316,6 +316,14 @@
         }
       ]
     },
+    {
+      "name": "CtsHostsideNetworkTests[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
+      "options": [
+        {
+          "exclude-annotation": "androidx.test.filters.RequiresDevice"
+        }
+      ]
+    },
     // Test with APK modules only, in cases where APEX is not supported, or the other modules
     // were simply not updated
     {
@@ -409,15 +417,6 @@
     // Postsubmit on virtual devices to monitor flakiness of @SkipMainlinePresubmit methods
     {
       "name": "CtsNetTestCases[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
-      "options": [
-        {
-          "exclude-annotation": "androidx.test.filters.RequiresDevice"
-        }
-      ]
-    },
-    // TODO: upgrade to presubmit. Postsubmit on virtual devices to monitor flakiness only.
-    {
-      "name": "CtsHostsideNetworkTests[CaptivePortalLoginGoogle.apk+NetworkStackGoogle.apk+com.google.android.resolv.apex+com.google.android.tethering.apex]",
       "options": [
         {
           "exclude-annotation": "androidx.test.filters.RequiresDevice"
