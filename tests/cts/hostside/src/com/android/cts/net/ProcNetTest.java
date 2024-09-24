@@ -166,6 +166,8 @@ public class ProcNetTest extends BaseHostJUnit4Test implements IBuildReceiver, I
      */
     @Test
     public void testRouterSolicitations() throws Exception {
+        assumeTrue(new DeviceSdkLevel(mDevice).isDeviceAtLeastU());
+
         for (String interfaceDir : mSysctlDirs) {
             String path = IPV6_SYSCTL_DIR + "/" + interfaceDir + "/" + "router_solicitations";
             int value = readIntFromPath(path);
@@ -186,8 +188,7 @@ public class ProcNetTest extends BaseHostJUnit4Test implements IBuildReceiver, I
      */
     @Test
     public void testCongestionControl() throws Exception {
-        final DeviceSdkLevel dsl = new DeviceSdkLevel(mDevice);
-        assumeTrue(dsl.isDeviceAtLeastV());
+        assumeTrue(new DeviceSdkLevel(mDevice).isDeviceAtLeastV());
 
         String path = "/proc/sys/net/ipv4/tcp_congestion_control";
         String value = mDevice.executeAdbCommand("shell", "cat", path).trim();

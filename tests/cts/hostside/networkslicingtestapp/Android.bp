@@ -21,7 +21,6 @@ package {
 
 java_defaults {
     name: "CtsHostsideNetworkCapTestsAppDefaults",
-    platform_apis: true,
     static_libs: [
         "androidx.test.ext.junit",
         "androidx.test.rules",
@@ -29,13 +28,6 @@ java_defaults {
         "cts-net-utils",
     ],
     srcs: ["src/**/*.java"],
-    // Tag this module as a cts test artifact
-    test_suites: [
-        "cts",
-        "general-tests",
-        "sts",
-    ],
-    min_sdk_version: "30",
 }
 
 android_test_helper_app {
@@ -43,6 +35,7 @@ android_test_helper_app {
     defaults: [
         "cts_support_defaults",
         "CtsHostsideNetworkCapTestsAppDefaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
     ],
     manifest: "AndroidManifestWithoutProperty.xml",
     sdk_version: "test_current",
@@ -53,6 +46,7 @@ android_test_helper_app {
     defaults: [
         "cts_support_defaults",
         "CtsHostsideNetworkCapTestsAppDefaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
     ],
     manifest: "AndroidManifestWithProperty.xml",
     sdk_version: "test_current",
@@ -63,6 +57,7 @@ android_test_helper_app {
     defaults: [
         "cts_support_defaults",
         "CtsHostsideNetworkCapTestsAppDefaults",
+        "CtsHostsideNetworkTestsAllAppDefaults",
     ],
     target_sdk_version: "33",
     manifest: "AndroidManifestWithoutProperty.xml",
