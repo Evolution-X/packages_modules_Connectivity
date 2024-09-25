@@ -2004,7 +2004,8 @@ public class Tethering {
             final UpstreamNetworkState ns = (UpstreamNetworkState) o;
             switch (arg1) {
                 case UpstreamNetworkMonitor.EVENT_ON_LINKPROPERTIES:
-                    mPrivateAddressCoordinator.updateUpstreamPrefix(ns);
+                    mPrivateAddressCoordinator.updateUpstreamPrefix(
+                            ns.linkProperties, ns.networkCapabilities, ns.network);
                     break;
                 case UpstreamNetworkMonitor.EVENT_ON_LOST:
                     mPrivateAddressCoordinator.removeUpstreamPrefix(ns.network);
