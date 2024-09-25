@@ -78,17 +78,20 @@ public class PrivateAddressCoordinator {
     private static final String LEGACY_BLUETOOTH_IFACE_ADDRESS = "192.168.44.1/24";
     private final List<IpPrefix> mTetheringPrefixes;
     private final ConnectivityManager mConnectivityMgr;
-    private final TetheringConfiguration mConfig;
+    private final boolean mIsRandomPrefixBaseEnabled;
+    private final boolean mShouldEnableWifiP2pDedicatedIp;
     // keyed by downstream type(TetheringManager.TETHERING_*).
     private final ArrayMap<AddressKey, LinkAddress> mCachedAddresses;
     private final Random mRandom;
 
-    public PrivateAddressCoordinator(Context context, TetheringConfiguration config) {
+    public PrivateAddressCoordinator(Context context, boolean isRandomPrefixBase,
+                                     boolean shouldEnableWifiP2pDedicatedIp) {
         mDownstreams = new ArraySet<>();
         mUpstreamPrefixMap = new ArrayMap<>();
         mConnectivityMgr = (ConnectivityManager) context.getSystemService(
                 Context.CONNECTIVITY_SERVICE);
-        mConfig = config;
+        mIsRandomPrefixBaseEnabled = isRandomPrefixBase;
+        mShouldEnableWifiP2pDedicatedIp = shouldEnableWifiP2pDedicatedIp;
         mCachedAddresses = new ArrayMap<AddressKey, LinkAddress>();
         // Reserved static addresses for bluetooth and wifi p2p.
         mCachedAddresses.put(new AddressKey(TETHERING_BLUETOOTH, CONNECTIVITY_SCOPE_GLOBAL),
@@ -175,7 +178,7 @@ public class PrivateAddressCoordinator {
     @Nullable
     public LinkAddress requestDownstreamAddress(final IpServer ipServer, final int scope,
             boolean useLastAddress) {
-        if (mConfig.shouldEnableWifiP2pDedicatedIp()
+        if (mShouldEnableWifiP2pDedicatedIp
                 && ipServer.interfaceType() == TETHERING_WIFI_P2P) {
             return new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS);
         }
@@ -208,7 +211,7 @@ public class PrivateAddressCoordinator {
     }
 
     private int getStartedPrefixIndex() {
-        if (!mConfig.isRandomPrefixBaseEnabled()) return 0;
+        if (!mIsRandomPrefixBaseEnabled) return 0;
 
         final int random = getRandomInt() & 0xffffff;
         // This is to select the starting prefix range (/8, /12, or /16) instead of the actual
