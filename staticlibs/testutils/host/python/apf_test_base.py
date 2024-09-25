@@ -50,6 +50,9 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     self.server_mac_address = apf_utils.get_hardware_address(
         self.serverDevice, self.server_iface_name
     )
+    self.client_mac_address = apf_utils.get_hardware_address(
+        self.clientDevice, self.client_iface_name
+    )
 
     # Enable doze mode to activate APF.
     adb_utils.set_doze_mode(self.clientDevice, True)
