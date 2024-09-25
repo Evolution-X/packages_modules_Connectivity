@@ -26,7 +26,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
-import android.annotation.SuppressLint;
 import android.net.MacAddress;
 import android.system.OsConstants;
 
@@ -286,6 +285,24 @@ public class RtNetlinkLinkMessageTest {
             assertNull(RtNetlinkLinkMessage.createSetLinkNameMessage(
                     interfaceName, sequenceNumber, invalidName, mOsAccess));
         }
+    }
+
+    @Test
+    public void testCreateGetLinkMessage() {
+        final String expectedHexBytes =
+                "20000000120001006824000000000000"    // struct nlmsghdr
+                + "00000000080000000000000000000000"; // struct ifinfomsg
+        final String interfaceName = "wlan0";
+        final int interfaceIndex = 8;
+        final int sequenceNumber = 0x2468;
+
+        when(mOsAccess.if_nametoindex(interfaceName)).thenReturn(interfaceIndex);
+
+        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createGetLinkMessage(
+                interfaceName, sequenceNumber, mOsAccess);
+        assertNotNull(msg);
+        final byte[] bytes = msg.pack(ByteOrder.LITTLE_ENDIAN);  // For testing.
+        assertEquals(expectedHexBytes, HexDump.toHexString(bytes));
     }
 
     @Test
