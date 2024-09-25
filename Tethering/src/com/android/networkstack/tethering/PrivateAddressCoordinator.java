@@ -32,7 +32,9 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
+import android.net.LinkProperties;
 import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.ip.IpServer;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -100,26 +102,26 @@ public class PrivateAddressCoordinator {
     }
 
     /**
-     * Record a new upstream IpPrefix which may conflict with tethering downstreams.
-     * The downstreams will be notified if a conflict is found. When updateUpstreamPrefix is called,
+     * Record a new upstream IpPrefix which may conflict with tethering downstreams. The downstreams
+     * will be notified if a conflict is found. When updateUpstreamPrefix is called,
      * UpstreamNetworkState must have an already populated LinkProperties.
      */
-    public void updateUpstreamPrefix(final UpstreamNetworkState ns) {
+    public void updateUpstreamPrefix(
+            final LinkProperties lp, final NetworkCapabilities nc, final Network network) {
         // Do not support VPN as upstream. Normally, networkCapabilities is not expected to be null,
         // but just checking to be sure.
-        if (ns.networkCapabilities != null && ns.networkCapabilities.hasTransport(TRANSPORT_VPN)) {
-            removeUpstreamPrefix(ns.network);
+        if (nc != null && nc.hasTransport(TRANSPORT_VPN)) {
+            removeUpstreamPrefix(network);
             return;
         }
 
-        final ArrayList<IpPrefix> ipv4Prefixes = getIpv4Prefixes(
-                ns.linkProperties.getAllLinkAddresses());
+        final ArrayList<IpPrefix> ipv4Prefixes = getIpv4Prefixes(lp.getAllLinkAddresses());
         if (ipv4Prefixes.isEmpty()) {
-            removeUpstreamPrefix(ns.network);
+            removeUpstreamPrefix(network);
             return;
         }
 
-        mUpstreamPrefixMap.put(ns.network, ipv4Prefixes);
+        mUpstreamPrefixMap.put(network, ipv4Prefixes);
         handleMaybePrefixConflict(ipv4Prefixes);
     }
 
