@@ -59,6 +59,9 @@
 #include "bpf/BpfUtils.h"
 #include "bpf_map_def.h"
 
+// The following matches bpf_helpers.h, which is only for inclusion in bpf code
+#define BPFLOADER_MAINLINE_VERSION 42u
+
 using android::base::EndsWith;
 using android::base::GetIntProperty;
 using android::base::GetProperty;
@@ -1154,7 +1157,10 @@ int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
 
     ret = readCodeSections(elfFile, cs);
-    if (ret == -ENOENT) return 0;  // no programs defined in this .o
+    // BPF .o's with no programs are only supported by mainline netbpfload,
+    // make sure .o's targeting non-mainline (ie. S) bpfloader don't show up.
+    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_VERSION)
+        return 0;
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
@@ -1419,7 +1425,7 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool has_platform_netbpfload_rc = exists("/system/etc/init/netbpfload.rc");
 
     // Version of Network BpfLoader depends on the Android OS version
-    unsigned int bpfloader_ver = 42u;    // [42] BPFLOADER_MAINLINE_VERSION
+    unsigned int bpfloader_ver = BPFLOADER_MAINLINE_VERSION;  // [42u]
     if (isAtLeastT) ++bpfloader_ver;     // [43] BPFLOADER_MAINLINE_T_VERSION
     if (isAtLeastU) ++bpfloader_ver;     // [44] BPFLOADER_MAINLINE_U_VERSION
     if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
