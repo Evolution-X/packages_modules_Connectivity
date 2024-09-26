@@ -423,7 +423,7 @@ public class TetheringManager {
     // Used to dispatch legacy ConnectivityManager methods that expect tethering to be able to
     // return results and perform operations synchronously.
     // TODO: remove once there are no callers of these legacy methods.
-    private class RequestDispatcher {
+    private static class RequestDispatcher {
         private final ConditionVariable mWaiting;
         public volatile int mRemoteResult;
 
@@ -439,8 +439,8 @@ public class TetheringManager {
             mWaiting = new ConditionVariable();
         }
 
-        int waitForResult(final RequestHelper request) {
-            getConnector(c -> request.runRequest(c, mListener));
+        int waitForResult(final RequestHelper request, final TetheringManager mgr) {
+            mgr.getConnector(c -> request.runRequest(c, mListener));
             if (!mWaiting.block(DEFAULT_TIMEOUT_MS)) {
                 throw new IllegalStateException("Callback timeout");
             }
@@ -596,7 +596,7 @@ public class TetheringManager {
             } catch (RemoteException e) {
                 throw new IllegalStateException(e);
             }
-        });
+        }, this);
     }
 
     /**
@@ -628,7 +628,7 @@ public class TetheringManager {
             } catch (RemoteException e) {
                 throw new IllegalStateException(e);
             }
-        });
+        }, this);
     }
 
     /**
@@ -656,7 +656,7 @@ public class TetheringManager {
             } catch (RemoteException e) {
                 throw new IllegalStateException(e);
             }
-        });
+        }, this);
     }
 
     /**
@@ -1677,7 +1677,7 @@ public class TetheringManager {
             } catch (RemoteException e) {
                 throw new IllegalStateException(e);
             }
-        });
+        }, this);
 
         return ret == TETHER_ERROR_NO_ERROR;
     }
@@ -1726,6 +1726,6 @@ public class TetheringManager {
             } catch (RemoteException e) {
                 throw new IllegalStateException(e);
             }
-        });
+        }, this);
     }
 }
