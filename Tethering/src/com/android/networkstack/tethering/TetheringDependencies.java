@@ -178,7 +178,8 @@ public abstract class TetheringDependencies {
      */
     public PrivateAddressCoordinator makePrivateAddressCoordinator(Context ctx,
             TetheringConfiguration cfg) {
-        return new PrivateAddressCoordinator(ctx, cfg);
+        return new PrivateAddressCoordinator(ctx, cfg.isRandomPrefixBaseEnabled(),
+                cfg.shouldEnableWifiP2pDedicatedIp());
     }
 
     /**
