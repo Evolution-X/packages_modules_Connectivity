@@ -53,6 +53,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * This class coordinate IP addresses conflict problem.
@@ -77,19 +78,20 @@ public class PrivateAddressCoordinator {
     private static final String LEGACY_WIFI_P2P_IFACE_ADDRESS = "192.168.49.1/24";
     private static final String LEGACY_BLUETOOTH_IFACE_ADDRESS = "192.168.44.1/24";
     private final List<IpPrefix> mTetheringPrefixes;
-    private final ConnectivityManager mConnectivityMgr;
+    // A supplier that returns ConnectivityManager#getAllNetworks.
+    private final Supplier<Network[]> mGetAllNetworksSupplier;
     private final boolean mIsRandomPrefixBaseEnabled;
     private final boolean mShouldEnableWifiP2pDedicatedIp;
     // keyed by downstream type(TetheringManager.TETHERING_*).
     private final ArrayMap<AddressKey, LinkAddress> mCachedAddresses;
     private final Random mRandom;
 
-    public PrivateAddressCoordinator(Context context, boolean isRandomPrefixBase,
-                                     boolean shouldEnableWifiP2pDedicatedIp) {
+    public PrivateAddressCoordinator(Supplier<Network[]> getAllNetworksSupplier,
+            boolean isRandomPrefixBase,
+            boolean shouldEnableWifiP2pDedicatedIp) {
         mDownstreams = new ArraySet<>();
         mUpstreamPrefixMap = new ArrayMap<>();
-        mConnectivityMgr = (ConnectivityManager) context.getSystemService(
-                Context.CONNECTIVITY_SERVICE);
+        mGetAllNetworksSupplier = getAllNetworksSupplier;
         mIsRandomPrefixBaseEnabled = isRandomPrefixBase;
         mShouldEnableWifiP2pDedicatedIp = shouldEnableWifiP2pDedicatedIp;
         mCachedAddresses = new ArrayMap<AddressKey, LinkAddress>();
@@ -166,7 +168,7 @@ public class PrivateAddressCoordinator {
 
         // Remove all upstreams that are no longer valid networks
         final Set<Network> toBeRemoved = new HashSet<>(mUpstreamPrefixMap.keySet());
-        toBeRemoved.removeAll(asList(mConnectivityMgr.getAllNetworks()));
+        toBeRemoved.removeAll(asList(mGetAllNetworksSupplier.get()));
 
         mUpstreamPrefixMap.removeAll(toBeRemoved);
     }
