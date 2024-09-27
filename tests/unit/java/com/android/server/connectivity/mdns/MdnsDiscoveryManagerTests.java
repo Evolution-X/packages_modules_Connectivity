@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -499,7 +500,7 @@ public class MdnsDiscoveryManagerTests {
         verify(executorProvider).shutdownExecutorService(mockExecutorService);
         verify(mockServiceTypeClientType1Network1).stopSendAndReceive(mockListenerOne);
         verify(socketClient).stopDiscovery();
-        verify(mockServiceCache).removeServices(cacheKey);
+        verify(mockServiceCache, timeout(DEFAULT_TIMEOUT)).removeServices(cacheKey);
     }
 
     @Test
@@ -523,7 +524,7 @@ public class MdnsDiscoveryManagerTests {
         runOnHandler(() -> callback.onSocketDestroyed(SOCKET_KEY_NETWORK_1));
         verify(mockServiceTypeClientType1Network1).notifySocketDestroyed();
         verify(executorProvider).shutdownExecutorService(mockExecutorService);
-        verify(mockServiceCache).removeServices(cacheKey);
+        verify(mockServiceCache, timeout(DEFAULT_TIMEOUT)).removeServices(cacheKey);
     }
 
     private MdnsPacket createMdnsPacket(String serviceType) {
