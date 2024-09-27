@@ -103,6 +103,7 @@ public final class PrivateAddressCoordinatorTest {
         MockitoAnnotations.initMocks(this);
 
         when(mContext.getSystemService(Context.CONNECTIVITY_SERVICE)).thenReturn(mConnectivityMgr);
+        when(mContext.getSystemService(ConnectivityManager.class)).thenReturn(mConnectivityMgr);
         when(mConnectivityMgr.getAllNetworks()).thenReturn(mAllNetworks);
         when(mConfig.shouldEnableWifiP2pDedicatedIp()).thenReturn(false);
         when(mConfig.isRandomPrefixBaseEnabled()).thenReturn(false);
@@ -110,7 +111,7 @@ public final class PrivateAddressCoordinatorTest {
         mPrivateAddressCoordinator =
                 spy(
                         new PrivateAddressCoordinator(
-                                mContext,
+                                mConnectivityMgr::getAllNetworks,
                                 mConfig.isRandomPrefixBaseEnabled(),
                                 mConfig.shouldEnableWifiP2pDedicatedIp()));
     }
@@ -615,7 +616,7 @@ public final class PrivateAddressCoordinatorTest {
         mPrivateAddressCoordinator =
                 spy(
                         new PrivateAddressCoordinator(
-                                mContext,
+                                mConnectivityMgr::getAllNetworks,
                                 mConfig.isRandomPrefixBaseEnabled(),
                                 mConfig.shouldEnableWifiP2pDedicatedIp()));
         when(mPrivateAddressCoordinator.getRandomInt()).thenReturn(randomIntForPrefixBase);
