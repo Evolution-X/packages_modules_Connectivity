@@ -64,6 +64,7 @@ import java.util.function.Supplier;
  * @hide
  */
 public class PrivateAddressCoordinator {
+    // WARNING: Keep in sync with chooseDownstreamAddress
     public static final int PREFIX_LENGTH = 24;
 
     // Upstream monitor would be stopped when tethering is down. When tethering restart, downstream
@@ -301,7 +302,8 @@ public class PrivateAddressCoordinator {
         // A random offset within the prefix. Used to determine the local address once the prefix
         // is selected. It does not result in an IPv4 address ending in .0, .1, or .255
         // For a PREFIX_LENGTH of 24, this is a number between 2 and 254.
-        final int subAddress = getSanitizedSubAddr(randomInt, ~prefixMask);
+        // WARNING: Keep in sync with PREFIX_LENGTH
+        final int subAddress = mRandom.nextInt(253) + 2;
 
         // Find a prefix length PREFIX_LENGTH between randomPrefixStart and the end of the block,
         // such that the prefix does not conflict with any upstream.
@@ -344,24 +346,6 @@ public class PrivateAddressCoordinator {
     @VisibleForTesting
     public int getRandomInt() {
         return mRandom.nextInt();
-    }
-
-    /** Get random subAddress and avoid selecting x.x.x.0, x.x.x.1 and x.x.x.255 address. */
-    private int getSanitizedSubAddr(final int randomInt, final int subAddrMask) {
-        final int randomSubAddr = randomInt & subAddrMask;
-        // If prefix length > 30, the selecting speace would be less than 4 which may be hard to
-        // avoid 3 consecutive address.
-        if (PREFIX_LENGTH > 30) return randomSubAddr;
-
-        // TODO: maybe it is not necessary to avoid .0, .1 and .255 address because tethering
-        // address would not be conflicted. This code only works because PREFIX_LENGTH is not longer
-        // than 24
-        final int candidate = randomSubAddr & 0xff;
-        if (candidate == 0 || candidate == 1 || candidate == 255) {
-            return (randomSubAddr & 0xfffffffc) + 2;
-        }
-
-        return randomSubAddr;
     }
 
     /** Release downstream record for IpServer. */
