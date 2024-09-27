@@ -124,6 +124,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.hardware.usb.UsbManager;
+import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.EthernetManager;
 import android.net.EthernetManager.TetheredInterfaceCallback;
@@ -374,6 +375,7 @@ public class TetheringTest {
         @Override
         public String getSystemServiceName(Class<?> serviceClass) {
             if (TelephonyManager.class.equals(serviceClass)) return Context.TELEPHONY_SERVICE;
+            if (ConnectivityManager.class.equals(serviceClass)) return Context.CONNECTIVITY_SERVICE;
             return super.getSystemServiceName(serviceClass);
         }
     }
