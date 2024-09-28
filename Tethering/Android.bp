@@ -79,6 +79,7 @@ java_defaults {
     ],
     defaults: ["TetheringExternalLibs"],
     libs: [
+        "framework-annotations-lib",
         "framework-tethering.impl",
     ],
     manifest: "AndroidManifestBase.xml",
