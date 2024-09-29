@@ -838,4 +838,26 @@ public final class ThreadNetworkControllerServiceTest {
 
         verify(mockReceiver, times(1)).onError(eq(ERROR_INTERNAL_ERROR), anyString());
     }
+
+    @Test
+    public void activateEphemeralKeyMode_succeed() throws Exception {
+        mService.initialize();
+        final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
+
+        mService.activateEphemeralKeyMode(1_000L, mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mockReceiver, times(1)).onSuccess();
+    }
+
+    @Test
+    public void deactivateEphemeralKeyMode_succeed() throws Exception {
+        mService.initialize();
+        final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
+
+        mService.deactivateEphemeralKeyMode(mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mockReceiver, times(1)).onSuccess();
+    }
 }
