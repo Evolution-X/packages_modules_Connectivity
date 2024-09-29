@@ -53,4 +53,7 @@ interface IThreadNetworkController {
     void setConfiguration(in ThreadConfiguration config, in IOperationReceiver receiver);
     void registerConfigurationCallback(in IConfigurationReceiver receiver);
     void unregisterConfigurationCallback(in IConfigurationReceiver receiver);
+
+    void activateEphemeralKeyMode(long lifetimeMillis, in IOperationReceiver receiver);
+    void deactivateEphemeralKeyMode(in IOperationReceiver receiver);
 }
