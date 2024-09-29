@@ -17,6 +17,8 @@
 package android.net.thread;
 
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_CHILD;
+import static android.net.thread.ThreadNetworkException.ERROR_FAILED_PRECONDITION;
+import static android.net.thread.ThreadNetworkException.ERROR_INTERNAL_ERROR;
 import static android.net.thread.ThreadNetworkException.ERROR_UNAVAILABLE;
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_CHANNEL;
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
@@ -26,6 +28,7 @@ import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
@@ -132,6 +135,16 @@ public final class ThreadNetworkControllerTest {
     private static IOperationalDatasetCallback getOperationalDatasetCallback(
             InvocationOnMock invocation) {
         return (IOperationalDatasetCallback) invocation.getArguments()[0];
+    }
+
+    private static IOperationReceiver getActivateEphemeralKeyModeReceiver(
+            InvocationOnMock invocation) {
+        return (IOperationReceiver) invocation.getArguments()[1];
+    }
+
+    private static IOperationReceiver getDeactivateEphemeralKeyModeReceiver(
+            InvocationOnMock invocation) {
+        return (IOperationReceiver) invocation.getArguments()[0];
     }
 
     @Test
@@ -439,5 +452,89 @@ public final class ThreadNetworkControllerTest {
 
         assertThat(callbackUid.get()).isNotEqualTo(SYSTEM_UID);
         assertThat(callbackUid.get()).isEqualTo(Process.myUid());
+    }
+
+    @Test
+    public void activateEphemeralKeyMode_callbackIsInvokedWithCallingAppIdentity()
+            throws Exception {
+        setBinderUid(SYSTEM_UID);
+        AtomicInteger successCallbackUid = new AtomicInteger(0);
+        AtomicInteger errorCallbackUid = new AtomicInteger(0);
+        Duration lifetime = Duration.ofSeconds(100);
+        doAnswer(
+                        invoke -> {
+                            getActivateEphemeralKeyModeReceiver(invoke).onSuccess();
+                            return null;
+                        })
+                .when(mMockService)
+                .activateEphemeralKeyMode(anyLong(), any(IOperationReceiver.class));
+        mController.activateEphemeralKeyMode(
+                lifetime, Runnable::run, v -> successCallbackUid.set(Binder.getCallingUid()));
+        doAnswer(
+                        invoke -> {
+                            getActivateEphemeralKeyModeReceiver(invoke)
+                                    .onError(ERROR_FAILED_PRECONDITION, "");
+                            return null;
+                        })
+                .when(mMockService)
+                .activateEphemeralKeyMode(anyLong(), any(IOperationReceiver.class));
+        mController.activateEphemeralKeyMode(
+                lifetime,
+                Runnable::run,
+                new OutcomeReceiver<>() {
+                    @Override
+                    public void onResult(Void unused) {}
+
+                    @Override
+                    public void onError(ThreadNetworkException e) {
+                        errorCallbackUid.set(Binder.getCallingUid());
+                    }
+                });
+
+        assertThat(successCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(successCallbackUid.get()).isEqualTo(Process.myUid());
+        assertThat(errorCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(errorCallbackUid.get()).isEqualTo(Process.myUid());
+    }
+
+    @Test
+    public void deactivateEphemeralKeyMode_callbackIsInvokedWithCallingAppIdentity()
+            throws Exception {
+        setBinderUid(SYSTEM_UID);
+        AtomicInteger successCallbackUid = new AtomicInteger(0);
+        AtomicInteger errorCallbackUid = new AtomicInteger(0);
+        doAnswer(
+                        invoke -> {
+                            getDeactivateEphemeralKeyModeReceiver(invoke).onSuccess();
+                            return null;
+                        })
+                .when(mMockService)
+                .deactivateEphemeralKeyMode(any(IOperationReceiver.class));
+        mController.deactivateEphemeralKeyMode(
+                Runnable::run, v -> successCallbackUid.set(Binder.getCallingUid()));
+        doAnswer(
+                        invoke -> {
+                            getDeactivateEphemeralKeyModeReceiver(invoke)
+                                    .onError(ERROR_INTERNAL_ERROR, "");
+                            return null;
+                        })
+                .when(mMockService)
+                .deactivateEphemeralKeyMode(any(IOperationReceiver.class));
+        mController.deactivateEphemeralKeyMode(
+                Runnable::run,
+                new OutcomeReceiver<>() {
+                    @Override
+                    public void onResult(Void unused) {}
+
+                    @Override
+                    public void onError(ThreadNetworkException e) {
+                        errorCallbackUid.set(Binder.getCallingUid());
+                    }
+                });
+
+        assertThat(successCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(successCallbackUid.get()).isEqualTo(Process.myUid());
+        assertThat(errorCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(errorCallbackUid.get()).isEqualTo(Process.myUid());
     }
 }
