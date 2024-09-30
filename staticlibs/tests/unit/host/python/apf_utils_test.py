@@ -25,8 +25,8 @@ from net_tests_utils.host.python.apf_utils import (
     get_apf_capabilities,
     get_apf_counter,
     get_apf_counters_from_dumpsys,
-    get_ipv4_address,
-    get_ipv6_address,
+    get_ipv4_addresses,
+    get_ipv6_addresses,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
     send_raw_packet_downstream,
@@ -114,44 +114,53 @@ IpClient.wlan1
       get_hardware_address(self.mock_ad, "wlan0")
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
-  def test_get_ipv4_address_success(
+  def test_get_ipv4_addresses_success(
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = """
 54: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
-inet 192.168.195.162/24 brd 192.168.195.255 scope global wlan0
-valid_lft forever preferred_lft forever
+    inet 192.168.195.162/24 brd 192.168.195.255 scope global wlan0
+       valid_lft forever preferred_lft forever
+    inet 192.168.200.1/24 brd 192.168.200.255 scope global wlan0
+       valid_lft forever preferred_lft forever
 """
-    ip_address = get_ipv4_address(self.mock_ad, "wlan0")
-    asserts.assert_equal(ip_address, "192.168.195.162")
+    ip_addresses = get_ipv4_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses, ["192.168.195.162", "192.168.200.1"])
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
-  def test_get_ipv4_address_not_found(
+  def test_get_ipv4_addresses_not_found(
       self, mock_adb_shell: MagicMock
   ) -> None:
-     mock_adb_shell.return_value = ""
-     with asserts.assert_raises(PatternNotFoundException):
-       get_ipv4_address(self.mock_ad, "wlan0")
+    mock_adb_shell.return_value = ""
+    ip_addresses = get_ipv4_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses, [])
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
-  def test_get_ipv6_address_success(
+  def test_get_ipv6_addresses_success(
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = """
 54: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
-inet6 fe80::10a3:5dff:fe52:de32/64 scope link
-valid_lft forever preferred_lft forever
+    inet6 fe80::10a3:5dff:fe52:de32/64 scope link
+        valid_lft forever preferred_lft forever
+    inet6 2001:b400:e53f:164e:9c1e:780e:d1:4658/64 scope global dynamic mngtmpaddr noprefixroute
+        valid_lft 6995sec preferred_lft 6995sec
+    inet6 fe80::3aff:2199:2d8e:20d1/64 scope link noprefixroute
+        valid_lft forever preferred_lft forever
 """
-    ip_address = get_ipv6_address(self.mock_ad, "wlan0")
-    asserts.assert_equal(ip_address, "fe80::10a3:5dff:fe52:de32")
+    ip_addresses = get_ipv6_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses,
+                         ["fe80::10a3:5dff:fe52:de32",
+                          "2001:b400:e53f:164e:9c1e:780e:d1:4658",
+                          "fe80::3aff:2199:2d8e:20d1"])
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_get_ipv6_address_not_found(
           self, mock_adb_shell: MagicMock
   ) -> None:
-      mock_adb_shell.return_value = ""
-      with asserts.assert_raises(PatternNotFoundException):
-          get_ipv6_address(self.mock_ad, "wlan0")
+    mock_adb_shell.return_value = ""
+    ip_addresses = get_ipv6_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses, [])
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
   def test_send_raw_packet_downstream_success(
