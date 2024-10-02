@@ -38,6 +38,7 @@ import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.networkstack.apishim.ConstantsShim.KEY_CARRIER_SUPPORTS_TETHERING_BOOL;
+import static com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import static com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
@@ -71,6 +72,7 @@ import android.os.PersistableBundle;
 import android.os.ResultReceiver;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.os.test.TestLooper;
 import android.provider.DeviceConfig;
 import android.provider.Settings;
@@ -114,6 +116,7 @@ public final class EntitlementManagerTest {
     @Mock private EntitlementManager
             .OnTetherProvisioningFailedListener mTetherProvisioningFailedListener;
     @Mock private AlarmManager mAlarmManager;
+    @Mock private UserManager mUserManager;
     @Mock private PendingIntent mAlarmIntent;
 
     @Rule
@@ -143,8 +146,20 @@ public final class EntitlementManagerTest {
         @Override
         public Object getSystemService(String name) {
             if (Context.ALARM_SERVICE.equals(name)) return mAlarmManager;
+            if (Context.USER_SERVICE.equals(name)) return mUserManager;
 
             return super.getSystemService(name);
+        }
+
+        @Override
+        public String getSystemServiceName(Class<?> serviceClass) {
+            if (UserManager.class.equals(serviceClass)) return Context.USER_SERVICE;
+            return super.getSystemServiceName(serviceClass);
+        }
+
+        @Override
+        public Context createContextAsUser(UserHandle user, int flags) {
+            return mMockContext; // Return self for easier test injection.
         }
     }
 
@@ -168,8 +183,10 @@ public final class EntitlementManagerTest {
         protected Intent runUiTetherProvisioning(int type,
                 final TetheringConfiguration config, final ResultReceiver receiver) {
             Intent intent = super.runUiTetherProvisioning(type, config, receiver);
-            assertUiTetherProvisioningIntent(type, config, receiver, intent);
-            uiProvisionCount++;
+            if (intent != null) {
+                assertUiTetherProvisioningIntent(type, config, receiver, intent);
+                uiProvisionCount++;
+            }
             receiver.send(fakeEntitlementResult, null);
             return intent;
         }
@@ -217,6 +234,13 @@ public final class EntitlementManagerTest {
             assertEquals(TEST_PACKAGE_NAME, pkgName);
             return mAlarmIntent;
         }
+
+        @Override
+        int getCurrentUser() {
+            // The result is not used, just override to bypass the need of accessing
+            // the static method.
+            return 0;
+        }
     }
 
     @Before
@@ -253,6 +277,7 @@ public final class EntitlementManagerTest {
                 false);
         when(mResources.getString(R.string.config_wifi_tether_enable)).thenReturn("");
         when(mLog.forSubComponent(anyString())).thenReturn(mLog);
+        doReturn(true).when(mUserManager).isAdminUser();
 
         mMockContext = new MockContext(mContext);
         mPermissionChangeCallback = spy(() -> { });
@@ -617,6 +642,33 @@ public final class EntitlementManagerTest {
         assertEquals(1, mEnMgr.uiProvisionCount);
         verify(mTetherProvisioningFailedListener, times(1))
                 .onTetherProvisioningFailed(TETHERING_WIFI, FAILED_TETHERING_REASON);
+    }
+
+    @IgnoreUpTo(SC_V2)
+    @Test
+    public void testUiProvisioningMultiUser_aboveT() {
+        doTestUiProvisioningMultiUser(true, 1);
+        doTestUiProvisioningMultiUser(false, 0);
+    }
+
+    @IgnoreAfter(SC_V2)
+    @Test
+    public void testUiProvisioningMultiUser_belowT() {
+        doTestUiProvisioningMultiUser(true, 1);
+        doTestUiProvisioningMultiUser(false, 1);
+    }
+
+    private void doTestUiProvisioningMultiUser(boolean isAdminUser, int expectedUiProvisionCount) {
+        setupForRequiredProvisioning();
+        doReturn(isAdminUser).when(mUserManager).isAdminUser();
+
+        mEnMgr.reset();
+        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mEnMgr.notifyUpstream(true);
+        mLooper.dispatchAll();
+        mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
+        mLooper.dispatchAll();
+        assertEquals(expectedUiProvisionCount, mEnMgr.uiProvisionCount);
     }
 
     @Test

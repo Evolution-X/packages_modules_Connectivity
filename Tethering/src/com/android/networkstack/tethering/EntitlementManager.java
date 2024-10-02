@@ -36,6 +36,7 @@ import static android.net.TetheringManager.TETHER_ERROR_PROVISIONING_FAILED;
 import static com.android.networkstack.apishim.ConstantsShim.ACTION_TETHER_UNSUPPORTED_CARRIER_UI;
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_NOT_EXPORTED;
 
+import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -50,8 +51,12 @@ import android.os.Parcel;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.Settings;
 import android.util.SparseIntArray;
+
+import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
@@ -406,12 +411,20 @@ public class EntitlementManager {
         return intent;
     }
 
+    @VisibleForTesting
+    int getCurrentUser() {
+        return ActivityManager.getCurrentUser();
+    }
+
     /**
      * Run the UI-enabled tethering provisioning check.
      * @param type tethering type from TetheringManager.TETHERING_{@code *}
-     * @param subId default data subscription ID.
      * @param receiver to receive entitlement check result.
+     *
+     * @return the broadcast intent, or null if the current user is not allowed to
+     *         perform entitlement check.
      */
+    @Nullable
     @VisibleForTesting
     protected Intent runUiTetherProvisioning(int type, final TetheringConfiguration config,
             ResultReceiver receiver) {
@@ -423,9 +436,28 @@ public class EntitlementManager {
         intent.putExtra(EXTRA_PROVISION_CALLBACK, receiver);
         intent.putExtra(EXTRA_TETHER_SUBID, config.activeDataSubId);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        // Only launch entitlement UI for system user. Entitlement UI should not appear for other
-        // user because only admin user is allowed to change tethering.
-        mContext.startActivity(intent);
+
+        // Only launch entitlement UI for the current user if it is allowed to
+        // change tethering. This usually means the system user or the admin users in HSUM.
+        if (SdkLevel.isAtLeastT()) {
+            // Create a user context for the current foreground user as UserManager#isAdmin()
+            // operates on the context user.
+            final int currentUserId = getCurrentUser();
+            final UserHandle currentUser = UserHandle.of(currentUserId);
+            final Context userContext = mContext.createContextAsUser(currentUser, 0);
+            final UserManager userManager = userContext.getSystemService(UserManager.class);
+
+            if (userManager.isAdminUser()) {
+                mContext.startActivityAsUser(intent, currentUser);
+            } else {
+                mLog.e("Current user (" + currentUserId
+                        + ") is not allowed to perform entitlement check.");
+                return null;
+            }
+        } else {
+            // For T- devices, there is no other admin user other than the system user.
+            mContext.startActivity(intent);
+        }
         return intent;
     }
 
