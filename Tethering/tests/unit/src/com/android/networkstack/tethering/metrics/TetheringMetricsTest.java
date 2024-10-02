@@ -498,7 +498,7 @@ public final class TetheringMetricsTest {
     private void verifyEmptyUsageForAllUpstreamTypes() {
         mHandler.post(() -> {
             for (UpstreamType type : UpstreamType.values()) {
-                assertEquals(EMPTY, mTetheringMetrics.getDataUsageFromUpstreamType(type));
+                assertEquals(EMPTY, mTetheringMetrics.getLastReportedUsageFromUpstreamType(type));
             }
         });
         HandlerUtils.waitForIdle(mHandler, DEFAULT_TIMEOUT);
@@ -555,7 +555,8 @@ public final class TetheringMetricsTest {
 
         mHandler.post(() -> {
             for (UpstreamType type : UpstreamType.values()) {
-                final DataUsage dataUsage = mTetheringMetrics.getDataUsageFromUpstreamType(type);
+                final DataUsage dataUsage =
+                        mTetheringMetrics.getLastReportedUsageFromUpstreamType(type);
                 if (TetheringMetrics.isUsageSupportedForUpstreamType(type)) {
                     assertEquals(mMockUpstreamUsageBaseline.get(type), dataUsage);
                 } else {
@@ -610,12 +611,21 @@ public final class TetheringMetricsTest {
         incrementCurrentTime(cellDuration);
         updateUpstreamDataUsage(UT_CELLULAR, cellUsageDiff);
 
+        // Change the upstream back to Wi-FI and update the data usage
+        runAndWaitForIdle(() ->
+                mTetheringMetrics.maybeUpdateUpstreamType(buildUpstreamState(TRANSPORT_WIFI)));
+        final long wifiDuration2 = 50 * SECOND_IN_MILLIS;
+        final long wifiUsageDiff2 = 1000L;
+        incrementCurrentTime(wifiDuration2);
+        updateUpstreamDataUsage(UT_WIFI, wifiUsageDiff2);
+
         // Stop tethering and verify that the data usage is uploaded.
         updateErrorAndSendReport(TETHERING_WIFI, TETHER_ERROR_NO_ERROR);
         UpstreamEvents.Builder upstreamEvents = UpstreamEvents.newBuilder();
         addUpstreamEvent(upstreamEvents, UT_WIFI, wifiDuration, wifiUsageDiff, wifiUsageDiff);
         addUpstreamEvent(upstreamEvents, UT_BLUETOOTH, bluetoothDuration, btUsageDiff, btUsageDiff);
         addUpstreamEvent(upstreamEvents, UT_CELLULAR, cellDuration, cellUsageDiff, cellUsageDiff);
+        addUpstreamEvent(upstreamEvents, UT_WIFI, wifiDuration2, wifiUsageDiff2, wifiUsageDiff2);
         verifyReport(DownstreamType.DS_TETHERING_WIFI, ErrorCode.EC_NO_ERROR,
                 UserType.USER_SETTINGS, upstreamEvents,
                 currentTimeMillis() - wifiTetheringStartTime);
