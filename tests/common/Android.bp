@@ -147,6 +147,7 @@ java_defaults {
         // meaning @hide APIs in framework-connectivity are resolved before @SystemApi
         // stubs in framework
         "framework-connectivity.impl",
+        "framework-connectivity-b.impl",
         "framework-connectivity-t.impl",
         "framework-tethering.impl",
         "framework",

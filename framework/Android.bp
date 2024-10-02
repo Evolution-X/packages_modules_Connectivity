@@ -189,6 +189,10 @@ java_sdk_library {
         // Tests using hidden APIs
         "//cts/tests/netlegacy22.api",
         "//cts/tests/tests/app.usage", // NetworkUsageStatsTest
+
+        // TODO: b/374174952 Remove it when VCN CTS is moved to Connectivity/
+        "//cts/tests/tests/vcn",
+
         "//external/sl4a:__subpackages__",
         "//frameworks/base/core/tests/bandwidthtests",
         "//frameworks/base/core/tests/benchmarks",
