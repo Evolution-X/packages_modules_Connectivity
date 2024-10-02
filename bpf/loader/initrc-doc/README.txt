@@ -1,20 +1,42 @@
 This directory contains comment stripped versions of
   //system/bpf/bpfloader/bpfloader.rc
-from previous versions of Android.
+or
+  //packages/modules/Connectivity/bpf/loader/netbpfload.rc
+(as appropriate) from previous versions of Android.
 
 Generated via:
-  (cd ../../../../../system/bpf && git cat-file -p remotes/aosp/android11-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk30-11-R.rc
-  (cd ../../../../../system/bpf && git cat-file -p remotes/aosp/android12-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk31-12-S.rc
-  (cd ../../../../../system/bpf && git cat-file -p remotes/aosp/android13-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk33-13-T.rc
-  (cd ../../../../../system/bpf && git cat-file -p remotes/aosp/android14-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk34-14-U.rc
-  (cd ../../../../../system/bpf && git cat-file -p remotes/aosp/main:bpfloader/bpfloader.rc;              ) | egrep -v '^ *#' > bpfloader-sdk34-14-U-QPR2.rc
+  (cd ../../../../../../system/bpf && git cat-file -p remotes/aosp/android11-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk30-11-R.rc
+  (cd ../../../../../../system/bpf && git cat-file -p remotes/aosp/android12-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk31-12-S.rc
+  (cd ../../../../../../system/bpf && git cat-file -p remotes/aosp/android13-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk33-13-T.rc
+  (cd ../../../../../../system/bpf && git cat-file -p remotes/aosp/android14-release:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk34-14-U.rc
+  git cat-file -p remotes/aosp/android14-qpr2-release:netbpfload/netbpfload.rc | egrep -v '^ *#' > bpfloader-sdk34-14-U-QPR2-24Q1.rc
+  git cat-file -p remotes/aosp/android14-qpr3-release:netbpfload/netbpfload.rc | egrep -v '^ *#' > bpfloader-sdk34-14-U-QPR3-24Q2.rc
+  git cat-file -p remotes/aosp/android15-release:netbpfload/netbpfload.rc      | egrep -v '^ *#' > bpfloader-sdk35-15-V-24Q3.rc
+  git cat-file -p remotes/aosp/main:bpf/loader/netbpfload.rc                   | egrep -v '^ *#' > bpfloader-sdk35-15-V-QPR1-24Q4.rc
+
+see also:
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android11-release/bpfloader/bpfloader.rc
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android12-release/bpfloader/bpfloader.rc
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android13-release/bpfloader/bpfloader.rc
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android14-release/bpfloader/bpfloader.rc
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android14-qpr1-release/bpfloader/bpfloader.rc
+  https://android.googlesource.com/platform/system/bpf/+/refs/heads/android14-qpr2-release/bpfloader/ (rc file is gone in QPR2)
+  https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/android14-qpr2-release/netbpfload/netbpfload.rc
+  https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/android14-qpr3-release/netbpfload/netbpfload.rc
+  https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/android15-release/netbpfload/netbpfload.rc
+  https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/android15-qpr1-release/netbpfload/netbpfload.rc
+  https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/main/netbpfload/netbpfload.rc
+or:
+  https://googleplex-android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/24Q1-release/netbpfload/netbpfload.rc
+  https://googleplex-android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/24Q2-release/netbpfload/netbpfload.rc
+  https://googleplex-android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/24Q3-release/netbpfload/netbpfload.rc
+  https://googleplex-android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/24Q4-release/bpf/loader/netbpfload.rc
 
 this is entirely equivalent to:
   (cd /android1/system/bpf && git cat-file -p remotes/goog/rvc-dev:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk30-11-R.rc
   (cd /android1/system/bpf && git cat-file -p remotes/goog/sc-dev:bpfloader/bpfloader.rc;  ) | egrep -v '^ *#' > bpfloader-sdk31-12-S.rc
   (cd /android1/system/bpf && git cat-file -p remotes/goog/tm-dev:bpfloader/bpfloader.rc;  ) | egrep -v '^ *#' > bpfloader-sdk33-13-T.rc
   (cd /android1/system/bpf && git cat-file -p remotes/goog/udc-dev:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk34-14-U.rc
-  (cd /android1/system/bpf && git cat-file -p remotes/goog/main:bpfloader/bpfloader.rc;    ) | egrep -v '^ *#' > bpfloader-sdk34-14-U-QPR2.rc
 
 it is also equivalent to:
   (cd /android1/system/bpf && git cat-file -p remotes/goog/rvc-qpr-dev:bpfloader/bpfloader.rc; ) | egrep -v '^ *#' > bpfloader-sdk30-11-R.rc

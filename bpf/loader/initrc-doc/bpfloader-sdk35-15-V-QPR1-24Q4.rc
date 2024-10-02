@@ -1,0 +1,5 @@
+service bpfloader /system/bin/false
+    user root
+    oneshot
+    reboot_on_failure reboot,netbpfload-missing
+    updatable
