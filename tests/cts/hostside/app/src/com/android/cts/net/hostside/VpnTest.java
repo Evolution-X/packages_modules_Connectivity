@@ -213,8 +213,6 @@ public class VpnTest {
 
     private static final String AUTOMATIC_ON_OFF_KEEPALIVE_VERSION =
                 "automatic_on_off_keepalive_version";
-    private static final String INGRESS_TO_VPN_ADDRESS_FILTERING =
-            "ingress_to_vpn_address_filtering";
     // Enabled since version 1 means it's always enabled because the version is always above 1
     private static final String AUTOMATIC_ON_OFF_KEEPALIVE_ENABLED = "1";
     private static final long TEST_TCP_POLLING_TIMER_EXPIRED_PERIOD_MS = 60_000L;
@@ -1951,9 +1949,6 @@ public class VpnTest {
      */
     private void doTestDropPacketToVpnAddress(final boolean duplicatedAddress)
             throws Exception {
-        assumeTrue(mCM.isConnectivityServiceFeatureEnabledForTesting(
-                INGRESS_TO_VPN_ADDRESS_FILTERING));
-
         final NetworkRequest request = new NetworkRequest.Builder()
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
