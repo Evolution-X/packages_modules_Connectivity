@@ -87,13 +87,13 @@ import android.stats.connectivity.UserType;
 import android.util.ArrayMap;
 
 import androidx.test.filters.SmallTest;
-import androidx.test.runner.AndroidJUnit4;
 
 import com.android.networkstack.tethering.UpstreamNetworkState;
 import com.android.networkstack.tethering.metrics.TetheringMetrics.DataUsage;
 import com.android.networkstack.tethering.metrics.TetheringMetrics.Dependencies;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
+import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.HandlerUtils;
 
 import org.junit.After;
@@ -104,7 +104,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-@RunWith(AndroidJUnit4.class)
+@DevSdkIgnoreRunner.MonitorThreadLeak
+@RunWith(DevSdkIgnoreRunner.class)
 @SmallTest
 public final class TetheringMetricsTest {
     @Rule public final DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
@@ -158,7 +159,7 @@ public final class TetheringMetricsTest {
         mThread = new HandlerThread("TetheringMetricsTest");
         mThread.start();
         mHandler = new Handler(mThread.getLooper());
-        doReturn(mHandler).when(mDeps).createHandler(any());
+        doReturn(mHandler).when(mDeps).createHandler();
         // Set up the usage for upstream types.
         mMockUpstreamUsageBaseline.put(UT_CELLULAR, new DataUsage(100L, 200L));
         mMockUpstreamUsageBaseline.put(UT_WIFI, new DataUsage(400L, 800L));
