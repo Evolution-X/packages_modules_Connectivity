@@ -51,34 +51,66 @@ Note: Sv2 sdk/api level is actually 32, it just didn't change anything wrt. bpf,
 
 Key takeaways:
 
-= R bpfloader:
+= R bpfloader (platform)
   - CHOWN + SYS_ADMIN
   - asynchronous startup
   - platform only
   - proc file setup handled by initrc
 
-= S bpfloader
+= S bpfloader (platform)
   - adds NET_ADMIN
   - synchronous startup
   - platform + mainline tethering offload
 
-= T bpfloader
+= T bpfloader (platform)
   - platform + mainline networking (including tethering offload)
   - supported btf for maps via exec of btfloader
 
-= U bpfloader
+= U bpfloader (platform)
   - proc file setup moved into bpfloader binary
   - explicitly specified user and groups:
     group root graphics network_stack net_admin net_bw_acct net_bw_stats net_raw system
     user root
 
-= U QPR2 bpfloader
+= U QPR2 [24Q1] bpfloader (platform netbpfload -> platform bpfloader)
   - drops support of btf for maps
   - invocation of /system/bin/netbpfload binary, which after handling *all*
     networking bpf related things executes the platform /system/bin/bpfloader
     which handles non-networking bpf.
+  - Note: this does not (by itself) call into apex NetBpfLoad
+
+= U QPR3 [24Q2] bpfloader (platform netbpfload -> apex netbpfload -> platform bpfloader)
+  - platform NetBpfload *always* execs into apex NetBpfLoad,
+  - shipped with mainline tethering apex that includes NetBpfLoad binary.
+
+= V [24Q3] bpfloader (apex netbpfload -> platform bpfloader)
+  - no significant changes, though it does hard require the apex NetBpfLoad
+    by virtue of the platform NetBpfLoad no longer being present.
+    ie. the apex must override the platform 'bpfloader' service for 35+:
+    the V FRC M-2024-08+ tethering apex does this.
+
+= V QPR1 [24Q4] bpfloader (apex netbpfload -> platform bpfloader)
+  - made netd start earlier (previously happened in parallel to zygote)
+  - renamed and moved the trigger out of netbpload.rc into
+    //system/core/rootdir/init.rc
+  - the new sequence is:
+      trigger post-fs-data        (logd available, starts apexd)
+      trigger load-bpf-programs   (does: exec_start bpfloader)
+      trigger bpf-progs-loaded    (does: start netd)
+      trigger zygote-start
+  - this is more or less irrelevant from the point of view of the bpfloader,
+    but it does mean netd init could fail and abort the boot earlier,
+    before 'A/B update_verifier marks a successful boot'.
+    Though note that due to netd being started asynchronously, it is racy.
 
 Note that there is now a copy of 'netbpfload' provided by the tethering apex
 mainline module at /apex/com.android.tethering/bin/netbpfload, which due
 to the use of execve("/system/bin/bpfloader") relies on T+ selinux which was
 added for btf map support (specifically the ability to exec the "btfloader").
+
+= mainline tethering apex M-2024-08+ overrides the platform service for V+
+  thus loading mainline (ie. networking) bpf programs from mainline 'NetBpfLoad'
+  and platform ones from platform 'bpfloader'.
+
+= mainline tethering apex M-2024-09+ changes T+ behaviour (U QPR3+ unaffected)
+  netd -> netd_updatable.so -> ctl.start=mdnsd_netbpfload -> load net bpf programs
