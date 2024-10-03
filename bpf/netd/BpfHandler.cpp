@@ -201,7 +201,7 @@ static inline void waitForNetProgsLoaded() {
     }
 }
 
-Status BpfHandler::init(const char* cg2_path) {
+static inline void waitForBpf() {
     // Note: netd *can* be restarted, so this might get called a second time after boot is complete
     // at which point we don't need to (and shouldn't) wait for (more importantly start) loading bpf
 
@@ -229,6 +229,21 @@ Status BpfHandler::init(const char* cg2_path) {
     }
 
     ALOGI("BPF programs are loaded");
+}
+
+Status BpfHandler::init(const char* cg2_path) {
+    // This wait is effectively a no-op on U QPR3+ devices (as netd starts
+    // *after* the synchronous 'exec_start bpfloader' which calls NetBpfLoad)
+    // but checking for U QPR3 is hard.
+    //
+    // Waiting should not be required on U QPR3+ devices,
+    // ...
+    //
+    // ...unless someone changed 'exec_start bpfloader' to 'start bpfloader'
+    // in the rc file.
+    //
+    // TODO: should be: if (!modules::sdklevel::IsAtLeastW())
+    if (android_get_device_api_level() <= __ANDROID_API_V__) waitForBpf();
 
     RETURN_IF_NOT_OK(initPrograms(cg2_path));
     RETURN_IF_NOT_OK(initMaps());

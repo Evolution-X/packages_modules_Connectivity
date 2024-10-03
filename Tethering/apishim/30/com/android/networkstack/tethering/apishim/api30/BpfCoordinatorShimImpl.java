@@ -198,4 +198,13 @@ public class BpfCoordinatorShimImpl
     public String toString() {
         return "Netd used";
     }
+
+    @Override
+    public int getLastMaxConnectionAndResetToCurrent() {
+        return 0;
+    }
+
+    @Override
+    public void clearConnectionCounters() {
+    }
 }

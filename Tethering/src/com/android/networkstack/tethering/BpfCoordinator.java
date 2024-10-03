@@ -27,6 +27,7 @@ import static android.net.netstats.provider.NetworkStatsProvider.QUOTA_UNLIMITED
 import static android.system.OsConstants.ETH_P_IP;
 import static android.system.OsConstants.ETH_P_IPV6;
 
+import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIVATE;
 import static com.android.net.module.util.NetworkStackConstants.IPV4_MIN_MTU;
 import static com.android.net.module.util.NetworkStackConstants.IPV6_ADDR_LEN;
 import static com.android.net.module.util.ip.ConntrackMonitor.ConntrackEvent;
@@ -334,7 +335,6 @@ public class BpfCoordinator {
     };
 
     // TODO: add BpfMap<TetherDownstream64Key, TetherDownstream64Value> retrieving function.
-    @VisibleForTesting
     public abstract static class Dependencies {
         /** Get handler. */
         @NonNull public abstract Handler getHandler();
@@ -585,14 +585,10 @@ public class BpfCoordinator {
             if (mHandler.hasCallbacks(mScheduledConntrackMetricsSampling)) {
                 mHandler.removeCallbacks(mScheduledConntrackMetricsSampling);
             }
-            final int currentCount = mBpfConntrackEventConsumer.getCurrentConnectionCount();
-            if (currentCount != 0) {
-                Log.wtf(TAG, "Unexpected CurrentConnectionCount: " + currentCount);
-            }
             // Avoid sending metrics when tethering is about to close.
             // This leads to a missing final sample before disconnect
             // but avoids possibly duplicating the last metric in the upload.
-            mBpfConntrackEventConsumer.clearConnectionCounters();
+            mBpfCoordinatorShim.clearConnectionCounters();
         }
         // Stop scheduled polling stats and poll the latest stats from BPF maps.
         if (mHandler.hasCallbacks(mScheduledPollingStats)) {
@@ -1091,10 +1087,6 @@ public class BpfCoordinator {
         for (final Tether4Key k : deleteDownstreamRuleKeys) {
             mBpfCoordinatorShim.tetherOffloadRuleRemove(DOWNSTREAM, k);
         }
-        if (mSupportActiveSessionsMetrics) {
-            mBpfConntrackEventConsumer.decreaseCurrentConnectionCount(
-                    deleteUpstreamRuleKeys.size());
-        }
 
         // Cleanup each upstream interface by a set which avoids duplicated work on the same
         // upstream interface. Cleaning up the same interface twice (or more) here may raise
@@ -1367,10 +1359,6 @@ public class BpfCoordinator {
 
         pw.println();
         pw.println("mSupportActiveSessionsMetrics: " + mSupportActiveSessionsMetrics);
-        pw.println("getLastMaxConnectionCount: "
-                + mBpfConntrackEventConsumer.getLastMaxConnectionCount());
-        pw.println("getCurrentConnectionCount: "
-                + mBpfConntrackEventConsumer.getCurrentConnectionCount());
     }
 
     private void dumpStats(@NonNull IndentingPrintWriter pw) {
@@ -2062,21 +2050,6 @@ public class BpfCoordinator {
     // while TCP status is established.
     @VisibleForTesting
     class BpfConntrackEventConsumer implements ConntrackEventConsumer {
-        /**
-         * Tracks the current number of tethering connections and the maximum
-         * observed since the last metrics collection. Used to provide insights
-         * into the distribution of active tethering sessions for metrics reporting.
-
-         * These variables are accessed on the handler thread, which includes:
-         *  1. ConntrackEvents signaling the addition or removal of an IPv4 rule.
-         *  2. ConntrackEvents indicating the removal of a tethering client,
-         *     triggering the removal of associated rules.
-         *  3. Removal of the last IpServer, which resets counters to handle
-         *     potential synchronization issues.
-         */
-        private int mLastMaxConnectionCount = 0;
-        private int mCurrentConnectionCount = 0;
-
         // The upstream4 and downstream4 rules are built as the following tables. Only raw ip
         // upstream interface is supported. Note that the field "lastUsed" is only updated by
         // BPF program which records the last used time for a given rule.
@@ -2210,10 +2183,6 @@ public class BpfCoordinator {
                     return;
                 }
 
-                if (mSupportActiveSessionsMetrics) {
-                    decreaseCurrentConnectionCount(1);
-                }
-
                 maybeClearLimit(upstreamIndex);
                 return;
             }
@@ -2237,40 +2206,12 @@ public class BpfCoordinator {
                         + ", downstream: " + addedDownstream + ")");
                 return;
             }
-            if (mSupportActiveSessionsMetrics && addedUpstream && addedDownstream) {
-                mCurrentConnectionCount++;
-                mLastMaxConnectionCount = Math.max(mCurrentConnectionCount,
-                        mLastMaxConnectionCount);
-            }
         }
+    }
 
-        public int getLastMaxConnectionAndResetToCurrent() {
-            final int ret = mLastMaxConnectionCount;
-            mLastMaxConnectionCount = mCurrentConnectionCount;
-            return ret;
-        }
-
-        /** For dumping current state only. */
-        public int getLastMaxConnectionCount() {
-            return mLastMaxConnectionCount;
-        }
-
-        public int getCurrentConnectionCount() {
-            return mCurrentConnectionCount;
-        }
-
-        public void decreaseCurrentConnectionCount(int count) {
-            mCurrentConnectionCount -= count;
-            if (mCurrentConnectionCount < 0) {
-                Log.wtf(TAG, "Unexpected mCurrentConnectionCount: "
-                        + mCurrentConnectionCount);
-            }
-        }
-
-        public void clearConnectionCounters() {
-            mCurrentConnectionCount = 0;
-            mLastMaxConnectionCount = 0;
-        }
+    @VisibleForTesting(visibility = PRIVATE)
+    public int getLastMaxConnectionAndResetToCurrent() {
+        return mBpfCoordinatorShim.getLastMaxConnectionAndResetToCurrent();
     }
 
     @VisibleForTesting
@@ -2611,7 +2552,7 @@ public class BpfCoordinator {
 
     private void uploadConntrackMetricsSample() {
         mDeps.sendTetheringActiveSessionsReported(
-                mBpfConntrackEventConsumer.getLastMaxConnectionAndResetToCurrent());
+                mBpfCoordinatorShim.getLastMaxConnectionAndResetToCurrent());
     }
 
     private void schedulePollingStats() {
