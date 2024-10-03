@@ -1148,6 +1148,7 @@ public class IpServer extends StateMachineShim {
                 case CMD_SERVICE_FAILED_TO_START:
                     mLog.e("start serving fail, error: " + message.arg1);
                     transitionTo(mInitialState);
+                    break;
                 default:
                     return false;
             }
