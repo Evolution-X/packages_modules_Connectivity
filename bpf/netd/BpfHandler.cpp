@@ -233,7 +233,7 @@ static inline void waitForBpf() {
 
 Status BpfHandler::init(const char* cg2_path) {
     // This wait is effectively a no-op on U QPR3+ devices (as netd starts
-    // *after* the synchronous exec_startbpfloader which calls NetBpfLoad)
+    // *after* the synchronous 'exec_start bpfloader' which calls NetBpfLoad)
     // but checking for U QPR3 is hard.
     //
     // Waiting should not be required on U QPR3+ devices,
