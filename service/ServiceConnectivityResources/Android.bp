@@ -33,6 +33,7 @@ android_app {
         "com.android.tethering",
     ],
     certificate: ":com.android.connectivity.resources.certificate",
+    updatable: true,
 }
 
 android_app_certificate {
