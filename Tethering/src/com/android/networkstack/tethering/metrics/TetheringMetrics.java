@@ -431,7 +431,6 @@ public class TetheringMetrics {
      * @param reported a NetworkTetheringReported object containing statistics to write
      */
     private void write(@NonNull final NetworkTetheringReported reported) {
-        final byte[] upstreamEvents = reported.getUpstreamEvents().toByteArray();
         mDependencies.write(reported);
         if (DBG) {
             Log.d(
@@ -445,7 +444,7 @@ public class TetheringMetrics {
                     + ", userType: "
                     + reported.getUserType().getNumber()
                     + ", upstreamTypes: "
-                    + Arrays.toString(upstreamEvents)
+                    + Arrays.toString(reported.getUpstreamEvents().toByteArray())
                     + ", durationMillis: "
                     + reported.getDurationMillis());
         }
