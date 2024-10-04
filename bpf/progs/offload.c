@@ -85,9 +85,8 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
 
     // Since the program never writes via DPA (direct packet access) auto-pull/unclone logic does
     // not trigger and thus we need to manually make sure we can read packet headers via DPA.
-    // Note: this is a blind best effort pull, which may fail or pull less - this doesn't matter.
     // It has to be done early cause it will invalidate any skb->data/data_end derived pointers.
-    try_make_writable(skb, l2_header_size + IP6_HLEN + TCP_HLEN);
+    if (bpf_skb_pull_data(skb, l2_header_size + IP6_HLEN)) return TC_ACT_PIPE;
 
     void* data = (void*)(long)skb->data;
     const void* data_end = (void*)(long)skb->data_end;
@@ -110,6 +109,14 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
     // If hardware offload is running and programming flows based on conntrack entries,
     // try not to interfere with it.
     if (ip6->nexthdr == IPPROTO_TCP) {
+        // don't need to check return code, as it's effectively checked in the next 'if' below
+        bpf_skb_pull_data(skb, l2_header_size + IP6_HLEN + TCP_HLEN);
+
+        data = (void*)(long)skb->data;
+        data_end = (void*)(long)skb->data_end;
+        eth = is_ethernet ? data : NULL;  // used iff is_ethernet
+        ip6 = is_ethernet ? (void*)(eth + 1) : data;
+
         struct tcphdr* tcph = (void*)(ip6 + 1);
 
         // Make sure we can get at the tcp header
