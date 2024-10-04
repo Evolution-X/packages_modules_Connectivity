@@ -102,4 +102,37 @@ public class HandlerUtils {
         if (e != null) throw e;
         return true;
     }
+
+    /**
+     * Ensures that the current running thread is the same as the thread associated with the given
+     * handler.
+     *
+     * @param handler The handler whose thread to compare.
+     * @throws IllegalStateException if the thread associated with the given handler is not the same
+     *                               as the current running thread.
+     * @hide
+     */
+    public static void ensureRunningOnHandlerThread(@NonNull Handler handler) {
+        if (!isRunningOnHandlerThread(handler)) {
+            throw new IllegalStateException(
+                    "Not running on Handler thread: " + Thread.currentThread().getName());
+        }
+    }
+
+    /**
+     * Checks if the current running thread is the same as the thread associated with the given
+     * handler.
+     *
+     * @param handler The handler whose thread to compare.
+     * @return {@code true} if the thread associated with the given handler is the same as the
+     *         current running thread, {@code false} otherwise.
+     *
+     * @hide
+     */
+    public static boolean isRunningOnHandlerThread(@NonNull Handler handler) {
+        if (handler.getLooper().getThread() == Thread.currentThread()) {
+            return true;
+        }
+        return false;
+    }
 }
