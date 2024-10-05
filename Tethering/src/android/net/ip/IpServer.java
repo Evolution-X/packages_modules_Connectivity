@@ -1394,7 +1394,27 @@ public class IpServer extends StateMachineShim {
         @Override
         public void enter() {
             mLastError = TETHER_ERROR_NO_ERROR;
+            // TODO: clean this up after the synchronous state machine is fully rolled out. Clean up
+            // can be directly triggered after calling IpServer.stop() inside Tethering.java.
             sendInterfaceState(STATE_UNAVAILABLE);
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            switch (message.what) {
+                case CMD_IPV6_TETHER_UPDATE:
+                    // sendInterfaceState(STATE_UNAVAILABLE) triggers
+                    // handleInterfaceServingStateInactive which in turn cleans up IPv6 tethering
+                    // (and calls into IpServer one more time). At this point, this is the only
+                    // message we potentially see in this state because this IpServer has already
+                    // been removed from mTetherStates before transitioning to this State; however,
+                    // handleInterfaceServiceStateInactive passes a reference.
+                    // TODO: This can be removed once SyncStateMachine is rolled out and the
+                    // teardown path is cleaned up.
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 
