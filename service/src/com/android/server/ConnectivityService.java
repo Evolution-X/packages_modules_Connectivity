@@ -14224,14 +14224,4 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         return features;
     }
-
-    @Override
-    public boolean isConnectivityServiceFeatureEnabledForTesting(String featureFlag) {
-        switch (featureFlag) {
-            case INGRESS_TO_VPN_ADDRESS_FILTERING:
-                return mIngressToVpnAddressFiltering;
-            default:
-                throw new IllegalArgumentException("Unknown flag: " + featureFlag);
-        }
-    }
 }
