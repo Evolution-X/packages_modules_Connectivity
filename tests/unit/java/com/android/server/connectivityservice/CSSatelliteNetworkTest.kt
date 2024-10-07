@@ -175,13 +175,17 @@ class CSSatelliteNetworkTest : CSTest() {
         val uids = setOf(TEST_PACKAGE_UID)
         updateSatelliteNetworkFallbackUids(uids)
 
-        verify(netd).networkAddUidRangesParcel(
-            NativeUidRangeConfig(
-                satelliteAgent.network.netId,
-                toUidRangeStableParcels(uidRangesForUids(uids)),
-                PREFERENCE_ORDER_SATELLITE_FALLBACK
+        if (destroyBeforeRequest) {
+            verify(netd, never()).networkAddUidRangesParcel(any())
+        } else {
+            verify(netd).networkAddUidRangesParcel(
+                NativeUidRangeConfig(
+                    satelliteAgent.network.netId,
+                    toUidRangeStableParcels(uidRangesForUids(uids)),
+                    PREFERENCE_ORDER_SATELLITE_FALLBACK
+                )
             )
-        )
+        }
 
         if (destroyAfterRequest) {
             satelliteAgent.unregisterAfterReplacement(timeoutMs = 5000)
