@@ -139,6 +139,7 @@ public class IpServerTest {
     private static final boolean DEFAULT_USING_BPF_OFFLOAD = true;
     private static final int DEFAULT_SUBNET_PREFIX_LENGTH = 0;
     private static final int P2P_SUBNET_PREFIX_LENGTH = 25;
+    private static final String LEGACY_WIFI_P2P_IFACE_ADDRESS = "192.168.49.1/24";
 
     private static final InterfaceParams TEST_IFACE_PARAMS = new InterfaceParams(
             IFACE_NAME, 42 /* index */, MacAddress.ALL_ZEROS_ADDRESS, 1500 /* defaultMtu */);
@@ -196,6 +197,12 @@ public class IpServerTest {
 
     private void initStateMachine(int interfaceType, boolean usingLegacyDhcp,
             boolean usingBpfOffload) throws Exception {
+        initStateMachine(interfaceType, usingLegacyDhcp, usingBpfOffload,
+                false /* shouldEnableWifiP2pDedicatedIp */);
+    }
+
+    private void initStateMachine(int interfaceType, boolean usingLegacyDhcp,
+            boolean usingBpfOffload, boolean shouldEnableWifiP2pDedicatedIp) throws Exception {
         when(mDependencies.getDadProxy(any(), any())).thenReturn(mDadProxy);
         when(mDependencies.getRouterAdvertisementDaemon(any())).thenReturn(mRaDaemon);
         when(mDependencies.getInterfaceParams(IFACE_NAME)).thenReturn(TEST_IFACE_PARAMS);
@@ -213,6 +220,8 @@ public class IpServerTest {
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(usingBpfOffload);
         when(mTetherConfig.useLegacyDhcpServer()).thenReturn(usingLegacyDhcp);
         when(mTetherConfig.getP2pLeasesSubnetPrefixLength()).thenReturn(P2P_SUBNET_PREFIX_LENGTH);
+        when(mTetherConfig.shouldEnableWifiP2pDedicatedIp())
+                .thenReturn(shouldEnableWifiP2pDedicatedIp);
         when(mBpfCoordinator.isUsingBpfOffload()).thenReturn(usingBpfOffload);
         mIpServer = createIpServer(interfaceType);
         mIpServer.start();
@@ -409,7 +418,7 @@ public class IpServerTest {
     }
 
     @Test
-    public void canBeTetheredAsWifiP2p() throws Exception {
+    public void canBeTetheredAsWifiP2p_NotUsingDedicatedIp() throws Exception {
         initStateMachine(TETHERING_WIFI_P2P);
 
         dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
@@ -427,6 +436,33 @@ public class IpServerTest {
         inOrder.verify(mCallback).updateLinkProperties(
                 eq(mIpServer), mLinkPropertiesCaptor.capture());
         assertIPv4AddressAndDirectlyConnectedRoute(mLinkPropertiesCaptor.getValue());
+        verifyNoMoreInteractions(mNetd, mCallback, mAddressCoordinator);
+    }
+
+    @Test
+    public void canBeTetheredAsWifiP2p_UsingDedicatedIp() throws Exception {
+        initStateMachine(TETHERING_WIFI_P2P, false /* usingLegacyDhcp */, DEFAULT_USING_BPF_OFFLOAD,
+                true /* shouldEnableWifiP2pDedicatedIp */);
+
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
+        InOrder inOrder = inOrder(mCallback, mNetd, mAddressCoordinator);
+        // When using WiFi P2p dedicated IP, the IpServer just picks the IP address without
+        // requesting for it at PrivateAddressCoordinator.
+        inOrder.verify(mAddressCoordinator, never()).requestDownstreamAddress(any(), anyInt(),
+                anyBoolean());
+        inOrder.verify(mNetd).interfaceSetCfg(argThat(cfg ->
+                IFACE_NAME.equals(cfg.ifName) && assertNotContainsFlag(cfg.flags, IF_STATE_UP)));
+        inOrder.verify(mNetd).tetherInterfaceAdd(IFACE_NAME);
+        inOrder.verify(mNetd).networkAddInterface(INetd.LOCAL_NET_ID, IFACE_NAME);
+        inOrder.verify(mNetd, times(2)).networkAddRoute(eq(INetd.LOCAL_NET_ID), eq(IFACE_NAME),
+                any(), any());
+        inOrder.verify(mCallback).updateInterfaceState(
+                mIpServer, STATE_LOCAL_ONLY, TETHER_ERROR_NO_ERROR);
+        inOrder.verify(mCallback).updateLinkProperties(
+                eq(mIpServer), mLinkPropertiesCaptor.capture());
+        assertIPv4AddressAndDirectlyConnectedRoute(mLinkPropertiesCaptor.getValue());
+        assertEquals(List.of(new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS)),
+                mLinkPropertiesCaptor.getValue().getLinkAddresses());
         verifyNoMoreInteractions(mNetd, mCallback, mAddressCoordinator);
     }
 

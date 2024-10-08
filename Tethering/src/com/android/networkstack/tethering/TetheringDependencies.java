@@ -177,13 +177,9 @@ public abstract class TetheringDependencies {
     /**
      * Make PrivateAddressCoordinator to be used by Tethering.
      */
-    public PrivateAddressCoordinator makePrivateAddressCoordinator(
-            Context ctx, TetheringConfiguration cfg) {
+    public PrivateAddressCoordinator makePrivateAddressCoordinator(Context ctx) {
         final ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
-        return new PrivateAddressCoordinator(
-                cm::getAllNetworks,
-                cfg.isRandomPrefixBaseEnabled(),
-                cfg.shouldEnableWifiP2pDedicatedIp());
+        return new PrivateAddressCoordinator(cm::getAllNetworks, ctx);
     }
 
     /**
