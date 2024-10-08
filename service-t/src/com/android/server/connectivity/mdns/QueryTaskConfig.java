@@ -55,20 +55,20 @@ public class QueryTaskConfig {
     private final int queriesPerBurst;
     private final int timeBetweenBurstsInMs;
     private final int burstCounter;
-    final long delayUntilNextTaskWithoutBackoffMs;
+    final long delayBeforeTaskWithoutBackoffMs;
     private final boolean isFirstBurst;
     private final long queryCount;
 
     QueryTaskConfig(long queryCount, int transactionId,
             boolean expectUnicastResponse, boolean isFirstBurst, int burstCounter,
             int queriesPerBurst, int timeBetweenBurstsInMs,
-            long delayUntilNextTaskWithoutBackoffMs) {
+            long delayBeforeTaskWithoutBackoffMs) {
         this.transactionId = transactionId;
         this.expectUnicastResponse = expectUnicastResponse;
         this.queriesPerBurst = queriesPerBurst;
         this.timeBetweenBurstsInMs = timeBetweenBurstsInMs;
         this.burstCounter = burstCounter;
-        this.delayUntilNextTaskWithoutBackoffMs = delayUntilNextTaskWithoutBackoffMs;
+        this.delayBeforeTaskWithoutBackoffMs = delayBeforeTaskWithoutBackoffMs;
         this.isFirstBurst = isFirstBurst;
         this.queryCount = queryCount;
     }
@@ -82,26 +82,26 @@ public class QueryTaskConfig {
         // Config the scan frequency based on the scan mode.
         if (queryMode == AGGRESSIVE_QUERY_MODE) {
             this.timeBetweenBurstsInMs = INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS;
-            this.delayUntilNextTaskWithoutBackoffMs =
+            this.delayBeforeTaskWithoutBackoffMs =
                     TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS;
         } else if (queryMode == PASSIVE_QUERY_MODE) {
             // In passive scan mode, sends a single burst of QUERIES_PER_BURST queries, and then
             // in each TIME_BETWEEN_BURSTS interval, sends QUERIES_PER_BURST_PASSIVE_MODE
             // queries.
             this.timeBetweenBurstsInMs = MAX_TIME_BETWEEN_ACTIVE_PASSIVE_BURSTS_MS;
-            this.delayUntilNextTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
+            this.delayBeforeTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
         } else {
             // In active scan mode, sends a burst of QUERIES_PER_BURST queries,
             // TIME_BETWEEN_QUERIES_IN_BURST_MS apart, then waits for the scan interval, and
             // then repeats. The scan interval starts as INITIAL_TIME_BETWEEN_BURSTS_MS and
             // doubles until it maxes out at TIME_BETWEEN_BURSTS_MS.
             this.timeBetweenBurstsInMs = INITIAL_TIME_BETWEEN_BURSTS_MS;
-            this.delayUntilNextTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
+            this.delayBeforeTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
         }
         this.queryCount = 0;
     }
 
-    long getDelayUntilNextTaskWithoutBackoff(boolean isFirstQueryInBurst,
+    long getDelayBeforeNextTaskWithoutBackoff(boolean isFirstQueryInBurst,
             boolean isLastQueryInBurst, int queryMode) {
         if (isFirstQueryInBurst && queryMode == AGGRESSIVE_QUERY_MODE) {
             return 0;
@@ -162,7 +162,7 @@ public class QueryTaskConfig {
                 getNextExpectUnicastResponse(isLastQueryInBurst, queryMode), newIsFirstBurst,
                 newBurstCounter, newQueriesPerBurst,
                 getNextTimeBetweenBurstsMs(isLastQueryInBurst, queryMode),
-                getDelayUntilNextTaskWithoutBackoff(
+                getDelayBeforeNextTaskWithoutBackoff(
                         isFirstQueryInBurst, isLastQueryInBurst, queryMode));
     }
 

@@ -107,7 +107,7 @@ public class MdnsQueryScheduler {
         final QueryTaskConfig nextRunConfig = currentConfig.getConfigForNextRun(queryMode);
         long timeToRun;
         if (mLastScheduledQueryTaskArgs == null && !forceEnableBackoff) {
-            timeToRun = now + nextRunConfig.delayUntilNextTaskWithoutBackoffMs;
+            timeToRun = now + nextRunConfig.delayBeforeTaskWithoutBackoffMs;
         } else {
             timeToRun = calculateTimeToRun(mLastScheduledQueryTaskArgs,
                     nextRunConfig, now, minRemainingTtl, lastSentTime, numOfQueriesBeforeBackoff,
@@ -133,7 +133,7 @@ public class MdnsQueryScheduler {
     private static long calculateTimeToRun(@Nullable ScheduledQueryTaskArgs taskArgs,
             QueryTaskConfig queryTaskConfig, long now, long minRemainingTtl, long lastSentTime,
             int numOfQueriesBeforeBackoff, boolean forceEnableBackoff) {
-        final long baseDelayInMs = queryTaskConfig.delayUntilNextTaskWithoutBackoffMs;
+        final long baseDelayInMs = queryTaskConfig.delayBeforeTaskWithoutBackoffMs;
         if (!(forceEnableBackoff
                 || queryTaskConfig.shouldUseQueryBackoff(numOfQueriesBeforeBackoff))) {
             return lastSentTime + baseDelayInMs;
