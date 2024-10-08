@@ -282,24 +282,6 @@ public final class PrivateAddressCoordinatorTest {
     }
 
     @Test
-    public void testEnableLegacyWifiP2PAddress() throws Exception {
-        when(mPrivateAddressCoordinator.getRandomInt()).thenReturn(
-                getSubAddress(mLegacyWifiP2pAddress.getAddress().getAddress()));
-        // No matter #shouldEnableWifiP2pDedicatedIp() is enabled or not, legacy wifi p2p prefix
-        // is resevered.
-        assertReseveredWifiP2pPrefix();
-
-        when(mConfig.shouldEnableWifiP2pDedicatedIp()).thenReturn(true);
-        assertReseveredWifiP2pPrefix();
-
-        // If #shouldEnableWifiP2pDedicatedIp() is enabled, wifi P2P gets the configured address.
-        LinkAddress address = requestDownstreamAddress(mWifiP2pIpServer,
-                CONNECTIVITY_SCOPE_LOCAL, true /* useLastAddress */);
-        assertEquals(mLegacyWifiP2pAddress, address);
-        mPrivateAddressCoordinator.releaseDownstream(mWifiP2pIpServer);
-    }
-
-    @Test
     public void testEnableSapAndLohsConcurrently() throws Exception {
         final LinkAddress hotspotAddress = requestDownstreamAddress(mHotspotIpServer,
                 CONNECTIVITY_SCOPE_GLOBAL, true /* useLastAddress */);

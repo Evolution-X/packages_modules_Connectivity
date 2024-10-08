@@ -124,6 +124,8 @@ public class IpServer extends StateMachineShim {
     // TODO: have PanService use some visible version of this constant
     private static final String BLUETOOTH_IFACE_ADDR = "192.168.44.1/24";
 
+    private static final String LEGACY_WIFI_P2P_IFACE_ADDRESS = "192.168.49.1/24";
+
     // TODO: have this configurable
     private static final int DHCP_LEASE_TIME_SECS = 3600;
 
@@ -249,6 +251,7 @@ public class IpServer extends StateMachineShim {
     private final LinkProperties mLinkProperties;
     private final boolean mUsingLegacyDhcp;
     private final int mP2pLeasesSubnetPrefixLength;
+    private final boolean mIsWifiP2pDedicatedIpEnabled;
 
     private final Dependencies mDeps;
 
@@ -313,6 +316,7 @@ public class IpServer extends StateMachineShim {
         mLinkProperties = new LinkProperties();
         mUsingLegacyDhcp = config.useLegacyDhcpServer();
         mP2pLeasesSubnetPrefixLength = config.getP2pLeasesSubnetPrefixLength();
+        mIsWifiP2pDedicatedIpEnabled = config.shouldEnableWifiP2pDedicatedIp();
         mPrivateAddressCoordinator = addressCoordinator;
         mDeps = deps;
         mTetheringMetrics = tetheringMetrics;
@@ -698,10 +702,17 @@ public class IpServer extends StateMachineShim {
         return (mInterfaceType == TetheringManager.TETHERING_BLUETOOTH) && !SdkLevel.isAtLeastT();
     }
 
+    private boolean shouldUseWifiP2pDedicatedIp() {
+        return mIsWifiP2pDedicatedIpEnabled
+                && mInterfaceType == TetheringManager.TETHERING_WIFI_P2P;
+    }
+
     private LinkAddress requestIpv4Address(final int scope, final boolean useLastAddress) {
         if (mStaticIpv4ServerAddr != null) return mStaticIpv4ServerAddr;
 
         if (shouldNotConfigureBluetoothInterface()) return new LinkAddress(BLUETOOTH_IFACE_ADDR);
+
+        if (shouldUseWifiP2pDedicatedIp()) return new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS);
 
         return mPrivateAddressCoordinator.requestDownstreamAddress(this, scope, useLastAddress);
     }
