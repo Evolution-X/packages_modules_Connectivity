@@ -57,9 +57,9 @@ public class QueryTaskConfig {
     private final int burstCounter;
     final long delayBeforeTaskWithoutBackoffMs;
     private final boolean isFirstBurst;
-    private final long queryCount;
+    private final long queryIndex;
 
-    QueryTaskConfig(long queryCount, int transactionId,
+    QueryTaskConfig(long queryIndex, int transactionId,
             boolean expectUnicastResponse, boolean isFirstBurst, int burstCounter,
             int queriesPerBurst, int timeBetweenBurstsInMs,
             long delayBeforeTaskWithoutBackoffMs) {
@@ -70,7 +70,7 @@ public class QueryTaskConfig {
         this.burstCounter = burstCounter;
         this.delayBeforeTaskWithoutBackoffMs = delayBeforeTaskWithoutBackoffMs;
         this.isFirstBurst = isFirstBurst;
-        this.queryCount = queryCount;
+        this.queryIndex = queryIndex;
     }
 
     QueryTaskConfig(int queryMode) {
@@ -98,7 +98,7 @@ public class QueryTaskConfig {
             this.timeBetweenBurstsInMs = INITIAL_TIME_BETWEEN_BURSTS_MS;
             this.delayBeforeTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
         }
-        this.queryCount = 0;
+        this.queryIndex = 0;
     }
 
     long getDelayBeforeNextTaskWithoutBackoff(boolean isFirstQueryInBurst,
@@ -137,7 +137,7 @@ public class QueryTaskConfig {
      * Get new QueryTaskConfig for next run.
      */
     public QueryTaskConfig getConfigForNextRun(int queryMode) {
-        long newQueryCount = queryCount + 1;
+        long newQueryCount = queryIndex + 1;
         int newTransactionId = transactionId + 1;
         if (newTransactionId > UNSIGNED_SHORT_MAX_VALUE) {
             newTransactionId = 1;
@@ -174,6 +174,6 @@ public class QueryTaskConfig {
         if (burstCounter != 0 || isFirstBurst) {
             return false;
         }
-        return queryCount > numOfQueriesBeforeBackoff;
+        return queryIndex > numOfQueriesBeforeBackoff;
     }
 }
