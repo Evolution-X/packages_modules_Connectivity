@@ -28,6 +28,7 @@ import static com.android.networkstack.tethering.util.PrefixUtils.asIpPrefix;
 
 import static java.util.Arrays.asList;
 
+import android.content.Context;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
@@ -42,6 +43,7 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.net.module.util.DeviceConfigUtils;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -67,6 +69,9 @@ public class PrivateAddressCoordinator {
     // WARNING: Keep in sync with chooseDownstreamAddress
     public static final int PREFIX_LENGTH = 24;
 
+    public static final String TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION =
+            "tether_force_random_prefix_base_selection";
+
     // Upstream monitor would be stopped when tethering is down. When tethering restart, downstream
     // address may be requested before coordinator get current upstream notification. To ensure
     // coordinator do not select conflict downstream prefix, mUpstreamPrefixMap would not be cleared
@@ -79,20 +84,42 @@ public class PrivateAddressCoordinator {
     private final List<IpPrefix> mTetheringPrefixes;
     // A supplier that returns ConnectivityManager#getAllNetworks.
     private final Supplier<Network[]> mGetAllNetworksSupplier;
-    private final boolean mIsRandomPrefixBaseEnabled;
-    private final boolean mShouldEnableWifiP2pDedicatedIp;
+    private final Dependencies mDeps;
     // keyed by downstream type(TetheringManager.TETHERING_*).
     private final ArrayMap<AddressKey, LinkAddress> mCachedAddresses;
     private final Random mRandom;
 
+    /** Capture PrivateAddressCoordinator dependencies for injection. */
+    public static class Dependencies {
+        private final Context mContext;
+
+        Dependencies(Context context) {
+            mContext = context;
+        }
+
+        /**
+         * Check whether or not one specific experimental feature is enabled according to {@link
+         * DeviceConfigUtils}.
+         *
+         * @param featureName The feature's name to look up.
+         * @return true if this feature is enabled, or false if disabled.
+         */
+        public boolean isFeatureEnabled(String featureName) {
+            return DeviceConfigUtils.isTetheringFeatureEnabled(mContext, featureName);
+        }
+    }
+
+    public PrivateAddressCoordinator(Supplier<Network[]> getAllNetworksSupplier, Context context) {
+        this(getAllNetworksSupplier, new Dependencies(context));
+    }
+
+    @VisibleForTesting
     public PrivateAddressCoordinator(Supplier<Network[]> getAllNetworksSupplier,
-            boolean isRandomPrefixBase,
-            boolean shouldEnableWifiP2pDedicatedIp) {
+                                     Dependencies deps) {
         mDownstreams = new ArraySet<>();
         mUpstreamPrefixMap = new ArrayMap<>();
         mGetAllNetworksSupplier = getAllNetworksSupplier;
-        mIsRandomPrefixBaseEnabled = isRandomPrefixBase;
-        mShouldEnableWifiP2pDedicatedIp = shouldEnableWifiP2pDedicatedIp;
+        mDeps = deps;
         mCachedAddresses = new ArrayMap<AddressKey, LinkAddress>();
         // Reserved static addresses for bluetooth and wifi p2p.
         mCachedAddresses.put(new AddressKey(TETHERING_BLUETOOTH, CONNECTIVITY_SCOPE_GLOBAL),
@@ -179,11 +206,6 @@ public class PrivateAddressCoordinator {
     @Nullable
     public LinkAddress requestDownstreamAddress(final IpServer ipServer, final int scope,
             boolean useLastAddress) {
-        if (mShouldEnableWifiP2pDedicatedIp
-                && ipServer.interfaceType() == TETHERING_WIFI_P2P) {
-            return new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS);
-        }
-
         final AddressKey addrKey = new AddressKey(ipServer.interfaceType(), scope);
         // This ensures that tethering isn't started on 2 different interfaces with the same type.
         // Once tethering could support multiple interface with the same type,
@@ -212,7 +234,7 @@ public class PrivateAddressCoordinator {
     }
 
     private int getRandomPrefixIndex() {
-        if (!mIsRandomPrefixBaseEnabled) return 0;
+        if (!mDeps.isFeatureEnabled(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION)) return 0;
 
         final int random = getRandomInt() & 0xffffff;
         // This is to select the starting prefix range (/8, /12, or /16) instead of the actual
