@@ -3061,6 +3061,7 @@ public class ConnectivityManagerTest {
 
         try {
             final Network cellNetwork = networkCallbackRule.requestCell();
+            ensureCellIsValidatedBeforeMockingValidationUrls();
             final Network wifiNetwork = prepareValidatedNetwork();
 
             final TestableNetworkCallback defaultCb =
