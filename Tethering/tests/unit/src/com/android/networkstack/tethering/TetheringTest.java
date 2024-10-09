@@ -71,6 +71,7 @@ import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTH
 import static com.android.net.module.util.NetworkStackConstants.RFC7421_PREFIX_LENGTH;
 import static com.android.networkstack.tethering.OffloadHardwareInterface.OFFLOAD_HAL_VERSION_HIDL_1_0;
 import static com.android.networkstack.tethering.OffloadHardwareInterface.OFFLOAD_HAL_VERSION_NONE;
+import static com.android.networkstack.tethering.PrivateAddressCoordinator.TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION;
 import static com.android.networkstack.tethering.TestConnectivityManager.BROADCAST_FIRST;
 import static com.android.networkstack.tethering.TestConnectivityManager.CALLBACKS_FIRST;
 import static com.android.networkstack.tethering.Tethering.UserRestrictionActionListener;
@@ -293,6 +294,7 @@ public class TetheringTest {
     @Mock private TetheredInterfaceRequestShim mTetheredInterfaceRequestShim;
     @Mock private TetheringMetrics mTetheringMetrics;
     @Mock private RoutingCoordinatorManager mRoutingCoordinatorManager;
+    @Mock private PrivateAddressCoordinator.Dependencies mPrivateAddressCoordinatorDependencies;
 
     private final MockIpServerDependencies mIpServerDependencies =
             spy(new MockIpServerDependencies());
@@ -535,9 +537,11 @@ public class TetheringTest {
         }
 
         @Override
-        public PrivateAddressCoordinator makePrivateAddressCoordinator(Context ctx,
-                TetheringConfiguration cfg) {
-            mPrivateAddressCoordinator = super.makePrivateAddressCoordinator(ctx, cfg);
+        public PrivateAddressCoordinator makePrivateAddressCoordinator(Context ctx) {
+            ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
+            mPrivateAddressCoordinator =
+                    new PrivateAddressCoordinator(
+                            cm::getAllNetworks, mPrivateAddressCoordinatorDependencies);
             return mPrivateAddressCoordinator;
         }
 
@@ -664,6 +668,8 @@ public class TetheringTest {
                 .thenReturn(true);
         initOffloadConfiguration(OFFLOAD_HAL_VERSION_HIDL_1_0, 0 /* defaultDisabled */);
         when(mOffloadHardwareInterface.getForwardedStats(any())).thenReturn(mForwardedStats);
+        when(mPrivateAddressCoordinatorDependencies.isFeatureEnabled(anyString()))
+                .thenReturn(false);
 
         mServiceContext = new TestContext(mContext);
         mServiceContext.setUseRegisteredHandlers(true);

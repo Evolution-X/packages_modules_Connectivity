@@ -15,7 +15,7 @@
 from mobly import asserts
 from net_tests_utils.host.python import adb_utils, apf_utils, assert_utils, multi_devices_test_base, tether_utils
 from net_tests_utils.host.python.tether_utils import UpstreamType
-
+import time
 
 class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
 
@@ -39,6 +39,7 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     )
 
     # Fetch device properties and storing them locally for later use.
+    # TODO: refactor to separate instances to store client and server device
     self.server_iface_name, client_network = (
         tether_utils.setup_hotspot_and_client_for_upstream_type(
             self.serverDevice, self.clientDevice, UpstreamType.NONE
@@ -49,6 +50,21 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     )
     self.server_mac_address = apf_utils.get_hardware_address(
         self.serverDevice, self.server_iface_name
+    )
+    self.client_mac_address = apf_utils.get_hardware_address(
+        self.clientDevice, self.client_iface_name
+    )
+    self.server_ipv4_addresses = apf_utils.get_ipv4_addresses(
+        self.serverDevice, self.server_iface_name
+    )
+    self.client_ipv4_addresses = apf_utils.get_ipv4_addresses(
+        self.clientDevice, self.client_iface_name
+    )
+    self.server_ipv6_addresses = apf_utils.get_ipv6_addresses(
+        self.serverDevice, self.server_iface_name
+    )
+    self.client_ipv6_addresses = apf_utils.get_ipv6_addresses(
+        self.clientDevice, self.client_iface_name
     )
 
     # Enable doze mode to activate APF.
@@ -81,4 +97,19 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
         > count_before_test
     )
 
-    # TODO: Verify the packet is not actually received.
+  def send_packet_and_expect_reply_received(
+      self, send_packet: str, counter_name: str, receive_packet: str
+  ) -> None:
+    try:
+        apf_utils.start_capture_packets(self.serverDevice, self.server_iface_name)
+
+        self.send_packet_and_expect_counter_increased(send_packet, counter_name)
+
+        assert_utils.expect_with_retry(
+            lambda: apf_utils.get_matched_packet_counts(
+                self.serverDevice, self.server_iface_name, receive_packet
+            )
+            == 1
+        )
+    finally:
+        apf_utils.stop_capture_packets(self.serverDevice, self.server_iface_name)

@@ -368,7 +368,7 @@ public final class ThreadNetworkController {
          *     0-9 of user-input friendly length (typically 9), or {@code null} if {@code
          *     ephemeralKeyState} is {@link #EPHEMERAL_KEY_DISABLED} or the caller doesn't have the
          *     permission {@link android.permission.THREAD_NETWORK_PRIVILEGED}
-         * @param expiry a timestamp of when the ephemeral key will expireor {@code null} if {@code
+         * @param expiry a timestamp of when the ephemeral key will expire or {@code null} if {@code
          *     ephemeralKeyState} is {@link #EPHEMERAL_KEY_DISABLED}
          */
         @FlaggedApi(Flags.FLAG_EPSKC_ENABLED)
