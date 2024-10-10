@@ -35,3 +35,12 @@ flag {
     description: "Controls whether the Android Thread Ephemeral Key feature is enabled"
     bug: "348323500"
 }
+
+flag {
+    name: "set_nat64_configuration_enabled"
+    is_exported: true
+    is_fixed_read_only: true
+    namespace: "thread_network"
+    description: "Controls whether the setConfiguration API of NAT64 feature is enabled"
+    bug: "368456504"
+}
