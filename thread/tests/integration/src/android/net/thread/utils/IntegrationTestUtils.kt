@@ -601,4 +601,12 @@ object IntegrationTestUtils {
     fun tearDownInfraNetwork(testNetworkTracker: TestNetworkTracker) {
         runAsShell(MANAGE_TEST_NETWORKS) { testNetworkTracker.teardown() }
     }
+
+    /**
+     * Stop the ot-daemon by shell command.
+     */
+    @JvmStatic
+    fun stopOtDaemon() {
+        runShellCommandOrThrow("stop ot-daemon")
+    }
 }
