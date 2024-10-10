@@ -748,15 +748,19 @@ public final class ThreadNetworkController {
      * OutcomeReceiver#onResult} will be called, and the {@code configuration} will be applied and
      * persisted to the device; the configuration changes can be observed by {@link
      * #registerConfigurationCallback}. On failure, {@link OutcomeReceiver#onError} of {@code
-     * receiver} will be invoked with a specific error.
+     * receiver} will be invoked with a specific error:
+     *
+     * <ul>
+     *   <li>{@link ThreadNetworkException#ERROR_UNSUPPORTED_FEATURE} the configuration enables a
+     *       feature which is not supported by the platform.
+     * </ul>
      *
      * @param configuration the configuration to set
      * @param executor the executor to execute {@code receiver}
      * @param receiver the receiver to receive result of this operation
-     * @hide
      */
-    // @FlaggedApi(ThreadNetworkFlags.FLAG_CONFIGURATION_ENABLED)
-    // @RequiresPermission(permission.THREAD_NETWORK_PRIVILEGED)
+    @FlaggedApi(Flags.FLAG_SET_NAT64_CONFIGURATION_ENABLED)
+    @RequiresPermission(permission.THREAD_NETWORK_PRIVILEGED)
     public void setConfiguration(
             @NonNull ThreadConfiguration configuration,
             @NonNull @CallbackExecutor Executor executor,

@@ -220,7 +220,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean mUserRestricted;
     private boolean mForceStopOtDaemonEnabled;
 
-    private OtDaemonConfiguration mOtDaemonConfig;
     private InfraLinkState mInfraLinkState;
 
     @VisibleForTesting
@@ -249,7 +248,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         // TODO: networkToLinkProperties should be shared with NsdPublisher, add a test/assert to
         // verify they are the same.
         mNetworkToLinkProperties = networkToLinkProperties;
-        mOtDaemonConfig = new OtDaemonConfiguration.Builder().build();
         mInfraLinkState = new InfraLinkState.Builder().build();
         mPersistentSettings = persistentSettings;
         mNsdPublisher = nsdPublisher;
@@ -346,6 +344,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         otDaemon.initialize(
                 mTunIfController.getTunFd(),
                 shouldEnableThread(),
+                newOtDaemonConfig(mPersistentSettings.getConfiguration()),
                 mNsdPublisher,
                 getMeshcopTxtAttributes(mResources.get()),
                 mOtDaemonCallbackProxy,
@@ -556,22 +555,21 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     public void setConfiguration(
             @NonNull ThreadConfiguration configuration, @NonNull IOperationReceiver receiver) {
         enforceAllPermissionsGranted(PERMISSION_THREAD_NETWORK_PRIVILEGED);
-        mHandler.post(() -> setConfigurationInternal(configuration, receiver));
+        mHandler.post(
+                () ->
+                        setConfigurationInternal(
+                                configuration, new OperationReceiverWrapper(receiver)));
     }
 
     private void setConfigurationInternal(
             @NonNull ThreadConfiguration configuration,
-            @NonNull IOperationReceiver operationReceiver) {
+            @NonNull OperationReceiverWrapper receiver) {
         checkOnHandlerThread();
 
         LOG.i("Set Thread configuration: " + configuration);
 
         final boolean changed = mPersistentSettings.putConfiguration(configuration);
-        try {
-            operationReceiver.onSuccess();
-        } catch (RemoteException e) {
-            // do nothing if the client is dead
-        }
+        receiver.onSuccess();
         if (changed) {
             for (IConfigurationReceiver configReceiver : mConfigurationReceivers.keySet()) {
                 try {
@@ -581,7 +579,22 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 }
             }
         }
-        // TODO: set the configuration at ot-daemon
+        try {
+            getOtDaemon()
+                    .setConfiguration(
+                            newOtDaemonConfig(configuration),
+                            new LoggingOtStatusReceiver("setConfiguration"));
+        } catch (RemoteException | ThreadNetworkException e) {
+            LOG.e("otDaemon.setConfiguration failed. Config: " + configuration, e);
+        }
+    }
+
+    private static OtDaemonConfiguration newOtDaemonConfig(
+            @NonNull ThreadConfiguration threadConfig) {
+        return new OtDaemonConfiguration.Builder()
+                .setNat64Enabled(threadConfig.isNat64Enabled())
+                .setDhcpv6PdEnabled(threadConfig.isDhcpv6PdEnabled())
+                .build();
     }
 
     @Override
@@ -764,19 +777,17 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                             + ", localNetworkInfo: "
                             + localNetworkInfo
                             + "}");
-            if (localNetworkInfo.getUpstreamNetwork() == null) {
+            mUpstreamNetwork = localNetworkInfo.getUpstreamNetwork();
+            if (mUpstreamNetwork == null) {
                 setInfraLinkState(newInfraLinkStateBuilder().build());
                 return;
             }
-            if (!localNetworkInfo.getUpstreamNetwork().equals(mUpstreamNetwork)) {
-                mUpstreamNetwork = localNetworkInfo.getUpstreamNetwork();
-                if (mNetworkToLinkProperties.containsKey(mUpstreamNetwork)) {
-                    setInfraLinkState(
-                            newInfraLinkStateBuilder(mNetworkToLinkProperties.get(mUpstreamNetwork))
-                                    .build());
-                }
-                mNsdPublisher.setNetworkForHostResolution(mUpstreamNetwork);
+            if (mNetworkToLinkProperties.containsKey(mUpstreamNetwork)) {
+                setInfraLinkState(
+                        newInfraLinkStateBuilder(mNetworkToLinkProperties.get(mUpstreamNetwork))
+                                .build());
             }
+            mNsdPublisher.setNetworkForHostResolution(mUpstreamNetwork);
         }
     }
 
@@ -1308,20 +1319,15 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     }
 
     private void setInfraLinkState(InfraLinkState newInfraLinkState) {
-        if (mInfraLinkState.equals(newInfraLinkState)) {
-            return;
+        if (!Objects.equals(mInfraLinkState, newInfraLinkState)) {
+            LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + newInfraLinkState);
         }
-        LOG.i("Infra link state changed: " + mInfraLinkState + " -> " + newInfraLinkState);
-
         setInfraLinkInterfaceName(newInfraLinkState.interfaceName);
         setInfraLinkNat64Prefix(newInfraLinkState.nat64Prefix);
         mInfraLinkState = newInfraLinkState;
     }
 
     private void setInfraLinkInterfaceName(String newInfraLinkInterfaceName) {
-        if (Objects.equals(mInfraLinkState.interfaceName, newInfraLinkInterfaceName)) {
-            return;
-        }
         ParcelFileDescriptor infraIcmp6Socket = null;
         if (newInfraLinkInterfaceName != null) {
             try {
@@ -1342,9 +1348,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     }
 
     private void setInfraLinkNat64Prefix(@Nullable String newNat64Prefix) {
-        if (Objects.equals(mInfraLinkState.nat64Prefix, newNat64Prefix)) {
-            return;
-        }
         try {
             getOtDaemon()
                     .setInfraLinkNat64Prefix(
@@ -1475,11 +1478,6 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             builder.addListeningAddress(address);
         }
         return builder.build();
-    }
-
-    private static OtDaemonConfiguration.Builder newOtDaemonConfigBuilder(
-            OtDaemonConfiguration config) {
-        return new OtDaemonConfiguration.Builder();
     }
 
     private static InfraLinkState.Builder newInfraLinkStateBuilder() {
