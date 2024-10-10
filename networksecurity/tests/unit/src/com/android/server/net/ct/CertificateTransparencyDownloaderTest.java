@@ -48,9 +48,10 @@ import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
+import java.util.Base64;
 
 /** Tests for the {@link CertificateTransparencyDownloader}. */
 @RunWith(JUnit4.class)
@@ -60,18 +61,20 @@ public class CertificateTransparencyDownloaderTest {
     @Mock private CertificateTransparencyInstaller mCertificateTransparencyInstaller;
 
     private PrivateKey mPrivateKey;
+    private PublicKey mPublicKey;
     private Context mContext;
     private File mTempFile;
     private DataStore mDataStore;
     private CertificateTransparencyDownloader mCertificateTransparencyDownloader;
 
     @Before
-    public void setUp() throws IOException, NoSuchAlgorithmException {
+    public void setUp() throws IOException, GeneralSecurityException {
         MockitoAnnotations.initMocks(this);
 
         KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
         KeyPair keyPair = instance.generateKeyPair();
         mPrivateKey = keyPair.getPrivate();
+        mPublicKey = keyPair.getPublic();
 
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
         mTempFile = File.createTempFile("datastore-test", ".properties");
@@ -80,16 +83,13 @@ public class CertificateTransparencyDownloaderTest {
 
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
-                        mContext,
-                        mDataStore,
-                        mDownloadHelper,
-                        mCertificateTransparencyInstaller,
-                        keyPair.getPublic().getEncoded());
+                        mContext, mDataStore, mDownloadHelper, mCertificateTransparencyInstaller);
     }
 
     @After
     public void tearDown() {
         mTempFile.delete();
+        mCertificateTransparencyDownloader.resetPublicKey();
     }
 
     @Test
@@ -155,6 +155,8 @@ public class CertificateTransparencyDownloaderTest {
         long metadataId = 123;
         File metadataFile = sign(logListFile);
         Uri metadataUri = Uri.fromFile(metadataFile);
+        mCertificateTransparencyDownloader.setPublicKey(
+                Base64.getEncoder().encodeToString(mPublicKey.getEncoded()));
 
         setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
         when(mCertificateTransparencyInstaller.install(any(), eq(version))).thenReturn(true);
@@ -200,6 +202,28 @@ public class CertificateTransparencyDownloaderTest {
         Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
         long metadataId = 123;
         Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-wrong_metadata", "sig"));
+
+        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(contentId));
+
+        verify(mCertificateTransparencyInstaller, never()).install(any(), eq(version));
+        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
+        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
+        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+    }
+
+    @Test
+    public void testDownloader_handleContentCompleteMissingVerificationPublicKey()
+            throws Exception {
+        String version = "666";
+        long contentId = 666;
+        File logListFile = File.createTempFile("log_list", "json");
+        Uri contentUri = Uri.fromFile(logListFile);
+        long metadataId = 123;
+        File metadataFile = sign(logListFile);
+        Uri metadataUri = Uri.fromFile(metadataFile);
 
         setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
 

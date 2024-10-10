@@ -40,6 +40,7 @@ final class Config {
     static final String FLAG_CONTENT_URL = FLAGS_PREFIX + "content_url";
     static final String FLAG_METADATA_URL = FLAGS_PREFIX + "metadata_url";
     static final String FLAG_VERSION = FLAGS_PREFIX + "version";
+    static final String FLAG_PUBLIC_KEY = FLAGS_PREFIX + "public_key";
 
     // properties
     static final String VERSION_PENDING = "version_pending";
