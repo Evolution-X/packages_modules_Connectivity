@@ -15,6 +15,7 @@
  */
 package com.android.server.net.ct;
 
+import android.annotation.NonNull;
 import android.annotation.RequiresApi;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
@@ -31,10 +32,13 @@ import androidx.annotation.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Optional;
 
 /** Helper class to download certificate transparency log files. */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -42,41 +46,23 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
 
     private static final String TAG = "CertificateTransparencyDownloader";
 
-    // TODO: move key to a DeviceConfig flag.
-    private static final byte[] PUBLIC_KEY_BYTES =
-            Base64.getDecoder()
-                    .decode(
-                            "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAsu0BHGnQ++W2CTdyZyxv"
-                                + "HHRALOZPlnu/VMVgo2m+JZ8MNbAOH2cgXb8mvOj8flsX/qPMuKIaauO+PwROMjiq"
-                                + "fUpcFm80Kl7i97ZQyBDYKm3MkEYYpGN+skAR2OebX9G2DfDqFY8+jUpOOWtBNr3L"
-                                + "rmVcwx+FcFdMjGDlrZ5JRmoJ/SeGKiORkbbu9eY1Wd0uVhz/xI5bQb0OgII7hEj+"
-                                + "i/IPbJqOHgB8xQ5zWAJJ0DmG+FM6o7gk403v6W3S8qRYiR84c50KppGwe4YqSMkF"
-                                + "bLDleGQWLoaDSpEWtESisb4JiLaY4H+Kk0EyAhPSb+49JfUozYl+lf7iFN3qRq/S"
-                                + "IXXTh6z0S7Qa8EYDhKGCrpI03/+qprwy+my6fpWHi6aUIk4holUCmWvFxZDfixox"
-                                + "K0RlqbFDl2JXMBquwlQpm8u5wrsic1ksIv9z8x9zh4PJqNpCah0ciemI3YGRQqSe"
-                                + "/mRRXBiSn9YQBUPcaeqCYan+snGADFwHuXCd9xIAdFBolw9R9HTedHGUfVXPJDiF"
-                                + "4VusfX6BRR/qaadB+bqEArF/TzuDUr6FvOR4o8lUUxgLuZ/7HO+bHnaPFKYHHSm+"
-                                + "+z1lVDhhYuSZ8ax3T0C3FZpb7HMjZtpEorSV5ElKJEJwrhrBCMOD8L01EoSPrGlS"
-                                + "1w22i9uGHMn/uGQKo28u7AsCAwEAAQ==");
-
     private final Context mContext;
     private final DataStore mDataStore;
     private final DownloadHelper mDownloadHelper;
     private final CertificateTransparencyInstaller mInstaller;
-    private final byte[] mPublicKey;
+
+    @NonNull private Optional<PublicKey> mPublicKey = Optional.empty();
 
     @VisibleForTesting
     CertificateTransparencyDownloader(
             Context context,
             DataStore dataStore,
             DownloadHelper downloadHelper,
-            CertificateTransparencyInstaller installer,
-            byte[] publicKey) {
+            CertificateTransparencyInstaller installer) {
         mContext = context;
         mDataStore = dataStore;
         mDownloadHelper = downloadHelper;
         mInstaller = installer;
-        mPublicKey = publicKey;
     }
 
     CertificateTransparencyDownloader(Context context, DataStore dataStore) {
@@ -84,8 +70,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
                 context,
                 dataStore,
                 new DownloadHelper(context),
-                new CertificateTransparencyInstaller(),
-                PUBLIC_KEY_BYTES);
+                new CertificateTransparencyInstaller());
     }
 
     void registerReceiver() {
@@ -96,6 +81,20 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyDownloader initialized successfully");
         }
+    }
+
+    void setPublicKey(String publicKey) throws GeneralSecurityException {
+        mPublicKey =
+                Optional.of(
+                        KeyFactory.getInstance("RSA")
+                                .generatePublic(
+                                        new X509EncodedKeySpec(
+                                                Base64.getDecoder().decode(publicKey))));
+    }
+
+    @VisibleForTesting
+    void resetPublicKey() {
+        mPublicKey = Optional.empty();
     }
 
     void startMetadataDownload(String metadataUrl) {
@@ -202,9 +201,11 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
     }
 
     private boolean verify(Uri file, Uri signature) throws IOException, GeneralSecurityException {
+        if (!mPublicKey.isPresent()) {
+            throw new InvalidKeyException("Missing public key for signature verification");
+        }
         Signature verifier = Signature.getInstance("SHA256withRSA");
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        verifier.initVerify(keyFactory.generatePublic(new X509EncodedKeySpec(mPublicKey)));
+        verifier.initVerify(mPublicKey.get());
         ContentResolver contentResolver = mContext.getContentResolver();
 
         try (InputStream fileStream = contentResolver.openInputStream(file);
