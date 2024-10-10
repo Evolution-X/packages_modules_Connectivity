@@ -506,6 +506,13 @@ package android.net.thread {
     field @NonNull public static final android.os.Parcelable.Creator<android.net.thread.ThreadConfiguration> CREATOR;
   }
 
+  @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") public static final class ThreadConfiguration.Builder {
+    ctor @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") public ThreadConfiguration.Builder();
+    ctor @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") public ThreadConfiguration.Builder(@NonNull android.net.thread.ThreadConfiguration);
+    method @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") @NonNull public android.net.thread.ThreadConfiguration build();
+    method @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") @NonNull public android.net.thread.ThreadConfiguration.Builder setNat64Enabled(boolean);
+  }
+
   @FlaggedApi("com.android.net.thread.flags.thread_enabled") public final class ThreadNetworkController {
     method @FlaggedApi("com.android.net.thread.flags.epskc_enabled") @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void activateEphemeralKeyMode(@NonNull java.time.Duration, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method public void createRandomizedDataset(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.net.thread.ActiveOperationalDataset,android.net.thread.ThreadNetworkException>);
@@ -520,6 +527,7 @@ package android.net.thread {
     method @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE) public void registerStateCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.thread.ThreadNetworkController.StateCallback);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void scheduleMigration(@NonNull android.net.thread.PendingOperationalDataset, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method @FlaggedApi("com.android.net.thread.flags.channel_max_powers_enabled") @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void setChannelMaxPowers(@NonNull @Size(min=1) android.util.SparseIntArray, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
+    method @FlaggedApi("com.android.net.thread.flags.set_nat64_configuration_enabled") @RequiresPermission(android.Manifest.permission.THREAD_NETWORK_PRIVILEGED) public void setConfiguration(@NonNull android.net.thread.ThreadConfiguration, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method @RequiresPermission("android.permission.THREAD_NETWORK_PRIVILEGED") public void setEnabled(boolean, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.net.thread.ThreadNetworkException>);
     method @FlaggedApi("com.android.net.thread.flags.configuration_enabled") @RequiresPermission(android.Manifest.permission.THREAD_NETWORK_PRIVILEGED) public void unregisterConfigurationCallback(@NonNull java.util.function.Consumer<android.net.thread.ThreadConfiguration>);
     method @RequiresPermission(allOf={android.Manifest.permission.ACCESS_NETWORK_STATE, "android.permission.THREAD_NETWORK_PRIVILEGED"}) public void unregisterOperationalDatasetCallback(@NonNull android.net.thread.ThreadNetworkController.OperationalDatasetCallback);

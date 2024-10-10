@@ -182,6 +182,7 @@ public class ThreadNetworkControllerTest {
     @After
     public void tearDown() throws Exception {
         dropAllPermissions();
+        setEnabledAndWait(mController, true);
         leaveAndWait(mController);
         tearDownTestNetwork();
         setConfigurationAndWait(mController, DEFAULT_CONFIG);
@@ -1148,15 +1149,9 @@ public class ThreadNetworkControllerTest {
         CompletableFuture<Void> setFuture2 = new CompletableFuture<>();
         ConfigurationListener listener = new ConfigurationListener(mController);
         ThreadConfiguration config1 =
-                new ThreadConfiguration.Builder()
-                        .setNat64Enabled(true)
-                        .setDhcpv6PdEnabled(true)
-                        .build();
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
         ThreadConfiguration config2 =
-                new ThreadConfiguration.Builder()
-                        .setNat64Enabled(false)
-                        .setDhcpv6PdEnabled(true)
-                        .build();
+                new ThreadConfiguration.Builder().setNat64Enabled(false).build();
 
         try {
             runAsShell(
