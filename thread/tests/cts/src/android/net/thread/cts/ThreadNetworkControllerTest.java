@@ -1043,7 +1043,9 @@ public class ThreadNetworkControllerTest {
                     listener2.expectThreadEphemeralKeyMode(EPHEMERAL_KEY_ENABLED);
 
             assertThat(epskc2.getSecond()).isEqualTo(epskc1.getSecond());
-            assertThat(epskc2.getThird()).isEqualTo(epskc1.getThird());
+            // allow time precision loss of a second since the value is passed via IPC
+            assertThat(epskc2.getThird()).isGreaterThan(epskc1.getThird().minusSeconds(1));
+            assertThat(epskc2.getThird()).isLessThan(epskc1.getThird().plusSeconds(1));
         } finally {
             listener2.unregisterStateCallback();
         }

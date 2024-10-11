@@ -420,7 +420,9 @@ public final class ThreadNetworkController {
 
         @Override
         public void onEphemeralKeyStateChanged(
-                @EphemeralKeyState int ephemeralKeyState, String ephemeralKey, long expiryMillis) {
+                @EphemeralKeyState int ephemeralKeyState,
+                String ephemeralKey,
+                long lifetimeMillis) {
             if (!Flags.epskcEnabled()) {
                 throw new IllegalStateException(
                         "This should not be called when Ephemeral key API is disabled");
@@ -430,7 +432,7 @@ public final class ThreadNetworkController {
             final Instant expiry =
                     ephemeralKeyState == EPHEMERAL_KEY_DISABLED
                             ? null
-                            : Instant.ofEpochMilli(expiryMillis);
+                            : Instant.now().plusMillis(lifetimeMillis);
 
             try {
                 mExecutor.execute(
