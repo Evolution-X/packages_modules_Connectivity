@@ -70,7 +70,7 @@ import com.android.net.module.util.Struct;
 import com.android.net.module.util.structs.FragmentHeader;
 import com.android.net.module.util.structs.Ipv6Header;
 import com.android.testutils.HandlerUtils;
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 import com.android.testutils.TestNetworkTracker;
 
 import org.junit.After;
@@ -158,10 +158,10 @@ public abstract class EthernetTetheringTestBase {
     protected TetheredInterfaceRequester mTetheredInterfaceRequester;
 
     // Late initialization in initTetheringTester().
-    private TapPacketReader mUpstreamReader;
+    private PollPacketReader mUpstreamReader;
     private TestNetworkTracker mUpstreamTracker;
     private TestNetworkInterface mDownstreamIface;
-    private TapPacketReader mDownstreamReader;
+    private PollPacketReader mDownstreamReader;
     private MyTetheringEventCallback mTetheringEventCallback;
 
     public Context getContext() {
@@ -187,10 +187,10 @@ public abstract class EthernetTetheringTestBase {
         return runAsShell(NETWORK_SETTINGS, TETHER_PRIVILEGED, () -> sTm.isTetheringSupported());
     }
 
-    protected void maybeStopTapPacketReader(final TapPacketReader tapPacketReader)
+    protected void maybeStopTapPacketReader(final PollPacketReader tapPacketReader)
             throws Exception {
         if (tapPacketReader != null) {
-            TapPacketReader reader = tapPacketReader;
+            PollPacketReader reader = tapPacketReader;
             mHandler.post(() -> reader.stop());
         }
     }
@@ -228,7 +228,7 @@ public abstract class EthernetTetheringTestBase {
             });
         }
         if (mUpstreamReader != null) {
-            TapPacketReader reader = mUpstreamReader;
+            PollPacketReader reader = mUpstreamReader;
             mHandler.post(() -> reader.stop());
             mUpstreamReader = null;
         }
@@ -291,7 +291,7 @@ public abstract class EthernetTetheringTestBase {
         });
     }
 
-    protected static void waitForRouterAdvertisement(TapPacketReader reader, String iface,
+    protected static void waitForRouterAdvertisement(PollPacketReader reader, String iface,
             long timeoutMs) {
         final long deadline = SystemClock.uptimeMillis() + timeoutMs;
         do {
@@ -574,13 +574,13 @@ public abstract class EthernetTetheringTestBase {
         return nif.getIndex();
     }
 
-    protected TapPacketReader makePacketReader(final TestNetworkInterface iface) throws Exception {
+    protected PollPacketReader makePacketReader(final TestNetworkInterface iface) throws Exception {
         FileDescriptor fd = iface.getFileDescriptor().getFileDescriptor();
         return makePacketReader(fd, getMTU(iface));
     }
 
-    protected TapPacketReader makePacketReader(FileDescriptor fd, int mtu) {
-        final TapPacketReader reader = new TapPacketReader(mHandler, fd, mtu);
+    protected PollPacketReader makePacketReader(FileDescriptor fd, int mtu) {
+        final PollPacketReader reader = new PollPacketReader(mHandler, fd, mtu);
         mHandler.post(() -> reader.start());
         HandlerUtils.waitForIdle(mHandler, TIMEOUT_MS);
         return reader;

@@ -43,7 +43,7 @@ import com.android.net.module.util.InterfaceParams;
 import com.android.networkstack.tethering.util.TetheringUtils;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DevSdkIgnoreRunner;
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 import com.android.testutils.TapPacketReaderRule;
 
 import org.junit.After;
@@ -75,7 +75,7 @@ public class DadProxyTest {
     private InterfaceParams mUpstreamParams, mTetheredParams;
     private HandlerThread mHandlerThread;
     private Handler mHandler;
-    private TapPacketReader mUpstreamPacketReader, mTetheredPacketReader;
+    private PollPacketReader mUpstreamPacketReader, mTetheredPacketReader;
 
     private static INetd sNetd;
 
@@ -219,7 +219,7 @@ public class DadProxyTest {
     }
 
     // TODO: change to assert.
-    private boolean waitForPacket(ByteBuffer packet, TapPacketReader reader) {
+    private boolean waitForPacket(ByteBuffer packet, PollPacketReader reader) {
         byte[] p;
 
         while ((p = reader.popPacket(PACKET_TIMEOUT_MS)) != null) {
@@ -247,7 +247,7 @@ public class DadProxyTest {
     }
 
     private void receivePacketAndMaybeExpectForwarded(boolean expectForwarded,
-            ByteBuffer in, TapPacketReader inReader, ByteBuffer out, TapPacketReader outReader)
+            ByteBuffer in, PollPacketReader inReader, ByteBuffer out, PollPacketReader outReader)
             throws IOException {
 
         inReader.sendResponse(in);
@@ -271,13 +271,13 @@ public class DadProxyTest {
         assertEquals(msg, expectForwarded, waitForPacket(out, outReader));
     }
 
-    private void receivePacketAndExpectForwarded(ByteBuffer in, TapPacketReader inReader,
-            ByteBuffer out, TapPacketReader outReader) throws IOException {
+    private void receivePacketAndExpectForwarded(ByteBuffer in, PollPacketReader inReader,
+            ByteBuffer out, PollPacketReader outReader) throws IOException {
         receivePacketAndMaybeExpectForwarded(true, in, inReader, out, outReader);
     }
 
-    private void receivePacketAndExpectNotForwarded(ByteBuffer in, TapPacketReader inReader,
-            ByteBuffer out, TapPacketReader outReader) throws IOException {
+    private void receivePacketAndExpectNotForwarded(ByteBuffer in, PollPacketReader inReader,
+            ByteBuffer out, PollPacketReader outReader) throws IOException {
         receivePacketAndMaybeExpectForwarded(false, in, inReader, out, outReader);
     }
 

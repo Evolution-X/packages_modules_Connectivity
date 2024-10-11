@@ -84,7 +84,7 @@ import com.android.net.module.util.structs.PrefixInformationOption;
 import com.android.net.module.util.structs.RaHeader;
 import com.android.net.module.util.structs.TcpHeader;
 import com.android.net.module.util.structs.UdpHeader;
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -157,14 +157,14 @@ public final class TetheringTester {
     public static final String DHCP_HOSTNAME = "testhostname";
 
     private final ArrayMap<MacAddress, TetheredDevice> mTetheredDevices;
-    private final TapPacketReader mDownstreamReader;
-    private final TapPacketReader mUpstreamReader;
+    private final PollPacketReader mDownstreamReader;
+    private final PollPacketReader mUpstreamReader;
 
-    public TetheringTester(TapPacketReader downstream) {
+    public TetheringTester(PollPacketReader downstream) {
         this(downstream, null);
     }
 
-    public TetheringTester(TapPacketReader downstream, TapPacketReader upstream) {
+    public TetheringTester(PollPacketReader downstream, PollPacketReader upstream) {
         if (downstream == null) fail("Downstream reader could not be NULL");
 
         mDownstreamReader = downstream;

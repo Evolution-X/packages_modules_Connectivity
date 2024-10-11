@@ -72,7 +72,7 @@ import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.RouterAdvertisementResponder
-import com.android.testutils.TapPacketReader
+import com.android.testutils.PollPacketReader
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertThrows
 import com.android.testutils.runAsShell
@@ -151,7 +151,7 @@ class EthernetManagerTest {
         hasCarrier: Boolean
     ) {
         private val tapInterface: TestNetworkInterface
-        private val packetReader: TapPacketReader
+        private val packetReader: PollPacketReader
         private val raResponder: RouterAdvertisementResponder
         private val tnm: TestNetworkManager
         val name get() = tapInterface.interfaceName
@@ -169,7 +169,11 @@ class EthernetManagerTest {
                 tnm.createTapInterface(hasCarrier, false /* bringUp */)
             }
             val mtu = tapInterface.mtu
-            packetReader = TapPacketReader(handler, tapInterface.fileDescriptor.fileDescriptor, mtu)
+            packetReader = PollPacketReader(
+                    handler,
+                    tapInterface.fileDescriptor.fileDescriptor,
+                    mtu
+            )
             raResponder = RouterAdvertisementResponder(packetReader)
             val iidString = "fe80::${Integer.toHexString(Random().nextInt(65536))}"
             val linklocal = InetAddresses.parseNumericAddress(iidString) as Inet6Address
@@ -336,7 +340,7 @@ class EthernetManagerTest {
         }
     }
 
-    private fun isEthernetSupported() : Boolean {
+    private fun isEthernetSupported(): Boolean {
         return context.getSystemService(EthernetManager::class.java) != null
     }
 

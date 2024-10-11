@@ -28,8 +28,6 @@ import com.android.net.module.util.NetworkStackConstants.IPV6_DST_ADDR_OFFSET
 import com.android.net.module.util.NetworkStackConstants.IPV6_HEADER_LEN
 import com.android.net.module.util.NetworkStackConstants.UDP_HEADER_LEN
 import com.android.net.module.util.TrackRecord
-import com.android.testutils.IPv6UdpFilter
-import com.android.testutils.TapPacketReader
 import java.net.Inet6Address
 import java.net.InetAddress
 import kotlin.test.assertEquals
@@ -246,7 +244,7 @@ private fun getDstAddr(packet: ByteArray): Inet6Address {
             as Inet6Address
 }
 
-fun TapPacketReader.pollForMdnsPacket(
+fun PollPacketReader.pollForMdnsPacket(
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS,
     predicate: (TestDnsPacket) -> Boolean
 ): TestDnsPacket? {
@@ -264,7 +262,7 @@ fun TapPacketReader.pollForMdnsPacket(
     }
 }
 
-fun TapPacketReader.pollForProbe(
+fun PollPacketReader.pollForProbe(
     serviceName: String,
     serviceType: String,
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS
@@ -272,7 +270,7 @@ fun TapPacketReader.pollForProbe(
     it.isProbeFor("$serviceName.$serviceType.local")
 }
 
-fun TapPacketReader.pollForAdvertisement(
+fun PollPacketReader.pollForAdvertisement(
     serviceName: String,
     serviceType: String,
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS
@@ -280,19 +278,19 @@ fun TapPacketReader.pollForAdvertisement(
     it.isReplyFor("$serviceName.$serviceType.local")
 }
 
-fun TapPacketReader.pollForQuery(
+fun PollPacketReader.pollForQuery(
     recordName: String,
     vararg requiredTypes: Int,
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS
 ): TestDnsPacket? = pollForMdnsPacket(timeoutMs) { it.isQueryFor(recordName, *requiredTypes) }
 
-fun TapPacketReader.pollForReply(
+fun PollPacketReader.pollForReply(
     recordName: String,
     type: Int,
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS
 ): TestDnsPacket? = pollForMdnsPacket(timeoutMs) { it.isReplyFor(recordName, type) }
 
-fun TapPacketReader.pollForReply(
+fun PollPacketReader.pollForReply(
     serviceName: String,
     serviceType: String,
     timeoutMs: Long = MDNS_REGISTRATION_TIMEOUT_MS

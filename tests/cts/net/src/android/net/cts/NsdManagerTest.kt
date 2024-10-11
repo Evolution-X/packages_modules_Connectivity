@@ -100,7 +100,7 @@ import com.android.testutils.NsdServiceInfoCallbackRecord.ServiceInfoCallbackEve
 import com.android.testutils.NsdServiceInfoCallbackRecord.ServiceInfoCallbackEvent.UnregisterCallbackSucceeded
 import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
-import com.android.testutils.TapPacketReader
+import com.android.testutils.PollPacketReader
 import com.android.testutils.TestDnsPacket
 import com.android.testutils.TestableNetworkAgent
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
@@ -1299,10 +1299,10 @@ class NsdManagerTest {
 
         val si = makeTestServiceInfo(testNetwork1.network)
 
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1345,10 +1345,10 @@ class NsdManagerTest {
                     parseNumericAddress("2001:db8::3"))
         }
 
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1391,10 +1391,10 @@ class NsdManagerTest {
             hostname = customHostname
         }
 
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1438,10 +1438,10 @@ class NsdManagerTest {
         val registrationRecord = NsdRegistrationRecord()
         val discoveryRecord = NsdDiscoveryRecord()
         val registeredService = registerService(registrationRecord, si)
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1518,10 +1518,10 @@ class NsdManagerTest {
         val registrationRecord = NsdRegistrationRecord()
         val discoveryRecord = NsdDiscoveryRecord()
         val registeredService = registerService(registrationRecord, si)
-        val packetReader = TapPacketReader(
+        val packetReader = PollPacketReader(
                 Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1587,10 +1587,10 @@ class NsdManagerTest {
         val registrationRecord = NsdRegistrationRecord()
         val discoveryRecord = NsdDiscoveryRecord()
         val registeredService = registerService(registrationRecord, si)
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1630,10 +1630,10 @@ class NsdManagerTest {
     fun testDiscoveryWithPtrOnlyResponse_ServiceIsFound() {
         // Register service on testNetwork1
         val discoveryRecord = NsdDiscoveryRecord()
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1688,10 +1688,10 @@ class NsdManagerTest {
     fun testResolveWhenServerSendsNoAdditionalRecord() {
         // Resolve service on testNetwork1
         val resolveRecord = NsdResolveRecord()
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1776,8 +1776,8 @@ class NsdManagerTest {
         var nsResponder: NSResponder? = null
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = TapPacketReader(Handler(handlerThread.looper),
-                testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
+            val packetReader = PollPacketReader(Handler(handlerThread.looper),
+                    testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
             packetReader.startAsyncForTest()
 
             handlerThread.waitForIdle(TIMEOUT_MS)
@@ -1826,7 +1826,7 @@ class NsdManagerTest {
         var nsResponder: NSResponder? = null
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = TapPacketReader(Handler(handlerThread.looper),
+            val packetReader = PollPacketReader(Handler(handlerThread.looper),
                     testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
             packetReader.startAsyncForTest()
 
@@ -1916,7 +1916,7 @@ class NsdManagerTest {
         var nsResponder: NSResponder? = null
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = TapPacketReader(Handler(handlerThread.looper),
+            val packetReader = PollPacketReader(Handler(handlerThread.looper),
                     testNetwork1.iface.fileDescriptor.fileDescriptor, 1500 /* maxPacketSize */)
             packetReader.startAsyncForTest()
 
@@ -1991,10 +1991,10 @@ class NsdManagerTest {
 
         // Register service on testNetwork1
         val discoveryRecord = NsdDiscoveryRecord()
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -2355,10 +2355,10 @@ class NsdManagerTest {
             it.port = TEST_PORT
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -2410,10 +2410,10 @@ class NsdManagerTest {
                     parseNumericAddress("2001:db8::2"))
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
                 testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -2467,10 +2467,10 @@ class NsdManagerTest {
             it.hostAddresses = listOf()
             it.publicKey = publicKey
         }
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
-            testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
@@ -2582,10 +2582,10 @@ class NsdManagerTest {
             "test_nsd_avoid_advertising_empty_txt_records",
             "1"
         )
-        val packetReader = TapPacketReader(
-            Handler(handlerThread.looper),
-            testNetwork1.iface.fileDescriptor.fileDescriptor,
-            1500 /* maxPacketSize */
+        val packetReader = PollPacketReader(
+                Handler(handlerThread.looper),
+                testNetwork1.iface.fileDescriptor.fileDescriptor,
+                1500 /* maxPacketSize */
         )
         packetReader.startAsyncForTest()
         handlerThread.waitForIdle(TIMEOUT_MS)
