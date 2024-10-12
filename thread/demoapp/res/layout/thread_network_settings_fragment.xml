@@ -52,6 +52,28 @@
         android:layout_marginTop="10dp"
         android:textSize="16dp"
         android:textStyle="bold"
+        android:text="Ephemeral Key State" />
+    <TextView
+        android:id="@+id/text_ephemeral_key_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="12dp" />
+
+    <Button android:id="@+id/button_activate_ephemeral_key_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Activate Ephemeral Key Mode" />
+    <Button android:id="@+id/button_deactivate_ephemeral_key_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Deactivate Ephemeral Key Mode" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:textSize="16dp"
+        android:textStyle="bold"
         android:text="Network Info" />
     <TextView
         android:id="@+id/text_network_info"
