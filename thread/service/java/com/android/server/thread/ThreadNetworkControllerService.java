@@ -1785,7 +1785,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                             .onEphemeralKeyStateChanged(
                                     newState.ephemeralKeyState,
                                     passcode,
-                                    newState.ephemeralKeyExpiryMillis);
+                                    newState.ephemeralKeyLifetimeMillis);
                 } catch (RemoteException ignored) {
                     // do nothing if the client is dead
                 }
@@ -1798,7 +1798,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             if (oldState.ephemeralKeyState != newState.ephemeralKeyState) return true;
             if (oldState.ephemeralKeyState == EPHEMERAL_KEY_DISABLED) return false;
             return (!Objects.equals(oldState.ephemeralKeyPasscode, newState.ephemeralKeyPasscode)
-                    || oldState.ephemeralKeyExpiryMillis != newState.ephemeralKeyExpiryMillis);
+                    || oldState.ephemeralKeyLifetimeMillis != newState.ephemeralKeyLifetimeMillis);
         }
 
         private void onActiveOperationalDatasetChanged(

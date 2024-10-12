@@ -24,5 +24,5 @@ oneway interface IStateCallback {
     void onPartitionIdChanged(long partitionId);
     void onThreadEnableStateChanged(int enabledState);
     void onEphemeralKeyStateChanged(
-            int ephemeralKeyState, @nullable String ephemeralKey, long expiryMillis);
+            int ephemeralKeyState, @nullable String ephemeralKey, long lifetimeMillis);
 }
