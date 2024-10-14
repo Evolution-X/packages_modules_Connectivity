@@ -14,7 +14,9 @@
 
 from mobly import asserts
 from mobly import base_test
-from net_tests_utils.host.python.assert_utils import UnexpectedBehaviorError, expect_with_retry
+from net_tests_utils.host.python.assert_utils import (
+    UnexpectedBehaviorError, UnexpectedExceptionError, expect_with_retry, expect_throws
+)
 
 
 class TestAssertUtils(base_test.BaseTestClass):
@@ -92,3 +94,22 @@ class TestAssertUtils(base_test.BaseTestClass):
           retry_interval_sec=0,
       )
     asserts.assert_true(retry_action_called, "retry_action not called.")
+
+  def test_expect_exception_throws(self):
+      def raise_unexpected_behavior_error():
+          raise UnexpectedBehaviorError()
+
+      expect_throws(raise_unexpected_behavior_error, UnexpectedBehaviorError)
+
+  def test_unexpect_exception_throws(self):
+      def raise_value_error():
+          raise ValueError()
+
+      with asserts.assert_raises(UnexpectedExceptionError):
+          expect_throws(raise_value_error, UnexpectedBehaviorError)
+
+  def test_no_exception_throws(self):
+      def raise_no_error():
+          return
+
+      expect_throws(raise_no_error, UnexpectedBehaviorError)
