@@ -147,6 +147,14 @@ public final class ThreadNetworkControllerTest {
         return (IOperationReceiver) invocation.getArguments()[0];
     }
 
+    private static IOperationReceiver getSetConfigurationReceiver(InvocationOnMock invocation) {
+        return (IOperationReceiver) invocation.getArguments()[1];
+    }
+
+    private static IConfigurationReceiver getConfigurationReceiver(InvocationOnMock invocation) {
+        return (IConfigurationReceiver) invocation.getArguments()[0];
+    }
+
     @Test
     public void registerStateCallback_callbackIsInvokedWithCallingAppIdentity() throws Exception {
         setBinderUid(SYSTEM_UID);
@@ -536,5 +544,69 @@ public final class ThreadNetworkControllerTest {
         assertThat(successCallbackUid.get()).isEqualTo(Process.myUid());
         assertThat(errorCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
         assertThat(errorCallbackUid.get()).isEqualTo(Process.myUid());
+    }
+
+    @Test
+    public void setConfiguration_callbackIsInvokedWithCallingAppIdentity() throws Exception {
+        setBinderUid(SYSTEM_UID);
+        AtomicInteger successCallbackUid = new AtomicInteger(0);
+        AtomicInteger errorCallbackUid = new AtomicInteger(0);
+        doAnswer(
+                        invoke -> {
+                            getSetConfigurationReceiver(invoke).onSuccess();
+                            return null;
+                        })
+                .when(mMockService)
+                .setConfiguration(any(ThreadConfiguration.class), any(IOperationReceiver.class));
+        mController.setConfiguration(
+                new ThreadConfiguration.Builder().build(),
+                Runnable::run,
+                v -> successCallbackUid.set(Binder.getCallingUid()));
+        doAnswer(
+                        invoke -> {
+                            getSetConfigurationReceiver(invoke).onError(ERROR_INTERNAL_ERROR, "");
+                            return null;
+                        })
+                .when(mMockService)
+                .setConfiguration(any(ThreadConfiguration.class), any(IOperationReceiver.class));
+        mController.setConfiguration(
+                new ThreadConfiguration.Builder().build(),
+                Runnable::run,
+                new OutcomeReceiver<>() {
+                    @Override
+                    public void onResult(Void unused) {}
+
+                    @Override
+                    public void onError(ThreadNetworkException e) {
+                        errorCallbackUid.set(Binder.getCallingUid());
+                    }
+                });
+
+        assertThat(successCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(successCallbackUid.get()).isEqualTo(Process.myUid());
+        assertThat(errorCallbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(errorCallbackUid.get()).isEqualTo(Process.myUid());
+    }
+
+    @Test
+    public void registerConfigurationCallback_callbackIsInvokedWithCallingAppIdentity()
+            throws Exception {
+        setBinderUid(SYSTEM_UID);
+        AtomicInteger callbackUid = new AtomicInteger(0);
+        doAnswer(
+                        invoke -> {
+                            getConfigurationReceiver(invoke)
+                                    .onConfigurationChanged(
+                                            new ThreadConfiguration.Builder().build());
+                            return null;
+                        })
+                .when(mMockService)
+                .registerConfigurationCallback(any(IConfigurationReceiver.class));
+
+        mController.registerConfigurationCallback(
+                Runnable::run, v -> callbackUid.set(Binder.getCallingUid()));
+
+        assertThat(callbackUid.get()).isNotEqualTo(SYSTEM_UID);
+        assertThat(callbackUid.get()).isEqualTo(Process.myUid());
     }
 }
