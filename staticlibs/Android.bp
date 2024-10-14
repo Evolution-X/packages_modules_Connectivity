@@ -435,6 +435,7 @@ java_library {
     sdk_version: "core_platform",
     srcs: [
         "device/com/android/net/module/util/FdEventsReader.java",
+        "device/com/android/net/module/util/HandlerUtils.java",
         "device/com/android/net/module/util/SharedLog.java",
         "framework/com/android/net/module/util/ByteUtils.java",
         "framework/com/android/net/module/util/CollectionUtils.java",
