@@ -182,22 +182,23 @@ def is_packet_capture_supported(
         ad: android_device.AndroidDevice,
 ) -> bool:
 
-  # Invoke the shell command with empty argument and see how NetworkStack respond.
-  # If supported, an IllegalArgumentException with help page will be printed.
-  functions_with_args = (
-    # list all functions and args with (func, *args) tuple
-    (start_capture_packets, (ad, "")),
-    (stop_capture_packets, (ad, "")),
-    (get_matched_packet_counts, (ad, "", ""))
-  )
-
-  for func, args in functions_with_args:
-    try:
-      func(*args)
-    except UnsupportedOperationException:
-      return False
-    except Exception:
-      continue
+  try:
+    # Invoke the shell command with empty argument and see how NetworkStack respond.
+    # If supported, an IllegalArgumentException with help page will be printed.
+    assert_utils.expect_throws(
+      lambda: start_capture_packets(ad, ""),
+      assert_utils.UnexpectedBehaviorError
+    )
+    assert_utils.expect_throws(
+      lambda: stop_capture_packets(ad, ""),
+      assert_utils.UnexpectedBehaviorError
+    )
+    assert_utils.expect_throws(
+      lambda: get_matched_packet_counts(ad, "", ""),
+      assert_utils.UnexpectedBehaviorError
+    )
+  except assert_utils.UnexpectedExceptionError:
+    return False
 
   # If no UnsupportOperationException is thrown, regard it as supported
   return True
