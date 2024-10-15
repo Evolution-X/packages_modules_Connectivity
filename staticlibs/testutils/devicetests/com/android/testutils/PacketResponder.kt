@@ -21,24 +21,24 @@ import java.util.function.Predicate
 private const val POLL_FREQUENCY_MS = 1000L
 
 /**
- * A class that can be used to reply to packets from a [TapPacketReader].
+ * A class that can be used to reply to packets from a [PollPacketReader].
  *
  * A reply thread will be created to reply to incoming packets asynchronously.
- * The receiver creates a new read head on the [TapPacketReader], to read packets, so it does not
- * affect packets obtained through [TapPacketReader.popPacket].
+ * The receiver creates a new read head on the [PollPacketReader], to read packets, so it does not
+ * affect packets obtained through [PollPacketReader.popPacket].
  *
- * @param reader a [TapPacketReader] to obtain incoming packets and reply to them.
+ * @param reader a [PollPacketReader] to obtain incoming packets and reply to them.
  * @param packetFilter A filter to apply to incoming packets.
  * @param name Name to use for the internal responder thread.
  */
 abstract class PacketResponder(
-    private val reader: TapPacketReader,
-    private val packetFilter: Predicate<ByteArray>,
-    name: String
+        private val reader: PollPacketReader,
+        private val packetFilter: Predicate<ByteArray>,
+        name: String
 ) {
     private val replyThread = ReplyThread(name)
 
-    protected abstract fun replyToPacket(packet: ByteArray, reader: TapPacketReader)
+    protected abstract fun replyToPacket(packet: ByteArray, reader: PollPacketReader)
 
     /**
      * Start the [PacketResponder].

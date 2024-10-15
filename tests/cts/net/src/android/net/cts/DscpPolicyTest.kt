@@ -71,7 +71,7 @@ import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.RouterAdvertisementResponder
 import com.android.testutils.SC_V2
-import com.android.testutils.TapPacketReader
+import com.android.testutils.PollPacketReader
 import com.android.testutils.TestableNetworkAgent
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnDscpPolicyStatusUpdated
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
@@ -135,7 +135,7 @@ class DscpPolicyTest {
     private lateinit var srcAddressV6: Inet6Address
     private lateinit var iface: TestNetworkInterface
     private lateinit var tunNetworkCallback: TestNetworkCallback
-    private lateinit var reader: TapPacketReader
+    private lateinit var reader: PollPacketReader
     private lateinit var arpResponder: ArpResponder
     private lateinit var raResponder: RouterAdvertisementResponder
 
@@ -169,7 +169,7 @@ class DscpPolicyTest {
         }
 
         handlerThread.start()
-        reader = TapPacketReader(
+        reader = PollPacketReader(
                 handlerThread.threadHandler,
                 iface.fileDescriptor.fileDescriptor,
                 MAX_PACKET_LENGTH)

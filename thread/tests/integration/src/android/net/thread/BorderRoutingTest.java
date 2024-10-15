@@ -68,7 +68,7 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 import com.android.testutils.TestNetworkTracker;
 
 import org.junit.After;
@@ -118,7 +118,7 @@ public class BorderRoutingTest {
     private Handler mHandler;
     private TestNetworkTracker mInfraNetworkTracker;
     private List<FullThreadDevice> mFtds;
-    private TapPacketReader mInfraNetworkReader;
+    private PollPacketReader mInfraNetworkReader;
     private InfraNetworkDevice mInfraDevice;
 
     @Before

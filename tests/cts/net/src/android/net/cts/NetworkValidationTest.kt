@@ -46,7 +46,7 @@ import com.android.testutils.AutoCloseTestInterfaceRule
 import com.android.testutils.DhcpClientPacketFilter
 import com.android.testutils.DhcpOptionFilter
 import com.android.testutils.RecorderCallback.CallbackEntry
-import com.android.testutils.TapPacketReader
+import com.android.testutils.PollPacketReader
 import com.android.testutils.TestHttpServer
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.runAsShell
@@ -93,7 +93,7 @@ class NetworkValidationTest {
     private val ethRequestCb = TestableNetworkCallback()
 
     private lateinit var iface: TestNetworkInterface
-    private lateinit var reader: TapPacketReader
+    private lateinit var reader: PollPacketReader
     private lateinit var capportUrl: Uri
 
     private var testSkipped = false
@@ -118,7 +118,7 @@ class NetworkValidationTest {
         iface = testInterfaceRule.createTapInterface()
 
         handlerThread.start()
-        reader = TapPacketReader(
+        reader = PollPacketReader(
                 handlerThread.threadHandler,
                 iface.fileDescriptor.fileDescriptor,
                 MAX_PACKET_LENGTH)
@@ -218,7 +218,7 @@ class NetworkValidationTest {
                     TEST_MTU, false /* rapidCommit */, capportUrl.toString())
 }
 
-private fun <T : DhcpPacket> TapPacketReader.assertDhcpPacketReceived(
+private fun <T : DhcpPacket> PollPacketReader.assertDhcpPacketReceived(
     packetType: Class<T>,
     timeoutMs: Long,
     type: Byte
