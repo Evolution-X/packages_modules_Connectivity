@@ -26,6 +26,8 @@ int register_com_android_server_connectivity_ClatCoordinator(JNIEnv* env);
 int register_android_server_net_NetworkStatsFactory(JNIEnv* env);
 int register_android_server_net_NetworkStatsService(JNIEnv* env);
 int register_com_android_server_ServiceManagerWrapper(JNIEnv* env);
+int register_com_android_net_module_util_TimerFdUtils(JNIEnv *env,
+                                                      char const *class_name);
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     JNIEnv *env;
@@ -54,6 +56,12 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (register_android_server_net_NetworkStatsService(env) < 0) {
             return JNI_ERR;
         }
+    }
+
+    if (register_com_android_net_module_util_TimerFdUtils(
+            env, "android/net/connectivity/com/android/net/module/util/"
+                 "TimerFdUtils") < 0) {
+      return JNI_ERR;
     }
 
     return JNI_VERSION_1_6;
