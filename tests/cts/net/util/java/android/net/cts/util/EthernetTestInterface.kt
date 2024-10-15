@@ -28,7 +28,7 @@ import android.net.cts.util.EthernetTestInterface.EthernetStateListener.Callback
 import android.os.Handler
 import android.util.Log
 import com.android.net.module.util.ArrayTrackRecord
-import com.android.testutils.TapPacketReader
+import com.android.testutils.PollPacketReader
 import com.android.testutils.runAsShell
 import com.android.testutils.waitForIdle
 import java.net.NetworkInterface
@@ -85,7 +85,7 @@ class EthernetTestInterface(
             assertNotNull(nif)
             return nif.mtu
         }
-    val packetReader = TapPacketReader(handler, testIface.fileDescriptor.fileDescriptor, mtu)
+    val packetReader = PollPacketReader(handler, testIface.fileDescriptor.fileDescriptor, mtu)
     private val listener = EthernetStateListener(name)
     private val em = context.getSystemService(EthernetManager::class.java)!!
     @Volatile private var cleanedUp = false

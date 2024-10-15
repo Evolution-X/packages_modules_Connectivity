@@ -30,12 +30,17 @@ import android.util.ArraySet;
 import android.util.Pair;
 
 import com.android.server.connectivity.mdns.MdnsConstants;
+import com.android.server.connectivity.mdns.MdnsInetAddressRecord;
 import com.android.server.connectivity.mdns.MdnsPacket;
 import com.android.server.connectivity.mdns.MdnsPacketWriter;
 import com.android.server.connectivity.mdns.MdnsRecord;
+import com.android.server.connectivity.mdns.MdnsResponse;
+import com.android.server.connectivity.mdns.MdnsServiceInfo;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -43,6 +48,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -317,5 +323,63 @@ public class MdnsUtils {
             }
         }
         return true;
+    }
+
+    /**
+     * Build MdnsServiceInfo object from given MdnsResponse, service type labels and current time.
+     *
+     * @param response target service response
+     * @param serviceTypeLabels service type labels
+     * @param elapsedRealtimeMillis current time.
+     */
+    public static MdnsServiceInfo buildMdnsServiceInfoFromResponse(@NonNull MdnsResponse response,
+            @NonNull String[] serviceTypeLabels, long elapsedRealtimeMillis) {
+        String[] hostName = null;
+        int port = 0;
+        if (response.hasServiceRecord()) {
+            hostName = response.getServiceRecord().getServiceHost();
+            port = response.getServiceRecord().getServicePort();
+        }
+
+        final List<String> ipv4Addresses = new ArrayList<>();
+        final List<String> ipv6Addresses = new ArrayList<>();
+        if (response.hasInet4AddressRecord()) {
+            for (MdnsInetAddressRecord inetAddressRecord : response.getInet4AddressRecords()) {
+                final Inet4Address inet4Address = inetAddressRecord.getInet4Address();
+                ipv4Addresses.add((inet4Address == null) ? null : inet4Address.getHostAddress());
+            }
+        }
+        if (response.hasInet6AddressRecord()) {
+            for (MdnsInetAddressRecord inetAddressRecord : response.getInet6AddressRecords()) {
+                final Inet6Address inet6Address = inetAddressRecord.getInet6Address();
+                ipv6Addresses.add((inet6Address == null) ? null : inet6Address.getHostAddress());
+            }
+        }
+        String serviceInstanceName = response.getServiceInstanceName();
+        if (serviceInstanceName == null) {
+            throw new IllegalStateException(
+                    "mDNS response must have non-null service instance name");
+        }
+        List<String> textStrings = null;
+        List<MdnsServiceInfo.TextEntry> textEntries = null;
+        if (response.hasTextRecord()) {
+            textStrings = response.getTextRecord().getStrings();
+            textEntries = response.getTextRecord().getEntries();
+        }
+        Instant now = Instant.now();
+        // TODO: Throw an error message if response doesn't have Inet6 or Inet4 address.
+        return new MdnsServiceInfo(
+                serviceInstanceName,
+                serviceTypeLabels,
+                response.getSubtypes(),
+                hostName,
+                port,
+                ipv4Addresses,
+                ipv6Addresses,
+                textStrings,
+                textEntries,
+                response.getInterfaceIndex(),
+                response.getNetwork(),
+                now.plusMillis(response.getMinRemainingTtl(elapsedRealtimeMillis)));
     }
 }

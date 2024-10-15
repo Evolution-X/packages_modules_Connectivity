@@ -62,18 +62,18 @@ public class RouterAdvertisementResponder extends PacketResponder {
     private static final String TAG = "RouterAdvertisementResponder";
     private static final Inet6Address DNS_SERVER =
             (Inet6Address) InetAddresses.parseNumericAddress("2001:4860:4860::64");
-    private final TapPacketReader mPacketReader;
+    private final PollPacketReader mPacketReader;
     // Maps IPv6 address to MacAddress and isRouter boolean.
     private final Map<Inet6Address, Pair<MacAddress, Boolean>> mNeighborMap = new ArrayMap<>();
     private final IpPrefix mPrefix;
 
-    public RouterAdvertisementResponder(TapPacketReader packetReader, IpPrefix prefix) {
+    public RouterAdvertisementResponder(PollPacketReader packetReader, IpPrefix prefix) {
         super(packetReader, RouterAdvertisementResponder::isRsOrNs, TAG);
         mPacketReader = packetReader;
         mPrefix = Objects.requireNonNull(prefix);
     }
 
-    public RouterAdvertisementResponder(TapPacketReader packetReader) {
+    public RouterAdvertisementResponder(PollPacketReader packetReader) {
         this(packetReader, makeRandomPrefix());
     }
 
@@ -148,7 +148,7 @@ public class RouterAdvertisementResponder extends PacketResponder {
                 buildSllaOption(srcMac));
     }
 
-    private static void sendResponse(TapPacketReader reader, ByteBuffer buffer) {
+    private static void sendResponse(PollPacketReader reader, ByteBuffer buffer) {
         try {
             reader.sendResponse(buffer);
         } catch (IOException e) {
@@ -158,7 +158,7 @@ public class RouterAdvertisementResponder extends PacketResponder {
         }
     }
 
-    private void replyToRouterSolicitation(TapPacketReader reader, MacAddress dstMac) {
+    private void replyToRouterSolicitation(PollPacketReader reader, MacAddress dstMac) {
         for (Map.Entry<Inet6Address, Pair<MacAddress, Boolean>> it : mNeighborMap.entrySet()) {
             final boolean isRouter = it.getValue().second;
             if (!isRouter) {
@@ -169,7 +169,7 @@ public class RouterAdvertisementResponder extends PacketResponder {
         }
     }
 
-    private void replyToNeighborSolicitation(TapPacketReader reader, MacAddress dstMac,
+    private void replyToNeighborSolicitation(PollPacketReader reader, MacAddress dstMac,
             Inet6Address dstIp, Inet6Address targetIp) {
         final Pair<MacAddress, Boolean> neighbor = mNeighborMap.get(targetIp);
         if (neighbor == null) {
@@ -190,7 +190,7 @@ public class RouterAdvertisementResponder extends PacketResponder {
     }
 
     @Override
-    protected void replyToPacket(byte[] packet, TapPacketReader reader) {
+    protected void replyToPacket(byte[] packet, PollPacketReader reader) {
         final ByteBuffer buf = ByteBuffer.wrap(packet);
         // Messages are filtered by parent class, so it is safe to assume that packet is either an
         // RS or NS.
