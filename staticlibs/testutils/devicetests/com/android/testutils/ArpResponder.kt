@@ -30,17 +30,17 @@ private val TYPE_ARP = byteArrayOf(0x08, 0x06)
 private val ARP_REPLY_IPV4 = byteArrayOf(0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02)
 
 /**
- * A class that can be used to reply to ARP packets on a [TapPacketReader].
+ * A class that can be used to reply to ARP packets on a [PollPacketReader].
  */
 class ArpResponder(
-    reader: TapPacketReader,
-    table: Map<Inet4Address, MacAddress>,
-    name: String = ArpResponder::class.java.simpleName
+        reader: PollPacketReader,
+        table: Map<Inet4Address, MacAddress>,
+        name: String = ArpResponder::class.java.simpleName
 ) : PacketResponder(reader, ArpRequestFilter(), name) {
     // Copy the map if not already immutable (toMap) to make sure it is not modified
     private val table = table.toMap()
 
-    override fun replyToPacket(packet: ByteArray, reader: TapPacketReader) {
+    override fun replyToPacket(packet: ByteArray, reader: PollPacketReader) {
         val targetIp = InetAddress.getByAddress(
                 packet.copyFromIndexWithLength(ARP_TARGET_IPADDR_OFFSET, 4))
                 as Inet4Address

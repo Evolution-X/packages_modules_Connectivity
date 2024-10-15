@@ -80,7 +80,7 @@ import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DeviceInfoUtils;
 import com.android.testutils.DumpTestUtils;
 import com.android.testutils.NetworkStackModuleTest;
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 
 import org.junit.After;
 import org.junit.Rule;
@@ -213,7 +213,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
         TestNetworkInterface downstreamIface = null;
         MyTetheringEventCallback tetheringEventCallback = null;
-        TapPacketReader downstreamReader = null;
+        PollPacketReader downstreamReader = null;
 
         try {
             downstreamIface = createTestInterface();
@@ -253,7 +253,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
         TestNetworkInterface downstreamIface = null;
         MyTetheringEventCallback tetheringEventCallback = null;
-        TapPacketReader downstreamReader = null;
+        PollPacketReader downstreamReader = null;
 
         try {
             downstreamIface = createTestInterface();
@@ -283,7 +283,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
         TestNetworkInterface downstreamIface = null;
         MyTetheringEventCallback tetheringEventCallback = null;
-        TapPacketReader downstreamReader = null;
+        PollPacketReader downstreamReader = null;
 
         try {
             downstreamIface = createTestInterface();
@@ -357,7 +357,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
 
         TestNetworkInterface downstreamIface = null;
         MyTetheringEventCallback tetheringEventCallback = null;
-        TapPacketReader downstreamReader = null;
+        PollPacketReader downstreamReader = null;
 
         try {
             downstreamIface = createTestInterface();
@@ -423,7 +423,7 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
         // client, which is not possible in this test.
     }
 
-    private void checkTetheredClientCallbacks(final TapPacketReader packetReader,
+    private void checkTetheredClientCallbacks(final PollPacketReader packetReader,
             final MyTetheringEventCallback tetheringEventCallback) throws Exception {
         // Create a fake client.
         byte[] clientMacAddr = new byte[6];

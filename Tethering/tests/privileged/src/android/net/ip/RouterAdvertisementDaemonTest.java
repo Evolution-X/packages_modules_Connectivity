@@ -64,7 +64,7 @@ import com.android.net.module.util.structs.MtuOption;
 import com.android.net.module.util.structs.PrefixInformationOption;
 import com.android.net.module.util.structs.RaHeader;
 import com.android.net.module.util.structs.RdnssOption;
-import com.android.testutils.TapPacketReader;
+import com.android.testutils.PollPacketReader;
 import com.android.testutils.TapPacketReaderRule;
 
 import org.junit.After;
@@ -93,7 +93,7 @@ public final class RouterAdvertisementDaemonTest {
     private InterfaceParams mTetheredParams;
     private HandlerThread mHandlerThread;
     private Handler mHandler;
-    private TapPacketReader mTetheredPacketReader;
+    private PollPacketReader mTetheredPacketReader;
     private RouterAdvertisementDaemon mRaDaemon;
 
     private static INetd sNetd;

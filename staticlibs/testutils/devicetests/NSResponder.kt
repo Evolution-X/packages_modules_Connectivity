@@ -35,12 +35,12 @@ import java.nio.ByteBuffer
 private const val NS_TYPE = 135.toShort()
 
 /**
- * A class that can be used to reply to Neighbor Solicitation packets on a [TapPacketReader].
+ * A class that can be used to reply to Neighbor Solicitation packets on a [PollPacketReader].
  */
 class NSResponder(
-    reader: TapPacketReader,
-    table: Map<Inet6Address, MacAddress>,
-    name: String = NSResponder::class.java.simpleName
+        reader: PollPacketReader,
+        table: Map<Inet6Address, MacAddress>,
+        name: String = NSResponder::class.java.simpleName
 ) : PacketResponder(reader, Icmpv6Filter(), name) {
     companion object {
         private val TAG = NSResponder::class.simpleName
@@ -49,7 +49,7 @@ class NSResponder(
     // Copy the map if not already immutable (toMap) to make sure it is not modified
     private val table = table.toMap()
 
-    override fun replyToPacket(packet: ByteArray, reader: TapPacketReader) {
+    override fun replyToPacket(packet: ByteArray, reader: PollPacketReader) {
         if (packet.size < IPV6_HEADER_LENGTH) {
             return
         }
