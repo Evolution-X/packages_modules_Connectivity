@@ -31,9 +31,9 @@ import kotlin.test.fail
 private const val HANDLER_TIMEOUT_MS = 10_000L
 
 /**
- * A [TestRule] that sets up a [TapPacketReader] on a [TestNetworkInterface] for use in the test.
+ * A [TestRule] that sets up a [PollPacketReader] on a [TestNetworkInterface] for use in the test.
  *
- * @param maxPacketSize Maximum size of packets read in the [TapPacketReader] buffer.
+ * @param maxPacketSize Maximum size of packets read in the [PollPacketReader] buffer.
  * @param autoStart Whether to initialize the interface and start the reader automatically for every
  *                  test. If false, each test must either call start() and stop(), or be annotated
  *                  with TapPacketReaderTest before using the reader or interface.
@@ -50,21 +50,21 @@ class TapPacketReaderRule @JvmOverloads constructor(
     // referenced before they could be initialized (typically if autoStart is false and the test
     // does not call start or use @TapPacketReaderTest).
     lateinit var iface: TestNetworkInterface
-    lateinit var reader: TapPacketReader
+    lateinit var reader: PollPacketReader
 
     @Volatile
     private var readerRunning = false
 
     /**
      * Indicates that the [TapPacketReaderRule] should initialize its [TestNetworkInterface] and
-     * start the [TapPacketReader] before the test, and tear them down afterwards.
+     * start the [PollPacketReader] before the test, and tear them down afterwards.
      *
      * For use when [TapPacketReaderRule] is created with autoStart = false.
      */
     annotation class TapPacketReaderTest
 
     /**
-     * Initialize the tap interface and start the [TapPacketReader].
+     * Initialize the tap interface and start the [PollPacketReader].
      *
      * Tests using this method must also call [stop] before exiting.
      * @param handler Handler to run the reader on. Callers are responsible for safely terminating
@@ -85,13 +85,13 @@ class TapPacketReaderRule @JvmOverloads constructor(
         }
         val usedHandler = handler ?: HandlerThread(
                 TapPacketReaderRule::class.java.simpleName).apply { start() }.threadHandler
-        reader = TapPacketReader(usedHandler, iface.fileDescriptor.fileDescriptor, maxPacketSize)
+        reader = PollPacketReader(usedHandler, iface.fileDescriptor.fileDescriptor, maxPacketSize)
         reader.startAsyncForTest()
         readerRunning = true
     }
 
     /**
-     * Stop the [TapPacketReader].
+     * Stop the [PollPacketReader].
      *
      * Tests calling [start] must call this method before exiting. If a handler was specified in
      * [start], all messages on that handler must also be processed after calling this method and

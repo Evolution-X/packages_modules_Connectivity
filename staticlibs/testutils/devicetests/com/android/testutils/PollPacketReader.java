@@ -35,19 +35,19 @@ import kotlin.Lazy;
 import kotlin.LazyKt;
 
 /**
- * A packet reader that runs on a TAP interface.
+ * A packet reader that can poll for received packets and send responses on a fd.
  *
  * It also implements facilities to reply to received packets.
  */
-public class TapPacketReader extends PacketReader {
-    private final FileDescriptor mTapFd;
+public class PollPacketReader extends PacketReader {
+    private final FileDescriptor mFd;
     private final ArrayTrackRecord<byte[]> mReceivedPackets = new ArrayTrackRecord<>();
     private final Lazy<ArrayTrackRecord<byte[]>.ReadHead> mReadHead =
             LazyKt.lazy(mReceivedPackets::newReadHead);
 
-    public TapPacketReader(Handler h, FileDescriptor tapFd, int maxPacketSize) {
+    public PollPacketReader(Handler h, FileDescriptor fd, int maxPacketSize) {
         super(h, maxPacketSize);
-        mTapFd = tapFd;
+        mFd = fd;
     }
 
 
@@ -63,7 +63,7 @@ public class TapPacketReader extends PacketReader {
 
     @Override
     protected FileDescriptor createFd() {
-        return mTapFd;
+        return mFd;
     }
 
     @Override
@@ -119,7 +119,7 @@ public class TapPacketReader extends PacketReader {
     }
 
     /*
-     * Send a response on the TAP interface.
+     * Send a response on the fd.
      *
      * The passed ByteBuffer is flipped after use.
      *
@@ -127,7 +127,7 @@ public class TapPacketReader extends PacketReader {
      * @throws IOException if the interface can't be written to.
      */
     public void sendResponse(final ByteBuffer packet) throws IOException {
-        try (FileOutputStream out = new FileOutputStream(mTapFd)) {
+        try (FileOutputStream out = new FileOutputStream(mFd)) {
             byte[] packetBytes = new byte[packet.limit()];
             packet.get(packetBytes);
             packet.flip();  // So we can reuse it in the future.
