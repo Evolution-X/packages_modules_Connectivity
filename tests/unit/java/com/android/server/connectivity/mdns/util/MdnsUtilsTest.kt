@@ -22,21 +22,27 @@ import com.android.server.connectivity.mdns.MdnsConstants
 import com.android.server.connectivity.mdns.MdnsConstants.FLAG_TRUNCATED
 import com.android.server.connectivity.mdns.MdnsConstants.IPV4_SOCKET_ADDR
 import com.android.server.connectivity.mdns.MdnsConstants.IPV6_SOCKET_ADDR
+import com.android.server.connectivity.mdns.MdnsInetAddressRecord
 import com.android.server.connectivity.mdns.MdnsPacket
 import com.android.server.connectivity.mdns.MdnsPacketReader
 import com.android.server.connectivity.mdns.MdnsPointerRecord
 import com.android.server.connectivity.mdns.MdnsRecord
+import com.android.server.connectivity.mdns.MdnsResponse
+import com.android.server.connectivity.mdns.MdnsServiceInfo
+import com.android.server.connectivity.mdns.MdnsServiceRecord
+import com.android.server.connectivity.mdns.MdnsTextRecord
 import com.android.server.connectivity.mdns.util.MdnsUtils.createQueryDatagramPackets
 import com.android.server.connectivity.mdns.util.MdnsUtils.truncateServiceName
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
-import java.net.DatagramPacket
-import kotlin.test.assertContentEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.net.DatagramPacket
+import kotlin.test.assertContentEquals
 
 @RunWith(DevSdkIgnoreRunner::class)
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
@@ -156,5 +162,55 @@ class MdnsUtilsTest {
         assertTrue(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v6Packet, v6Packet)))
         assertFalse(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v6Packet, otherV6Packet)))
         assertFalse(MdnsUtils.checkAllPacketsWithSameAddress(listOf(v4Packet, v6Packet)))
+    }
+
+    @Test
+    fun testBuildMdnsServiceInfoFromResponse() {
+        val serviceInstanceName = "MyTestService"
+        val serviceType = "_testservice._tcp.local"
+        val hostName = "Android_000102030405060708090A0B0C0D0E0F.local"
+        val port = 12345
+        val ttlTime = 120000L
+        val testElapsedRealtime = 123L
+        val serviceName = "$serviceInstanceName.$serviceType".split(".").toTypedArray()
+        val v4Address = "192.0.2.1"
+        val v6Address = "2001:db8::1"
+        val interfaceIndex = 99
+        val response = MdnsResponse(0 /* now */, serviceName, interfaceIndex, null /* network */)
+        // Set PTR record
+        response.addPointerRecord(MdnsPointerRecord(serviceType.split(".").toTypedArray(),
+                testElapsedRealtime, false /* cacheFlush */, ttlTime, serviceName))
+        // Set SRV record.
+        response.serviceRecord = MdnsServiceRecord(serviceName, testElapsedRealtime,
+                false /* cacheFlush */, ttlTime, 0 /* servicePriority */, 0 /* serviceWeight */,
+                port, hostName.split(".").toTypedArray())
+        // Set TXT record.
+        response.textRecord = MdnsTextRecord(serviceName,
+                testElapsedRealtime, true /* cacheFlush */, 0L /* ttlMillis */,
+                listOf(MdnsServiceInfo.TextEntry.fromString("somedifferent=entry")))
+        // Set InetAddress record.
+        response.addInet4AddressRecord(MdnsInetAddressRecord(hostName.split(".").toTypedArray(),
+                testElapsedRealtime, true /* cacheFlush */,
+                0L /* ttlMillis */, InetAddresses.parseNumericAddress(v4Address)))
+        response.addInet6AddressRecord(MdnsInetAddressRecord(hostName.split(".").toTypedArray(),
+                testElapsedRealtime, true /* cacheFlush */,
+                0L /* ttlMillis */, InetAddresses.parseNumericAddress(v6Address)))
+
+        // Convert a MdnsResponse to a MdnsServiceInfo
+        val serviceInfo = MdnsUtils.buildMdnsServiceInfoFromResponse(
+                response, serviceType.split(".").toTypedArray(), testElapsedRealtime)
+
+        assertEquals(serviceInstanceName, serviceInfo.serviceInstanceName)
+        assertArrayEquals(serviceType.split(".").toTypedArray(), serviceInfo.serviceType)
+        assertArrayEquals(hostName.split(".").toTypedArray(), serviceInfo.hostName)
+        assertEquals(port, serviceInfo.port)
+        assertEquals(1, serviceInfo.ipv4Addresses.size)
+        assertEquals(v4Address, serviceInfo.ipv4Addresses[0])
+        assertEquals(1, serviceInfo.ipv6Addresses.size)
+        assertEquals(v6Address, serviceInfo.ipv6Addresses[0])
+        assertEquals(interfaceIndex, serviceInfo.interfaceIndex)
+        assertEquals(null, serviceInfo.network)
+        assertEquals(mapOf("somedifferent" to "entry"),
+                serviceInfo.attributes)
     }
 }
