@@ -18,6 +18,7 @@ package com.android.testutils
 
 import android.device.collectors.BaseMetricListener
 import android.device.collectors.DataRecord
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
@@ -29,8 +30,19 @@ import kotlin.test.assertNull
 import org.junit.runner.Description
 import org.junit.runner.notification.Failure
 
+/**
+ * A diagnostics collector that outputs diagnostics files as test artifacts.
+ *
+ * <p>Collects diagnostics automatically by default on non-local builds. Can be enabled/disabled
+ * manually with:
+ * ```
+ * atest MyModule -- \
+ *     --module-arg MyModule:instrumentation-arg:connectivity-diagnostics-on-failure:=false
+ * ```
+ */
 class ConnectivityDiagnosticsCollector : BaseMetricListener() {
     companion object {
+        private const val ARG_RUN_ON_FAILURE = "connectivity-diagnostics-on-failure"
         private const val COLLECTOR_DIR = "run_listeners/connectivity_diagnostics"
         private const val FILENAME_SUFFIX = "_conndiag.txt"
         private const val MAX_DUMPS = 20
@@ -60,7 +72,11 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
     override fun onTestFail(testData: DataRecord, description: Description, failure: Failure) {
         // TODO: find a way to disable this behavior only on local runs, to avoid slowing them down
         // when iterating on failing tests.
+        if (!runOnFailure()) return
         if (outputFiles.size >= MAX_DUMPS) return
+        Log.i(TAG, "Collecting diagnostics for test failure. Disable by running tests with: " +
+                "atest MyModule -- " +
+                "--module-arg MyModule:instrumentation-arg:$ARG_RUN_ON_FAILURE:=false")
         collectTestFailureDiagnostics(failure.exception)
 
         val baseFilename = "${description.className}#${description.methodName}_failure"
@@ -78,6 +94,13 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         // Flush any data that the test added to the buffer for dumping
         val baseFilename = "${description.className}#${description.methodName}_testdump"
         flushBufferToFileMetric(testData, baseFilename)
+    }
+
+    private fun runOnFailure(): Boolean {
+        // Do not run on local builds (which have ro.build.version.incremental set to eng.username)
+        // to avoid slowing down local runs.
+        val enabledByDefault = !Build.VERSION.INCREMENTAL.startsWith("eng.")
+        return argsBundle.getString(ARG_RUN_ON_FAILURE)?.toBooleanStrictOrNull() ?: enabledByDefault
     }
 
     private fun flushBufferToFileMetric(testData: DataRecord, baseFilename: String) {
