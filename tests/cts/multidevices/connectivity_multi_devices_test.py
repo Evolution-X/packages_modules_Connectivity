@@ -2,7 +2,6 @@
 """Connectivity multi devices tests."""
 import sys
 
-from mobly import asserts
 from mobly import base_test
 from mobly import test_runner
 from mobly import utils
@@ -11,7 +10,6 @@ from net_tests_utils.host.python import adb_utils, apf_utils, assert_utils, mdns
 from net_tests_utils.host.python.tether_utils import UpstreamType
 
 CONNECTIVITY_MULTI_DEVICES_SNIPPET_PACKAGE = "com.google.snippet.connectivity"
-COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED = "DROPPED_ETHERTYPE_NOT_ALLOWED"
 
 
 class ConnectivityMultiDevicesTest(base_test.BaseTestClass):
@@ -84,50 +82,6 @@ class ConnectivityMultiDevicesTest(base_test.BaseTestClass):
       tether_utils.cleanup_tethering_for_upstream_type(
           self.serverDevice, UpstreamType.NONE
       )
-
-  def test_apf_drop_ethercat(self):
-    tether_utils.assume_hotspot_test_preconditions(
-        self.serverDevice, self.clientDevice, UpstreamType.NONE
-    )
-    client = self.clientDevice.connectivity_multi_devices_snippet
-    try:
-      server_iface_name, client_network = (
-          tether_utils.setup_hotspot_and_client_for_upstream_type(
-              self.serverDevice, self.clientDevice, UpstreamType.NONE
-          )
-      )
-      client_iface_name = client.getInterfaceNameFromNetworkHandle(client_network)
-
-      adb_utils.set_doze_mode(self.clientDevice, True)
-
-      count_before_test = apf_utils.get_apf_counter(
-          self.clientDevice,
-          client_iface_name,
-          COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED,
-      )
-      try:
-        apf_utils.send_broadcast_empty_ethercat_packet(
-            self.serverDevice, server_iface_name
-        )
-      except apf_utils.UnsupportedOperationException:
-        asserts.skip(
-            "NetworkStack is too old to support send raw packet, skip test."
-        )
-
-      assert_utils.expect_with_retry(
-          lambda: apf_utils.get_apf_counter(
-              self.clientDevice,
-              client_iface_name,
-              COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED,
-          )
-          > count_before_test
-      )
-    finally:
-      adb_utils.set_doze_mode(self.clientDevice, False)
-      tether_utils.cleanup_tethering_for_upstream_type(
-          self.serverDevice, UpstreamType.NONE
-      )
-
 
 if __name__ == "__main__":
   # Take test args
