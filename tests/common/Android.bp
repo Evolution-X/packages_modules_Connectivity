@@ -78,7 +78,7 @@ android_library {
     name: "ConnectivityCoverageTestsLib",
     min_sdk_version: "30",
     static_libs: [
-        "FrameworksNetTestsLib",
+        "ConnectivityUnitTestsLib",
         "NetdStaticLibTestsLib",
         "NetworkStaticLibTestsLib",
         "NetworkStackTestsLib",

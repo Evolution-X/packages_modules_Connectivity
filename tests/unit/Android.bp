@@ -72,8 +72,8 @@ filegroup {
     ],
 }
 
-java_defaults {
-    name: "FrameworksNetTestsDefaults",
+android_library {
+    name: "ConnectivityUnitTestsLib",
     min_sdk_version: "30",
     defaults: [
         "framework-connectivity-internal-test-defaults",
@@ -82,6 +82,7 @@ java_defaults {
         "java/**/*.java",
         "java/**/*.kt",
     ],
+    exclude_srcs: [":non-connectivity-module-test"],
     static_libs: [
         "androidx.test.rules",
         "androidx.test.uiautomator_uiautomator",
@@ -110,14 +111,6 @@ java_defaults {
         "ServiceConnectivityResources",
     ],
     exclude_kotlinc_generated_files: false,
-}
-
-android_library {
-    name: "FrameworksNetTestsLib",
-    defaults: [
-        "FrameworksNetTestsDefaults",
-    ],
-    exclude_srcs: [":non-connectivity-module-test"],
     visibility: ["//packages/modules/Connectivity/tests:__subpackages__"],
 }
 
@@ -137,7 +130,7 @@ genrule {
 java_genrule {
     name: "frameworks-net-tests-lib-jarjar-gen",
     tool_files: [
-        ":FrameworksNetTestsLib{.jar}",
+        ":ConnectivityUnitTestsLib{.jar}",
         "jarjar-excludes.txt",
     ],
     tools: [
@@ -145,7 +138,7 @@ java_genrule {
     ],
     out: ["frameworks-net-tests-lib-jarjar-rules.txt"],
     cmd: "$(location jarjar-rules-generator) " +
-        "$(location :FrameworksNetTestsLib{.jar}) " +
+        "$(location :ConnectivityUnitTestsLib{.jar}) " +
         "--prefix android.net.connectivity " +
         "--excludes $(location jarjar-excludes.txt) " +
         "--output $(out)",
@@ -156,14 +149,25 @@ android_test {
     name: "FrameworksNetTests",
     enabled: enable_frameworks_net_tests,
     defaults: [
-        "FrameworksNetTestsDefaults",
+        "framework-connectivity-internal-test-defaults",
         "FrameworksNetTests-jni-defaults",
     ],
     jarjar_rules: ":frameworks-net-tests-jarjar-rules",
+    srcs: [":non-connectivity-module-test"],
     test_suites: ["device-tests"],
     static_libs: [
+        "frameworks-base-testutils",
         "services.core",
         "services.net",
+        "androidx.test.rules",
+        "framework-protos",
+        "mockito-target-minus-junit4",
+        "net-tests-utils",
+        "service-connectivity-pre-jarjar",
+        "service-connectivity-tiramisu-pre-jarjar",
+    ],
+    libs: [
+        "android.test.mock.stubs",
     ],
     jni_libs: [
         "libandroid_net_connectivity_com_android_net_module_util_jni",
