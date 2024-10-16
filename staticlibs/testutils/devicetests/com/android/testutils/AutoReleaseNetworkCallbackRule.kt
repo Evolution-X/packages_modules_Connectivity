@@ -98,10 +98,10 @@ open class NetworkCallbackHelper {
         cellRequestCb = null
     }
 
-    private fun addCallback(
-        cb: TestableNetworkCallback,
-        registrar: (TestableNetworkCallback) -> Unit
-    ): TestableNetworkCallback {
+    private fun <T> addCallback(
+        cb: T,
+        registrar: (NetworkCallback) -> Unit
+    ): T where T : NetworkCallback {
         registrar(cb)
         cbToCleanup.add(cb)
         return cb
@@ -142,17 +142,24 @@ open class NetworkCallbackHelper {
     /**
      * File a callback for a NetworkRequest.
      *
-     * This will fail tests (throw) if the cell network cannot be obtained, or if it was already
-     * requested.
-     *
      * Tests may call [unregisterNetworkCallback] once they are done using the returned [Network],
      * otherwise it will be automatically unrequested after the test.
      */
     @JvmOverloads
     fun registerNetworkCallback(
+        request: NetworkRequest
+    ): TestableNetworkCallback = registerNetworkCallback(request, TestableNetworkCallback())
+
+    /**
+     * File a callback for a NetworkRequest.
+     *
+     * Tests may call [unregisterNetworkCallback] once they are done using the returned [Network],
+     * otherwise it will be automatically unrequested after the test.
+     */
+    fun <T> registerNetworkCallback(
         request: NetworkRequest,
-        cb: TestableNetworkCallback = TestableNetworkCallback()
-    ) = addCallback(cb) { cm.registerNetworkCallback(request, it) }
+        cb: T
+    ) where T : NetworkCallback = addCallback(cb) { cm.registerNetworkCallback(request, it) }
 
     /**
      * @see ConnectivityManager.registerDefaultNetworkCallback
