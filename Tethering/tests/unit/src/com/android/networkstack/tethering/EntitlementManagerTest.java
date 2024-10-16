@@ -78,6 +78,7 @@ import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.telephony.CarrierConfigManager;
 
+import androidx.annotation.NonNull;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
@@ -129,9 +130,10 @@ public final class EntitlementManagerTest {
     private MockContext mMockContext;
     private Runnable mPermissionChangeCallback;
 
-    private WrappedEntitlementManager mEnMgr;
+    private EntitlementManager mEnMgr;
     private TetheringConfiguration mConfig;
     private MockitoSession mMockingSession;
+    private TestDependencies mDeps;
 
     private class MockContext extends BroadcastInterceptingContext {
         MockContext(Context base) {
@@ -163,14 +165,13 @@ public final class EntitlementManagerTest {
         }
     }
 
-    public class WrappedEntitlementManager extends EntitlementManager {
+    class TestDependencies extends EntitlementManager.Dependencies {
         public int fakeEntitlementResult = TETHER_ERROR_ENTITLEMENT_UNKNOWN;
         public int uiProvisionCount = 0;
         public int silentProvisionCount = 0;
-
-        public WrappedEntitlementManager(Context ctx, Handler h, SharedLog log,
-                Runnable callback) {
-            super(ctx, h, log, callback);
+        TestDependencies(@NonNull Context context,
+                @NonNull SharedLog log) {
+            super(context, log);
         }
 
         public void reset() {
@@ -212,7 +213,7 @@ public final class EntitlementManagerTest {
             Intent intent = super.runSilentTetherProvisioning(type, config, receiver);
             assertSilentTetherProvisioning(type, config, intent);
             silentProvisionCount++;
-            addDownstreamMapping(type, fakeEntitlementResult);
+            mEnMgr.addDownstreamMapping(type, fakeEntitlementResult);
             return intent;
         }
 
@@ -280,9 +281,10 @@ public final class EntitlementManagerTest {
         doReturn(true).when(mUserManager).isAdminUser();
 
         mMockContext = new MockContext(mContext);
+        mDeps = new TestDependencies(mMockContext, mLog);
         mPermissionChangeCallback = spy(() -> { });
-        mEnMgr = new WrappedEntitlementManager(mMockContext, new Handler(mLooper.getLooper()), mLog,
-                mPermissionChangeCallback);
+        mEnMgr = new EntitlementManager(mMockContext, new Handler(mLooper.getLooper()), mLog,
+                mPermissionChangeCallback, mDeps);
         mEnMgr.setOnTetherProvisioningFailedListener(mTetherProvisioningFailedListener);
         mConfig = new FakeTetheringConfiguration(mMockContext, mLog, INVALID_SUBSCRIPTION_ID);
         mEnMgr.setTetheringConfigurationFetcher(() -> {
@@ -345,7 +347,7 @@ public final class EntitlementManagerTest {
     @Test
     public void testRequestLastEntitlementCacheValue() throws Exception {
         // 1. Entitlement check is not required.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         ResultReceiver receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -354,8 +356,8 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
 
         setupForRequiredProvisioning();
         // 2. No cache value and don't need to run entitlement check.
@@ -367,10 +369,10 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, false);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 3. No cache value and ui entitlement check is needed.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -379,11 +381,11 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(1, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 4. Cache value is TETHER_ERROR_PROVISIONING_FAILED and don't need to run entitlement
         // check.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -392,10 +394,10 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, false);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 5. Cache value is TETHER_ERROR_PROVISIONING_FAILED and ui entitlement check is needed.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -404,10 +406,10 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(1, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 6. Cache value is TETHER_ERROR_NO_ERROR.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -416,8 +418,8 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 7. Test get value for other downstream type.
         receiver = new ResultReceiver(null) {
             @Override
@@ -427,10 +429,10 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_USB, receiver, false);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
         // 8. Test get value for invalid downstream type.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -439,8 +441,8 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI_P2P, receiver, true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
     }
 
     private void assertPermissionChangeCallback(InOrder inOrder) {
@@ -456,7 +458,7 @@ public final class EntitlementManagerTest {
         final InOrder inOrder = inOrder(mPermissionChangeCallback);
         setupForRequiredProvisioning();
         mEnMgr.notifyUpstream(true);
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
         mLooper.dispatchAll();
         // Permitted: true -> false
@@ -468,7 +470,7 @@ public final class EntitlementManagerTest {
         // Permitted: false -> false
         assertNoPermissionChange(inOrder);
 
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
         mLooper.dispatchAll();
         // Permitted: false -> true
@@ -481,21 +483,21 @@ public final class EntitlementManagerTest {
         final InOrder inOrder = inOrder(mPermissionChangeCallback);
         setupForRequiredProvisioning();
         mEnMgr.notifyUpstream(true);
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
         mLooper.dispatchAll();
         // Permitted: true -> false
         assertPermissionChangeCallback(inOrder);
         assertFalse(mEnMgr.isCellularUpstreamPermitted());
 
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
         mLooper.dispatchAll();
         // Permitted: false -> false
         assertNoPermissionChange(inOrder);
         assertFalse(mEnMgr.isCellularUpstreamPermitted());
 
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.startProvisioningIfNeeded(TETHERING_BLUETOOTH, true);
         mLooper.dispatchAll();
         // Permitted: false -> false
@@ -508,14 +510,14 @@ public final class EntitlementManagerTest {
         final InOrder inOrder = inOrder(mPermissionChangeCallback);
         setupForRequiredProvisioning();
         mEnMgr.notifyUpstream(true);
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
         mLooper.dispatchAll();
         // Permitted: true -> true
         assertNoPermissionChange(inOrder);
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
 
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
         mLooper.dispatchAll();
         // Permitted: true -> true
@@ -544,89 +546,89 @@ public final class EntitlementManagerTest {
         final InOrder inOrder = inOrder(mPermissionChangeCallback);
         setupForRequiredProvisioning();
         // 1. start ui provisioning, upstream is mobile
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(1, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         // Permitted: true -> true
         assertNoPermissionChange(inOrder);
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 2. start no-ui provisioning
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, false);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        assertEquals(1, mEnMgr.silentProvisionCount);
+        assertEquals(0, mDeps.uiProvisionCount);
+        assertEquals(1, mDeps.silentProvisionCount);
         // Permitted: true -> true
         assertNoPermissionChange(inOrder);
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 3. tear down mobile, then start ui provisioning
         mEnMgr.notifyUpstream(false);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_BLUETOOTH, true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(0, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         assertNoPermissionChange(inOrder);
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 4. switch upstream back to mobile
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(1, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         // Permitted: true -> true
         assertNoPermissionChange(inOrder);
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 5. tear down mobile, then switch SIM
         mEnMgr.notifyUpstream(false);
         mLooper.dispatchAll();
         mEnMgr.reevaluateSimCardProvisioning(mConfig);
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(0, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         assertNoPermissionChange(inOrder);
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 6. switch upstream back to mobile again
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        assertEquals(3, mEnMgr.silentProvisionCount);
+        assertEquals(0, mDeps.uiProvisionCount);
+        assertEquals(3, mDeps.silentProvisionCount);
         // Permitted: true -> false
         assertPermissionChangeCallback(inOrder);
         assertFalse(mEnMgr.isCellularUpstreamPermitted());
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 7. start ui provisioning, upstream is mobile, downstream is ethernet
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.startProvisioningIfNeeded(TETHERING_ETHERNET, true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(1, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         // Permitted: false -> true
         assertPermissionChangeCallback(inOrder);
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
-        mEnMgr.reset();
+        mDeps.reset();
 
         // 8. downstream is invalid
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI_P2P, true);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        assertEquals(0, mEnMgr.silentProvisionCount);
+        assertEquals(0, mDeps.uiProvisionCount);
+        assertEquals(0, mDeps.silentProvisionCount);
         assertNoPermissionChange(inOrder);
-        mEnMgr.reset();
+        mDeps.reset();
     }
 
     @Test
@@ -634,12 +636,12 @@ public final class EntitlementManagerTest {
         setupForRequiredProvisioning();
         verify(mTetherProvisioningFailedListener, times(0))
                 .onTetherProvisioningFailed(TETHERING_WIFI, FAILED_TETHERING_REASON);
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
         mLooper.dispatchAll();
-        assertEquals(1, mEnMgr.uiProvisionCount);
+        assertEquals(1, mDeps.uiProvisionCount);
         verify(mTetherProvisioningFailedListener, times(1))
                 .onTetherProvisioningFailed(TETHERING_WIFI, FAILED_TETHERING_REASON);
     }
@@ -662,13 +664,13 @@ public final class EntitlementManagerTest {
         setupForRequiredProvisioning();
         doReturn(isAdminUser).when(mUserManager).isAdminUser();
 
-        mEnMgr.reset();
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.reset();
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
         mLooper.dispatchAll();
-        assertEquals(expectedUiProvisionCount, mEnMgr.uiProvisionCount);
+        assertEquals(expectedUiProvisionCount, mDeps.uiProvisionCount);
     }
 
     @Test
@@ -683,7 +685,7 @@ public final class EntitlementManagerTest {
         assertTrue(mEnMgr.isCellularUpstreamPermitted());
 
         // If second downstream run entitlement check fail, cellular upstream is not permitted.
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_PROVISIONING_FAILED;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
@@ -691,7 +693,7 @@ public final class EntitlementManagerTest {
         assertFalse(mEnMgr.isCellularUpstreamPermitted());
 
         // When second downstream is down, exempted downstream can use cellular upstream.
-        assertEquals(1, mEnMgr.uiProvisionCount);
+        assertEquals(1, mDeps.uiProvisionCount);
         verify(mTetherProvisioningFailedListener).onTetherProvisioningFailed(TETHERING_USB,
                 FAILED_TETHERING_REASON);
         mEnMgr.stopProvisioningIfNeeded(TETHERING_USB);
@@ -712,7 +714,7 @@ public final class EntitlementManagerTest {
         setupForRequiredProvisioning();
         assertFalse(mEnMgr.isCellularUpstreamPermitted());
 
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
         mEnMgr.startProvisioningIfNeeded(TETHERING_WIFI, true);
@@ -734,7 +736,7 @@ public final class EntitlementManagerTest {
             throws Exception {
         setupCarrierConfig(false);
         setupForRequiredProvisioning();
-        mEnMgr.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
+        mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         ResultReceiver receiver = new ResultReceiver(null) {
             @Override
             protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -743,8 +745,8 @@ public final class EntitlementManagerTest {
         };
         mEnMgr.requestLatestTetheringEntitlementResult(TETHERING_WIFI, receiver, false);
         mLooper.dispatchAll();
-        assertEquals(0, mEnMgr.uiProvisionCount);
-        mEnMgr.reset();
+        assertEquals(0, mDeps.uiProvisionCount);
+        mDeps.reset();
     }
 
     @Test
