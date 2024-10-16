@@ -20,6 +20,7 @@ package com.android.testutils
 
 import com.android.testutils.FunctionalUtils.ThrowingRunnable
 import com.android.testutils.FunctionalUtils.ThrowingSupplier
+import java.util.function.Consumer
 import javax.annotation.CheckReturnValue
 
 /**
@@ -73,11 +74,23 @@ import javax.annotation.CheckReturnValue
  * });
  */
 
+object TryTestConfig {
+    internal var diagnosticsCollector: Consumer<Throwable>? = null
+
+    /**
+     * Set the diagnostics collector to be used in case of failure in [tryTest].
+     */
+    fun setDiagnosticsCollector(collector: Consumer<Throwable>) {
+        diagnosticsCollector = collector
+    }
+}
+
 @CheckReturnValue
 fun <T> tryTest(block: () -> T) = TryExpr(
         try {
             Result.success(block())
         } catch (e: Throwable) {
+            TryTestConfig.diagnosticsCollector?.accept(e)
             Result.failure(e)
         })
 
