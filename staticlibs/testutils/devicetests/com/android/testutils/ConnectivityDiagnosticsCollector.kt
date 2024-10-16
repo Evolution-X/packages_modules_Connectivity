@@ -27,6 +27,7 @@ import java.io.File
 import java.io.PrintWriter
 import java.time.ZonedDateTime
 import kotlin.test.assertNull
+import org.junit.AssumptionViolatedException
 import org.junit.runner.Description
 import org.junit.runner.notification.Failure
 
@@ -61,7 +62,9 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         assertNull(instance, "ConnectivityDiagnosticsCollectors were set up multiple times")
         instance = this
         TryTestConfig.setDiagnosticsCollector { throwable ->
-            collectTestFailureDiagnostics(throwable)
+            if (runOnFailure(throwable)) {
+                collectTestFailureDiagnostics(throwable)
+            }
         }
     }
 
@@ -72,7 +75,7 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
     override fun onTestFail(testData: DataRecord, description: Description, failure: Failure) {
         // TODO: find a way to disable this behavior only on local runs, to avoid slowing them down
         // when iterating on failing tests.
-        if (!runOnFailure()) return
+        if (!runOnFailure(failure.exception)) return
         if (outputFiles.size >= MAX_DUMPS) return
         Log.i(TAG, "Collecting diagnostics for test failure. Disable by running tests with: " +
                 "atest MyModule -- " +
@@ -96,7 +99,10 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         flushBufferToFileMetric(testData, baseFilename)
     }
 
-    private fun runOnFailure(): Boolean {
+    private fun runOnFailure(exception: Throwable): Boolean {
+        // Assumption failures (assumeTrue/assumeFalse) are not actual failures
+        if (exception is AssumptionViolatedException) return false
+
         // Do not run on local builds (which have ro.build.version.incremental set to eng.username)
         // to avoid slowing down local runs.
         val enabledByDefault = !Build.VERSION.INCREMENTAL.startsWith("eng.")
