@@ -359,7 +359,7 @@ public class ThreadNetworkShellCommandTest {
         runShellCommand("config");
 
         verify(mErrorWriter, never()).println();
-        verify(mOutputWriter, times(1)).println(contains("Nat64Enabled=true"));
+        verify(mOutputWriter, times(1)).println(contains("nat64Enabled=true"));
     }
 
     @Test

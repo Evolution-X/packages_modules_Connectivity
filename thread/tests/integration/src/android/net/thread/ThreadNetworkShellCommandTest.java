@@ -189,7 +189,7 @@ public class ThreadNetworkShellCommandTest {
 
         final String result = runThreadCommand("config");
 
-        assertThat(result).contains("Nat64Enabled=true");
+        assertThat(result).contains("nat64Enabled=true");
     }
 
     @Test
