@@ -56,7 +56,13 @@
              the runner will only run the tests annotated with that annotation, but if it does not,
              the runner will run all the tests. -->
         <option name="include-annotation" value="com.android.testutils.filters.{MODULE}" />
+        <option name="device-listeners" value="com.android.testutils.ConnectivityDiagnosticsCollector" />
     </test>
+    <metrics_collector class="com.android.tradefed.device.metric.FilePullerLogCollector">
+        <!-- Pattern matching the fileKey used by ConnectivityDiagnosticsCollector when calling addFileMetric -->
+        <option name="pull-pattern-keys" value="com.android.testutils.ConnectivityDiagnosticsCollector.*"/>
+        <option name="collect-on-run-ended-only" value="true" />
+    </metrics_collector>
     <!-- When this test is run in a Mainline context (e.g. with `mts-tradefed`), only enable it if
         one of the Mainline modules below is present on the device used for testing. -->
     <object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
