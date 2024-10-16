@@ -115,6 +115,8 @@ public class NetworkStatsManagerTest {
 
     private static final int NETWORK_TAG = 0xf00d;
     private static final long THRESHOLD_BYTES = 2 * 1024 * 1024;  // 2 MB
+    private static final long SHORT_TOLERANCE = MINUTE / 2;
+    private static final long LONG_TOLERANCE = MINUTE * 120;
 
     private abstract class NetworkInterfaceToTest {
         private boolean mMetered;
@@ -364,16 +366,17 @@ public class NetworkStatsManagerTest {
         }
     }
 
-    private boolean shouldTestThisNetworkType(int networkTypeIndex, final long tolerance)
+    private boolean shouldTestThisNetworkType(int networkTypeIndex) {
+        return mPm.hasSystemFeature(mNetworkInterfacesToTest[networkTypeIndex].getSystemFeature());
+    }
+
+    private void requestNetworkAndGenerateTraffic(int networkTypeIndex, final long tolerance)
             throws Exception {
-        boolean hasFeature = mPm.hasSystemFeature(
-                mNetworkInterfacesToTest[networkTypeIndex].getSystemFeature());
-        if (!hasFeature) {
-            return false;
-        }
-        NetworkCallback callback = new NetworkCallback(tolerance, new URL(CHECK_CONNECTIVITY_URL));
+        final NetworkInterfaceToTest networkInterface = mNetworkInterfacesToTest[networkTypeIndex];
+        final NetworkCallback callback = new NetworkCallback(tolerance,
+                new URL(CHECK_CONNECTIVITY_URL));
         mCm.requestNetwork(new NetworkRequest.Builder()
-                .addTransportType(mNetworkInterfacesToTest[networkTypeIndex].getTransportType())
+                .addTransportType(networkInterface.getTransportType())
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build(), callback);
         synchronized (this) {
@@ -388,20 +391,17 @@ public class NetworkStatsManagerTest {
             }
         }
         mCm.unregisterNetworkCallback(callback);
-        if (callback.success) {
-            mNetworkInterfacesToTest[networkTypeIndex].setMetered(callback.metered);
-            mNetworkInterfacesToTest[networkTypeIndex].setRoaming(callback.roaming);
-            mNetworkInterfacesToTest[networkTypeIndex].setIsDefault(callback.isDefault);
-            return true;
+        if (!callback.success) {
+            fail(networkInterface.getSystemFeature()
+                    + " is a reported system feature, however no corresponding "
+                    + "connected network interface was found or the attempt "
+                    + "to connect and read has timed out (timeout = " + (TIMEOUT_MILLIS * 2.4)
+                    + "ms)." + networkInterface.getErrorMessage());
         }
 
-        // This will always fail at this point as we know 'hasFeature' is true.
-        assertFalse(mNetworkInterfacesToTest[networkTypeIndex].getSystemFeature()
-                + " is a reported system feature, "
-                + "however no corresponding connected network interface was found or the attempt "
-                + "to connect and read has timed out (timeout = " + (TIMEOUT_MILLIS * 2) + "ms)."
-                + mNetworkInterfacesToTest[networkTypeIndex].getErrorMessage(), hasFeature);
-        return false;
+        networkInterface.setMetered(callback.metered);
+        networkInterface.setRoaming(callback.roaming);
+        networkInterface.setIsDefault(callback.isDefault);
     }
 
     private String getSubscriberId(int networkIndex) {
@@ -417,9 +417,10 @@ public class NetworkStatsManagerTest {
     @Test
     public void testDeviceSummary() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
-            if (!shouldTestThisNetworkType(i, MINUTE / 2)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            requestNetworkAndGenerateTraffic(i, SHORT_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats.Bucket bucket = null;
             try {
@@ -453,9 +454,10 @@ public class NetworkStatsManagerTest {
     @Test
     public void testUserSummary() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
-            if (!shouldTestThisNetworkType(i, MINUTE / 2)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            requestNetworkAndGenerateTraffic(i, SHORT_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats.Bucket bucket = null;
             try {
@@ -489,14 +491,15 @@ public class NetworkStatsManagerTest {
     @Test
     public void testAppSummary() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
+            if (!shouldTestThisNetworkType(i)) {
+                continue;
+            }
             // Use tolerance value that large enough to make sure stats of at
             // least one bucket is included. However, this is possible that
             // the test will see data of different app but with the same UID
             // that created before testing.
             // TODO: Consider query stats before testing and use the difference to verify.
-            if (!shouldTestThisNetworkType(i, MINUTE * 120)) {
-                continue;
-            }
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats result = null;
             try {
@@ -565,10 +568,11 @@ public class NetworkStatsManagerTest {
     @Test
     public void testAppDetails() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
-            // Relatively large tolerance to accommodate for history bucket size.
-            if (!shouldTestThisNetworkType(i, MINUTE * 120)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            // Relatively large tolerance to accommodate for history bucket size.
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats result = null;
             try {
@@ -609,9 +613,10 @@ public class NetworkStatsManagerTest {
     public void testUidDetails() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
             // Relatively large tolerance to accommodate for history bucket size.
-            if (!shouldTestThisNetworkType(i, MINUTE * 120)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats result = null;
             try {
@@ -663,9 +668,10 @@ public class NetworkStatsManagerTest {
     public void testTagDetails() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
             // Relatively large tolerance to accommodate for history bucket size.
-            if (!shouldTestThisNetworkType(i, MINUTE * 120)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats result = null;
             try {
@@ -769,10 +775,11 @@ public class NetworkStatsManagerTest {
     @Test
     public void testUidTagStateDetails() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
-            // Relatively large tolerance to accommodate for history bucket size.
-            if (!shouldTestThisNetworkType(i, MINUTE * 120)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            // Relatively large tolerance to accommodate for history bucket size.
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
             NetworkStats result = null;
             try {
@@ -847,9 +854,10 @@ public class NetworkStatsManagerTest {
     public void testCallback() throws Exception {
         for (int i = 0; i < mNetworkInterfacesToTest.length; ++i) {
             // Relatively large tolerance to accommodate for history bucket size.
-            if (!shouldTestThisNetworkType(i, MINUTE / 2)) {
+            if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
+            requestNetworkAndGenerateTraffic(i, SHORT_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
 
             TestUsageCallback usageCallback = new TestUsageCallback();
