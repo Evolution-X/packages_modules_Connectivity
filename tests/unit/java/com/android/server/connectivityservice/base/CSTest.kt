@@ -341,6 +341,18 @@ open class CSTest {
             }
         }
 
+        // Need a non-zero value to avoid disarming the timer.
+        val defaultCellDataInactivityTimeoutForTest: Int = 81
+        override fun getDefaultCellularDataInactivityTimeout(): Int {
+            return defaultCellDataInactivityTimeoutForTest
+        }
+
+        // Need a non-zero value to avoid disarming the timer.
+        val defaultWifiDataInactivityTimeoutForTest: Int = 121
+        override fun getDefaultWifiDataInactivityTimeout(): Int {
+            return defaultWifiDataInactivityTimeoutForTest
+        }
+
         override fun isChangeEnabled(changeId: Long, pkg: String, user: UserHandle) =
                 changeId in enabledChangeIds
         override fun isChangeEnabled(changeId: Long, uid: Int) =
