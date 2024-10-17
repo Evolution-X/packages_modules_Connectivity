@@ -30,7 +30,6 @@ import static android.system.OsConstants.SO_RCVBUF;
 import static android.system.OsConstants.SO_RCVTIMEO;
 import static android.system.OsConstants.SO_SNDTIMEO;
 
-import static com.android.net.module.util.netlink.NetlinkConstants.RTM_NEWLINK;
 import static com.android.net.module.util.netlink.NetlinkConstants.hexify;
 import static com.android.net.module.util.netlink.NetlinkConstants.NLMSG_DONE;
 import static com.android.net.module.util.netlink.NetlinkConstants.RTNL_FAMILY_IP6MR;
@@ -58,7 +57,6 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -224,96 +222,6 @@ public class NetlinkUtils {
             Log.e(TAG, "Fail to send RTM_DELADDR to delete " + ip.getHostAddress(), e);
             return false;
         }
-    }
-
-    /**
-     * Sends an RTM_NEWLINK message to kernel to set a network interface up or down.
-     *
-     * @param ifName  The name of the network interface to modify.
-     * @param isUp    {@code true} to set the interface up, {@code false} to set it down.
-     * @return {@code true} if the request was successfully sent, {@code false} otherwise.
-     */
-    public static boolean sendRtmSetLinkStateRequest(@NonNull String ifName, boolean isUp) {
-        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkStateMessage(
-                ifName, 1 /*sequenceNumber*/, isUp);
-        if (msg == null) {
-            return false;
-        }
-
-        final byte[] bytes = msg.pack(ByteOrder.nativeOrder());
-        try {
-            NetlinkUtils.sendOneShotKernelMessage(NETLINK_ROUTE, bytes);
-            return true;
-        } catch (ErrnoException e) {
-            Log.e(TAG, "Fail to set the interface " + ifName + " " + (isUp ? "up" : "down"), e);
-            return false;
-        }
-    }
-
-    /**
-     * Sends an RTM_NEWLINK message to kernel to rename a network interface.
-     *
-     * @param ifName     The current name of the network interface.
-     * @param newIfName  The new name to assign to the interface.
-     * @return {@code true} if the request was successfully sent, {@code false} otherwise.
-     */
-    public static boolean sendRtmSetLinkNameRequest(
-            @NonNull String ifName, @NonNull String newIfName) {
-        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createSetLinkNameMessage(
-                ifName, 1 /*sequenceNumber*/, newIfName);
-        if (msg == null) {
-            return false;
-        }
-
-        final byte[] bytes = msg.pack(ByteOrder.nativeOrder());
-        try {
-            NetlinkUtils.sendOneShotKernelMessage(NETLINK_ROUTE, bytes);
-            return true;
-        } catch (ErrnoException e) {
-            Log.e(TAG, "Fail to rename the interface from " + ifName + " to " + newIfName, e);
-            return false;
-        }
-    }
-
-    /**
-     * Gets the information of a network interface using a Netlink message.
-     * <p>
-     * This method sends a Netlink message to the kernel to request information about the specified
-     * network interface and returns a {@link RtNetlinkLinkMessage} containing the interface status.
-     *
-     * @param ifName The name of the network interface to query.
-     * @return An {@link RtNetlinkLinkMessage} containing the interface status, or {@code null} if
-     *         the interface does not exist or an error occurred during the query.
-     */
-    @Nullable
-    public static RtNetlinkLinkMessage getLinkRequest(@NonNull String ifName) {
-        final int ifIndex = new OsAccess().if_nametoindex(ifName);
-        if (ifIndex == OsAccess.INVALID_INTERFACE_INDEX) {
-            return null;
-        }
-
-        final AtomicReference<RtNetlinkLinkMessage> recvMsg = new AtomicReference<>();
-        final Consumer<RtNetlinkLinkMessage> handleNlMsg = (msg) -> {
-            if (msg.getHeader().nlmsg_type == RTM_NEWLINK
-                    && msg.getIfinfoHeader().index == ifIndex) {
-                recvMsg.set(msg);
-            }
-        };
-
-        final RtNetlinkLinkMessage msg = RtNetlinkLinkMessage.createGetLinkMessage(
-                ifName, 1 /*sequenceNumber*/);
-        if (msg == null) {
-            return null;
-        }
-
-        final byte[] bytes = msg.pack(ByteOrder.nativeOrder());
-        try {
-            NetlinkUtils.getAndProcessNetlinkDumpMessages(
-                    bytes, NETLINK_ROUTE, RtNetlinkLinkMessage.class, handleNlMsg);
-        } catch (SocketException | InterruptedIOException | ErrnoException e) {
-            // Nothing we can do here.
-        }
-        return recvMsg.get();
     }
 
     /**
