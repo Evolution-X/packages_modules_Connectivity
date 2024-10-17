@@ -18,8 +18,8 @@ package com.android.server.connectivity.mdns;
 
 import static com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase;
 import static com.android.net.module.util.DnsUtils.toDnsUpperCase;
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 import static com.android.server.connectivity.mdns.MdnsResponse.EXPIRATION_NEVER;
-import static com.android.server.connectivity.mdns.util.MdnsUtils.ensureRunningOnHandlerThread;
 
 import static java.lang.Math.min;
 
