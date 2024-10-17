@@ -16,7 +16,9 @@
 
 package com.android.net.module.util
 
+import android.content.Context
 import android.net.INetd
+import android.net.Network
 import android.os.Build
 import android.util.Log
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
@@ -34,7 +36,9 @@ import org.mockito.Mockito.mock
 @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
 class RoutingCoordinatorServiceTest {
     val mNetd = mock(INetd::class.java)
-    val mService = RoutingCoordinatorService(mNetd)
+    val mGetAllNetworksSupplier = { emptyArray<Network>() }
+    val mContext = mock(Context::class.java)
+    val mService = RoutingCoordinatorService(mNetd, mGetAllNetworksSupplier, mContext)
 
     @Test
     fun testInterfaceForward() {

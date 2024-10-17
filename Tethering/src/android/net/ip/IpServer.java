@@ -70,13 +70,13 @@ import com.android.internal.util.MessageUtils;
 import com.android.internal.util.State;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.InterfaceParams;
+import com.android.net.module.util.IIpv4PrefixRequest;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.SyncStateMachine.StateInfo;
 import com.android.net.module.util.ip.InterfaceController;
 import com.android.networkstack.tethering.BpfCoordinator;
-import com.android.networkstack.tethering.PrivateAddressCoordinator;
 import com.android.networkstack.tethering.TetheringConfiguration;
 import com.android.networkstack.tethering.metrics.TetheringMetrics;
 import com.android.networkstack.tethering.util.InterfaceSet;
@@ -242,9 +242,10 @@ public class IpServer extends StateMachineShim {
     private final BpfCoordinator mBpfCoordinator;
     @NonNull
     private final RoutingCoordinatorManager mRoutingCoordinator;
+    @NonNull
+    private final IIpv4PrefixRequest mIpv4PrefixRequest;
     private final Callback mCallback;
     private final InterfaceController mInterfaceCtrl;
-    private final PrivateAddressCoordinator mPrivateAddressCoordinator;
 
     private final String mIfaceName;
     private final int mInterfaceType;
@@ -301,7 +302,7 @@ public class IpServer extends StateMachineShim {
             String ifaceName, Handler handler, int interfaceType, SharedLog log,
             INetd netd, @NonNull BpfCoordinator bpfCoordinator,
             RoutingCoordinatorManager routingCoordinatorManager, Callback callback,
-            TetheringConfiguration config, PrivateAddressCoordinator addressCoordinator,
+            TetheringConfiguration config,
             TetheringMetrics tetheringMetrics, Dependencies deps) {
         super(ifaceName, USE_SYNC_SM ? null : handler.getLooper());
         mHandler = handler;
@@ -309,6 +310,12 @@ public class IpServer extends StateMachineShim {
         mNetd = netd;
         mBpfCoordinator = bpfCoordinator;
         mRoutingCoordinator = routingCoordinatorManager;
+        mIpv4PrefixRequest = new IIpv4PrefixRequest.Stub() {
+            @Override
+            public void onIpv4PrefixConflict(IpPrefix ipPrefix) throws RemoteException {
+                sendMessage(CMD_NOTIFY_PREFIX_CONFLICT);
+            }
+        };
         mCallback = callback;
         mInterfaceCtrl = new InterfaceController(ifaceName, mNetd, mLog);
         mIfaceName = ifaceName;
@@ -317,7 +324,6 @@ public class IpServer extends StateMachineShim {
         mUsingLegacyDhcp = config.useLegacyDhcpServer();
         mP2pLeasesSubnetPrefixLength = config.getP2pLeasesSubnetPrefixLength();
         mIsWifiP2pDedicatedIpEnabled = config.shouldEnableWifiP2pDedicatedIp();
-        mPrivateAddressCoordinator = addressCoordinator;
         mDeps = deps;
         mTetheringMetrics = tetheringMetrics;
         resetLinkProperties();
@@ -393,6 +399,11 @@ public class IpServer extends StateMachineShim {
     /** The interface parameters which IpServer is using */
     public InterfaceParams getInterfaceParams() {
         return mInterfaceParams;
+    }
+
+    @VisibleForTesting
+    public IIpv4PrefixRequest getIpv4PrefixRequest() {
+        return mIpv4PrefixRequest;
     }
 
     /**
@@ -643,7 +654,7 @@ public class IpServer extends StateMachineShim {
         // NOTE: All of configureIPv4() will be refactored out of existence
         // into calls to InterfaceController, shared with startIPv4().
         mInterfaceCtrl.clearIPv4Address();
-        mPrivateAddressCoordinator.releaseDownstream(this);
+        mRoutingCoordinator.releaseDownstream(mIpv4PrefixRequest);
         mBpfCoordinator.tetherOffloadClientClear(this);
         mIpv4Address = null;
         mStaticIpv4ServerAddr = null;
@@ -714,7 +725,8 @@ public class IpServer extends StateMachineShim {
 
         if (shouldUseWifiP2pDedicatedIp()) return new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS);
 
-        return mPrivateAddressCoordinator.requestDownstreamAddress(this, scope, useLastAddress);
+        return mRoutingCoordinator.requestDownstreamAddress(mInterfaceType, scope, useLastAddress,
+                mIpv4PrefixRequest);
     }
 
     private boolean startIPv6() {
