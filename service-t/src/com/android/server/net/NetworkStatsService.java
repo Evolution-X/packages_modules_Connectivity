@@ -52,7 +52,6 @@ import static android.net.NetworkTemplate.MATCH_WIFI;
 import static android.net.TrafficStats.KB_IN_BYTES;
 import static android.net.TrafficStats.MB_IN_BYTES;
 import static android.net.TrafficStats.UID_TETHERING;
-import static android.net.TrafficStats.getValueForTypeFromFirstEntry;
 import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID_TAG;
@@ -127,6 +126,7 @@ import android.net.UnderlyingNetworkInfo;
 import android.net.Uri;
 import android.net.netstats.IUsageCallback;
 import android.net.netstats.NetworkStatsDataMigrationUtils;
+import android.net.netstats.StatsResult;
 import android.net.netstats.provider.INetworkStatsProvider;
 import android.net.netstats.provider.INetworkStatsProviderCallback;
 import android.net.netstats.provider.NetworkStatsProvider;
@@ -2133,18 +2133,12 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         }
     }
 
+    @Nullable
     @Override
-    public long getUidStats(int uid, int type) {
-        return getValueForTypeFromFirstEntry(getTypelessUidStats(uid), type);
-    }
-
-    @NonNull
-    @Override
-    public NetworkStats getTypelessUidStats(int uid) {
-        final NetworkStats stats = new NetworkStats(0, 0);
+    public StatsResult getUidStats(int uid) {
         final int callingUid = Binder.getCallingUid();
         if (callingUid != android.os.Process.SYSTEM_UID && callingUid != uid) {
-            return stats;
+            return null;
         }
         final NetworkStats.Entry entry;
         if (mAlwaysUseTrafficStatsServiceRateLimitCache
@@ -2153,10 +2147,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                     () -> mDeps.nativeGetUidStat(uid));
         } else entry = mDeps.nativeGetUidStat(uid);
 
-        if (entry != null) {
-            stats.insertEntry(entry);
-        }
-        return stats;
+        return getStatsResultFromEntryOrNull(entry);
     }
 
     @Nullable
@@ -2173,9 +2164,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         return entry;
     }
 
-    @NonNull
+    @Nullable
     @Override
-    public NetworkStats getTypelessIfaceStats(@NonNull String iface) {
+    public StatsResult getIfaceStats(@NonNull String iface) {
         Objects.requireNonNull(iface);
 
         final NetworkStats.Entry entry;
@@ -2186,11 +2177,13 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                     () -> getIfaceStatsInternal(iface));
         } else entry = getIfaceStatsInternal(iface);
 
-        NetworkStats stats = new NetworkStats(0, 0);
-        if (entry != null) {
-            stats.insertEntry(entry);
-        }
-        return stats;
+        return getStatsResultFromEntryOrNull(entry);
+    }
+
+    @Nullable
+    private StatsResult getStatsResultFromEntryOrNull(@Nullable NetworkStats.Entry entry) {
+        if (entry == null) return null;
+        return new StatsResult(entry.rxBytes, entry.rxPackets, entry.txBytes, entry.txPackets);
     }
 
     @Nullable
@@ -2203,9 +2196,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         return entry;
     }
 
-    @NonNull
+    @Nullable
     @Override
-    public NetworkStats getTypelessTotalStats() {
+    public StatsResult getTotalStats() {
         final NetworkStats.Entry entry;
         if (mAlwaysUseTrafficStatsServiceRateLimitCache
                 || mDeps.isChangeEnabled(
@@ -2214,11 +2207,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                     IFACE_ALL, UID_ALL, () -> getTotalStatsInternal());
         } else entry = getTotalStatsInternal();
 
-        final NetworkStats stats = new NetworkStats(0, 0);
-        if (entry != null) {
-            stats.insertEntry(entry);
-        }
-        return stats;
+        return getStatsResultFromEntryOrNull(entry);
     }
 
     @Override
