@@ -16,7 +16,7 @@
 
 package com.android.server.connectivity.mdns;
 
-import static com.android.server.connectivity.mdns.util.MdnsUtils.ensureRunningOnHandlerThread;
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;

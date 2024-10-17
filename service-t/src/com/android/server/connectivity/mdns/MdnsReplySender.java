@@ -16,9 +16,9 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 import static com.android.server.connectivity.mdns.MdnsConstants.IPV4_SOCKET_ADDR;
 import static com.android.server.connectivity.mdns.MdnsConstants.IPV6_SOCKET_ADDR;
-import static com.android.server.connectivity.mdns.util.MdnsUtils.ensureRunningOnHandlerThread;
 
 import android.annotation.NonNull;
 import android.annotation.RequiresApi;

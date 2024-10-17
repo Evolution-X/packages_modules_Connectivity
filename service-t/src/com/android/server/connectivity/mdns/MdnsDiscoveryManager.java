@@ -35,7 +35,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.DnsUtils;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.SharedLog;
-import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -211,7 +210,7 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
 
         void ensureRunningOnHandlerThread() {
             synchronized (pendingTasks) {
-                MdnsUtils.ensureRunningOnHandlerThread(handler);
+                HandlerUtils.ensureRunningOnHandlerThread(handler);
             }
         }
 
