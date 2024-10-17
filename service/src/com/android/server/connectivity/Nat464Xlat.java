@@ -20,6 +20,7 @@ import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 
 import static com.android.net.module.util.CollectionUtils.contains;
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -500,7 +501,7 @@ public class Nat464Xlat {
         // Once this code is converted to StateMachine, it will be possible to use deferMessage to
         // ensure it stays in STARTING state until the interfaceLinkStateChanged notification fires,
         // and possibly use a timeout (or provide some guarantees at the lower layer) to address #1.
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mNetwork.handler());
         if (!isStarting() || !up || !Objects.equals(mIface, iface)) {
             return;
         }
@@ -524,7 +525,7 @@ public class Nat464Xlat {
      * Must be called on the handler thread.
      */
     public void handleInterfaceRemoved(String iface) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mNetwork.handler());
         if (!Objects.equals(mIface, iface)) {
             return;
         }
@@ -546,7 +547,7 @@ public class Nat464Xlat {
     @Nullable
     public Inet6Address translateV4toV6(@NonNull Inet4Address addr) {
         // Variables in Nat464Xlat should only be accessed from handler thread.
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mNetwork.handler());
         if (!isStarted()) return null;
 
         return convertv4ToClatv6(mNat64PrefixInUse, addr);
@@ -574,7 +575,7 @@ public class Nat464Xlat {
     @Nullable
     public Inet6Address getClatv6SrcAddress() {
         // Variables in Nat464Xlat should only be accessed from handler thread.
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mNetwork.handler());
 
         return mIPv6Address;
     }
@@ -585,20 +586,13 @@ public class Nat464Xlat {
     @Nullable
     public Inet4Address getClatv4SrcAddress() {
         // Variables in Nat464Xlat should only be accessed from handler thread.
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mNetwork.handler());
         if (!isStarted()) return null;
 
         final LinkAddress v4Addr = getLinkAddress(mIface);
         if (v4Addr == null) return null;
 
         return (Inet4Address) v4Addr.getAddress();
-    }
-
-    private void ensureRunningOnHandlerThread() {
-        if (mNetwork.handler().getLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException(
-                    "Not running on handler thread: " + Thread.currentThread().getName());
-        }
     }
 
     /**

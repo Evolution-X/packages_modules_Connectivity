@@ -19,6 +19,7 @@ package com.android.server.connectivity;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 import static com.android.server.connectivity.ConnectivityFlags.CARRIER_SERVICE_CHANGED_USE_CALLBACK;
 
 import android.annotation.NonNull;
@@ -168,7 +169,7 @@ public class CarrierPrivilegeAuthenticator {
     private void simConfigChanged() {
         //  If mRequestRestrictedWifiEnabled is false, constructor calls simConfigChanged
         if (mRequestRestrictedWifiEnabled) {
-            ensureRunningOnHandlerThread();
+            ensureRunningOnHandlerThread(mHandler);
         }
         synchronized (mLock) {
             unregisterCarrierPrivilegesListeners();
@@ -212,7 +213,7 @@ public class CarrierPrivilegeAuthenticator {
         public void onCarrierPrivilegesChanged(
                 @NonNull List<String> privilegedPackageNames,
                 @NonNull int[] privilegedUids) {
-            ensureRunningOnHandlerThread();
+            ensureRunningOnHandlerThread(mHandler);
             if (mUseCallbacksForServiceChanged) return;
             // Re-trigger the synchronous check (which is also very cheap due
             // to caching in CarrierPrivilegesTracker). This allows consistency
@@ -223,7 +224,7 @@ public class CarrierPrivilegeAuthenticator {
         @Override
         public void onCarrierServiceChanged(@Nullable final String carrierServicePackageName,
                 final int carrierServiceUid) {
-            ensureRunningOnHandlerThread();
+            ensureRunningOnHandlerThread(mHandler);
             if (!mUseCallbacksForServiceChanged) {
                 // Re-trigger the synchronous check (which is also very cheap due
                 // to caching in CarrierPrivilegesTracker). This allows consistency
@@ -462,13 +463,6 @@ public class CarrierPrivilegeAuthenticator {
         } catch (UnsupportedApiLevelException unsupportedApiLevelException) {
             // Should not happen since CarrierPrivilegeAuthenticator is only used on T+
             Log.e(TAG, "removeCarrierPrivilegesListener API is not available");
-        }
-    }
-
-    private void ensureRunningOnHandlerThread() {
-        if (mHandler.getLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException(
-                    "Not running on handler thread: " + Thread.currentThread().getName());
         }
     }
 

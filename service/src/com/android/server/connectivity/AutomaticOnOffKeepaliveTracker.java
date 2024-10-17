@@ -25,6 +25,7 @@ import static android.system.OsConstants.AF_INET6;
 import static android.system.OsConstants.SOL_SOCKET;
 import static android.system.OsConstants.SO_SNDTIMEO;
 
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 import static com.android.net.module.util.netlink.NetlinkUtils.IO_TIMEOUT_MS;
 
 import android.annotation.IntDef;
@@ -440,7 +441,7 @@ public class AutomaticOnOffKeepaliveTracker {
      */
     @Nullable
     public AutomaticOnOffKeepalive getKeepaliveForBinder(@NonNull final IBinder token) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
 
         return CollectionUtils.findFirst(mAutomaticOnOffKeepalives,
                 it -> it.mCallback.asBinder().equals(token));
@@ -580,7 +581,7 @@ public class AutomaticOnOffKeepaliveTracker {
     }
 
     private void cleanupAutoOnOffKeepalive(@NonNull final AutomaticOnOffKeepalive autoKi) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         mKeepaliveStatsTracker.onStopKeepalive(autoKi.getNetwork(), autoKi.mKi.getSlot());
         autoKi.close();
         if (null != autoKi.mAlarmListener) mAlarmManager.cancel(autoKi.mAlarmListener);
@@ -693,7 +694,7 @@ public class AutomaticOnOffKeepaliveTracker {
      * This should be only be called in ConnectivityService handler thread.
      */
     public void dump(IndentingPrintWriter pw) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         mKeepaliveTracker.dump(pw);
         // Reading DeviceConfig will check if the calling uid and calling package name are the same.
         // Clear calling identity to align the calling uid and package so that it won't fail if cts
@@ -771,7 +772,7 @@ public class AutomaticOnOffKeepaliveTracker {
     private boolean isAnyTcpSocketConnectedForFamily(FileDescriptor fd, int family, int networkMark,
             int networkMask)
             throws ErrnoException, InterruptedIOException {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         // Build SocketDiag messages and cache it.
         if (mSockDiagMsg.get(family) == null) {
             mSockDiagMsg.put(family, InetDiagMessage.buildInetDiagReqForAliveTcpSockets(family));
@@ -841,13 +842,6 @@ public class AutomaticOnOffKeepaliveTracker {
             }
         }
         return mark;
-    }
-
-    private void ensureRunningOnHandlerThread() {
-        if (mConnectivityServiceHandler.getLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException(
-                    "Not running on handler thread: " + Thread.currentThread().getName());
-        }
     }
 
     private long getTcpPollingIntervalMs(@NonNull AutomaticOnOffKeepalive ki) {
