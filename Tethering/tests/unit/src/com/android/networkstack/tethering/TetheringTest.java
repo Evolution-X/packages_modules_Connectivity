@@ -71,7 +71,6 @@ import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTH
 import static com.android.net.module.util.NetworkStackConstants.RFC7421_PREFIX_LENGTH;
 import static com.android.networkstack.tethering.OffloadHardwareInterface.OFFLOAD_HAL_VERSION_HIDL_1_0;
 import static com.android.networkstack.tethering.OffloadHardwareInterface.OFFLOAD_HAL_VERSION_NONE;
-import static com.android.networkstack.tethering.PrivateAddressCoordinator.TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION;
 import static com.android.networkstack.tethering.TestConnectivityManager.BROADCAST_FIRST;
 import static com.android.networkstack.tethering.TestConnectivityManager.CALLBACKS_FIRST;
 import static com.android.networkstack.tethering.Tethering.UserRestrictionActionListener;
@@ -97,6 +96,7 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -192,7 +192,9 @@ import com.android.internal.util.test.BroadcastInterceptingContext;
 import com.android.internal.util.test.FakeSettingsProvider;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.InterfaceParams;
+import com.android.net.module.util.PrivateAddressCoordinator;
 import com.android.net.module.util.RoutingCoordinatorManager;
+import com.android.net.module.util.RoutingCoordinatorService;
 import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.ip.IpNeighborMonitor;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
@@ -293,7 +295,6 @@ public class TetheringTest {
     @Mock private BluetoothPanShim mBluetoothPanShim;
     @Mock private TetheredInterfaceRequestShim mTetheredInterfaceRequestShim;
     @Mock private TetheringMetrics mTetheringMetrics;
-    @Mock private RoutingCoordinatorManager mRoutingCoordinatorManager;
     @Mock private PrivateAddressCoordinator.Dependencies mPrivateAddressCoordinatorDependencies;
 
     private final MockIpServerDependencies mIpServerDependencies =
@@ -318,12 +319,12 @@ public class TetheringTest {
     private TetheringConfiguration mConfig;
     private EntitlementManager mEntitleMgr;
     private OffloadController mOffloadCtrl;
-    private PrivateAddressCoordinator mPrivateAddressCoordinator;
     private SoftApCallback mSoftApCallback;
     private SoftApCallback mLocalOnlyHotspotCallback;
     private UpstreamNetworkMonitor mUpstreamNetworkMonitor;
     private UpstreamNetworkMonitor.EventListener mEventListener;
     private TetheredInterfaceCallbackShim mTetheredInterfaceCallbackShim;
+    private RoutingCoordinatorManager mRoutingCoordinatorManager;
 
     private TestConnectivityManager mCm;
     private boolean mForceEthernetServiceUnavailable = false;
@@ -489,8 +490,16 @@ public class TetheringTest {
         }
 
         @Override
-        public RoutingCoordinatorManager getRoutingCoordinator(final Context context,
-                SharedLog log) {
+        public RoutingCoordinatorManager getRoutingCoordinator(
+                final Context context, SharedLog log) {
+            ConnectivityManager cm = context.getSystemService(ConnectivityManager.class);
+            when(mPrivateAddressCoordinatorDependencies.isFeatureEnabled(anyString()))
+                    .thenReturn(false);
+            RoutingCoordinatorService service = new RoutingCoordinatorService(
+                    getINetd(context, log),
+                            cm::getAllNetworks,
+                            mPrivateAddressCoordinatorDependencies);
+            mRoutingCoordinatorManager = spy(new RoutingCoordinatorManager(context, service));
             return mRoutingCoordinatorManager;
         }
 
@@ -534,15 +543,6 @@ public class TetheringTest {
         @Override
         public TetheringMetrics makeTetheringMetrics(Context ctx) {
             return mTetheringMetrics;
-        }
-
-        @Override
-        public PrivateAddressCoordinator makePrivateAddressCoordinator(Context ctx) {
-            ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
-            mPrivateAddressCoordinator =
-                    new PrivateAddressCoordinator(
-                            cm::getAllNetworks, mPrivateAddressCoordinatorDependencies);
-            return mPrivateAddressCoordinator;
         }
 
         @Override
@@ -668,8 +668,6 @@ public class TetheringTest {
                 .thenReturn(true);
         initOffloadConfiguration(OFFLOAD_HAL_VERSION_HIDL_1_0, 0 /* defaultDisabled */);
         when(mOffloadHardwareInterface.getForwardedStats(any())).thenReturn(mForwardedStats);
-        when(mPrivateAddressCoordinatorDependencies.isFeatureEnabled(anyString()))
-                .thenReturn(false);
 
         mServiceContext = new TestContext(mContext);
         mServiceContext.setUseRegisteredHandlers(true);
@@ -687,6 +685,7 @@ public class TetheringTest {
                 new IntentFilter(ACTION_TETHER_STATE_CHANGED));
 
         mCm = spy(new TestConnectivityManager(mServiceContext, mock(IConnectivityManager.class)));
+        when(mCm.getAllNetworks()).thenReturn(new Network[] {});
 
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_WIFI)).thenReturn(true);
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)).thenReturn(true);
@@ -869,6 +868,9 @@ public class TetheringTest {
                     any(NetworkCallback.class), any(Handler.class));
             assertTrue(TestConnectivityManager.looksLikeDefaultRequest(reqCaptor.getValue()));
         }
+
+        // Ignore calls to {@link ConnectivityManager#getallNetworks}.
+        verify(mCm, atLeast(0)).getAllNetworks();
 
         // The default network request is only ever filed once.
         verifyNoMoreInteractions(mCm);

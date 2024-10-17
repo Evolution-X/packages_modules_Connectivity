@@ -19,8 +19,13 @@ package com.android.net.module.util;
 import static com.android.net.module.util.NetdUtils.toRouteInfoParcel;
 
 import android.annotation.NonNull;
+import android.content.Context;
 import android.net.INetd;
 
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.RouteInfo;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
@@ -28,8 +33,10 @@ import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Class to coordinate routing across multiple clients.
@@ -45,8 +52,22 @@ public class RoutingCoordinatorService extends IRoutingCoordinator.Stub {
     private static final String TAG = RoutingCoordinatorService.class.getSimpleName();
     private final INetd mNetd;
 
-    public RoutingCoordinatorService(@NonNull INetd netd) {
+    private final Object mPrivateAddressCoordinatorLock = new Object();
+    @GuardedBy("mPrivateAddressCoordinatorLock")
+    private final PrivateAddressCoordinator mPrivateAddressCoordinator;
+
+    public RoutingCoordinatorService(@NonNull INetd netd,
+                                     @NonNull Supplier<Network[]> getAllNetworksSupplier,
+                                     @NonNull Context context) {
+        this(netd, getAllNetworksSupplier, new PrivateAddressCoordinator.Dependencies(context));
+    }
+
+    @VisibleForTesting
+    public RoutingCoordinatorService(@NonNull INetd netd,
+                                     @NonNull Supplier<Network[]> getAllNetworksSupplier,
+                                     @NonNull PrivateAddressCoordinator.Dependencies pacDeps) {
         mNetd = netd;
+        mPrivateAddressCoordinator = new PrivateAddressCoordinator(getAllNetworksSupplier, pacDeps);
     }
 
     /**
@@ -224,5 +245,75 @@ public class RoutingCoordinatorService extends IRoutingCoordinator.Stub {
                 mNetd.ipfwdDisableForwarding("RoutingCoordinator");
             }
         }
+    }
+
+    // PrivateAddressCoordinator methods:
+
+    /** Update the prefix of an upstream. */
+    @Override
+    public void updateUpstreamPrefix(LinkProperties lp, NetworkCapabilities nc, Network network) {
+        BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        mPrivateAddressCoordinator.updateUpstreamPrefix(lp, nc, network);
+                    }
+                });
+    }
+
+    /** Remove the upstream prefix of the given {@link Network}. */
+    @Override
+    public void removeUpstreamPrefix(Network network) {
+        Objects.requireNonNull(network);
+        BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        mPrivateAddressCoordinator.removeUpstreamPrefix(network);
+                    }
+                });
+    }
+
+    /** Remove the deprecated upstream networks if any. */
+    @Override
+    public void maybeRemoveDeprecatedUpstreams() {
+        BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        mPrivateAddressCoordinator.maybeRemoveDeprecatedUpstreams();
+                    }
+                });
+    }
+
+    /**
+     * Request an IPv4 address for the downstream.
+     *
+     * @param interfaceType the Tethering type (see TetheringManager#TETHERING_*).
+     * @param scope CONNECTIVITY_SCOPE_GLOBAL or CONNECTIVITY_SCOPE_LOCAL
+     * @param useLastAddress whether to use the last address
+     * @param request a {@link IIpv4PrefixRequest} to report conflicts
+     * @return an IPv4 address allocated for the downstream, could be null
+     */
+    @Override
+    public LinkAddress requestDownstreamAddress(int interfaceType, int scope,
+            boolean useLastAddress, IIpv4PrefixRequest request) {
+        Objects.requireNonNull(request);
+        return BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        return mPrivateAddressCoordinator.requestDownstreamAddress(
+                                interfaceType, scope, useLastAddress, request);
+                    }
+                });
+    }
+
+    /** Release the IPv4 address allocated for the downstream. */
+    @Override
+    public void releaseDownstream(IIpv4PrefixRequest request) {
+        Objects.requireNonNull(request);
+        BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        mPrivateAddressCoordinator.releaseDownstream(request);
+                    }
+                });
     }
 }
