@@ -416,13 +416,6 @@ public class MdnsInterfaceAdvertiser implements MulticastPacketReader.PacketHand
         // recvbuf and src are reused after this returns; ensure references to src are not kept.
         final InetSocketAddress srcCopy = new InetSocketAddress(src.getAddress(), src.getPort());
 
-        if (DBG) {
-            mSharedLog.v("Parsed packet with " + packet.questions.size() + " questions, "
-                    + packet.answers.size() + " answers, "
-                    + packet.authorityRecords.size() + " authority, "
-                    + packet.additionalRecords.size() + " additional from " + srcCopy);
-        }
-
         Map<Integer, Integer> conflictingServices =
                 mRecordRepository.getConflictingServices(packet);
 
@@ -440,7 +433,14 @@ public class MdnsInterfaceAdvertiser implements MulticastPacketReader.PacketHand
         // answer. One exception is simultaneous probe tiebreaking (rfc6762 8.2), in which case the
         // conflicting service is still probing and won't reply either.
         final MdnsReplyInfo answers = mRecordRepository.getReply(packet, srcCopy);
-
+        // Dump the query packet.
+        if (DBG || answers != null) {
+            mSharedLog.v("Parsed packet with transactionId(" + packet.transactionId + "): "
+                    + packet.questions.size() + " questions, "
+                    + packet.answers.size() + " answers, "
+                    + packet.authorityRecords.size() + " authority, "
+                    + packet.additionalRecords.size() + " additional from " + srcCopy);
+        }
         if (answers == null) return;
         mReplySender.queueReply(answers);
     }

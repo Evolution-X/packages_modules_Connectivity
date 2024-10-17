@@ -245,7 +245,7 @@ public class MdnsReplySender {
                 return;
             }
 
-            if (mEnableDebugLog) mSharedLog.v("Sending " + replyInfo);
+            mSharedLog.log("Sending " + replyInfo);
 
             final int flags = 0x8400; // Response, authoritative (rfc6762 18.4)
             final MdnsPacket packet = new MdnsPacket(flags,
