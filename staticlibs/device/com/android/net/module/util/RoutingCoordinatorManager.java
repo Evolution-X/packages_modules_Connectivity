@@ -17,17 +17,27 @@
 package com.android.net.module.util;
 
 import android.content.Context;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.RouteInfo;
 import android.os.IBinder;
 import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * A manager class for talking to the routing coordinator service.
  *
  * This class should only be used by the connectivity and tethering module. This is enforced
  * by the build rules. Do not change build rules to gain access to this class from elsewhere.
+ *
+ * This class has following functionalities:
+ * - Manage routes and forwarding for networks.
+ * - Manage IPv4 prefix allocation for network interfaces.
+ *
  * @hide
  */
 public class RoutingCoordinatorManager {
@@ -150,6 +160,67 @@ public class RoutingCoordinatorManager {
     public void removeInterfaceForward(final String fromIface, final String toIface) {
         try {
             mService.removeInterfaceForward(fromIface, toIface);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    // PrivateAddressCoordinator methods:
+
+    /** Update the prefix of an upstream. */
+    public void updateUpstreamPrefix(LinkProperties lp, NetworkCapabilities nc, Network network) {
+        try {
+            mService.updateUpstreamPrefix(lp, nc, network);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** Remove the upstream prefix of the given {@link Network}. */
+    public void removeUpstreamPrefix(Network network) {
+        try {
+            mService.removeUpstreamPrefix(network);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** Remove the deprecated upstream networks if any. */
+    public void maybeRemoveDeprecatedUpstreams() {
+        try {
+            mService.maybeRemoveDeprecatedUpstreams();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Request an IPv4 address for the downstream.
+     *
+     * @param interfaceType the Tethering type (see TetheringManager#TETHERING_*).
+     * @param scope CONNECTIVITY_SCOPE_GLOBAL or CONNECTIVITY_SCOPE_LOCAL
+     * @param useLastAddress whether to use the last address
+     * @param request a {@link IIpv4PrefixRequest} to report conflicts
+     * @return an IPv4 address allocated for the downstream, could be null
+     */
+    @Nullable
+    public LinkAddress requestDownstreamAddress(
+            int interfaceType,
+            int scope,
+            boolean useLastAddress,
+            IIpv4PrefixRequest request) {
+        try {
+            return mService.requestDownstreamAddress(
+                    interfaceType, scope, useLastAddress, request);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** Release the IPv4 address allocated for the downstream. */
+    public void releaseDownstream(IIpv4PrefixRequest request) {
+        try {
+            mService.releaseDownstream(request);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
