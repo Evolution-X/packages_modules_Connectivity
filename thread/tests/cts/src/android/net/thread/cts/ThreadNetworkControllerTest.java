@@ -1265,7 +1265,10 @@ public class ThreadNetworkControllerTest {
 
         assertThat(txtMap.get("rv")).isNotNull();
         assertThat(txtMap.get("tv")).isNotNull();
-        assertThat(txtMap.get("sb")).isNotNull();
+        // Border Agent State Bitmap is 32 bits
+        assertThat(txtMap.get("sb").length).isEqualTo(4);
+        // The 12th bit (4th bit of the second byte) for ePSKc support should be set to 1.
+        assertThat(txtMap.get("sb")[2] & 8).isEqualTo(8);
     }
 
     @Test
@@ -1290,7 +1293,10 @@ public class ThreadNetworkControllerTest {
         Map<String, byte[]> txtMap = resolvedService.getAttributes();
         assertThat(txtMap.get("rv")).isNotNull();
         assertThat(txtMap.get("tv")).isNotNull();
-        assertThat(txtMap.get("sb")).isNotNull();
+        // Border Agent State Bitmap is 32 bits
+        assertThat(txtMap.get("sb").length).isEqualTo(4);
+        // The 12th bit (4th bit of the second byte) for ePSKc support should be set to 1.
+        assertThat(txtMap.get("sb")[2] & 8).isEqualTo(8);
         assertThat(txtMap.get("id").length).isEqualTo(16);
     }
 
