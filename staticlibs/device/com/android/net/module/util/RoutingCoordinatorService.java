@@ -284,23 +284,40 @@ public class RoutingCoordinatorService extends IRoutingCoordinator.Stub {
     }
 
     /**
-     * Request an IPv4 address for the downstream.
+     * Request an IPv4 address for the downstream. Return the last time used address for the
+     * provided (interfaceType, scope) pair if possible.
      *
      * @param interfaceType the Tethering type (see TetheringManager#TETHERING_*).
      * @param scope CONNECTIVITY_SCOPE_GLOBAL or CONNECTIVITY_SCOPE_LOCAL
-     * @param useLastAddress whether to use the last address
      * @param request a {@link IIpv4PrefixRequest} to report conflicts
      * @return an IPv4 address allocated for the downstream, could be null
      */
     @Override
-    public LinkAddress requestDownstreamAddress(int interfaceType, int scope,
-            boolean useLastAddress, IIpv4PrefixRequest request) {
+    public LinkAddress requestStickyDownstreamAddress(int interfaceType, int scope,
+            IIpv4PrefixRequest request) {
         Objects.requireNonNull(request);
         return BinderUtils.withCleanCallingIdentity(
                 () -> {
                     synchronized (mPrivateAddressCoordinatorLock) {
-                        return mPrivateAddressCoordinator.requestDownstreamAddress(
-                                interfaceType, scope, useLastAddress, request);
+                        return mPrivateAddressCoordinator.requestStickyDownstreamAddress(
+                                interfaceType, scope, request);
+                    }
+                });
+    }
+
+    /**
+     * Request an IPv4 address for the downstream.
+     *
+     * @param request a {@link IIpv4PrefixRequest} to report conflicts
+     * @return an IPv4 address allocated for the downstream, could be null
+     */
+    @Override
+    public LinkAddress requestDownstreamAddress(IIpv4PrefixRequest request) {
+        Objects.requireNonNull(request);
+        return BinderUtils.withCleanCallingIdentity(
+                () -> {
+                    synchronized (mPrivateAddressCoordinatorLock) {
+                        return mPrivateAddressCoordinator.requestDownstreamAddress(request);
                     }
                 });
     }
