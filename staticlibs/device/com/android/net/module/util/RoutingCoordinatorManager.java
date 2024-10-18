@@ -195,23 +195,35 @@ public class RoutingCoordinatorManager {
     }
 
     /**
-     * Request an IPv4 address for the downstream.
+     * Request an IPv4 address for the downstream. Return the last time used address for the
+     * provided (interfaceType, scope) pair if possible.
      *
      * @param interfaceType the Tethering type (see TetheringManager#TETHERING_*).
      * @param scope CONNECTIVITY_SCOPE_GLOBAL or CONNECTIVITY_SCOPE_LOCAL
-     * @param useLastAddress whether to use the last address
      * @param request a {@link IIpv4PrefixRequest} to report conflicts
      * @return an IPv4 address allocated for the downstream, could be null
      */
     @Nullable
-    public LinkAddress requestDownstreamAddress(
+    public LinkAddress requestStickyDownstreamAddress(
             int interfaceType,
             int scope,
-            boolean useLastAddress,
             IIpv4PrefixRequest request) {
         try {
-            return mService.requestDownstreamAddress(
-                    interfaceType, scope, useLastAddress, request);
+            return mService.requestStickyDownstreamAddress(interfaceType, scope, request);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Request an IPv4 address for the downstream.
+     *
+     * @param request a {@link IIpv4PrefixRequest} to report conflicts
+     * @return an IPv4 address allocated for the downstream, could be null
+     */
+    public LinkAddress requestDownstreamAddress(IIpv4PrefixRequest request) {
+        try {
+            return mService.requestDownstreamAddress(request);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
