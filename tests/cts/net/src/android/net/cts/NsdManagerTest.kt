@@ -1641,9 +1641,12 @@ class NsdManagerTest {
                 assertEmpty(it.hostAddresses)
                 assertEquals(0, it.attributes.size)
             }
-        } cleanup {
+        } cleanupStep {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<DiscoveryStopped>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -1658,68 +1661,73 @@ class NsdManagerTest {
         val si = makeTestServiceInfo(testNetwork1.network)
         nsdManager.resolveService(si, { it.run() }, resolveRecord)
 
-        val serviceFullName = "$serviceName.$serviceType.local"
-        // The query should ask for ANY, since both SRV and TXT are requested. Note legacy
-        // mdnsresponder will ask for SRV and TXT separately, and will not proceed to asking for
-        // address records without an answer for both.
-        val srvTxtQuery = packetReader.pollForQuery(serviceFullName, DnsResolver.TYPE_ANY)
-        assertNotNull(srvTxtQuery)
+        tryTest {
+            val serviceFullName = "$serviceName.$serviceType.local"
+            // The query should ask for ANY, since both SRV and TXT are requested. Note legacy
+            // mdnsresponder will ask for SRV and TXT separately, and will not proceed to asking for
+            // address records without an answer for both.
+            val srvTxtQuery = packetReader.pollForQuery(serviceFullName, DnsResolver.TYPE_ANY)
+            assertNotNull(srvTxtQuery)
 
-        /*
-        Generated with:
-        scapy.raw(scapy.dns_compress(scapy.DNS(rd=0, qr=1, aa=1, qd = None, an =
-            scapy.DNSRRSRV(rrname='NsdTest123456789._nmt123456789._tcp.local',
-                rclass=0x8001, port=31234, target='testhost.local', ttl=120) /
-            scapy.DNSRR(rrname='NsdTest123456789._nmt123456789._tcp.local', type='TXT', ttl=120,
-                rdata='testkey=testvalue')
-        ))).hex()
-         */
-        val srvTxtResponsePayload = HexDump.hexStringToByteArray(
-            "000084000000000200000000104" +
-                "e7364546573743132333435363738390d5f6e6d74313233343536373839045f746370056c6f6" +
-                "3616c0000218001000000780011000000007a020874657374686f7374c030c00c00100001000" +
-                "00078001211746573746b65793d7465737476616c7565"
-        )
-        replaceServiceNameAndTypeWithTestSuffix(srvTxtResponsePayload)
-        packetReader.sendResponse(buildMdnsPacket(srvTxtResponsePayload))
+            /*
+            Generated with:
+            scapy.raw(scapy.dns_compress(scapy.DNS(rd=0, qr=1, aa=1, qd = None, an =
+                scapy.DNSRRSRV(rrname='NsdTest123456789._nmt123456789._tcp.local',
+                    rclass=0x8001, port=31234, target='testhost.local', ttl=120) /
+                scapy.DNSRR(rrname='NsdTest123456789._nmt123456789._tcp.local', type='TXT', ttl=120,
+                    rdata='testkey=testvalue')
+            ))).hex()
+             */
+            val srvTxtResponsePayload = HexDump.hexStringToByteArray(
+                    "000084000000000200000000104" +
+                            "e7364546573743132333435363738390d5f6e6d74313233343536373839045f7463" +
+                            "70056c6f63616c0000218001000000780011000000007a020874657374686f7374c" +
+                            "030c00c0010000100000078001211746573746b65793d7465737476616c7565"
+            )
+            replaceServiceNameAndTypeWithTestSuffix(srvTxtResponsePayload)
+            packetReader.sendResponse(buildMdnsPacket(srvTxtResponsePayload))
 
-        val testHostname = "testhost.local"
-        val addressQuery = packetReader.pollForQuery(
-            testHostname,
-            DnsResolver.TYPE_A,
-            DnsResolver.TYPE_AAAA
-        )
-        assertNotNull(addressQuery)
+            val testHostname = "testhost.local"
+            val addressQuery = packetReader.pollForQuery(
+                    testHostname,
+                    DnsResolver.TYPE_A,
+                    DnsResolver.TYPE_AAAA
+            )
+            assertNotNull(addressQuery)
 
-        /*
-        Generated with:
-        scapy.raw(scapy.dns_compress(scapy.DNS(rd=0, qr=1, aa=1, qd = None, an =
-            scapy.DNSRR(rrname='testhost.local', type='A', ttl=120,
-                rdata='192.0.2.123') /
-            scapy.DNSRR(rrname='testhost.local', type='AAAA', ttl=120,
-                rdata='2001:db8::123')
-        ))).hex()
-         */
-        val addressPayload = HexDump.hexStringToByteArray(
-            "0000840000000002000000000874657374" +
-                "686f7374056c6f63616c0000010001000000780004c000027bc00c001c000100000078001020" +
-                "010db8000000000000000000000123"
-        )
-        packetReader.sendResponse(buildMdnsPacket(addressPayload))
+            /*
+            Generated with:
+            scapy.raw(scapy.dns_compress(scapy.DNS(rd=0, qr=1, aa=1, qd = None, an =
+                scapy.DNSRR(rrname='testhost.local', type='A', ttl=120,
+                    rdata='192.0.2.123') /
+                scapy.DNSRR(rrname='testhost.local', type='AAAA', ttl=120,
+                    rdata='2001:db8::123')
+            ))).hex()
+             */
+            val addressPayload = HexDump.hexStringToByteArray(
+                    "0000840000000002000000000874657374" +
+                            "686f7374056c6f63616c0000010001000000780004c000027bc00c001c000100000" +
+                            "078001020010db8000000000000000000000123"
+            )
+            packetReader.sendResponse(buildMdnsPacket(addressPayload))
 
-        val serviceResolved = resolveRecord.expectCallback<ServiceResolved>()
-        serviceResolved.serviceInfo.let {
-            assertEquals(serviceName, it.serviceName)
-            assertEquals(".$serviceType", it.serviceType)
-            assertEquals(testNetwork1.network, it.network)
-            assertEquals(31234, it.port)
-            assertEquals(1, it.attributes.size)
-            assertArrayEquals("testvalue".encodeToByteArray(), it.attributes["testkey"])
+            val serviceResolved = resolveRecord.expectCallback<ServiceResolved>()
+            serviceResolved.serviceInfo.let {
+                assertEquals(serviceName, it.serviceName)
+                assertEquals(".$serviceType", it.serviceType)
+                assertEquals(testNetwork1.network, it.network)
+                assertEquals(31234, it.port)
+                assertEquals(1, it.attributes.size)
+                assertArrayEquals("testvalue".encodeToByteArray(), it.attributes["testkey"])
+            }
+            assertEquals(
+                    setOf(parseNumericAddress("192.0.2.123"), parseNumericAddress("2001:db8::123")),
+                    serviceResolved.serviceInfo.hostAddresses.toSet()
+            )
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
-        assertEquals(
-                setOf(parseNumericAddress("192.0.2.123"), parseNumericAddress("2001:db8::123")),
-                serviceResolved.serviceInfo.hostAddresses.toSet()
-        )
     }
 
     @Test
@@ -1733,9 +1741,9 @@ class NsdManagerTest {
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
         var nsResponder: NSResponder? = null
+        val packetReader = makePacketReader()
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = makePacketReader()
             /*
             Send a "query unicast" query.
             Generated with:
@@ -1760,10 +1768,13 @@ class NsdManagerTest {
                         pkt.dstAddr == testSrcAddr
             }
             assertNotNull(reply)
-        } cleanup {
+        } cleanupStep {
             nsResponder?.stop()
             nsdManager.unregisterService(registrationRecord)
             registrationRecord.expectCallback<ServiceUnregistered>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -1779,9 +1790,9 @@ class NsdManagerTest {
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
         var nsResponder: NSResponder? = null
+        val packetReader = makePacketReader()
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = makePacketReader()
             /*
             Send a query with a known answer. Expect to receive a response containing TXT record
             only.
@@ -1846,10 +1857,13 @@ class NsdManagerTest {
                         pkt.dstAddr == testSrcAddr
             }
             assertNotNull(reply2)
-        } cleanup {
+        } cleanupStep {
             nsResponder?.stop()
             nsdManager.unregisterService(registrationRecord)
             registrationRecord.expectCallback<ServiceUnregistered>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -1865,9 +1879,9 @@ class NsdManagerTest {
         // Register service on testNetwork1
         val registrationRecord = NsdRegistrationRecord()
         var nsResponder: NSResponder? = null
+        val packetReader = makePacketReader()
         tryTest {
             registerService(registrationRecord, si)
-            val packetReader = makePacketReader()
             /*
             Send a query with truncated bit set.
             Generated with:
@@ -1923,10 +1937,13 @@ class NsdManagerTest {
                         pkt.dstAddr == testSrcAddr
             }
             assertNotNull(reply)
-        } cleanup {
+        } cleanupStep {
             nsResponder?.stop()
             nsdManager.unregisterService(registrationRecord)
             registrationRecord.expectCallback<ServiceUnregistered>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -1984,9 +2001,12 @@ class NsdManagerTest {
                         pkt.isReplyFor("$serviceType.local", DnsResolver.TYPE_PTR)
             }
             assertNotNull(query)
-        } cleanup {
+        } cleanupStep {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<DiscoveryStopped>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -2328,8 +2348,11 @@ class NsdManagerTest {
             nsdManager.stopServiceDiscovery(discoveryRecord)
 
             discoveryRecord.expectCallback<DiscoveryStopped>()
-        } cleanup {
+        } cleanupStep {
             nsdManager.unregisterService(registrationRecord)
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -2366,8 +2389,11 @@ class NsdManagerTest {
                         it.nsType == DnsResolver.TYPE_A
             }
             assertEquals(3, addressRecords.size)
-        } cleanup {
+        } cleanupStep {
             nsdManager.unregisterService(registrationRecord)
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -2428,9 +2454,12 @@ class NsdManagerTest {
             assertTrue(keyRecords.any { it.dName == "$customHostname.local" })
             assertTrue(keyRecords.all { it.ttl == NAME_RECORDS_TTL_MILLIS })
             assertTrue(keyRecords.all { it.rr.contentEquals(publicKey) })
-        } cleanup {
+        } cleanupStep {
             nsdManager.unregisterService(registrationRecord1)
             nsdManager.unregisterService(registrationRecord2)
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
@@ -2521,9 +2550,12 @@ class NsdManagerTest {
             assertEquals(1, txtRecords.size)
             // The TXT record should contain as single zero
             assertContentEquals(byteArrayOf(0), txtRecords[0].rr)
-        } cleanup {
+        } cleanupStep {
             nsdManager.unregisterService(registrationRecord)
             registrationRecord.expectCallback<ServiceUnregistered>()
+        } cleanup {
+            packetReader.handler.post { packetReader.stop() }
+            handlerThread.waitForIdle(TIMEOUT_MS)
         }
     }
 
