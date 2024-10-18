@@ -29,6 +29,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.net.thread.ActiveOperationalDataset;
+import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkController.StateCallback;
 import android.net.thread.ThreadNetworkException;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 /** A helper class which provides synchronous API wrappers for {@link ThreadNetworkController}. */
 public final class ThreadNetworkControllerWrapper {
@@ -47,6 +49,7 @@ public final class ThreadNetworkControllerWrapper {
     public static final Duration LEAVE_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration CALLBACK_TIMEOUT = Duration.ofSeconds(1);
     private static final Duration SET_ENABLED_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration CONFIG_TIMEOUT = Duration.ofSeconds(1);
 
     private final ThreadNetworkController mController;
 
@@ -188,6 +191,29 @@ public final class ThreadNetworkControllerWrapper {
                     mController.setTestNetworkAsUpstream(
                             networkInterfaceName, directExecutor(), future::complete);
                 });
+        future.get(CALLBACK_TIMEOUT.toSeconds(), SECONDS);
+    }
+
+    public ThreadConfiguration getConfiguration() throws Exception {
+        CompletableFuture<ThreadConfiguration> future = new CompletableFuture<>();
+        Consumer<ThreadConfiguration> callback = future::complete;
+        runAsShell(
+                PERMISSION_THREAD_NETWORK_PRIVILEGED,
+                () -> mController.registerConfigurationCallback(directExecutor(), callback));
+        future.get(CALLBACK_TIMEOUT.toSeconds(), SECONDS);
+        runAsShell(
+                PERMISSION_THREAD_NETWORK_PRIVILEGED,
+                () -> mController.unregisterConfigurationCallback(callback));
+        return future.getNow(null);
+    }
+
+    public void setConfigurationAndWait(ThreadConfiguration config) throws Exception {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        runAsShell(
+                PERMISSION_THREAD_NETWORK_PRIVILEGED,
+                () ->
+                        mController.setConfiguration(
+                                config, directExecutor(), newOutcomeReceiver(future)));
         future.get(CALLBACK_TIMEOUT.toSeconds(), SECONDS);
     }
 

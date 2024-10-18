@@ -18,6 +18,8 @@ package com.android.server.connectivity;
 
 import static android.telephony.SubscriptionManager.OnSubscriptionsChangedListener;
 
+import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
+
 import android.annotation.NonNull;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -466,7 +468,7 @@ public class KeepaliveStatsTracker {
             int intervalSeconds,
             int appUid,
             boolean isAutoKeepalive) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!isEnabled()) return;
         final int keepaliveId = getKeepaliveId(network, slot);
         if (keepaliveId == INVALID_KEEPALIVE_ID) return;
@@ -538,21 +540,21 @@ public class KeepaliveStatsTracker {
 
     /** Inform the KeepaliveStatsTracker a keepalive has just been paused. */
     public void onPauseKeepalive(@NonNull Network network, int slot) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!isEnabled()) return;
         onKeepaliveActive(network, slot, /* keepaliveActive= */ false);
     }
 
     /** Inform the KeepaliveStatsTracker a keepalive has just been resumed. */
     public void onResumeKeepalive(@NonNull Network network, int slot) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!isEnabled()) return;
         onKeepaliveActive(network, slot, /* keepaliveActive= */ true);
     }
 
     /** Inform the KeepaliveStatsTracker a keepalive has just been stopped. */
     public void onStopKeepalive(@NonNull Network network, int slot) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!isEnabled()) return;
 
         final int keepaliveId = getKeepaliveId(network, slot);
@@ -615,7 +617,7 @@ public class KeepaliveStatsTracker {
      */
     @VisibleForTesting
     public @NonNull DailykeepaliveInfoReported buildKeepaliveMetrics() {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         final long timeNow = mDependencies.getElapsedRealtime();
         return buildKeepaliveMetrics(timeNow);
     }
@@ -673,7 +675,7 @@ public class KeepaliveStatsTracker {
      */
     @VisibleForTesting
     public @NonNull DailykeepaliveInfoReported buildAndResetMetrics() {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         final long timeNow = mDependencies.getElapsedRealtime();
 
         final DailykeepaliveInfoReported metrics = buildKeepaliveMetrics(timeNow);
@@ -750,7 +752,7 @@ public class KeepaliveStatsTracker {
 
     /** Writes the stored metrics to ConnectivityStatsLog and resets. */
     public void writeAndResetMetrics() {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         // Keepalive stats use repeated atoms, which are only supported on T+. If written to statsd
         // on S- they will bootloop the system, so they must not be sent on S-. See b/289471411.
         if (!SdkLevel.isAtLeastT()) {
@@ -771,17 +773,10 @@ public class KeepaliveStatsTracker {
 
     /** Dump KeepaliveStatsTracker state. */
     public void dump(IndentingPrintWriter pw) {
-        ensureRunningOnHandlerThread();
+        ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         pw.println("KeepaliveStatsTracker enabled: " + isEnabled());
         pw.increaseIndent();
         pw.println(buildKeepaliveMetrics().toString());
         pw.decreaseIndent();
-    }
-
-    private void ensureRunningOnHandlerThread() {
-        if (mConnectivityServiceHandler.getLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException(
-                    "Not running on handler thread: " + Thread.currentThread().getName());
-        }
     }
 }

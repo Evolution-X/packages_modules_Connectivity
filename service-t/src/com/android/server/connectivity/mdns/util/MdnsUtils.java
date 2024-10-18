@@ -24,7 +24,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.net.Network;
 import android.os.Build;
-import android.os.Handler;
 import android.os.SystemClock;
 import android.util.ArraySet;
 import android.util.Pair;
@@ -88,21 +87,6 @@ public class MdnsUtils {
         }
     }
 
-    /*** Ensure that current running thread is same as given handler thread */
-    public static void ensureRunningOnHandlerThread(@NonNull Handler handler) {
-        if (!isRunningOnHandlerThread(handler)) {
-            throw new IllegalStateException(
-                    "Not running on Handler thread: " + Thread.currentThread().getName());
-        }
-    }
-
-    /*** Check that current running thread is same as given handler thread */
-    public static boolean isRunningOnHandlerThread(@NonNull Handler handler) {
-        if (handler.getLooper().getThread() == Thread.currentThread()) {
-            return true;
-        }
-        return false;
-    }
 
     /*** Check whether the target network matches the current network */
     public static boolean isNetworkMatched(@Nullable Network targetNetwork,

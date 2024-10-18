@@ -202,20 +202,6 @@ public class EthernetNetworkFactory {
         return;
     }
 
-    private static NetworkCapabilities mixInCapabilities(NetworkCapabilities nc,
-            NetworkCapabilities addedNc) {
-       final NetworkCapabilities.Builder builder = new NetworkCapabilities.Builder(nc);
-       for (int transport : addedNc.getTransportTypes()) builder.addTransportType(transport);
-       for (int capability : addedNc.getCapabilities()) builder.addCapability(capability);
-       return builder.build();
-    }
-
-    private static NetworkCapabilities createDefaultNetworkCapabilities() {
-        return NetworkCapabilities.Builder
-                .withoutDefaultCapabilities()
-                .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET).build();
-    }
-
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     protected boolean removeInterface(String interfaceName) {
         NetworkInterfaceState iface = mTrackingInterfaces.remove(interfaceName);
@@ -554,14 +540,6 @@ public class EthernetNetworkFactory {
                 return;
             }
             maybeRestart();
-        }
-
-        private void ensureRunningOnEthernetHandlerThread() {
-            if (mHandler.getLooper().getThread() != Thread.currentThread()) {
-                throw new IllegalStateException(
-                        "Not running on the Ethernet thread: "
-                                + Thread.currentThread().getName());
-            }
         }
 
         private void handleOnLinkPropertiesChange(LinkProperties linkProperties) {

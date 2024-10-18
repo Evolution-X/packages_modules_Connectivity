@@ -88,6 +88,13 @@ class NetworkTraceHandler
   // Connects to the system Perfetto daemon and registers the trace handler.
   static void InitPerfettoTracing();
 
+  // This prevents Perfetto from holding the data source lock when calling
+  // OnSetup, OnStart, or OnStop. The lock is still held by the LockedHandle
+  // returned by GetDataSourceLocked. Disabling this lock prevents a deadlock
+  // where OnStop holds this lock waiting for the poller to stop, but the poller
+  // is running the callback that is trying to acquire the lock.
+  static constexpr bool kRequiresCallbacksUnderLock = false;
+
   // When isTest is true, skip non-hermetic code.
   NetworkTraceHandler(bool isTest = false) : mIsTest(isTest) {}
 

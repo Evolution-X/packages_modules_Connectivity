@@ -27,6 +27,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 
+import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.SharedLog;
 
 import java.io.IOException;
@@ -167,9 +168,7 @@ public abstract class MdnsPacketRepeater<T extends MdnsPacketRepeater.Request> {
      * @return true if probing was in progress, false if this was a no-op
      */
     public boolean stop(int id) {
-        if (mHandler.getLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException("stop can only be called from the looper thread");
-        }
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
         // Since this is run on the looper thread, messages cannot be currently processing and are
         // all in the handler queue; unless this method is called from a message, but the current
         // message cannot be cancelled.

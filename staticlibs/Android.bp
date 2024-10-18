@@ -650,6 +650,7 @@ filegroup {
     name: "net-utils-all-srcs",
     srcs: [
         "device/**/*.java",
+        ":framework-connectivity-shared-srcs",
         ":net-utils-framework-common-srcs",
     ],
     visibility: ["//visibility:private"],

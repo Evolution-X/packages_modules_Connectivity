@@ -253,7 +253,6 @@ public class Tethering {
     private final TetheringNotificationUpdater mNotificationUpdater;
     private final UserManager mUserManager;
     private final BpfCoordinator mBpfCoordinator;
-    private final PrivateAddressCoordinator mPrivateAddressCoordinator;
     private final TetheringMetrics mTetheringMetrics;
     private final WearableConnectionManager mWearableConnectionManager;
     private int mActiveDataSubId = INVALID_SUBSCRIPTION_ID;
@@ -359,7 +358,6 @@ public class Tethering {
         // Load tethering configuration.
         updateConfiguration();
         mConfig.readEnableSyncSM(mContext);
-        mPrivateAddressCoordinator = mDeps.makePrivateAddressCoordinator(mContext);
 
         // Must be initialized after tethering configuration is loaded because BpfCoordinator
         // constructor needs to use the configuration.
@@ -2001,11 +1999,11 @@ public class Tethering {
             final UpstreamNetworkState ns = (UpstreamNetworkState) o;
             switch (arg1) {
                 case UpstreamNetworkMonitor.EVENT_ON_LINKPROPERTIES:
-                    mPrivateAddressCoordinator.updateUpstreamPrefix(
+                    mRoutingCoordinator.updateUpstreamPrefix(
                             ns.linkProperties, ns.networkCapabilities, ns.network);
                     break;
                 case UpstreamNetworkMonitor.EVENT_ON_LOST:
-                    mPrivateAddressCoordinator.removeUpstreamPrefix(ns.network);
+                    mRoutingCoordinator.removeUpstreamPrefix(ns.network);
                     break;
             }
 
@@ -2075,7 +2073,7 @@ public class Tethering {
                     return;
                 }
 
-                mPrivateAddressCoordinator.maybeRemoveDeprecatedUpstreams();
+                mRoutingCoordinator.maybeRemoveDeprecatedUpstreams();
                 mUpstreamNetworkMonitor.startObserveAllNetworks();
 
                 // TODO: De-duplicate with updateUpstreamWanted() below.
@@ -2663,11 +2661,6 @@ public class Tethering {
 
         dumpBpf(pw);
 
-        pw.println("Private address coordinator:");
-        pw.increaseIndent();
-        mPrivateAddressCoordinator.dump(pw);
-        pw.decreaseIndent();
-
         if (mWearableConnectionManager != null) {
             pw.println("WearableConnectionManager:");
             pw.increaseIndent();
@@ -2821,8 +2814,7 @@ public class Tethering {
         mLog.i("adding IpServer for: " + iface);
         final TetherState tetherState = new TetherState(
                 new IpServer(iface, mHandler, interfaceType, mLog, mNetd, mBpfCoordinator,
-                        mRoutingCoordinator, new ControlCallback(), mConfig,
-                        mPrivateAddressCoordinator, mTetheringMetrics,
+                        mRoutingCoordinator, new ControlCallback(), mConfig, mTetheringMetrics,
                         mDeps.makeIpServerDependencies()), isNcm);
         mTetherStates.put(iface, tetherState);
         tetherState.ipServer.start();
