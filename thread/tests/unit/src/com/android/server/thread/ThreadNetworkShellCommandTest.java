@@ -38,8 +38,11 @@ import static org.mockito.Mockito.when;
 
 import android.content.Context;
 import android.net.thread.ActiveOperationalDataset;
+import android.net.thread.IConfigurationReceiver;
+import android.net.thread.IOperationReceiver;
 import android.net.thread.IOutputReceiver;
 import android.net.thread.PendingOperationalDataset;
+import android.net.thread.ThreadConfiguration;
 import android.os.Binder;
 import android.os.Process;
 
@@ -319,5 +322,109 @@ public class ThreadNetworkShellCommandTest {
         inOrder.verify(mOutputWriter).print("\r\n");
         inOrder.verify(mOutputWriter).print("Done");
         inOrder.verify(mOutputWriter).print("\r\n");
+    }
+
+    @Test
+    public void config_getConfig_testingPermissionIsChecked() {
+        runShellCommand("config");
+
+        verify(mContext, times(1))
+                .enforceCallingOrSelfPermission(
+                        eq("android.permission.THREAD_NETWORK_TESTING"), anyString());
+    }
+
+    @Test
+    public void config_getConfig_serviceTimeOut_failsWithTimeoutError() {
+        runShellCommand("config");
+
+        verify(mControllerService, times(1)).registerConfigurationCallback(any());
+        verify(mErrorWriter, atLeastOnce()).println(contains("timeout"));
+        verify(mOutputWriter, never()).println();
+    }
+
+    @Test
+    public void config_getConfig_expectedValueIsPrinted() {
+        doAnswer(
+                        inv -> {
+                            ((IConfigurationReceiver) inv.getArgument(0))
+                                    .onConfigurationChanged(
+                                            new ThreadConfiguration.Builder()
+                                                    .setNat64Enabled(true)
+                                                    .build());
+                            return null;
+                        })
+                .when(mControllerService)
+                .registerConfigurationCallback(any());
+
+        runShellCommand("config");
+
+        verify(mErrorWriter, never()).println();
+        verify(mOutputWriter, times(1)).println(contains("Nat64Enabled=true"));
+    }
+
+    @Test
+    public void config_setConfig_testingPermissionIsChecked() {
+        runShellCommand("config", "nat64", "enabled");
+
+        verify(mContext, times(1))
+                .enforceCallingOrSelfPermission(
+                        eq("android.permission.THREAD_NETWORK_TESTING"), anyString());
+    }
+
+    @Test
+    public void config_setConfig_serviceTimeOut_failedWithTimeoutError() {
+        runShellCommand("config", "nat64", "enabled");
+
+        verify(mControllerService, times(1)).registerConfigurationCallback(any());
+        verify(mErrorWriter, atLeastOnce()).println(contains("timeout"));
+        verify(mOutputWriter, never()).println();
+    }
+
+    @Test
+    public void config_invalidArgument_failsWithInvalidArgumentError() {
+        doAnswer(
+                        inv -> {
+                            ((IConfigurationReceiver) inv.getArgument(0))
+                                    .onConfigurationChanged(
+                                            new ThreadConfiguration.Builder().build());
+                            return null;
+                        })
+                .when(mControllerService)
+                .registerConfigurationCallback(any());
+
+        runShellCommand("config", "invalidName", "invalidValue");
+
+        verify(mErrorWriter, atLeastOnce()).println(contains("Invalid config"));
+        verify(mOutputWriter, never()).println();
+    }
+
+    @Test
+    public void config_setConfig_expectedValueIsSet() {
+        doAnswer(
+                        inv -> {
+                            ((IConfigurationReceiver) inv.getArgument(0))
+                                    .onConfigurationChanged(
+                                            new ThreadConfiguration.Builder()
+                                                    .setNat64Enabled(false)
+                                                    .build());
+                            return null;
+                        })
+                .when(mControllerService)
+                .registerConfigurationCallback(any());
+        doAnswer(
+                        inv -> {
+                            ((IOperationReceiver) inv.getArgument(0)).onSuccess();
+                            return null;
+                        })
+                .when(mControllerService)
+                .setConfiguration(any(), any());
+
+        runShellCommand("config", "nat64", "enabled");
+
+        verify(mControllerService, times(1))
+                .setConfiguration(
+                        eq(new ThreadConfiguration.Builder().setNat64Enabled(true).build()), any());
+        verify(mErrorWriter, never()).println();
+        verify(mOutputWriter, never()).println();
     }
 }

@@ -32,6 +32,7 @@ import android.net.TestNetworkInterface
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.thread.ActiveOperationalDataset
+import android.net.thread.ThreadConfiguration
 import android.net.thread.ThreadNetworkController
 import android.os.Build
 import android.os.Handler
@@ -107,6 +108,9 @@ object IntegrationTestUtils {
     @JvmField
     val DEFAULT_DATASET: ActiveOperationalDataset =
         ActiveOperationalDataset.fromThreadTlvs(DEFAULT_DATASET_TLVS)
+
+    @JvmField
+    val DEFAULT_CONFIG = ThreadConfiguration.Builder().build()
 
     /**
      * Waits for the given [Supplier] to be true until given timeout.
