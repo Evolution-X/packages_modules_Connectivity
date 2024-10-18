@@ -136,12 +136,16 @@ public final class PrivateAddressCoordinatorTest {
 
     private LinkAddress requestDownstreamAddress(
             final IpServer ipServer, int scope, boolean useLastAddress) throws Exception {
-        final LinkAddress address =
-                mPrivateAddressCoordinator.requestDownstreamAddress(
-                        ipServer.interfaceType(),
-                        scope,
-                        useLastAddress,
-                        ipServer.getIpv4PrefixRequest());
+        LinkAddress address;
+        if (useLastAddress) {
+            address =
+                    mPrivateAddressCoordinator.requestStickyDownstreamAddress(
+                            ipServer.interfaceType(), scope, ipServer.getIpv4PrefixRequest());
+        } else {
+            address =
+                    mPrivateAddressCoordinator.requestDownstreamAddress(
+                            ipServer.getIpv4PrefixRequest());
+        }
         when(ipServer.getAddress()).thenReturn(address);
         return address;
     }

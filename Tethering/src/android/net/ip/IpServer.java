@@ -725,8 +725,12 @@ public class IpServer extends StateMachineShim {
 
         if (shouldUseWifiP2pDedicatedIp()) return new LinkAddress(LEGACY_WIFI_P2P_IFACE_ADDRESS);
 
-        return mRoutingCoordinator.requestDownstreamAddress(mInterfaceType, scope, useLastAddress,
-                mIpv4PrefixRequest);
+        if (useLastAddress) {
+            return mRoutingCoordinator.requestStickyDownstreamAddress(mInterfaceType, scope,
+                    mIpv4PrefixRequest);
+        }
+
+        return mRoutingCoordinator.requestDownstreamAddress(mIpv4PrefixRequest);
     }
 
     private boolean startIPv6() {
