@@ -424,6 +424,11 @@
       ]
     }
   ],
+  "automotive-mumd-presubmit": [
+    {
+      "name": "CtsNetTestCases"
+    }
+  ],
   "imports": [
     {
       "path": "frameworks/base/core/java/android/net"
