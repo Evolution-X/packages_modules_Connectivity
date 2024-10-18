@@ -115,20 +115,27 @@ interface IRoutingCoordinator {
     void maybeRemoveDeprecatedUpstreams();
 
    /**
-    * Request an IPv4 address for the downstream.
+    * Request an IPv4 address for the downstream. Return the last time used address for the
+    * provided (interfaceType, scope) pair if possible.
     *
     * @param interfaceType the Tethering type (see TetheringManager#TETHERING_*).
     * @param scope CONNECTIVITY_SCOPE_GLOBAL or CONNECTIVITY_SCOPE_LOCAL
-    * @param useLastAddress whether to use the last address
     * @param request a {@link IIpv4PrefixRequest} to report conflicts
     * @return an IPv4 address allocated for the downstream, could be null
     */
     @nullable
-    LinkAddress requestDownstreamAddress(
+    LinkAddress requestStickyDownstreamAddress(
             in int interfaceType,
             in int scope,
-            in boolean useLastAddress,
             in IIpv4PrefixRequest request);
+   /**
+    * Request an IPv4 address for the downstream.
+    *
+    * @param request a {@link IIpv4PrefixRequest} to report conflicts
+    * @return an IPv4 address allocated for the downstream, could be null
+    */
+    @nullable
+    LinkAddress requestDownstreamAddress(in IIpv4PrefixRequest request);
 
     /** Release the IPv4 address allocated for the downstream. */
     void releaseDownstream(in IIpv4PrefixRequest request);
