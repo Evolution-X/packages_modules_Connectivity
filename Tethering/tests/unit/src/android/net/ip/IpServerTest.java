@@ -258,8 +258,8 @@ public class IpServerTest {
                     mIpServer, interfaceParams.index, upstreamPrefixes);
         }
         reset(mNetd, mBpfCoordinator, mCallback, mRoutingCoordinatorManager);
-        when(mRoutingCoordinatorManager.requestDownstreamAddress(anyInt(), anyInt(),
-                anyBoolean(), any())).thenReturn(mTestAddress);
+        when(mRoutingCoordinatorManager.requestStickyDownstreamAddress(anyInt(), anyInt(),
+                any())).thenReturn(mTestAddress);
     }
 
     @SuppressWarnings("DoNotCall") // Ignore warning for synchronous to call to Thread.run()
@@ -280,8 +280,9 @@ public class IpServerTest {
     @Before public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         when(mSharedLog.forSubComponent(anyString())).thenReturn(mSharedLog);
-        when(mRoutingCoordinatorManager.requestDownstreamAddress(anyInt(), anyInt(),
-                anyBoolean(), any())).thenReturn(mTestAddress);
+        when(mRoutingCoordinatorManager.requestStickyDownstreamAddress(anyInt(), anyInt(),
+                any())).thenReturn(mTestAddress);
+        when(mRoutingCoordinatorManager.requestDownstreamAddress(any())).thenReturn(mTestAddress);
         when(mTetherConfig.isBpfOffloadEnabled()).thenReturn(DEFAULT_USING_BPF_OFFLOAD);
         when(mTetherConfig.useLegacyDhcpServer()).thenReturn(false /* default value */);
 
@@ -348,11 +349,11 @@ public class IpServerTest {
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         if (isAtLeastT()) {
             inOrder.verify(mRoutingCoordinatorManager)
-                    .requestDownstreamAddress(
+                    .requestStickyDownstreamAddress(
                             eq(TETHERING_BLUETOOTH),
                             eq(CONNECTIVITY_SCOPE_GLOBAL),
-                            eq(true),
                             any());
+            inOrder.verify(mRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
             inOrder.verify(mNetd).interfaceSetCfg(argThat(cfg ->
                     IFACE_NAME.equals(cfg.ifName) && assertContainsFlag(cfg.flags, IF_STATE_UP)));
         }
@@ -401,8 +402,9 @@ public class IpServerTest {
 
         dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
-        inOrder.verify(mRoutingCoordinatorManager).requestDownstreamAddress(anyInt(),
-                eq(CONNECTIVITY_SCOPE_GLOBAL), eq(true), any());
+        inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
+                eq(CONNECTIVITY_SCOPE_GLOBAL), any());
+        inOrder.verify(mRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
         inOrder.verify(mNetd).interfaceSetCfg(argThat(cfg ->
                 IFACE_NAME.equals(cfg.ifName) && assertContainsFlag(cfg.flags, IF_STATE_UP)));
         inOrder.verify(mNetd).tetherInterfaceAdd(IFACE_NAME);
@@ -423,8 +425,9 @@ public class IpServerTest {
 
         dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
-        inOrder.verify(mRoutingCoordinatorManager).requestDownstreamAddress(anyInt(),
-                eq(CONNECTIVITY_SCOPE_LOCAL), eq(true), any());
+        inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
+                eq(CONNECTIVITY_SCOPE_LOCAL), any());
+        inOrder.verify(mRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
         inOrder.verify(mNetd).interfaceSetCfg(argThat(cfg ->
                   IFACE_NAME.equals(cfg.ifName) && assertNotContainsFlag(cfg.flags, IF_STATE_UP)));
         inOrder.verify(mNetd).tetherInterfaceAdd(IFACE_NAME);
@@ -449,7 +452,8 @@ public class IpServerTest {
         // When using WiFi P2p dedicated IP, the IpServer just picks the IP address without
         // requesting for it at RoutingCoordinatorManager.
         inOrder.verify(mRoutingCoordinatorManager, never())
-                .requestDownstreamAddress(anyInt(), anyInt(), anyBoolean(), any());
+                .requestStickyDownstreamAddress(anyInt(), anyInt(), any());
+        inOrder.verify(mRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
         inOrder.verify(mNetd).interfaceSetCfg(argThat(cfg ->
                 IFACE_NAME.equals(cfg.ifName) && assertNotContainsFlag(cfg.flags, IF_STATE_UP)));
         inOrder.verify(mNetd).tetherInterfaceAdd(IFACE_NAME);
@@ -731,8 +735,9 @@ public class IpServerTest {
         final ArgumentCaptor<LinkProperties> lpCaptor =
                 ArgumentCaptor.forClass(LinkProperties.class);
         InOrder inOrder = inOrder(mNetd, mCallback, mRoutingCoordinatorManager);
-        inOrder.verify(mRoutingCoordinatorManager).requestDownstreamAddress(anyInt(),
-                eq(CONNECTIVITY_SCOPE_LOCAL), eq(true), any());
+        inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
+                eq(CONNECTIVITY_SCOPE_LOCAL), any());
+        inOrder.verify(mRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
         inOrder.verify(mNetd).networkAddInterface(INetd.LOCAL_NET_ID, IFACE_NAME);
         // One for ipv4 route, one for ipv6 link local route.
         inOrder.verify(mNetd, times(2)).networkAddRoute(eq(INetd.LOCAL_NET_ID), eq(IFACE_NAME),
@@ -745,13 +750,13 @@ public class IpServerTest {
         // Simulate the DHCP server receives DHCPDECLINE on MirrorLink and then signals
         // onNewPrefixRequest callback.
         final LinkAddress newAddress = new LinkAddress("192.168.100.125/24");
-        when(mRoutingCoordinatorManager.requestDownstreamAddress(anyInt(), anyInt(),
-                anyBoolean(), any())).thenReturn(newAddress);
+        when(mRoutingCoordinatorManager.requestDownstreamAddress(any())).thenReturn(newAddress);
         eventCallbacks.onNewPrefixRequest(new IpPrefix("192.168.42.0/24"));
         mLooper.dispatchAll();
 
-        inOrder.verify(mRoutingCoordinatorManager).requestDownstreamAddress(anyInt(),
-                eq(CONNECTIVITY_SCOPE_LOCAL), eq(false), any());
+        inOrder.verify(mRoutingCoordinatorManager, never())
+                .requestStickyDownstreamAddress(anyInt(), anyInt(), any());
+        inOrder.verify(mRoutingCoordinatorManager).requestDownstreamAddress(any());
         inOrder.verify(mNetd).tetherApplyDnsInterfaces();
         inOrder.verify(mCallback).updateLinkProperties(eq(mIpServer), lpCaptor.capture());
         verifyNoMoreInteractions(mCallback);

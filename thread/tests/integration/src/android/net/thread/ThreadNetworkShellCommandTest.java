@@ -19,6 +19,7 @@ package android.net.thread;
 import static android.net.thread.ThreadNetworkController.STATE_DISABLED;
 import static android.net.thread.ThreadNetworkController.STATE_ENABLED;
 import static android.net.thread.ThreadNetworkException.ERROR_THREAD_DISABLED;
+import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_CONFIG;
 import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
 
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
@@ -79,6 +80,7 @@ public class ThreadNetworkShellCommandTest {
     public void tearDown() throws Exception {
         mFtd.destroy();
         ensureThreadEnabled();
+        mController.setConfigurationAndWait(DEFAULT_CONFIG);
     }
 
     private static void ensureThreadEnabled() {
@@ -177,6 +179,27 @@ public class ThreadNetworkShellCommandTest {
         assertThat(result).contains("1 packets transmitted, 1 packets received");
         assertThat(result).contains("Packet loss = 0.0%");
         assertThat(result).endsWith("Done\r\n");
+    }
+
+    @Test
+    public void config_getConfig_expectedValueIsPrinted() throws Exception {
+        ThreadConfiguration config =
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
+        mController.setConfigurationAndWait(config);
+
+        final String result = runThreadCommand("config");
+
+        assertThat(result).contains("Nat64Enabled=true");
+    }
+
+    @Test
+    public void config_setConfig_expectedValueIsSet() throws Exception {
+        ThreadConfiguration config = new ThreadConfiguration.Builder().build();
+        mController.setConfigurationAndWait(config);
+
+        runThreadCommand("config nat64 enabled");
+
+        assertThat(mController.getConfiguration().isNat64Enabled()).isTrue();
     }
 
     private static String runThreadCommand(String cmd) {

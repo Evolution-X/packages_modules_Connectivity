@@ -444,24 +444,26 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     }
 
     public void initialize() {
-        mHandler.post(
-                () -> {
-                    LOG.v(
-                            "Initializing Thread system service: Thread is "
-                                    + (shouldEnableThread() ? "enabled" : "disabled"));
-                    try {
-                        mTunIfController.createTunInterface();
-                    } catch (IOException e) {
-                        throw new IllegalStateException(
-                                "Failed to create Thread tunnel interface", e);
-                    }
-                    mConnectivityManager.registerNetworkProvider(mNetworkProvider);
-                    requestUpstreamNetwork();
-                    registerThreadNetworkCallback();
-                    mUserRestricted = isThreadUserRestricted();
-                    registerUserRestrictionsReceiver();
-                    maybeInitializeOtDaemon();
-                });
+        mHandler.post(() -> initializeInternal());
+    }
+
+    private void initializeInternal() {
+        checkOnHandlerThread();
+
+        LOG.v(
+                "Initializing Thread system service: Thread is "
+                        + (shouldEnableThread() ? "enabled" : "disabled"));
+        try {
+            mTunIfController.createTunInterface();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create Thread tunnel interface", e);
+        }
+        mConnectivityManager.registerNetworkProvider(mNetworkProvider);
+        requestUpstreamNetwork();
+        registerThreadNetworkCallback();
+        mUserRestricted = isThreadUserRestricted();
+        registerUserRestrictionsReceiver();
+        maybeInitializeOtDaemon();
     }
 
     /**
