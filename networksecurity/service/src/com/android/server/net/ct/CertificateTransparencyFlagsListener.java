@@ -43,7 +43,7 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
 
     void initialize() {
         mDataStore.load();
-        mCertificateTransparencyDownloader.registerReceiver();
+        mCertificateTransparencyDownloader.initialize();
         DeviceConfig.addOnPropertiesChangedListener(
                 Config.NAMESPACE_NETWORK_SECURITY, Executors.newSingleThreadExecutor(), this);
         if (Config.DEBUG) {
