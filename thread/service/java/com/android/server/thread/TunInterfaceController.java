@@ -93,7 +93,7 @@ public class TunInterfaceController {
 
     /** Returns link properties of the Thread TUN interface. */
     public LinkProperties getLinkProperties() {
-        return mLinkProperties;
+        return new LinkProperties(mLinkProperties);
     }
 
     /**
