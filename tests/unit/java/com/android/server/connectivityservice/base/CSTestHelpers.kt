@@ -54,6 +54,7 @@ import com.android.internal.util.test.FakeSettingsProvider
 import com.android.modules.utils.build.SdkLevel
 import com.android.server.ConnectivityService.Dependencies
 import com.android.server.connectivity.ConnectivityResources
+import com.android.server.connectivity.PermissionMonitor
 import kotlin.test.fail
 import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.any
@@ -192,13 +193,14 @@ internal fun initMockedResources(res: Resources) {
 
 private val TEST_LINGER_DELAY_MS = 400
 private val TEST_NASCENT_DELAY_MS = 300
-internal fun makeConnectivityService(context: Context, netd: INetd, deps: Dependencies) =
+internal fun makeConnectivityService(context: Context, netd: INetd, deps: Dependencies,
+                                     mPermDeps: PermissionMonitor.Dependencies) =
         ConnectivityService(
                 context,
                 mock<IDnsResolver>(),
                 mock<IpConnectivityLog>(),
                 netd,
-                deps).also {
+                deps, mPermDeps).also {
             it.mLingerDelayMs = TEST_LINGER_DELAY_MS
             it.mNascentDelayMs = TEST_NASCENT_DELAY_MS
         }

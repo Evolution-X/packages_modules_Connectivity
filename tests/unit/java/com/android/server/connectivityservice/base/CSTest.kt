@@ -72,6 +72,7 @@ import com.android.server.connectivity.MulticastRoutingCoordinatorService
 import com.android.server.connectivity.MultinetworkPolicyTracker
 import com.android.server.connectivity.MultinetworkPolicyTrackerTestDependencies
 import com.android.server.connectivity.NetworkRequestStateStatsMetrics
+import com.android.server.connectivity.PermissionMonitor
 import com.android.server.connectivity.ProxyTracker
 import com.android.server.connectivity.SatelliteAccessController
 import com.android.testutils.visibleOnHandlerThread
@@ -217,6 +218,7 @@ open class CSTest {
     val destroySocketsWrapper = mock<DestroySocketsWrapper>()
 
     val deps = CSDeps()
+    val permDeps = PermDeps()
 
     // Initializations that start threads are done from setUp to avoid thread leak
     lateinit var alarmHandlerThread: HandlerThread
@@ -253,7 +255,9 @@ open class CSTest {
 
         alarmHandlerThread = HandlerThread("TestAlarmManager").also { it.start() }
         alarmManager = makeMockAlarmManager(alarmHandlerThread)
-        service = makeConnectivityService(context, netd, deps).also { it.systemReadyInternal() }
+        service = makeConnectivityService(context, netd, deps, permDeps).also {
+            it.systemReadyInternal()
+        }
         cm = ConnectivityManager(context, service)
         // csHandler initialization must be after makeConnectivityService since ConnectivityService
         // constructor starts csHandlerThread
@@ -397,6 +401,10 @@ open class CSTest {
         }
 
         override fun makeL2capNetworkProvider(context: Context) = null
+    }
+
+    inner class PermDeps : PermissionMonitor.Dependencies() {
+        override fun shouldEnforceLocalNetRestrictions(uid: Int) = false
     }
 
     inner class CSContext(base: Context) : BroadcastInterceptingContext(base) {
