@@ -33,9 +33,12 @@ import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_PROVISIONING_FAILED;
 
+import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIVATE;
 import static com.android.networkstack.apishim.ConstantsShim.ACTION_TETHER_UNSUPPORTED_CARRIER_UI;
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_NOT_EXPORTED;
 
+import android.annotation.NonNull;
+import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -50,8 +53,12 @@ import android.os.Parcel;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.Settings;
 import android.util.SparseIntArray;
+
+import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
@@ -85,7 +92,6 @@ public class EntitlementManager {
     // Indicate tethering is not supported by carrier.
     private static final int TETHERING_PROVISIONING_CARRIER_UNSUPPORT = 1002;
 
-    private final ComponentName mSilentProvisioningService;
     private static final int MS_PER_HOUR = 60 * 60 * 1000;
     private static final int DUMP_TIMEOUT = 10_000;
 
@@ -109,9 +115,115 @@ public class EntitlementManager {
     private boolean mNeedReRunProvisioningUi = false;
     private OnTetherProvisioningFailedListener mListener;
     private TetheringConfigurationFetcher mFetcher;
+    private final Dependencies mDeps;
+
+    @VisibleForTesting(visibility = PRIVATE)
+    static class Dependencies {
+        @NonNull
+        private final Context mContext;
+        @NonNull
+        private final SharedLog mLog;
+        private final ComponentName mSilentProvisioningService;
+
+        Dependencies(@NonNull Context context, @NonNull SharedLog log) {
+            mContext = context;
+            mLog = log;
+            mSilentProvisioningService = ComponentName.unflattenFromString(
+                    mContext.getResources().getString(R.string.config_wifi_tether_enable));
+        }
+
+        /**
+         * Run the UI-enabled tethering provisioning check.
+         * @param type tethering type from TetheringManager.TETHERING_{@code *}
+         * @param receiver to receive entitlement check result.
+         *
+         * @return the broadcast intent, or null if the current user is not allowed to
+         *         perform entitlement check.
+         */
+        @Nullable
+        protected Intent runUiTetherProvisioning(int type, final TetheringConfiguration config,
+                ResultReceiver receiver) {
+            if (DBG) mLog.i("runUiTetherProvisioning: " + type);
+
+            Intent intent = new Intent(Settings.ACTION_TETHER_PROVISIONING_UI);
+            intent.putExtra(EXTRA_ADD_TETHER_TYPE, type);
+            intent.putExtra(EXTRA_TETHER_UI_PROVISIONING_APP_NAME, config.provisioningApp);
+            intent.putExtra(EXTRA_PROVISION_CALLBACK, receiver);
+            intent.putExtra(EXTRA_TETHER_SUBID, config.activeDataSubId);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            // Only launch entitlement UI for the current user if it is allowed to
+            // change tethering. This usually means the system user or the admin users in HSUM.
+            if (SdkLevel.isAtLeastT()) {
+                // Create a user context for the current foreground user as UserManager#isAdmin()
+                // operates on the context user.
+                final int currentUserId = getCurrentUser();
+                final UserHandle currentUser = UserHandle.of(currentUserId);
+                final Context userContext = mContext.createContextAsUser(currentUser, 0);
+                final UserManager userManager = userContext.getSystemService(UserManager.class);
+
+                if (userManager.isAdminUser()) {
+                    mContext.startActivityAsUser(intent, currentUser);
+                } else {
+                    mLog.e("Current user (" + currentUserId
+                            + ") is not allowed to perform entitlement check.");
+                    return null;
+                }
+            } else {
+                // For T- devices, there is no other admin user other than the system user.
+                mContext.startActivity(intent);
+            }
+            return intent;
+        }
+
+        /**
+         * Run no UI tethering provisioning check.
+         * @param type tethering type from TetheringManager.TETHERING_{@code *}
+         */
+        protected Intent runSilentTetherProvisioning(
+                int type, final TetheringConfiguration config, ResultReceiver receiver) {
+            if (DBG) mLog.i("runSilentTetherProvisioning: " + type);
+
+            Intent intent = new Intent();
+            intent.putExtra(EXTRA_ADD_TETHER_TYPE, type);
+            intent.putExtra(EXTRA_RUN_PROVISION, true);
+            intent.putExtra(EXTRA_TETHER_SILENT_PROVISIONING_ACTION, config.provisioningAppNoUi);
+            intent.putExtra(EXTRA_TETHER_PROVISIONING_RESPONSE, config.provisioningResponse);
+            intent.putExtra(EXTRA_PROVISION_CALLBACK, receiver);
+            intent.putExtra(EXTRA_TETHER_SUBID, config.activeDataSubId);
+            intent.setComponent(mSilentProvisioningService);
+            // Only admin user can change tethering and SilentTetherProvisioning don't need to
+            // show UI, it is fine to always start setting's background service as system user.
+            mContext.startService(intent);
+            return intent;
+        }
+
+        /**
+         * Create a PendingIntent for the provisioning recheck alarm.
+         * @param pkgName the package name of the PendingIntent.
+         */
+        PendingIntent createRecheckAlarmIntent(final String pkgName) {
+            final Intent intent = new Intent(ACTION_PROVISIONING_ALARM);
+            intent.setPackage(pkgName);
+            return PendingIntent.getBroadcast(mContext, 0, intent, PendingIntent.FLAG_IMMUTABLE);
+        }
+
+        /**
+         * Get the current user id.
+         */
+        int getCurrentUser() {
+            return ActivityManager.getCurrentUser();
+        }
+    }
 
     public EntitlementManager(Context ctx, Handler h, SharedLog log,
             Runnable callback) {
+        this(ctx, h, log, callback, new Dependencies(ctx, log));
+    }
+
+    @VisibleForTesting(visibility = PRIVATE)
+    EntitlementManager(Context ctx, Handler h, SharedLog log,
+            Runnable callback, @NonNull Dependencies deps) {
         mContext = ctx;
         mLog = log.forSubComponent(TAG);
         mCurrentDownstreams = new BitSet();
@@ -120,6 +232,7 @@ public class EntitlementManager {
         mEntitlementCacheValue = new SparseIntArray();
         mPermissionChangeCallback = callback;
         mHandler = h;
+        mDeps = deps;
         if (SdkLevel.isAtLeastU()) {
             mContext.registerReceiver(mReceiver, new IntentFilter(ACTION_PROVISIONING_ALARM),
                     null, mHandler, RECEIVER_NOT_EXPORTED);
@@ -127,8 +240,6 @@ public class EntitlementManager {
             mContext.registerReceiver(mReceiver, new IntentFilter(ACTION_PROVISIONING_ALARM),
                     null, mHandler);
         }
-        mSilentProvisioningService = ComponentName.unflattenFromString(
-                mContext.getResources().getString(R.string.config_wifi_tether_enable));
     }
 
     public void setOnTetherProvisioningFailedListener(
@@ -382,53 +493,6 @@ public class EntitlementManager {
         }
     }
 
-    /**
-     * Run no UI tethering provisioning check.
-     * @param type tethering type from TetheringManager.TETHERING_{@code *}
-     * @param subId default data subscription ID.
-     */
-    @VisibleForTesting
-    protected Intent runSilentTetherProvisioning(
-            int type, final TetheringConfiguration config, ResultReceiver receiver) {
-        if (DBG) mLog.i("runSilentTetherProvisioning: " + type);
-
-        Intent intent = new Intent();
-        intent.putExtra(EXTRA_ADD_TETHER_TYPE, type);
-        intent.putExtra(EXTRA_RUN_PROVISION, true);
-        intent.putExtra(EXTRA_TETHER_SILENT_PROVISIONING_ACTION, config.provisioningAppNoUi);
-        intent.putExtra(EXTRA_TETHER_PROVISIONING_RESPONSE, config.provisioningResponse);
-        intent.putExtra(EXTRA_PROVISION_CALLBACK, receiver);
-        intent.putExtra(EXTRA_TETHER_SUBID, config.activeDataSubId);
-        intent.setComponent(mSilentProvisioningService);
-        // Only admin user can change tethering and SilentTetherProvisioning don't need to
-        // show UI, it is fine to always start setting's background service as system user.
-        mContext.startService(intent);
-        return intent;
-    }
-
-    /**
-     * Run the UI-enabled tethering provisioning check.
-     * @param type tethering type from TetheringManager.TETHERING_{@code *}
-     * @param subId default data subscription ID.
-     * @param receiver to receive entitlement check result.
-     */
-    @VisibleForTesting
-    protected Intent runUiTetherProvisioning(int type, final TetheringConfiguration config,
-            ResultReceiver receiver) {
-        if (DBG) mLog.i("runUiTetherProvisioning: " + type);
-
-        Intent intent = new Intent(Settings.ACTION_TETHER_PROVISIONING_UI);
-        intent.putExtra(EXTRA_ADD_TETHER_TYPE, type);
-        intent.putExtra(EXTRA_TETHER_UI_PROVISIONING_APP_NAME, config.provisioningApp);
-        intent.putExtra(EXTRA_PROVISION_CALLBACK, receiver);
-        intent.putExtra(EXTRA_TETHER_SUBID, config.activeDataSubId);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        // Only launch entitlement UI for system user. Entitlement UI should not appear for other
-        // user because only admin user is allowed to change tethering.
-        mContext.startActivity(intent);
-        return intent;
-    }
-
     private void runTetheringProvisioning(
             boolean showProvisioningUi, int downstreamType, final TetheringConfiguration config) {
         if (!config.isCarrierSupportTethering) {
@@ -442,9 +506,9 @@ public class EntitlementManager {
         ResultReceiver receiver =
                 buildProxyReceiver(downstreamType, showProvisioningUi/* notifyFail */, null);
         if (showProvisioningUi) {
-            runUiTetherProvisioning(downstreamType, config, receiver);
+            mDeps.runUiTetherProvisioning(downstreamType, config, receiver);
         } else {
-            runSilentTetherProvisioning(downstreamType, config, receiver);
+            mDeps.runSilentTetherProvisioning(downstreamType, config, receiver);
         }
     }
 
@@ -458,20 +522,13 @@ public class EntitlementManager {
         mContext.startActivity(intent);
     }
 
-    @VisibleForTesting
-    PendingIntent createRecheckAlarmIntent(final String pkgName) {
-        final Intent intent = new Intent(ACTION_PROVISIONING_ALARM);
-        intent.setPackage(pkgName);
-        return PendingIntent.getBroadcast(mContext, 0, intent, PendingIntent.FLAG_IMMUTABLE);
-    }
-
     // Not needed to check if this don't run on the handler thread because it's private.
     private void scheduleProvisioningRecheck(final TetheringConfiguration config) {
         if (mProvisioningRecheckAlarm == null) {
             final int period = config.provisioningCheckPeriod;
             if (period <= 0) return;
 
-            mProvisioningRecheckAlarm = createRecheckAlarmIntent(mContext.getPackageName());
+            mProvisioningRecheckAlarm = mDeps.createRecheckAlarmIntent(mContext.getPackageName());
             AlarmManager alarmManager = (AlarmManager) mContext.getSystemService(
                     Context.ALARM_SERVICE);
             long triggerAtMillis = SystemClock.elapsedRealtime() + (period * MS_PER_HOUR);
@@ -697,7 +754,7 @@ public class EntitlementManager {
             receiver.send(cacheValue, null);
         } else {
             ResultReceiver proxy = buildProxyReceiver(downstream, false/* notifyFail */, receiver);
-            runUiTetherProvisioning(downstream, config, proxy);
+            mDeps.runUiTetherProvisioning(downstream, config, proxy);
         }
     }
 }
