@@ -16,6 +16,7 @@
 
 package com.android.server.net.integrationtests
 
+import android.Manifest.permission
 import android.app.usage.NetworkStatsManager
 import android.content.ComponentName
 import android.content.Context
@@ -66,6 +67,7 @@ import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.DeviceInfoUtils
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.runAsShell
 import com.android.testutils.tryTest
 import java.util.function.BiConsumer
 import java.util.function.Consumer
@@ -208,7 +210,9 @@ class ConnectivityServiceIntegrationTest {
         networkStackClient = TestNetworkStackClient(realContext)
         networkStackClient.start()
 
-        service = TestConnectivityService(TestDependencies())
+        service = runAsShell(permission.OBSERVE_GRANT_REVOKE_PERMISSIONS) {
+            TestConnectivityService(TestDependencies())
+        }
         cm = ConnectivityManager(context, service)
         context.addMockSystemService(Context.CONNECTIVITY_SERVICE, cm)
         context.addMockSystemService(Context.NETWORK_STATS_SERVICE, statsManager)
