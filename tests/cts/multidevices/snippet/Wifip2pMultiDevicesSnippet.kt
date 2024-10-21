@@ -21,8 +21,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager.FEATURE_WIFI_DIRECT
 import android.net.MacAddress
-import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
@@ -44,10 +44,6 @@ private const val TIMEOUT_MS = 60000L
 
 class Wifip2pMultiDevicesSnippet : Snippet {
     private val context by lazy { InstrumentationRegistry.getInstrumentation().getTargetContext() }
-    private val wifiManager by lazy {
-        context.getSystemService(WifiManager::class.java)
-                ?: fail("Could not get WifiManager service")
-    }
     private val wifip2pManager by lazy {
         context.getSystemService(WifiP2pManager::class.java)
                 ?: fail("Could not get WifiP2pManager service")
@@ -84,7 +80,7 @@ class Wifip2pMultiDevicesSnippet : Snippet {
     }
 
     @Rpc(description = "Check whether the device supports Wi-Fi P2P.")
-    fun isP2pSupported() = wifiManager.isP2pSupported()
+    fun isP2pSupported() = context.packageManager.hasSystemFeature(FEATURE_WIFI_DIRECT)
 
     @Rpc(description = "Start Wi-Fi P2P")
     fun startWifiP2p() {
