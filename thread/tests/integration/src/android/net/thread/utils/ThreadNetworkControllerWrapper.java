@@ -200,7 +200,7 @@ public final class ThreadNetworkControllerWrapper {
         runAsShell(
                 PERMISSION_THREAD_NETWORK_PRIVILEGED,
                 () -> mController.registerConfigurationCallback(directExecutor(), callback));
-        future.get(CALLBACK_TIMEOUT.toSeconds(), SECONDS);
+        future.get(CONFIG_TIMEOUT.toSeconds(), SECONDS);
         runAsShell(
                 PERMISSION_THREAD_NETWORK_PRIVILEGED,
                 () -> mController.unregisterConfigurationCallback(callback));
@@ -214,7 +214,14 @@ public final class ThreadNetworkControllerWrapper {
                 () ->
                         mController.setConfiguration(
                                 config, directExecutor(), newOutcomeReceiver(future)));
-        future.get(CALLBACK_TIMEOUT.toSeconds(), SECONDS);
+        future.get(CONFIG_TIMEOUT.toSeconds(), SECONDS);
+    }
+
+    public void setNat64EnabledAndWait(boolean enabled) throws Exception {
+        final ThreadConfiguration config = getConfiguration();
+        final ThreadConfiguration newConfig =
+                new ThreadConfiguration.Builder(config).setNat64Enabled(enabled).build();
+        setConfigurationAndWait(newConfig);
     }
 
     private static <V> OutcomeReceiver<V, ThreadNetworkException> newOutcomeReceiver(
