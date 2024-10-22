@@ -19,6 +19,8 @@ from typing import Callable
 class UnexpectedBehaviorError(Exception):
   """Raised when there is an unexpected behavior during applying a procedure."""
 
+class UnexpectedExceptionError(Exception):
+  """Raised when there is an unexpected exception throws during applying a procedure"""
 
 def expect_with_retry(
     predicate: Callable[[], bool],
@@ -41,3 +43,17 @@ def expect_with_retry(
   raise UnexpectedBehaviorError(
       "Predicate didn't become true after " + str(max_retries) + " retries."
   )
+
+def expect_throws(runnable: callable, exception_class) -> None:
+  try:
+    runnable()
+    raise UnexpectedBehaviorError("Expected an exception, but none was thrown")
+  except exception_class:
+    pass
+  except UnexpectedBehaviorError as e:
+    raise e
+  except Exception as e:
+      raise UnexpectedExceptionError(
+        f"Expected exception of type {exception_class.__name__}, "
+        f"but got {type(e).__name__}: {e}"
+      )
