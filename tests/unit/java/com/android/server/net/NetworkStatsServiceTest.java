@@ -78,6 +78,7 @@ import static com.android.server.net.NetworkStatsService.NETSTATS_FASTDATAINPUT_
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_ATTEMPTS_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_FALLBACKS_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_SUCCESSES_COUNTER_NAME;
+import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG;
 import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
@@ -129,6 +130,7 @@ import android.net.TetherStatsParcel;
 import android.net.TetheringManager;
 import android.net.UnderlyingNetworkInfo;
 import android.net.netstats.StatsResult;
+import android.net.netstats.TrafficStatsRateLimitCacheConfig;
 import android.net.netstats.provider.INetworkStatsProviderCallback;
 import android.net.wifi.WifiInfo;
 import android.os.Build;
@@ -622,8 +624,9 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         }
 
         @Override
-        public boolean isTrafficStatsServiceRateLimitCacheEnabled(Context ctx) {
-            return mFeatureFlags.getOrDefault(
+        public boolean isTrafficStatsServiceRateLimitCacheEnabled(Context ctx,
+                boolean isClientCacheEnabled) {
+            return !isClientCacheEnabled && mFeatureFlags.getOrDefault(
                     TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG, false);
         }
 
@@ -641,6 +644,19 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         @Override
         public int getTrafficStatsServiceRateLimitCacheMaxEntries() {
             return DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES;
+        }
+
+        @Override
+        public TrafficStatsRateLimitCacheConfig getTrafficStatsRateLimitCacheClientSideConfig(
+                @NonNull Context ctx) {
+            final TrafficStatsRateLimitCacheConfig config =
+                    new TrafficStatsRateLimitCacheConfig.Builder()
+                            .setIsCacheEnabled(mFeatureFlags.getOrDefault(
+                                    TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG, false))
+                            .setExpiryDurationMs(DEFAULT_TRAFFIC_STATS_CACHE_EXPIRY_DURATION_MS)
+                            .setMaxEntries(DEFAULT_TRAFFIC_STATS_SERVICE_CACHE_MAX_ENTRIES)
+                            .build();
+            return config;
         }
 
         @Override
@@ -2452,6 +2468,44 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         assertUidTotal(sTemplateWifi, UID_RED, 0L, 0L, 0L, 0L, 0);
         assertUidTotal(sTemplateWifi, UID_BLUE, 0L, 0L, 0L, 0L, 0);
         assertUidTotal(sTemplateWifi, UID_GREEN, 64L, 3L, 1024L, 8L, 0);
+    }
+
+    @FeatureFlag(name = TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
+    @Test
+    public void testGetRateLimitCacheConfig_featureDisabled() {
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, false);
+        assertFalse(mService.getRateLimitCacheConfig().isCacheEnabled);
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
+        assertFalse(mService.getRateLimitCacheConfig().isCacheEnabled);
+    }
+
+    @FeatureFlag(name = TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Test
+    public void testGetRateLimitCacheConfig_vOrAbove() {
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, false);
+        assertTrue(mService.getRateLimitCacheConfig().isCacheEnabled);
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
+        assertTrue(mService.getRateLimitCacheConfig().isCacheEnabled);
+    }
+
+    @FeatureFlag(name = TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @DevSdkIgnoreRule.IgnoreAfter(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Test
+    public void testGetRateLimitCacheConfig_belowV() {
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, false);
+        assertFalse(mService.getRateLimitCacheConfig().isCacheEnabled);
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
+        assertTrue(mService.getRateLimitCacheConfig().isCacheEnabled);
+    }
+
+    @FeatureFlag(name = TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG)
+    @Test
+    public void testTrafficStatsRateLimitCache_clientCacheEnabledDisableServiceCache()
+            throws Exception {
+        mDeps.setChangeEnabled(ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE, true);
+        doTestTrafficStatsRateLimitCache(false /* expectCached */);
     }
 
     @FeatureFlag(name = TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG, enabled = false)
