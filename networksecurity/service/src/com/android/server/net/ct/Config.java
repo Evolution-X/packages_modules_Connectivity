@@ -33,6 +33,10 @@ final class Config {
     private static final String PREFERENCES_FILE_NAME = "ct.preferences";
     static final File PREFERENCES_FILE = new File(DEVICE_PROTECTED_DATA_DIR, PREFERENCES_FILE_NAME);
 
+    // CT directory
+    static final String CT_ROOT_DIRECTORY_PATH = "/data/misc/keychain/ct/";
+    static final String COMPATIBILITY_VERSION = "v1";
+
     // Phenotype flags
     static final String NAMESPACE_NETWORK_SECURITY = "network_security";
     private static final String FLAGS_PREFIX = "CertificateTransparencyLogList__";
