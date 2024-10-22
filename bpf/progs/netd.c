@@ -99,6 +99,11 @@ DEFINE_BPF_RINGBUF_EXT(packet_trace_ringbuf, PacketTrace, PACKET_TRACE_BUF_SIZE,
 DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
                        DATA_SAVER_ENABLED_MAP_SIZE)
 
+DEFINE_BPF_MAP_EXT(local_net_access_map, LPM_TRIE, LocalNetAccessKey, bool, 1000,
+                   AID_ROOT, AID_NET_BW_ACCT, 0060, "fs_bpf_net_shared", "", PRIVATE,
+                   BPFLOADER_MAINLINE_25Q2_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG, LOAD_ON_USER,
+                   LOAD_ON_USERDEBUG, 0)
+
 // iptables xt_bpf programs need to be usable by both netd and netutils_wrappers
 // selinux contexts, because even non-xt_bpf iptables mutations are implemented as
 // a full table dump, followed by an update in userspace, and then a reload into the kernel,
@@ -228,6 +233,23 @@ static __always_inline inline int bpf_skb_load_bytes_net(const struct __sk_buff*
     return KVER_IS_AT_LEAST(kver, 4, 19, 0)
         ? bpf_skb_load_bytes_relative(skb, L3_off, to, len, BPF_HDR_START_NET)
         : bpf_skb_load_bytes(skb, L3_off, to, len);
+}
+
+/*
+ * False iff arguments are found with longest prefix match lookup and disallowed.
+ */
+static inline __always_inline __unused bool is_local_net_access_allowed(const uint32_t if_index,
+        const struct in6_addr* remote_ip6, const uint16_t protocol, const __be16 remote_port) {
+    LocalNetAccessKey query_key = {
+        .lpm_bitlen = 8 * (sizeof(if_index) + sizeof(*remote_ip6) + sizeof(protocol)
+            + sizeof(remote_port)),
+        .if_index = if_index,
+        .remote_ip6 = *remote_ip6,
+        .protocol = protocol,
+        .remote_port = remote_port
+    };
+    bool* v = bpf_local_net_access_map_lookup_elem(&query_key);
+    return v ? *v : true;
 }
 
 static __always_inline inline void do_packet_tracing(
