@@ -61,7 +61,11 @@ public final class ThreadConfiguration implements Parcelable {
         return mNat64Enabled;
     }
 
-    /** Returns {@code true} if DHCPv6 Prefix Delegation is enabled. */
+    /**
+     * Returns {@code true} if DHCPv6 Prefix Delegation is enabled.
+     *
+     * @hide
+     */
     public boolean isDhcpv6PdEnabled() {
         return mDhcpv6PdEnabled;
     }

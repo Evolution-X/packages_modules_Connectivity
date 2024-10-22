@@ -500,7 +500,6 @@ package android.net.thread {
 
   @FlaggedApi("com.android.net.thread.flags.configuration_enabled") public final class ThreadConfiguration implements android.os.Parcelable {
     method public int describeContents();
-    method public boolean isDhcpv6PdEnabled();
     method public boolean isNat64Enabled();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.thread.ThreadConfiguration> CREATOR;
