@@ -61,7 +61,7 @@ java_library {
 // Combine Connectivity, NetworkStack and Tethering jarjar rules for coverage target.
 // The jarjar files are simply concatenated in the order specified in srcs.
 // jarjar stops at the first matching rule, so order of concatenation affects the output.
-genrule {
+java_genrule {
     name: "ConnectivityCoverageJarJarRules",
     defaults: ["jarjar-rules-combine-defaults"],
     srcs: [

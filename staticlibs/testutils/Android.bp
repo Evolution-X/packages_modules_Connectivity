@@ -103,7 +103,7 @@ java_test_host {
         "mcts-wifi",
         "mcts-dnsresolver",
     ],
-    data: [":ConnectivityTestPreparer"],
+    device_common_data: [":ConnectivityTestPreparer"],
 }
 
 python_library_host {
