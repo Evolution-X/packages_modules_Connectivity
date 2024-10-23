@@ -38,9 +38,15 @@ import android.os.Build
 import android.os.Handler
 import android.os.SystemClock
 import android.system.OsConstants
+import android.system.OsConstants.IPPROTO_ICMP
 import androidx.test.core.app.ApplicationProvider
 import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
+import com.android.net.module.util.IpUtils
 import com.android.net.module.util.NetworkStackConstants
+import com.android.net.module.util.NetworkStackConstants.ICMP_CHECKSUM_OFFSET
+import com.android.net.module.util.NetworkStackConstants.IPV4_CHECKSUM_OFFSET
+import com.android.net.module.util.NetworkStackConstants.IPV4_HEADER_MIN_LEN
+import com.android.net.module.util.NetworkStackConstants.IPV4_LENGTH_OFFSET
 import com.android.net.module.util.Struct
 import com.android.net.module.util.structs.Icmpv4Header
 import com.android.net.module.util.structs.Icmpv6Header
@@ -305,6 +311,73 @@ object IntegrationTestUtils {
             // by anybody.
         }
         return null
+    }
+
+    /** Builds an ICMPv4 Echo Reply packet to respond to the given ICMPv4 Echo Request packet. */
+    @JvmStatic
+    fun buildIcmpv4EchoReply(request: ByteBuffer): ByteBuffer? {
+        val requestIpv4Header = Struct.parse(Ipv4Header::class.java, request) ?: return null
+        val requestIcmpv4Header = Struct.parse(Icmpv4Header::class.java, request) ?: return null
+
+        val id = request.getShort()
+        val seq = request.getShort()
+
+        val payload = ByteBuffer.allocate(4 + request.limit() - request.position())
+        payload.putShort(id)
+        payload.putShort(seq)
+        payload.put(request)
+        payload.rewind()
+
+        val ipv4HeaderLen = Struct.getSize(Ipv4Header::class.java)
+        val Icmpv4HeaderLen = Struct.getSize(Icmpv4Header::class.java)
+        val payloadLen = payload.limit();
+
+        val reply = ByteBuffer.allocate(ipv4HeaderLen + Icmpv4HeaderLen + payloadLen)
+
+        // IPv4 header
+        val replyIpv4Header = Ipv4Header(
+            0 /* TYPE OF SERVICE */,
+            0.toShort().toInt()/* totalLength, calculate later */,
+            requestIpv4Header.id,
+            requestIpv4Header.flagsAndFragmentOffset,
+            0x40 /* ttl */,
+            IPPROTO_ICMP.toByte(),
+            0.toShort()/* checksum, calculate later */,
+            requestIpv4Header.dstIp /* srcIp */,
+            requestIpv4Header.srcIp /* dstIp */
+        )
+        replyIpv4Header.writeToByteBuffer(reply)
+
+        // ICMPv4 header
+        val replyIcmpv4Header = Icmpv4Header(
+            0 /* type, ICMP_ECHOREPLY */,
+            requestIcmpv4Header.code,
+            0.toShort() /* checksum, calculate later */
+        )
+        replyIcmpv4Header.writeToByteBuffer(reply)
+
+        // Payload
+        reply.put(payload)
+        reply.flip()
+
+        // Populate the IPv4 totalLength field.
+        reply.putShort(
+            IPV4_LENGTH_OFFSET, (ipv4HeaderLen + Icmpv4HeaderLen + payloadLen).toShort()
+        )
+
+        // Populate the IPv4 header checksum field.
+        reply.putShort(
+            IPV4_CHECKSUM_OFFSET, IpUtils.ipChecksum(reply, 0 /* headerOffset */)
+        )
+
+        // Populate the ICMP checksum field.
+        reply.putShort(
+            IPV4_HEADER_MIN_LEN + ICMP_CHECKSUM_OFFSET, IpUtils.icmpChecksum(
+                reply, IPV4_HEADER_MIN_LEN, Icmpv4HeaderLen + payloadLen
+            )
+        )
+
+        return reply
     }
 
     /** Returns the Prefix Information Options (PIO) extracted from an ICMPv6 RA message.  */
