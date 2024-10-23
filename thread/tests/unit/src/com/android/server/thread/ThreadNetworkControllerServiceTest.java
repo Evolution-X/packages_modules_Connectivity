@@ -44,6 +44,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNotNull;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
@@ -64,6 +66,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
+import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkAgent;
@@ -91,9 +94,12 @@ import androidx.test.filters.SmallTest;
 
 import com.android.connectivity.resources.R;
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
+import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.thread.openthread.DnsTxtAttribute;
+import com.android.server.thread.openthread.IOtStatusReceiver;
 import com.android.server.thread.openthread.MeshcopTxtAttributes;
+import com.android.server.thread.openthread.OtDaemonConfiguration;
 import com.android.server.thread.openthread.testing.FakeOtDaemon;
 
 import org.junit.Before;
@@ -164,8 +170,10 @@ public final class ThreadNetworkControllerServiceTest {
     private static final byte[] TEST_VENDOR_OUI_BYTES = new byte[] {(byte) 0xAC, (byte) 0xDE, 0x48};
     private static final String TEST_VENDOR_NAME = "test vendor";
     private static final String TEST_MODEL_NAME = "test model";
+    private static final LinkAddress TEST_NAT64_CIDR = new LinkAddress("192.168.255.0/24");
 
     @Mock private ConnectivityManager mMockConnectivityManager;
+    @Mock private RoutingCoordinatorManager mMockRoutingCoordinatorManager;
     @Mock private NetworkAgent mMockNetworkAgent;
     @Mock private TunInterfaceController mMockTunIfController;
     @Mock private ParcelFileDescriptor mMockTunFd;
@@ -208,7 +216,10 @@ public final class ThreadNetworkControllerServiceTest {
         NetworkProvider networkProvider =
                 new NetworkProvider(mContext, mTestLooper.getLooper(), "ThreadNetworkProvider");
 
-        mFakeOtDaemon = new FakeOtDaemon(handler);
+        when(mMockRoutingCoordinatorManager.requestDownstreamAddress(any()))
+                .thenReturn(TEST_NAT64_CIDR);
+
+        mFakeOtDaemon = spy(new FakeOtDaemon(handler));
         when(mMockTunIfController.getTunFd()).thenReturn(mMockTunFd);
 
         when(mMockUserManager.hasUserRestriction(eq(DISALLOW_THREAD_NETWORK))).thenReturn(false);
@@ -235,6 +246,7 @@ public final class ThreadNetworkControllerServiceTest {
                         networkProvider,
                         () -> mFakeOtDaemon,
                         mMockConnectivityManager,
+                        mMockRoutingCoordinatorManager,
                         mMockTunIfController,
                         mMockInfraIfController,
                         mPersistentSettings,
@@ -278,6 +290,37 @@ public final class ThreadNetworkControllerServiceTest {
         assertThat(meshcopTxts.modelName).isEqualTo(TEST_MODEL_NAME);
         assertThat(meshcopTxts.nonStandardTxtEntries)
                 .containsExactly(new DnsTxtAttribute("vt", "test".getBytes(UTF_8)));
+    }
+
+    @Test
+    public void initialize_nat64Disabled_doesNotRequestNat64CidrAndConfiguresOtDaemon()
+            throws Exception {
+        ThreadConfiguration config =
+                new ThreadConfiguration.Builder().setNat64Enabled(false).build();
+        mPersistentSettings.putConfiguration(config);
+        mService.initialize();
+        mTestLooper.dispatchAll();
+
+        verify(mMockRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
+        verify(mFakeOtDaemon, times(1)).setNat64Cidr(isNull(), any());
+        verify(mFakeOtDaemon, never()).setNat64Cidr(isNotNull(), any());
+    }
+
+    @Test
+    public void initialize_nat64Enabled_requestsNat64CidrAndConfiguresAtOtDaemon()
+            throws Exception {
+        ThreadConfiguration config =
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
+        mPersistentSettings.putConfiguration(config);
+        mService.initialize();
+        mTestLooper.dispatchAll();
+
+        verify(mMockRoutingCoordinatorManager, times(1)).requestDownstreamAddress(any());
+        verify(mFakeOtDaemon, times(1))
+                .setConfiguration(
+                        new OtDaemonConfiguration.Builder().setNat64Enabled(true).build(),
+                        null /* receiver */);
+        verify(mFakeOtDaemon, times(1)).setNat64Cidr(eq(TEST_NAT64_CIDR.toString()), any());
     }
 
     @Test
@@ -755,6 +798,71 @@ public final class ThreadNetworkControllerServiceTest {
         inOrder.verify(mockReceiver1).onSuccess();
         inOrder.verify(mockReceiver2).onSuccess();
         inOrder.verify(mockReceiver3).onSuccess();
+    }
+
+    @Test
+    public void setConfiguration_enablesNat64_requestsNat64CidrAndConfiguresOtdaemon()
+            throws Exception {
+        mService.initialize();
+        mTestLooper.dispatchAll();
+        clearInvocations(mMockRoutingCoordinatorManager, mFakeOtDaemon);
+
+        final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
+        mService.setConfiguration(
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build(), mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mockReceiver, times(1)).onSuccess();
+        verify(mMockRoutingCoordinatorManager, times(1)).requestDownstreamAddress(any());
+        verify(mFakeOtDaemon, times(1))
+                .setConfiguration(
+                        eq(new OtDaemonConfiguration.Builder().setNat64Enabled(true).build()),
+                        any(IOtStatusReceiver.class));
+        verify(mFakeOtDaemon, times(1))
+                .setNat64Cidr(eq(TEST_NAT64_CIDR.toString()), any(IOtStatusReceiver.class));
+    }
+
+    @Test
+    public void setConfiguration_enablesNat64_otDaemonRemoteFailure_serviceDoesNotCrash()
+            throws Exception {
+        mService.initialize();
+        mTestLooper.dispatchAll();
+        clearInvocations(mMockRoutingCoordinatorManager, mFakeOtDaemon);
+        mFakeOtDaemon.setSetNat64CidrException(
+                new RemoteException("ot-daemon setNat64Cidr() throws"));
+
+        final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
+        mService.setConfiguration(
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build(), mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mFakeOtDaemon, times(1))
+                .setNat64Cidr(eq(TEST_NAT64_CIDR.toString()), any(IOtStatusReceiver.class));
+    }
+
+    @Test
+    public void setConfiguration_disablesNat64_releasesNat64CidrAndConfiguresOtdaemon()
+            throws Exception {
+        mPersistentSettings.putConfiguration(
+                new ThreadConfiguration.Builder().setNat64Enabled(true).build());
+        mService.initialize();
+        mTestLooper.dispatchAll();
+        clearInvocations(mMockRoutingCoordinatorManager, mFakeOtDaemon);
+
+        final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
+        mService.setConfiguration(
+                new ThreadConfiguration.Builder().setNat64Enabled(false).build(), mockReceiver);
+        mTestLooper.dispatchAll();
+
+        verify(mockReceiver, times(1)).onSuccess();
+        verify(mMockRoutingCoordinatorManager, times(1)).releaseDownstream(any());
+        verify(mMockRoutingCoordinatorManager, never()).requestDownstreamAddress(any());
+        verify(mFakeOtDaemon, times(1))
+                .setConfiguration(
+                        eq(new OtDaemonConfiguration.Builder().setNat64Enabled(false).build()),
+                        any(IOtStatusReceiver.class));
+        verify(mFakeOtDaemon, times(1)).setNat64Cidr(isNull(), any(IOtStatusReceiver.class));
+        verify(mFakeOtDaemon, never()).setNat64Cidr(isNotNull(), any(IOtStatusReceiver.class));
     }
 
     @Test
