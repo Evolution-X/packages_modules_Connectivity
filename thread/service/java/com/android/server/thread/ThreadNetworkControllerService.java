@@ -78,6 +78,8 @@ import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
 import android.net.InetAddresses;
+import android.net.IpPrefix;
+import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.LocalNetworkConfig;
 import android.net.LocalNetworkInfo;
@@ -120,6 +122,8 @@ import android.util.SparseArray;
 
 import com.android.connectivity.resources.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.RoutingCoordinatorManager;
+import com.android.net.module.util.IIpv4PrefixRequest;
 import com.android.net.module.util.SharedLog;
 import com.android.server.ServiceManagerWrapper;
 import com.android.server.connectivity.ConnectivityResources;
@@ -193,10 +197,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private final NetworkProvider mNetworkProvider;
     private final Supplier<IOtDaemon> mOtDaemonSupplier;
     private final ConnectivityManager mConnectivityManager;
+    private final RoutingCoordinatorManager mRoutingCoordinatorManager;
     private final TunInterfaceController mTunIfController;
     private final InfraInterfaceController mInfraIfController;
     private final NsdPublisher mNsdPublisher;
     private final OtDaemonCallbackProxy mOtDaemonCallbackProxy = new OtDaemonCallbackProxy();
+    private final Nat64CidrController mNat64CidrController = new Nat64CidrController();
     private final ConnectivityResources mResources;
     private final Supplier<String> mCountryCodeSupplier;
     private final Map<IConfigurationReceiver, IBinder.DeathRecipient> mConfigurationReceivers =
@@ -229,6 +235,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             NetworkProvider networkProvider,
             Supplier<IOtDaemon> otDaemonSupplier,
             ConnectivityManager connectivityManager,
+            RoutingCoordinatorManager routingCoordinatorManager,
             TunInterfaceController tunIfController,
             InfraInterfaceController infraIfController,
             ThreadPersistentSettings persistentSettings,
@@ -242,6 +249,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mNetworkProvider = networkProvider;
         mOtDaemonSupplier = otDaemonSupplier;
         mConnectivityManager = connectivityManager;
+        mRoutingCoordinatorManager = routingCoordinatorManager;
         mTunIfController = tunIfController;
         mInfraIfController = infraIfController;
         mUpstreamNetworkRequest = newUpstreamNetworkRequest();
@@ -266,13 +274,19 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         NetworkProvider networkProvider =
                 new NetworkProvider(context, handlerThread.getLooper(), "ThreadNetworkProvider");
         Map<Network, LinkProperties> networkToLinkProperties = new HashMap<>();
+        final ConnectivityManager connectivityManager =
+                context.getSystemService(ConnectivityManager.class);
+        final RoutingCoordinatorManager routingCoordinatorManager =
+                new RoutingCoordinatorManager(
+                        context, connectivityManager.getRoutingCoordinatorService());
 
         return new ThreadNetworkControllerService(
                 context,
                 handler,
                 networkProvider,
                 () -> IOtDaemon.Stub.asInterface(ServiceManagerWrapper.waitForService("ot_daemon")),
-                context.getSystemService(ConnectivityManager.class),
+                connectivityManager,
+                routingCoordinatorManager,
                 new TunInterfaceController(TUN_IF_NAME),
                 new InfraInterfaceController(),
                 persistentSettings,
@@ -351,6 +365,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 mCountryCodeSupplier.get());
         otDaemon.asBinder().linkToDeath(() -> mHandler.post(this::onOtDaemonDied), 0);
         mOtDaemon = otDaemon;
+        mHandler.post(mNat64CidrController::maybeUpdateNat64Cidr);
         return mOtDaemon;
     }
 
@@ -589,6 +604,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         } catch (RemoteException | ThreadNetworkException e) {
             LOG.e("otDaemon.setConfiguration failed. Config: " + configuration, e);
         }
+        mNat64CidrController.maybeUpdateNat64Cidr();
     }
 
     private static OtDaemonConfiguration newOtDaemonConfig(
@@ -833,7 +849,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 mHandler.getLooper(),
                 LOG.getTag(),
                 netCaps,
-                mTunIfController.getLinkProperties(),
+                getTunIfLinkProperties(),
                 newLocalNetworkConfig(),
                 score,
                 new NetworkAgentConfig.Builder().build(),
@@ -1391,9 +1407,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
         // The OT daemon can send link property updates before the networkAgent is
         // registered
-        if (mNetworkAgent != null) {
-            mNetworkAgent.sendLinkProperties(mTunIfController.getLinkProperties());
-        }
+        maybeSendLinkProperties();
     }
 
     private void handlePrefixChanged(List<OnMeshPrefixConfig> onMeshPrefixConfigList) {
@@ -1403,9 +1417,18 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
         // The OT daemon can send link property updates before the networkAgent is
         // registered
-        if (mNetworkAgent != null) {
-            mNetworkAgent.sendLinkProperties(mTunIfController.getLinkProperties());
+        maybeSendLinkProperties();
+    }
+
+    private void maybeSendLinkProperties() {
+        if (mNetworkAgent == null) {
+            return;
         }
+        mNetworkAgent.sendLinkProperties(getTunIfLinkProperties());
+    }
+
+    private LinkProperties getTunIfLinkProperties() {
+        return mTunIfController.getLinkPropertiesWithNat64Cidr(mNat64CidrController.mNat64Cidr);
     }
 
     @RequiresPermission(
@@ -1849,6 +1872,66 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         @Override
         public void onPrefixChanged(List<OnMeshPrefixConfig> onMeshPrefixConfigList) {
             mHandler.post(() -> handlePrefixChanged(onMeshPrefixConfigList));
+        }
+    }
+
+    private final class Nat64CidrController extends IIpv4PrefixRequest.Stub {
+        private static final int RETRY_DELAY_ON_FAILURE_MILLIS = 600_000; // 10 minutes
+
+        @Nullable private LinkAddress mNat64Cidr;
+
+        @Override
+        public void onIpv4PrefixConflict(IpPrefix prefix) {
+            mHandler.post(() -> onIpv4PrefixConflictInternal(prefix));
+        }
+
+        private void onIpv4PrefixConflictInternal(IpPrefix prefix) {
+            checkOnHandlerThread();
+
+            LOG.i("Conflict on NAT64 CIDR: " + prefix);
+            maybeReleaseNat64Cidr();
+            maybeUpdateNat64Cidr();
+        }
+
+        public void maybeUpdateNat64Cidr() {
+            checkOnHandlerThread();
+
+            if (mPersistentSettings.getConfiguration().isNat64Enabled()) {
+                maybeRequestNat64Cidr();
+            } else {
+                maybeReleaseNat64Cidr();
+            }
+            try {
+                getOtDaemon()
+                        .setNat64Cidr(
+                                mNat64Cidr == null ? null : mNat64Cidr.toString(),
+                                new LoggingOtStatusReceiver("setNat64Cidr"));
+            } catch (RemoteException | ThreadNetworkException e) {
+                LOG.e("Failed to set NAT64 CIDR at otd-daemon", e);
+            }
+            maybeSendLinkProperties();
+        }
+
+        private void maybeRequestNat64Cidr() {
+            if (mNat64Cidr != null) {
+                return;
+            }
+            final LinkAddress downstreamAddress =
+                    mRoutingCoordinatorManager.requestDownstreamAddress(this);
+            if (downstreamAddress == null) {
+                mHandler.postDelayed(() -> maybeUpdateNat64Cidr(), RETRY_DELAY_ON_FAILURE_MILLIS);
+            }
+            mNat64Cidr = downstreamAddress;
+            LOG.i("Allocated NAT64 CIDR: " + mNat64Cidr);
+        }
+
+        private void maybeReleaseNat64Cidr() {
+            if (mNat64Cidr == null) {
+                return;
+            }
+            LOG.i("Released NAT64 CIDR: " + mNat64Cidr);
+            mNat64Cidr = null;
+            mRoutingCoordinatorManager.releaseDownstream(this);
         }
     }
 }
