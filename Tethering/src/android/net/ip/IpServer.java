@@ -46,7 +46,7 @@ import android.net.MacAddress;
 import android.net.RouteInfo;
 import android.net.TetheredClient;
 import android.net.TetheringManager;
-import android.net.TetheringManager.TetheringRequest;
+import android.net.TetheringRequestParcel;
 import android.net.dhcp.DhcpLeaseParcelable;
 import android.net.dhcp.DhcpServerCallbacks;
 import android.net.dhcp.DhcpServingParamsParcel;
@@ -400,7 +400,7 @@ public class IpServer extends StateMachineShim {
     }
 
     /** Enable this IpServer. IpServer state machine will be tethered or localHotspot state. */
-    public void enable(final int requestedState, final TetheringRequest request) {
+    public void enable(final int requestedState, final TetheringRequestParcel request) {
         sendMessage(CMD_TETHER_REQUESTED, requestedState, 0, request);
     }
 
@@ -980,18 +980,18 @@ public class IpServer extends StateMachineShim {
         mLinkProperties.setInterfaceName(mIfaceName);
     }
 
-    private void maybeConfigureStaticIp(final TetheringRequest request) {
+    private void maybeConfigureStaticIp(final TetheringRequestParcel request) {
         // Ignore static address configuration if they are invalid or null. In theory, static
         // addresses should not be invalid here because TetheringManager do not allow caller to
         // specify invalid static address configuration.
-        if (request == null || request.getLocalIpv4Address() == null
-                || request.getClientStaticIpv4Address() == null || !checkStaticAddressConfiguration(
-                request.getLocalIpv4Address(), request.getClientStaticIpv4Address())) {
+        if (request == null || request.localIPv4Address == null
+                || request.staticClientAddress == null || !checkStaticAddressConfiguration(
+                request.localIPv4Address, request.staticClientAddress)) {
             return;
         }
 
-        mStaticIpv4ServerAddr = request.getLocalIpv4Address();
-        mStaticIpv4ClientAddr = request.getClientStaticIpv4Address();
+        mStaticIpv4ServerAddr = request.localIPv4Address;
+        mStaticIpv4ClientAddr = request.staticClientAddress;
     }
 
     class InitialState extends State {
@@ -1008,11 +1008,11 @@ public class IpServer extends StateMachineShim {
                     mLastError = TETHER_ERROR_NO_ERROR;
                     switch (message.arg1) {
                         case STATE_LOCAL_ONLY:
-                            maybeConfigureStaticIp((TetheringRequest) message.obj);
+                            maybeConfigureStaticIp((TetheringRequestParcel) message.obj);
                             transitionTo(mLocalHotspotState);
                             break;
                         case STATE_TETHERED:
-                            maybeConfigureStaticIp((TetheringRequest) message.obj);
+                            maybeConfigureStaticIp((TetheringRequestParcel) message.obj);
                             transitionTo(mTetheredState);
                             break;
                         default:

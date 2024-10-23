@@ -15,6 +15,8 @@
  */
 package com.android.networkstack.tethering.util;
 
+import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
+import static android.net.TetheringManager.TETHERING_USB;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.system.OsConstants.AF_UNIX;
 import static android.system.OsConstants.EAGAIN;
@@ -23,6 +25,8 @@ import static android.system.OsConstants.SOCK_DGRAM;
 import static android.system.OsConstants.SOCK_NONBLOCK;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 
 import android.net.LinkAddress;
 import android.net.MacAddress;
@@ -39,7 +43,9 @@ import com.android.net.module.util.Struct;
 import com.android.net.module.util.structs.EthernetHeader;
 import com.android.net.module.util.structs.Icmpv6Header;
 import com.android.net.module.util.structs.Ipv6Header;
+import com.android.testutils.MiscAsserts;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -55,6 +61,13 @@ public class TetheringUtilsTest {
     private static final LinkAddress TEST_CLIENT_ADDR = new LinkAddress("192.168.43.5/24");
     private static final int PACKET_SIZE = 1500;
 
+    private TetheringRequestParcel mTetheringRequest;
+
+    @Before
+    public void setUp() {
+        mTetheringRequest = makeTetheringRequestParcel();
+    }
+
     public TetheringRequestParcel makeTetheringRequestParcel() {
         final TetheringRequestParcel request = new TetheringRequestParcel();
         request.tetheringType = TETHERING_WIFI;
@@ -63,6 +76,40 @@ public class TetheringUtilsTest {
         request.exemptFromEntitlementCheck = false;
         request.showProvisioningUi = true;
         return request;
+    }
+
+    @Test
+    public void testIsTetheringRequestEquals() {
+        TetheringRequestParcel request = makeTetheringRequestParcel();
+
+        assertTrue(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, mTetheringRequest));
+        assertTrue(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+        assertTrue(TetheringUtils.isTetheringRequestEquals(null, null));
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, null));
+        assertFalse(TetheringUtils.isTetheringRequestEquals(null, mTetheringRequest));
+
+        request = makeTetheringRequestParcel();
+        request.tetheringType = TETHERING_USB;
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+
+        request = makeTetheringRequestParcel();
+        request.localIPv4Address = null;
+        request.staticClientAddress = null;
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+
+        request = makeTetheringRequestParcel();
+        request.exemptFromEntitlementCheck = true;
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+
+        request = makeTetheringRequestParcel();
+        request.showProvisioningUi = false;
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+
+        request = makeTetheringRequestParcel();
+        request.connectivityScope = CONNECTIVITY_SCOPE_LOCAL;
+        assertFalse(TetheringUtils.isTetheringRequestEquals(mTetheringRequest, request));
+
+        MiscAsserts.assertFieldCountEquals(6, TetheringRequestParcel.class);
     }
 
     // Writes the specified packet to a filedescriptor, skipping the Ethernet header.

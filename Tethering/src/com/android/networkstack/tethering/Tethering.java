@@ -97,6 +97,7 @@ import android.net.TetheringCallbackStartedParcel;
 import android.net.TetheringConfigurationParcel;
 import android.net.TetheringInterface;
 import android.net.TetheringManager.TetheringRequest;
+import android.net.TetheringRequestParcel;
 import android.net.Uri;
 import android.net.ip.IpServer;
 import android.net.wifi.WifiClient;
@@ -146,6 +147,7 @@ import com.android.networkstack.apishim.common.UnsupportedApiLevelException;
 import com.android.networkstack.tethering.metrics.TetheringMetrics;
 import com.android.networkstack.tethering.util.InterfaceSet;
 import com.android.networkstack.tethering.util.PrefixUtils;
+import com.android.networkstack.tethering.util.TetheringUtils;
 import com.android.networkstack.tethering.util.VersionedBroadcastListener;
 import com.android.networkstack.tethering.wear.WearableConnectionManager;
 
@@ -229,7 +231,7 @@ public class Tethering {
     // Currently active tethering requests per tethering type. Only one of each type can be
     // requested at a time. After a tethering type is requested, the map keeps tethering parameters
     // to be used after the interface comes up asynchronously.
-    private final SparseArray<TetheringRequest> mActiveTetheringRequests =
+    private final SparseArray<TetheringRequestParcel> mActiveTetheringRequests =
             new SparseArray<>();
 
     private final Context mContext;
@@ -655,27 +657,28 @@ public class Tethering {
         processInterfaceStateChange(iface, false /* enabled */);
     }
 
-    void startTethering(final TetheringRequest request, final String callerPkg,
+    void startTethering(final TetheringRequestParcel request, final String callerPkg,
             final IIntResultListener listener) {
         mHandler.post(() -> {
-            final int type = request.getTetheringType();
-            final TetheringRequest unfinishedRequest = mActiveTetheringRequests.get(type);
+            final TetheringRequestParcel unfinishedRequest = mActiveTetheringRequests.get(
+                    request.tetheringType);
             // If tethering is already enabled with a different request,
             // disable before re-enabling.
-            if (unfinishedRequest != null && !unfinishedRequest.equals(request)) {
-                enableTetheringInternal(type, false /* disabled */, null);
-                mEntitlementMgr.stopProvisioningIfNeeded(type);
+            if (unfinishedRequest != null
+                    && !TetheringUtils.isTetheringRequestEquals(unfinishedRequest, request)) {
+                enableTetheringInternal(request.tetheringType, false /* disabled */, null);
+                mEntitlementMgr.stopProvisioningIfNeeded(request.tetheringType);
             }
-            mActiveTetheringRequests.put(type, request);
+            mActiveTetheringRequests.put(request.tetheringType, request);
 
-            if (request.isExemptFromEntitlementCheck()) {
-                mEntitlementMgr.setExemptedDownstreamType(type);
+            if (request.exemptFromEntitlementCheck) {
+                mEntitlementMgr.setExemptedDownstreamType(request.tetheringType);
             } else {
-                mEntitlementMgr.startProvisioningIfNeeded(type,
-                        request.getShouldShowEntitlementUi());
+                mEntitlementMgr.startProvisioningIfNeeded(request.tetheringType,
+                        request.showProvisioningUi);
             }
-            enableTetheringInternal(type, true /* enabled */, listener);
-            mTetheringMetrics.createBuilder(type, callerPkg);
+            enableTetheringInternal(request.tetheringType, true /* enabled */, listener);
+            mTetheringMetrics.createBuilder(request.tetheringType, callerPkg);
         });
     }
 
@@ -1011,7 +1014,7 @@ public class Tethering {
         //
         // This code cannot race with untether() because they both run on the handler thread.
         final int type = tetherState.ipServer.interfaceType();
-        final TetheringRequest request = mActiveTetheringRequests.get(type, null);
+        final TetheringRequestParcel request = mActiveTetheringRequests.get(type, null);
         if (request != null) {
             mActiveTetheringRequests.delete(type);
         }
@@ -1068,14 +1071,14 @@ public class Tethering {
     }
 
     private int getRequestedState(int type) {
-        final TetheringRequest request = mActiveTetheringRequests.get(type);
+        final TetheringRequestParcel request = mActiveTetheringRequests.get(type);
 
         // The request could have been deleted before we had a chance to complete it.
         // If so, assume that the scope is the default scope for this tethering type.
         // This likely doesn't matter - if the request has been deleted, then tethering is
         // likely going to be stopped soon anyway.
         final int connectivityScope = (request != null)
-                ? request.getConnectivityScope()
+                ? request.connectivityScope
                 : TetheringRequest.getDefaultConnectivityScope(type);
 
         return connectivityScope == CONNECTIVITY_SCOPE_LOCAL
@@ -1374,7 +1377,7 @@ public class Tethering {
     }
 
     @VisibleForTesting
-    SparseArray<TetheringRequest> getActiveTetheringRequests() {
+    SparseArray<TetheringRequestParcel> getActiveTetheringRequests() {
         return mActiveTetheringRequests;
     }
 
