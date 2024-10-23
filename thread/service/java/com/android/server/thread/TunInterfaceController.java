@@ -92,8 +92,19 @@ public class TunInterfaceController {
     }
 
     /** Returns link properties of the Thread TUN interface. */
-    public LinkProperties getLinkProperties() {
+    private LinkProperties getLinkProperties() {
         return new LinkProperties(mLinkProperties);
+    }
+
+    /** Returns link properties of the Thread TUN interface with the given NAT64 CIDR. */
+    // TODO: manage the NAT64 CIDR in the TunInterfaceController
+    public LinkProperties getLinkPropertiesWithNat64Cidr(@Nullable LinkAddress nat64Cidr) {
+        final LinkProperties lp = getLinkProperties();
+        if (nat64Cidr != null) {
+            lp.addLinkAddress(nat64Cidr);
+            lp.addRoute(getRouteForAddress(nat64Cidr));
+        }
+        return lp;
     }
 
     /**
@@ -148,6 +159,9 @@ public class TunInterfaceController {
 
     /** Adds a new address to the interface. */
     public void addAddress(LinkAddress address) {
+        if (!(address.getAddress() instanceof Inet6Address)) {
+            return;
+        }
         LOG.v("Adding address " + address + " with flags: " + address.getFlags());
 
         long preferredLifetimeSeconds;
@@ -172,7 +186,7 @@ public class TunInterfaceController {
                             (address.getExpirationTime() - SystemClock.elapsedRealtime()) / 1000L,
                             0L);
         }
-
+        // Only apply to Ipv6 address
         if (!NetlinkUtils.sendRtmNewAddressRequest(
                 Os.if_nametoindex(mIfName),
                 address.getAddress(),
@@ -190,6 +204,9 @@ public class TunInterfaceController {
 
     /** Removes an address from the interface. */
     public void removeAddress(LinkAddress address) {
+        if (!(address.getAddress() instanceof Inet6Address)) {
+            return;
+        }
         LOG.v("Removing address " + address);
 
         // Intentionally update the mLinkProperties before send netlink message because the
@@ -197,6 +214,7 @@ public class TunInterfaceController {
         // when the netlink request below fails
         mLinkProperties.removeLinkAddress(address);
         mLinkProperties.removeRoute(getRouteForAddress(address));
+        // Only apply to Ipv6 address
         if (!NetlinkUtils.sendRtmDelAddressRequest(
                 Os.if_nametoindex(mIfName),
                 (Inet6Address) address.getAddress(),

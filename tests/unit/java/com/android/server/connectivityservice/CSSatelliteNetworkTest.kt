@@ -163,19 +163,36 @@ class CSSatelliteNetworkTest : CSTest() {
         doTestSatelliteNeverBecomeDefaultNetwork(restricted = false)
     }
 
-    private fun doTestUnregisterAfterReplacementSatisfier(destroyed: Boolean) {
+    private fun doTestUnregisterAfterReplacementSatisfier(destroyBeforeRequest: Boolean = false,
+                                                          destroyAfterRequest: Boolean = false) {
         val satelliteAgent = createSatelliteAgent("satellite0")
         satelliteAgent.connect()
+
+        if (destroyBeforeRequest) {
+            satelliteAgent.unregisterAfterReplacement(timeoutMs = 5000)
+        }
 
         val uids = setOf(TEST_PACKAGE_UID)
         updateSatelliteNetworkFallbackUids(uids)
 
-        if (destroyed) {
+        if (destroyBeforeRequest) {
+            verify(netd, never()).networkAddUidRangesParcel(any())
+        } else {
+            verify(netd).networkAddUidRangesParcel(
+                NativeUidRangeConfig(
+                    satelliteAgent.network.netId,
+                    toUidRangeStableParcels(uidRangesForUids(uids)),
+                    PREFERENCE_ORDER_SATELLITE_FALLBACK
+                )
+            )
+        }
+
+        if (destroyAfterRequest) {
             satelliteAgent.unregisterAfterReplacement(timeoutMs = 5000)
         }
 
         updateSatelliteNetworkFallbackUids(setOf())
-        if (destroyed) {
+        if (destroyBeforeRequest || destroyAfterRequest) {
             // If the network is already destroyed, networkRemoveUidRangesParcel should not be
             // called.
             verify(netd, never()).networkRemoveUidRangesParcel(any())
@@ -191,13 +208,18 @@ class CSSatelliteNetworkTest : CSTest() {
     }
 
     @Test
-    fun testUnregisterAfterReplacementSatisfier_destroyed() {
-        doTestUnregisterAfterReplacementSatisfier(destroyed = true)
+    fun testUnregisterAfterReplacementSatisfier_destroyBeforeRequest() {
+        doTestUnregisterAfterReplacementSatisfier(destroyBeforeRequest = true)
+    }
+
+    @Test
+    fun testUnregisterAfterReplacementSatisfier_destroyAfterRequest() {
+        doTestUnregisterAfterReplacementSatisfier(destroyAfterRequest = true)
     }
 
     @Test
     fun testUnregisterAfterReplacementSatisfier_notDestroyed() {
-        doTestUnregisterAfterReplacementSatisfier(destroyed = false)
+        doTestUnregisterAfterReplacementSatisfier()
     }
 
     private fun assertCreateMultiLayerNrisFromSatelliteNetworkPreferredUids(uids: Set<Int>) {
