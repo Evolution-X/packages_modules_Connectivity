@@ -59,6 +59,7 @@ import java.util.concurrent.ScheduledExecutorService;
 public class MdnsServiceTypeClient {
 
     private static final String TAG = MdnsServiceTypeClient.class.getSimpleName();
+    private static final boolean DBG = MdnsDiscoveryManager.DBG;
     @VisibleForTesting
     static final int EVENT_START_QUERYTASK = 1;
     static final int EVENT_QUERY_RESULT = 2;
@@ -184,10 +185,14 @@ public class MdnsServiceTypeClient {
                                     searchOptions.numOfQueriesBeforeBackoff(),
                                     false /* forceEnableBackoff */
                             );
+                    final long timeToNextTaskMs = calculateTimeToNextTask(args, now);
+                    sharedLog.log(String.format("Query sent with transactionId: %d. "
+                                    + "Next run: sessionId: %d, in %d ms",
+                            sentResult.transactionId, args.sessionId, timeToNextTaskMs));
                     dependencies.sendMessageDelayed(
                             handler,
                             handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                            calculateTimeToNextTask(args, now, sharedLog));
+                            timeToNextTaskMs);
                     break;
                 }
                 default:
@@ -369,10 +374,13 @@ public class MdnsServiceTypeClient {
                             searchOptions.numOfQueriesBeforeBackoff(),
                             forceEnableBackoff
                     );
+            final long timeToNextTaskMs = calculateTimeToNextTask(args, now);
+            sharedLog.log(String.format("Schedule a query. Next run: sessionId: %d, in %d ms",
+                    args.sessionId, timeToNextTaskMs));
             dependencies.sendMessageDelayed(
                     handler,
                     handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                    calculateTimeToNextTask(args, now, sharedLog));
+                    timeToNextTaskMs);
         } else {
             final List<MdnsResponse> servicesToResolve = makeResponsesForResolve(socketKey);
             final QueryTask queryTask = new QueryTask(
@@ -492,6 +500,10 @@ public class MdnsServiceTypeClient {
                 // If the response is not modified and already in the cache. The cache will
                 // need to be updated to refresh the last receipt time.
                 serviceCache.addOrUpdateService(cacheKey, response);
+                if (DBG) {
+                    sharedLog.v("Update the last receipt time for service:"
+                            + serviceInstanceName);
+                }
             }
         }
         if (dependencies.hasMessages(handler, EVENT_START_QUERYTASK)) {
@@ -503,10 +515,13 @@ public class MdnsServiceTypeClient {
                             searchOptions.numOfQueriesBeforeBackoff());
             if (args != null) {
                 removeScheduledTask();
+                final long timeToNextTaskMs = calculateTimeToNextTask(args, now);
+                sharedLog.log(String.format("Reschedule a query. Next run: sessionId: %d, in %d ms",
+                        args.sessionId, timeToNextTaskMs));
                 dependencies.sendMessageDelayed(
                         handler,
                         handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                        calculateTimeToNextTask(args, now, sharedLog));
+                        timeToNextTaskMs);
             }
         }
     }
@@ -757,11 +772,8 @@ public class MdnsServiceTypeClient {
     }
 
     private static long calculateTimeToNextTask(MdnsQueryScheduler.ScheduledQueryTaskArgs args,
-            long now, SharedLog sharedLog) {
-        long timeToNextTasksWithBackoffInMs = Math.max(args.timeToRun - now, 0);
-        sharedLog.log(String.format("Next run: sessionId: %d, in %d ms",
-                args.sessionId, timeToNextTasksWithBackoffInMs));
-        return timeToNextTasksWithBackoffInMs;
+            long now) {
+        return Math.max(args.timeToRun - now, 0);
     }
 
     /**
