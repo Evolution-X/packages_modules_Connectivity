@@ -19,11 +19,10 @@
   android:layout_width="match_parent"
   android:layout_height="match_parent">
     <LinearLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:padding="8dp"
         android:orientation="vertical"
         tools:context=".ThreadNetworkSettingsFragment" >
@@ -40,28 +39,28 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="16dp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:text="State" />
         <TextView
             android:id="@+id/text_state"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12dp"
+            android:textSize="12sp"
             android:typeface="monospace" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:textSize="16dp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:text="Network Info" />
         <TextView
             android:id="@+id/text_network_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12dp" />
+            android:textSize="12sp" />
 
         <Button android:id="@+id/button_migrate_network"
             android:layout_width="wrap_content"
@@ -71,7 +70,7 @@
             android:id="@+id/text_migrate_network_state"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12dp" />
+            android:textSize="12sp" />
 
         <Button android:id="@+id/button_activate_ephemeral_key_mode"
             android:layout_width="wrap_content"
@@ -86,7 +85,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:textSize="16dp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:text="Ephemeral Key State" />
         <TextView
@@ -94,6 +93,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="50dp"
-            android:textSize="12dp" />
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
