@@ -626,6 +626,31 @@ filegroup {
     visibility: ["//visibility:private"],
 }
 
+// Filegroup to build lib used by IPsec/IKE framework
+// Any class here *must* have a corresponding jarjar rule in the IPsec build rules.
+filegroup {
+    name: "net-utils-framework-ipsec-common-srcs",
+    srcs: [
+        "framework/com/android/net/module/util/HexDump.java",
+    ],
+    path: "framework",
+    visibility: ["//visibility:private"],
+}
+
+java_library {
+    name: "net-utils-framework-ipsec",
+    sdk_version: "module_current",
+    min_sdk_version: "30",
+    srcs: [":net-utils-framework-ipsec-common-srcs"],
+    libs: [
+        "androidx.annotation_annotation",
+    ],
+    visibility: [
+        "//packages/modules/IPsec",
+    ],
+    apex_available: ["com.android.ipsec"],
+}
+
 // Use a file group containing classes necessary for framework-connectivity. The file group should
 // be as small as possible because because the classes end up in the bootclasspath and R8 is not
 // used to remove unused classes.
