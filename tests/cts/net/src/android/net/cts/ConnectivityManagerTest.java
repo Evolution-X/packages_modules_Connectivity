@@ -113,6 +113,7 @@ import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_NONE
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_EXPORTED;
 import static com.android.testutils.Cleanup.testAndCleanup;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
+import static com.android.testutils.MiscAsserts.assertEventuallyTrue;
 import static com.android.testutils.MiscAsserts.assertThrows;
 import static com.android.testutils.TestNetworkTrackerKt.initTestNetwork;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
@@ -2934,12 +2935,7 @@ public class ConnectivityManagerTest {
                 mCm.getActiveNetwork(), false /* accept */ , false /* always */));
     }
 
-    private void ensureCellIsValidatedBeforeMockingValidationUrls() {
-        // Verify that current supported network is validated so that the mock http server will not
-        // apply to unexpected networks. Also see aosp/2208680.
-        //
-        // This may also apply to wifi in principle, but in practice methods that mock validation
-        // URL all disconnect wifi forcefully anyway, so don't wait for wifi to validate.
+    private void ensureCellIsValidated() {
         if (mPackageManager.hasSystemFeature(FEATURE_TELEPHONY)) {
             new ConnectUtil(mContext).ensureCellularValidated();
         }
@@ -3022,9 +3018,13 @@ public class ConnectivityManagerTest {
             networkCallbackRule.requestCell();
 
             final Network wifiNetwork = prepareUnvalidatedNetwork();
-            // Default network should not be wifi ,but checking that wifi is not the default doesn't
-            // guarantee that it won't become the default in the future.
-            assertNotEquals(wifiNetwork, mCm.getActiveNetwork());
+            // Default network should not be wifi ,but checking that Wi-Fi is not the default
+            // doesn't guarantee that it won't become the default in the future.
+            // On U 24Q2+ telephony may teardown (unregisterAfterReplacement) its network when Wi-Fi
+            // is toggled (as part of prepareUnvalidatedNetwork here). Give some time for Wi-Fi to
+            // not be default in case telephony is reconnecting.
+            assertEventuallyTrue("Wifi remained default despite being unvalidated",
+                    WIFI_CONNECT_TIMEOUT_MS, () -> !wifiNetwork.equals(mCm.getActiveNetwork()));
 
             final TestableNetworkCallback wifiCb = networkCallbackRule.registerNetworkCallback(
                     makeWifiNetworkRequest());
@@ -3061,7 +3061,7 @@ public class ConnectivityManagerTest {
 
         try {
             final Network cellNetwork = networkCallbackRule.requestCell();
-            ensureCellIsValidatedBeforeMockingValidationUrls();
+            ensureCellIsValidated();
             final Network wifiNetwork = prepareValidatedNetwork();
 
             final TestableNetworkCallback defaultCb =
@@ -3157,7 +3157,12 @@ public class ConnectivityManagerTest {
     }
 
     private Network prepareValidatedNetwork() throws Exception {
-        ensureCellIsValidatedBeforeMockingValidationUrls();
+        // Verify that current supported network is validated so that the mock http server will not
+        // apply to unexpected networks. Also see aosp/2208680.
+        //
+        // This may also apply to wifi in principle, but in practice methods that mock validation
+        // URL all disconnect wifi forcefully anyway, so don't wait for wifi to validate.
+        ensureCellIsValidated();
 
         prepareHttpServer();
         configTestServer(Status.NO_CONTENT, Status.NO_CONTENT);
@@ -3169,7 +3174,7 @@ public class ConnectivityManagerTest {
     }
 
     private Network preparePartialConnectivity() throws Exception {
-        ensureCellIsValidatedBeforeMockingValidationUrls();
+        ensureCellIsValidated();
 
         prepareHttpServer();
         // Configure response code for partial connectivity
@@ -3184,7 +3189,7 @@ public class ConnectivityManagerTest {
     }
 
     private Network prepareUnvalidatedNetwork() throws Exception {
-        ensureCellIsValidatedBeforeMockingValidationUrls();
+        ensureCellIsValidated();
 
         prepareHttpServer();
         // Configure response code for unvalidated network
