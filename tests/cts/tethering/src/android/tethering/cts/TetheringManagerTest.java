@@ -32,6 +32,7 @@ import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
 import static android.net.TetheringManager.TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.cts.util.CtsTetheringUtils.isAnyIfaceMatch;
+import static android.os.Process.INVALID_UID;
 
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
@@ -244,24 +245,35 @@ public class TetheringManagerTest {
         assertFalse(tr.isExemptFromEntitlementCheck());
         assertTrue(tr.getShouldShowEntitlementUi());
         assertEquals(softApConfiguration, tr.getSoftApConfiguration());
+        assertEquals(INVALID_UID, tr.getUid());
+        assertNull(tr.getPackageName());
 
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
         final TetheringRequest tr2 = new TetheringRequest.Builder(TETHERING_USB)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
-                .setShouldShowEntitlementUi(false).build();
+                .setShouldShowEntitlementUi(false)
+                .build();
+        int uid = 1000;
+        String packageName = "package";
+        tr2.setUid(uid);
+        tr2.setPackageName(packageName);
 
         assertEquals(localAddr, tr2.getLocalIpv4Address());
         assertEquals(clientAddr, tr2.getClientStaticIpv4Address());
         assertEquals(TETHERING_USB, tr2.getTetheringType());
         assertTrue(tr2.isExemptFromEntitlementCheck());
         assertFalse(tr2.getShouldShowEntitlementUi());
+        assertEquals(uid, tr2.getUid());
+        assertEquals(packageName, tr2.getPackageName());
 
         final TetheringRequest tr3 = new TetheringRequest.Builder(TETHERING_USB)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false).build();
+        tr3.setUid(uid);
+        tr3.setPackageName(packageName);
         assertEquals(tr2, tr3);
     }
 
