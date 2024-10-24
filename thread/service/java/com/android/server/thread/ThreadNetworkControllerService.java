@@ -145,11 +145,13 @@ import libcore.util.HexEncoding;
 
 import java.io.IOException;
 import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1342,6 +1344,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
         setInfraLinkInterfaceName(newInfraLinkState.interfaceName);
         setInfraLinkNat64Prefix(newInfraLinkState.nat64Prefix);
+        setInfraLinkDnsServers(newInfraLinkState.dnsServers);
         mInfraLinkState = newInfraLinkState;
     }
 
@@ -1372,6 +1375,16 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                             newNat64Prefix, new LoggingOtStatusReceiver("setInfraLinkNat64Prefix"));
         } catch (RemoteException | ThreadNetworkException e) {
             LOG.e("Failed to set infra link NAT64 prefix " + newNat64Prefix, e);
+        }
+    }
+
+    private void setInfraLinkDnsServers(List<String> newDnsServers) {
+        try {
+            getOtDaemon()
+                    .setInfraLinkDnsServers(
+                            newDnsServers, new LoggingOtStatusReceiver("setInfraLinkDnsServers"));
+        } catch (RemoteException | ThreadNetworkException e) {
+            LOG.e("Failed to set infra link DNS servers " + newDnsServers, e);
         }
     }
 
@@ -1520,7 +1533,17 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
         return new InfraLinkState.Builder()
                 .setInterfaceName(linkProperties.getInterfaceName())
-                .setNat64Prefix(nat64Prefix);
+                .setNat64Prefix(nat64Prefix)
+                .setDnsServers(addressesToStrings(linkProperties.getDnsServers()));
+    }
+
+    private static List<String> addressesToStrings(List<InetAddress> addresses) {
+        List<String> strings = new ArrayList<>();
+
+        for (InetAddress address : addresses) {
+            strings.add(address.getHostAddress());
+        }
+        return strings;
     }
 
     private static final class CallbackMetadata {
