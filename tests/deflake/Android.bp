@@ -40,7 +40,7 @@ java_test_host {
         "kotlin-test",
         "net-host-tests-utils",
     ],
-    data: [":FrameworksNetTests"],
+    device_common_data: [":FrameworksNetTests"],
     test_suites: ["device-tests"],
     // It will get build error if just set enabled to true. It fails with "windows_common"
     // depends on some disabled modules that are used by this test and it looks like set

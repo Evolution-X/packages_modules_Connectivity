@@ -311,7 +311,7 @@ java_library_static {
     apex_available: ["com.android.tethering"],
 }
 
-genrule {
+java_genrule {
     name: "connectivity-jarjar-rules",
     defaults: ["jarjar-rules-combine-defaults"],
     srcs: [

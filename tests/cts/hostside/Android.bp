@@ -56,7 +56,7 @@ java_test_host {
         "mts-tethering",
         "sts",
     ],
-    data: [
+    device_common_data: [
         ":CtsHostsideNetworkTestsApp",
         ":CtsHostsideNetworkTestsApp2",
         ":CtsHostsideNetworkCapTestsAppWithoutProperty",

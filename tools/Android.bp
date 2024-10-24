@@ -81,7 +81,7 @@ python_test_host {
         "gen_jarjar.py",
         "gen_jarjar_test.py",
     ],
-    data: [
+    device_common_data: [
         "testdata/test-jarjar-excludes.txt",
         // txt with Test classes to test they aren't included when added to jarjar excludes
         "testdata/test-jarjar-excludes-testclass.txt",
