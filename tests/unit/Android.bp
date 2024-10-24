@@ -114,7 +114,7 @@ android_library {
     visibility: ["//packages/modules/Connectivity/tests:__subpackages__"],
 }
 
-genrule {
+java_genrule {
     name: "frameworks-net-tests-jarjar-rules",
     defaults: ["jarjar-rules-combine-defaults"],
     srcs: [
