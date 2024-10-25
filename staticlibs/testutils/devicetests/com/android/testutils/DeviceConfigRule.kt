@@ -89,6 +89,7 @@ class DeviceConfigRule @JvmOverloads constructor(
                 } cleanupStep {
                     runAsShell(WRITE_DEVICE_CONFIG) {
                         originalConfig.forEach { (key, value) ->
+                            Log.i(TAG, "Resetting config \"${key.second}\" to \"$value\"")
                             DeviceConfig.setProperty(
                                     key.first, key.second, value, false /* makeDefault */)
                         }
