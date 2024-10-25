@@ -1874,4 +1874,45 @@ public class IpSecManagerTunnelTest extends IpSecBaseTest {
                 },
                 false /* enableEncrypt */);
     }
+
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @Test
+    public void testMigrateWhenMultipleTunnelsExist() throws Exception {
+        assumeTrue(mCtsNetUtils.hasIpsecTunnelsFeature());
+        assumeTrue(mCtsNetUtils.hasIpsecTunnelMigrateFeature());
+
+        final int spi = getRandomSpi(LOCAL_OUTER_6, REMOTE_OUTER_6);
+
+        // Create tunnelIfaceFoo and tunnelIfaceBar. Verify tunnelIfaceBar migration will not throw
+        try (IpSecManager.IpSecTunnelInterface tunnelIfaceFoo =
+                mISM.createIpSecTunnelInterface(
+                        LOCAL_OUTER_4, REMOTE_OUTER_4, sTunWrapper.network)) {
+
+            buildTunnelNetworkAndRunTestsSimple(
+                    spi,
+                    (ipsecNetwork,
+                            tunnelIfaceBar,
+                            tunUtils,
+                            inTunnelTransform,
+                            outTunnelTransform,
+                            localOuter,
+                            remoteOuter,
+                            seqNum) -> {
+                        tunnelIfaceBar.setUnderlyingNetwork(sTunWrapperNew.network);
+
+                        mISM.startTunnelModeTransformMigration(
+                                inTunnelTransform, REMOTE_OUTER_6_NEW, LOCAL_OUTER_6_NEW);
+                        mISM.startTunnelModeTransformMigration(
+                                outTunnelTransform, LOCAL_OUTER_6_NEW, REMOTE_OUTER_6_NEW);
+
+                        mISM.applyTunnelModeTransform(
+                                tunnelIfaceBar, IpSecManager.DIRECTION_IN, inTunnelTransform);
+                        mISM.applyTunnelModeTransform(
+                                tunnelIfaceBar, IpSecManager.DIRECTION_OUT, outTunnelTransform);
+
+                        return 0 /* not used */;
+                    },
+                    true /* enableEncrypt */);
+        }
+    }
 }
