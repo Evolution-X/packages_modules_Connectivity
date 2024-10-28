@@ -29,21 +29,18 @@ public class QueryTaskConfig {
     private final boolean alwaysAskForUnicastResponse =
             MdnsConfigs.alwaysAskForUnicastResponseInEachBurst();
     @VisibleForTesting
-    final int transactionId;
-    @VisibleForTesting
     final boolean expectUnicastResponse;
     final int queryIndex;
     final int queryMode;
 
-    QueryTaskConfig(int queryMode, int queryIndex, int transactionId) {
+    QueryTaskConfig(int queryMode, int queryIndex) {
         this.queryMode = queryMode;
-        this.transactionId = transactionId;
         this.queryIndex = queryIndex;
         this.expectUnicastResponse = getExpectUnicastResponse();
     }
 
     QueryTaskConfig(int queryMode) {
-        this(queryMode, 0, 1);
+        this(queryMode, 0);
     }
 
     /**
@@ -51,12 +48,11 @@ public class QueryTaskConfig {
      */
     public QueryTaskConfig getConfigForNextRun(int queryMode) {
         final int newQueryIndex = queryIndex + 1;
-        int newTransactionId = transactionId + 1;
-        if (newTransactionId > UNSIGNED_SHORT_MAX_VALUE) {
-            newTransactionId = 1;
-        }
+        return new QueryTaskConfig(queryMode, newQueryIndex);
+    }
 
-        return new QueryTaskConfig(queryMode, newQueryIndex, newTransactionId);
+    public int getTransactionId() {
+        return (queryIndex % (UNSIGNED_SHORT_MAX_VALUE - 1)) + 1;
     }
 
     private boolean getExpectUnicastResponse() {

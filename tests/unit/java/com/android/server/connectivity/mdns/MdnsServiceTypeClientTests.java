@@ -581,21 +581,21 @@ public class MdnsServiceTypeClientTests {
 
         // This is the first query. We will ask for unicast response.
         assertTrue(config.expectUnicastResponse);
-        assertEquals(config.transactionId, 1);
+        assertEquals(config.getTransactionId(), 1);
 
         // For the rest of queries in this burst, we will NOT ask for unicast response.
         for (int i = 1; i < MdnsConfigs.queriesPerBurst(); i++) {
-            int oldTransactionId = config.transactionId;
+            int oldTransactionId = config.getTransactionId();
             config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
             assertFalse(config.expectUnicastResponse);
-            assertEquals(config.transactionId, oldTransactionId + 1);
+            assertEquals(config.getTransactionId(), oldTransactionId + 1);
         }
 
         // This is the first query of a new burst. We will ask for unicast response.
-        int oldTransactionId = config.transactionId;
+        int oldTransactionId = config.getTransactionId();
         config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
         assertTrue(config.expectUnicastResponse);
-        assertEquals(config.transactionId, oldTransactionId + 1);
+        assertEquals(config.getTransactionId(), oldTransactionId + 1);
     }
 
     @Test
@@ -606,21 +606,21 @@ public class MdnsServiceTypeClientTests {
 
         // This is the first query. We will ask for unicast response.
         assertTrue(config.expectUnicastResponse);
-        assertEquals(config.transactionId, 1);
+        assertEquals(config.getTransactionId(), 1);
 
         // For the rest of queries in this burst, we will NOT ask for unicast response.
         for (int i = 1; i < MdnsConfigs.queriesPerBurst(); i++) {
-            int oldTransactionId = config.transactionId;
+            int oldTransactionId = config.getTransactionId();
             config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
             assertFalse(config.expectUnicastResponse);
-            assertEquals(config.transactionId, oldTransactionId + 1);
+            assertEquals(config.getTransactionId(), oldTransactionId + 1);
         }
 
         // This is the first query of a new burst. We will NOT ask for unicast response.
-        int oldTransactionId = config.transactionId;
+        int oldTransactionId = config.getTransactionId();
         config = config.getConfigForNextRun(ACTIVE_QUERY_MODE);
         assertFalse(config.expectUnicastResponse);
-        assertEquals(config.transactionId, oldTransactionId + 1);
+        assertEquals(config.getTransactionId(), oldTransactionId + 1);
     }
 
     @Test
