@@ -403,6 +403,8 @@ static unsigned long long (*bpf_get_current_uid_gid)(void) = (void*) BPF_FUNC_ge
 static unsigned long long (*bpf_get_smp_processor_id)(void) = (void*) BPF_FUNC_get_smp_processor_id;
 static long (*bpf_get_stackid)(void* ctx, void* map, uint64_t flags) = (void*) BPF_FUNC_get_stackid;
 static long (*bpf_get_current_comm)(void* buf, uint32_t buf_size) = (void*) BPF_FUNC_get_current_comm;
+// bpf_sk_fullsock requires 5.1+ kernel
+static struct bpf_sock* (*bpf_sk_fullsock)(struct bpf_sock* sk) = (void*) BPF_FUNC_sk_fullsock;
 
 // GPL only:
 static int (*bpf_trace_printk)(const char* fmt, int fmt_size, ...) = (void*) BPF_FUNC_trace_printk;
