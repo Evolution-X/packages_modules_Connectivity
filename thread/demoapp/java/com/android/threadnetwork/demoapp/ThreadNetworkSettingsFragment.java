@@ -28,6 +28,7 @@ import android.net.RouteInfo;
 import android.net.thread.ActiveOperationalDataset;
 import android.net.thread.OperationalDatasetTimestamp;
 import android.net.thread.PendingOperationalDataset;
+import android.net.thread.ThreadConfiguration;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkException;
 import android.net.thread.ThreadNetworkManager;
@@ -44,6 +45,8 @@ import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -63,6 +66,7 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
     private TextView mTextNetworkInfo;
     private TextView mMigrateNetworkState;
     private TextView mEphemeralKeyStateText;
+    private SwitchMaterial mNat64Switch;
     private Executor mMainExecutor;
 
     private int mDeviceRole;
@@ -72,6 +76,7 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
     private String mEphemeralKey;
     private Instant mEphemeralKeyExpiry;
     private Timer mEphemeralKeyLifetimeTimer;
+    private ThreadConfiguration mThreadConfiguration;
 
     private static final byte[] DEFAULT_ACTIVE_DATASET_TLVS =
             base16().lowerCase()
@@ -108,6 +113,10 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
             default:
                 return "Unknown";
         }
+    }
+
+    private static String booleanToEnabledOrDisabled(boolean enabled) {
+        return enabled ? "Enabled" : "Disabled";
     }
 
     @Override
@@ -181,11 +190,16 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
                         this.mActiveDataset = newActiveDataset;
                         updateState();
                     });
+            mThreadController.registerConfigurationCallback(
+                    mMainExecutor, this::updateConfiguration);
         }
 
         mTextState = (TextView) view.findViewById(R.id.text_state);
         mTextNetworkInfo = (TextView) view.findViewById(R.id.text_network_info);
         mEphemeralKeyStateText = (TextView) view.findViewById(R.id.text_ephemeral_key_state);
+        mNat64Switch = (SwitchMaterial) view.findViewById(R.id.switch_nat64);
+        mNat64Switch.setOnCheckedChangeListener(
+                (buttonView, isChecked) -> doSetNat64Enabled(isChecked));
 
         if (mThreadController == null) {
             mTextState.setText("Thread not supported!");
@@ -303,6 +317,34 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
                 });
     }
 
+    private void doSetNat64Enabled(boolean enabled) {
+        if (mThreadConfiguration == null) {
+            Log.e(TAG, "Thread configuration is not available");
+            return;
+        }
+        final ThreadConfiguration config =
+                new ThreadConfiguration.Builder(mThreadConfiguration)
+                        .setNat64Enabled(enabled)
+                        .build();
+        mThreadController.setConfiguration(
+                config,
+                mMainExecutor,
+                new OutcomeReceiver<>() {
+                    @Override
+                    public void onError(ThreadNetworkException error) {
+                        Log.e(
+                                TAG,
+                                "Failed to set NAT64 " + booleanToEnabledOrDisabled(enabled),
+                                error);
+                    }
+
+                    @Override
+                    public void onResult(Void v) {
+                        Log.i(TAG, "Successfully set NAT64 " + booleanToEnabledOrDisabled(enabled));
+                    }
+                });
+    }
+
     private void updateState() {
         Log.i(
                 TAG,
@@ -367,5 +409,12 @@ public final class ThreadNetworkSettingsFragment extends Fragment {
             sb.append(route + "\n");
         }
         mTextNetworkInfo.setText(sb.toString());
+    }
+
+    private void updateConfiguration(ThreadConfiguration config) {
+        Log.i(TAG, "Updating configuration: " + config);
+
+        mThreadConfiguration = config;
+        mNat64Switch.setChecked(config.isNat64Enabled());
     }
 }
