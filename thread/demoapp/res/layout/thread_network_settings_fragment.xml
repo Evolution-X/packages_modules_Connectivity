@@ -92,7 +92,21 @@
             android:id="@+id/text_ephemeral_key_state"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="50dp"
             android:textSize="12sp" />
+
+        <TextView
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="Configuration"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_nat64"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="false"
+            android:text="NAT64" />
+
     </LinearLayout>
 </ScrollView>
