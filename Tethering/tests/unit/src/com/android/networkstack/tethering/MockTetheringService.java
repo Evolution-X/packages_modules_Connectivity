@@ -32,8 +32,6 @@ import androidx.annotation.Nullable;
 public class MockTetheringService extends TetheringService {
     private final Tethering mTethering = mock(Tethering.class);
     private final ArrayMap<String, Integer> mMockedPermissions = new ArrayMap<>();
-    private final ArrayMap<String, Integer> mMockedPackageUids = new ArrayMap<>();
-    private int mMockCallingUid;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -61,17 +59,6 @@ public class MockTetheringService extends TetheringService {
             return mocked;
         }
         return super.checkCallingOrSelfPermission(permission);
-    }
-
-    @Override
-    boolean checkPackageNameMatchesUid(@NonNull Context context, int uid,
-            @NonNull String callingPackage) {
-        return mMockedPackageUids.getOrDefault(callingPackage, 0) == uid;
-    }
-
-    @Override
-    int getBinderCallingUid() {
-        return mMockCallingUid;
     }
 
     public Tethering getTethering() {
@@ -103,20 +90,6 @@ public class MockTetheringService extends TetheringService {
             } else {
                 mMockedPermissions.put(permission, granted);
             }
-        }
-
-        /**
-         * Mock a package name matching a uid.
-         */
-        public void setPackageNameUid(String packageName, int uid) {
-            mMockedPackageUids.put(packageName, uid);
-        }
-
-        /**
-         * Mock a package name matching a uid.
-         */
-        public void setCallingUid(int uid) {
-            mMockCallingUid = uid;
         }
     }
 }
