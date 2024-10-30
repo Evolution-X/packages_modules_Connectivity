@@ -28,6 +28,7 @@ import com.android.tradefed.targetprep.suite.SuiteApkInstaller
 private const val CONNECTIVITY_CHECKER_APK = "ConnectivityTestPreparer.apk"
 private const val CONNECTIVITY_PKG_NAME = "com.android.testutils.connectivitypreparer"
 private const val CONNECTIVITY_CHECK_CLASS = "$CONNECTIVITY_PKG_NAME.ConnectivityCheckTest"
+private const val CARRIER_CONFIG_SETUP_CLASS = "$CONNECTIVITY_PKG_NAME.CarrierConfigSetupTest"
 
 // As per the <instrumentation> defined in the checker manifest
 private const val CONNECTIVITY_CHECK_RUNNER_NAME = "androidx.test.runner.AndroidJUnitRunner"
@@ -84,27 +85,28 @@ open class ConnectivityTestTargetPreparer : BaseTargetPreparer() {
         installer.setShouldGrantPermission(true)
         installer.setUp(testInfo)
 
-        val testMethods = mutableListOf<String>()
+        val testMethods = mutableListOf<Pair<String, String>>()
         if (!ignoreWifiCheck) {
-            testMethods.add("testCheckWifiSetup")
+            testMethods.add(CONNECTIVITY_CHECK_CLASS to "testCheckWifiSetup")
         }
         if (!ignoreMobileDataCheck) {
-            testMethods.add("testCheckTelephonySetup")
+            testMethods.add(CARRIER_CONFIG_SETUP_CLASS to "testSetCarrierConfig")
+            testMethods.add(CONNECTIVITY_CHECK_CLASS to "testCheckTelephonySetup")
         }
 
         testMethods.forEach {
-            runTestMethod(testInfo, it)
+            runTestMethod(testInfo, it.first, it.second)
         }
     }
 
-    private fun runTestMethod(testInfo: TestInformation, method: String) {
+    private fun runTestMethod(testInfo: TestInformation, clazz: String, method: String) {
         val runner = DefaultRemoteAndroidTestRunner(
             CONNECTIVITY_PKG_NAME,
             CONNECTIVITY_CHECK_RUNNER_NAME,
             testInfo.device.iDevice
         )
         runner.runOptions = "--no-hidden-api-checks"
-        runner.setMethodName(CONNECTIVITY_CHECK_CLASS, method)
+        runner.setMethodName(clazz, method)
 
         val receiver = CollectingTestListener()
         if (!testInfo.device.runInstrumentationTests(runner, receiver)) {
@@ -187,6 +189,9 @@ open class ConnectivityTestTargetPreparer : BaseTargetPreparer() {
 
     override fun tearDown(testInfo: TestInformation, e: Throwable?) {
         if (isTearDownDisabled) return
+        if (!ignoreMobileDataCheck) {
+            runTestMethod(testInfo, CARRIER_CONFIG_SETUP_CLASS, "testClearCarrierConfig")
+        }
         installer.tearDown(testInfo, e)
         setUpdaterNetworkingEnabled(
             testInfo,
