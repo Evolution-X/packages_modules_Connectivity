@@ -15,6 +15,8 @@
  */
 package android.net.thread.utils;
 
+import static android.net.DnsResolver.TYPE_A;
+import static android.net.DnsResolver.TYPE_AAAA;
 import static android.net.thread.utils.IntegrationTestUtils.SERVICE_DISCOVERY_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.waitFor;
 
@@ -352,6 +354,31 @@ public final class FullThreadDevice {
     /** Sets the DNS server address. */
     public void setDnsServerAddress(String address) {
         executeCommand("dns config " + address);
+    }
+
+    /** Resolves the {@code queryType} record of the {@code hostname} via DNS. */
+    public List<InetAddress> resolveHost(String hostname, int queryType) {
+        // CLI output:
+        // DNS response for hostname.com. - fd12::abc1 TTL:50 fd12::abc2 TTL:50 fd12::abc3 TTL:50
+
+        String command;
+        switch (queryType) {
+            case TYPE_A -> command = "resolve4";
+            case TYPE_AAAA -> command = "resolve";
+            default -> throw new IllegalArgumentException("Invalid query type: " + queryType);
+        }
+        final List<InetAddress> addresses = new ArrayList<>();
+        String line;
+        try {
+            line = executeCommand("dns " + command + " " + hostname).get(0);
+        } catch (IllegalStateException e) {
+            return addresses;
+        }
+        final String[] addressTtlPairs = line.split("-")[1].strip().split(" ");
+        for (int i = 0; i < addressTtlPairs.length; i += 2) {
+            addresses.add(InetAddresses.parseNumericAddress(addressTtlPairs[i]));
+        }
+        return addresses;
     }
 
     /** Returns the first browsed service instance of {@code serviceType}. */
