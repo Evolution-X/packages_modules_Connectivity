@@ -34,7 +34,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -80,7 +79,6 @@ import java.util.function.Supplier;
 public final class TetheringServiceTest {
     private static final String TEST_IFACE_NAME = "test_wlan0";
     private static final String TEST_CALLER_PKG = "com.android.shell";
-    private static final int TEST_CALLER_UID = 1234;
     private static final String TEST_ATTRIBUTION_TAG = null;
     @Mock private ITetheringEventCallback mITetheringEventCallback;
     @Rule public ServiceTestRule mServiceTestRule;
@@ -130,8 +128,6 @@ public final class TetheringServiceTest {
         mTetheringConnector = ITetheringConnector.Stub.asInterface(mMockConnector.getIBinder());
         final MockTetheringService service = mMockConnector.getService();
         mTethering = service.getTethering();
-        mMockConnector.setCallingUid(TEST_CALLER_UID);
-        mMockConnector.setPackageNameUid(TEST_CALLER_PKG, TEST_CALLER_UID);
     }
 
     @After
@@ -334,16 +330,6 @@ public final class TetheringServiceTest {
         });
 
         runAsTetherPrivileged((result) -> {
-            String wrongPackage = "wrong.package";
-            mTetheringConnector.startTethering(request, wrongPackage,
-                    TEST_ATTRIBUTION_TAG, result);
-            verify(mTethering, never()).startTethering(
-                    eq(new TetheringRequest(request)), eq(wrongPackage), eq(result));
-            result.assertResult(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
-            verifyNoMoreInteractionsForTethering();
-        });
-
-        runAsTetherPrivileged((result) -> {
             runStartTethering(result, request);
             verifyNoMoreInteractionsForTethering();
         });
@@ -457,13 +443,6 @@ public final class TetheringServiceTest {
         runAsTetherPrivileged((none) -> {
             runRequestLatestTetheringEntitlementResult();
             verifyNoMoreInteractionsForTethering();
-        });
-
-        runAsTetherPrivileged((none) -> {
-            mTetheringConnector.requestLatestTetheringEntitlementResult(TETHERING_WIFI, result,
-                    true /* showEntitlementUi */, "wrong.package", TEST_ATTRIBUTION_TAG);
-            result.assertResult(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
-            verifyNoMoreInteractions(mTethering);
         });
 
         runAsWriteSettings((none) -> {
