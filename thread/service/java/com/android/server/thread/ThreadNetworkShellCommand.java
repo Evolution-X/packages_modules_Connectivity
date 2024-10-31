@@ -137,6 +137,8 @@ public final class ThreadNetworkShellCommand extends BasicShellCommandHandler {
                 return setThreadEnabled(true);
             case "disable":
                 return setThreadEnabled(false);
+            case "config":
+                return handleConfigCommand();
             case "join":
                 return join();
             case "leave":
@@ -149,8 +151,6 @@ public final class ThreadNetworkShellCommand extends BasicShellCommandHandler {
                 return forceCountryCode();
             case "get-country-code":
                 return getCountryCode();
-            case "config":
-                return handleConfigCommand();
             case "ot-ctl":
                 return handleOtCtlCommand();
             default:
@@ -321,6 +321,7 @@ public final class ThreadNetworkShellCommand extends BasicShellCommandHandler {
         final ThreadConfiguration.Builder newConfigBuilder =
                 new ThreadConfiguration.Builder(oldConfig);
         switch (name) {
+            case "br" -> newConfigBuilder.setBorderRouterEnabled(argEnabledOrDisabled(value));
             case "nat64" -> newConfigBuilder.setNat64Enabled(argEnabledOrDisabled(value));
             case "pd" -> newConfigBuilder.setDhcpv6PdEnabled(argEnabledOrDisabled(value));
             default -> throw new IllegalArgumentException("Invalid config name: " + name);

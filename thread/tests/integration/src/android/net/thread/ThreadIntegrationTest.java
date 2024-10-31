@@ -16,10 +16,13 @@
 
 package android.net.thread;
 
+import static android.Manifest.permission.ACCESS_NETWORK_STATE;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_DETACHED;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_LEADER;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_STOPPED;
 import static android.net.thread.utils.IntegrationTestUtils.CALLBACK_TIMEOUT;
+import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_CONFIG;
 import static android.net.thread.utils.IntegrationTestUtils.RESTART_JOIN_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.getPrefixesFromNetData;
@@ -30,10 +33,13 @@ import static android.net.thread.utils.IntegrationTestUtils.waitFor;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommand;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
 import static com.android.server.thread.openthread.IOtDaemon.TUN_IF_NAME;
+import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
@@ -41,6 +47,9 @@ import android.net.InetAddresses;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
@@ -66,6 +75,7 @@ import java.net.InetAddress;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -83,6 +93,8 @@ public class ThreadIntegrationTest {
     // The maximum time for changes to be propagated to netdata.
     private static final Duration NET_DATA_UPDATE_TIMEOUT = Duration.ofSeconds(1);
 
+    private static final Duration NETWORK_CALLBACK_TIMEOUT = Duration.ofSeconds(10);
+
     // A valid Thread Active Operational Dataset generated from OpenThread CLI "dataset init new".
     private static final byte[] DEFAULT_DATASET_TLVS =
             base16().decode(
@@ -93,6 +105,8 @@ public class ThreadIntegrationTest {
                                     + "B9D351B40C0402A0FFF8");
     private static final ActiveOperationalDataset DEFAULT_DATASET =
             ActiveOperationalDataset.fromThreadTlvs(DEFAULT_DATASET_TLVS);
+    private static final ThreadConfiguration DEFAULT_CONFIG =
+            new ThreadConfiguration.Builder().build();
 
     private static final Inet6Address GROUP_ADDR_ALL_ROUTERS =
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::2");
@@ -126,6 +140,7 @@ public class ThreadIntegrationTest {
     public void tearDown() throws Exception {
         mController.setTestNetworkAsUpstreamAndWait(null);
         mController.leaveAndWait();
+        mController.setConfigurationAndWait(DEFAULT_CONFIG);
 
         mFtd.destroy();
         mExecutor.shutdownNow();
@@ -327,6 +342,44 @@ public class ThreadIntegrationTest {
                 .isFalse();
     }
 
+    @Test
+    public void setConfiguration_disableBorderRouter_noBrfunctionsEnabled() throws Exception {
+        NetworkRequest request =
+                new NetworkRequest.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_THREAD)
+                        .build();
+        startFtdLeader(mFtd, DEFAULT_DATASET);
+
+        mController.setConfigurationAndWait(
+                new ThreadConfiguration.Builder().setBorderRouterEnabled(false).build());
+        mController.joinAndWait(DEFAULT_DATASET);
+        NetworkCapabilities caps = registerNetworkCallbackAndWait(request);
+
+        assertThat(caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK)).isFalse();
+        assertThat(mOtCtl.getBorderRoutingState()).ignoringCase().isEqualTo("disabled");
+        assertThat(mOtCtl.getSrpServerState()).ignoringCase().isNotEqualTo("disabled");
+        // TODO: b/376217403 - enables / disables Border Agent at runtime
+    }
+
+    private NetworkCapabilities registerNetworkCallbackAndWait(NetworkRequest request)
+            throws Exception {
+        CompletableFuture<Network> networkFuture = new CompletableFuture<>();
+        ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
+        ConnectivityManager.NetworkCallback callback =
+                new ConnectivityManager.NetworkCallback() {
+                    @Override
+                    public void onAvailable(Network network) {
+                        networkFuture.complete(network);
+                    }
+                };
+
+        runAsShell(ACCESS_NETWORK_STATE, () -> cm.registerNetworkCallback(request, callback));
+
+        assertThat(networkFuture.get(NETWORK_CALLBACK_TIMEOUT.getSeconds(), SECONDS)).isNotNull();
+        return runAsShell(
+                ACCESS_NETWORK_STATE, () -> cm.getNetworkCapabilities(networkFuture.get()));
+    }
+
     // TODO (b/323300829): add more tests for integration with linux platform and
     // ConnectivityService
 
@@ -339,6 +392,14 @@ public class ThreadIntegrationTest {
         ftd.factoryReset();
         ftd.joinNetwork(activeDataset);
         ftd.waitForStateAnyOf(List.of("router", "child"), Duration.ofSeconds(8));
+    }
+
+    /** Starts a Thread FTD device as a leader. */
+    private void startFtdLeader(FullThreadDevice ftd, ActiveOperationalDataset activeDataset)
+            throws Exception {
+        ftd.factoryReset();
+        ftd.joinNetwork(activeDataset);
+        ftd.waitForStateAnyOf(List.of("leader"), Duration.ofSeconds(8));
     }
 
     /**
