@@ -2369,6 +2369,18 @@ public class ConnectivityServiceTest {
             mScheduledEvaluationTimeouts.add(new Pair<>(network.netId, delayMs));
             super.scheduleEvaluationTimeout(handler, network, delayMs);
         }
+
+        @Override
+        public int getDefaultCellularDataInactivityTimeout() {
+            // Needed to mock out the dependency on DeviceConfig
+            return 10;
+        }
+
+        @Override
+        public int getDefaultWifiDataInactivityTimeout() {
+            // Needed to mock out the dependency on DeviceConfig
+            return 15;
+        }
     }
 
     private class AutomaticOnOffKeepaliveTrackerDependencies

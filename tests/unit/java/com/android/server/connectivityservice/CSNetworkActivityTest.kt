@@ -21,6 +21,7 @@ import android.net.ConnectivityManager.ACTION_DATA_ACTIVITY_CHANGE
 import android.net.ConnectivityManager.EXTRA_DEVICE_TYPE
 import android.net.ConnectivityManager.EXTRA_IS_ACTIVE
 import android.net.ConnectivityManager.EXTRA_REALTIME_NS
+import android.net.ConnectivitySettingsManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_IMS
@@ -41,12 +42,14 @@ import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
+import java.time.Duration
 import kotlin.test.assertNotNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
@@ -68,6 +71,18 @@ private const val TIMEOUT_MS = 250L
 @SmallTest
 @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class CSNetworkActivityTest : CSTest() {
+
+    private fun setMobileDataActivityTimeout(timeoutSeconds: Int) {
+        ConnectivitySettingsManager.setMobileDataActivityTimeout(
+            context, Duration.ofSeconds(timeoutSeconds.toLong())
+        )
+    }
+
+    private fun setWifiDataActivityTimeout(timeoutSeconds: Int) {
+        ConnectivitySettingsManager.setWifiDataActivityTimeout(
+            context, Duration.ofSeconds(timeoutSeconds.toLong())
+        )
+    }
 
     private fun getRegisteredNetdUnsolicitedEventListener(): BaseNetdUnsolicitedEventListener {
         val captor = ArgumentCaptor.forClass(BaseNetdUnsolicitedEventListener::class.java)
@@ -252,7 +267,121 @@ class CSNetworkActivityTest : CSTest() {
         cm.unregisterNetworkCallback(dataNetworkCb)
         cm.unregisterNetworkCallback(imsNetworkCb)
     }
+
+    @Test
+    fun testCellularIdleTimerSettingsTimeout() {
+        val cellNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_CELLULAR)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val cellLp = LinkProperties().apply {
+            interfaceName = DATA_CELL_IFNAME
+        }
+
+        val settingsTimeout: Int = deps.defaultCellDataInactivityTimeoutForTest + 432
+        // DATA_ACTIVITY_TIMEOUT_MOBILE is set, so the default should be ignored.
+        setMobileDataActivityTimeout(settingsTimeout)
+        val cellAgent = Agent(nc = cellNc, lp = cellLp)
+        cellAgent.connect()
+
+        verify(netd).idletimerAddInterface(eq(DATA_CELL_IFNAME), eq(settingsTimeout), anyString())
+    }
+
+    @Test
+    fun testCellularIdleTimerDefaultTimeout() {
+        val cellNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_CELLULAR)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val cellLp = LinkProperties().apply {
+            interfaceName = DATA_CELL_IFNAME
+        }
+
+        val testTimeout: Int = deps.defaultCellDataInactivityTimeoutForTest
+        // DATA_ACTIVITY_TIMEOUT_MOBILE is not set, so the default should be used.
+        val cellAgent = Agent(nc = cellNc, lp = cellLp)
+        cellAgent.connect()
+
+        verify(netd).idletimerAddInterface(eq(DATA_CELL_IFNAME), eq(testTimeout), anyString())
+    }
+
+    @Test
+    fun testCellularIdleTimerDisabled() {
+        val cellNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_CELLULAR)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val cellLp = LinkProperties().apply {
+            interfaceName = DATA_CELL_IFNAME
+        }
+        setMobileDataActivityTimeout(0)
+        val cellAgent = Agent(nc = cellNc, lp = cellLp)
+        cellAgent.connect()
+
+        verify(netd, never()).idletimerAddInterface(eq(DATA_CELL_IFNAME), anyInt(), anyString())
+    }
+
+    @Test
+    fun testWifiIdleTimerSettingsTimeout() {
+        val wifiNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_WIFI)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val wifiLp = LinkProperties().apply {
+            interfaceName = WIFI_IFNAME
+        }
+        val settingsTimeout: Int = deps.defaultWifiDataInactivityTimeout + 435
+        setWifiDataActivityTimeout(settingsTimeout)
+        // DATA_ACTIVITY_TIMEOUT_MOBILE is set, so the default should be ignored.
+        val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
+        wifiAgent.connect()
+
+        verify(netd).idletimerAddInterface(eq(WIFI_IFNAME), eq(settingsTimeout), anyString())
+    }
+
+    @Test
+    fun testWifiIdleTimerDefaultTimeout() {
+        val wifiNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_WIFI)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val wifiLp = LinkProperties().apply {
+            interfaceName = WIFI_IFNAME
+        }
+        val testTimeout: Int = deps.defaultWifiDataInactivityTimeoutForTest
+        // DATA_ACTIVITY_TIMEOUT_WIFI is not set, so the default should be used.
+        val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
+        wifiAgent.connect()
+
+        verify(netd).idletimerAddInterface(eq(WIFI_IFNAME), eq(testTimeout), anyString())
+    }
+
+    @Test
+    fun testWifiIdleTimerDisabled() {
+        val wifiNc = NetworkCapabilities.Builder()
+            .addTransportType(TRANSPORT_WIFI)
+            .addCapability(NET_CAPABILITY_INTERNET)
+            .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            .build()
+        val wifiLp = LinkProperties().apply {
+            interfaceName = WIFI_IFNAME
+        }
+        setWifiDataActivityTimeout(0)
+        val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
+        wifiAgent.connect()
+
+        verify(netd, never()).idletimerAddInterface(eq(WIFI_IFNAME), anyInt(), anyString())
+    }
 }
+
 
 internal fun CSContext.expectDataActivityBroadcast(
         deviceType: Int,
