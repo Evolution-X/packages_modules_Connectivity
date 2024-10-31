@@ -21,10 +21,10 @@ import android.net.INetworkStatsSession;
 import android.net.Network;
 import android.net.NetworkStateSnapshot;
 import android.net.NetworkStats;
-import android.net.NetworkStatsHistory;
 import android.net.NetworkTemplate;
 import android.net.UnderlyingNetworkInfo;
 import android.net.netstats.IUsageCallback;
+import android.net.netstats.StatsResult;
 import android.net.netstats.provider.INetworkStatsProvider;
 import android.net.netstats.provider.INetworkStatsProviderCallback;
 import android.os.IBinder;
@@ -78,16 +78,13 @@ interface INetworkStatsService {
     void unregisterUsageRequest(in DataUsageRequest request);
 
     /** Get the uid stats information since boot */
-    NetworkStats getTypelessUidStats(int uid);
+    StatsResult getUidStats(int uid);
 
     /** Get the iface stats information since boot */
-    NetworkStats getTypelessIfaceStats(String iface);
+    StatsResult getIfaceStats(String iface);
 
     /** Get the total network stats information since boot */
-    NetworkStats getTypelessTotalStats();
-
-    /** Get the uid stats information (with specified type) since boot */
-    long getUidStats(int uid, int type);
+    StatsResult getTotalStats();
 
     /** Registers a network stats provider */
     INetworkStatsProviderCallback registerNetworkStatsProvider(String tag,
