@@ -44,6 +44,11 @@ public final class ConnectivityFlags {
 
     public static final String BACKGROUND_FIREWALL_CHAIN = "background_firewall_chain";
 
+    public static final String CELLULAR_DATA_INACTIVITY_TIMEOUT =
+            "cellular_data_inactivity_timeout";
+
+    public static final String WIFI_DATA_INACTIVITY_TIMEOUT = "wifi_data_inactivity_timeout";
+
     public static final String DELAY_DESTROY_SOCKETS = "delay_destroy_sockets";
 
     public static final String USE_DECLARED_METHODS_FOR_CALLBACKS =
