@@ -56,7 +56,6 @@ import static android.net.NetworkTemplate.OEM_MANAGED_YES;
 import static android.net.TrafficStats.MB_IN_BYTES;
 import static android.net.TrafficStats.UID_REMOVED;
 import static android.net.TrafficStats.UID_TETHERING;
-import static android.net.TrafficStats.getValueForTypeFromFirstEntry;
 import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_TRAFFICSTATS_RATE_LIMIT_CACHE;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID_TAG;
@@ -128,8 +127,8 @@ import android.net.TelephonyNetworkSpecifier;
 import android.net.TestNetworkSpecifier;
 import android.net.TetherStatsParcel;
 import android.net.TetheringManager;
-import android.net.TrafficStats;
 import android.net.UnderlyingNetworkInfo;
+import android.net.netstats.StatsResult;
 import android.net.netstats.provider.INetworkStatsProviderCallback;
 import android.net.wifi.WifiInfo;
 import android.os.DropBoxManager;
@@ -209,7 +208,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 
 /**
  * Tests for {@link NetworkStatsService}.
@@ -2515,22 +2513,18 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
     // Assert for 3 different API return values respectively.
     private void assertTrafficStatsValues(String iface, int uid, long rxBytes, long rxPackets,
             long txBytes, long txPackets) {
-        assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> getValueForTypeFromFirstEntry(mService.getTypelessTotalStats(), type));
-        assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> getValueForTypeFromFirstEntry(
-                        mService.getTypelessIfaceStats(iface), type)
-        );
-        assertTrafficStatsValuesThat(rxBytes, rxPackets, txBytes, txPackets,
-                (type) -> getValueForTypeFromFirstEntry(mService.getTypelessUidStats(uid), type));
+        assertStatsResultEquals(mService.getTotalStats(), rxBytes, rxPackets, txBytes, txPackets);
+        assertStatsResultEquals(mService.getIfaceStats(iface), rxBytes, rxPackets, txBytes,
+                txPackets);
+        assertStatsResultEquals(mService.getUidStats(uid), rxBytes, rxPackets, txBytes, txPackets);
     }
 
-    private void assertTrafficStatsValuesThat(long rxBytes, long rxPackets, long txBytes,
-            long txPackets, Function<Integer, Long> fetcher) {
-        assertEquals(rxBytes, (long) fetcher.apply(TrafficStats.TYPE_RX_BYTES));
-        assertEquals(rxPackets, (long) fetcher.apply(TrafficStats.TYPE_RX_PACKETS));
-        assertEquals(txBytes, (long) fetcher.apply(TrafficStats.TYPE_TX_BYTES));
-        assertEquals(txPackets, (long) fetcher.apply(TrafficStats.TYPE_TX_PACKETS));
+    private void assertStatsResultEquals(StatsResult stats, long rxBytes, long rxPackets,
+            long txBytes, long txPackets) {
+        assertEquals(rxBytes, stats.rxBytes);
+        assertEquals(rxPackets, stats.rxPackets);
+        assertEquals(txBytes, stats.txBytes);
+        assertEquals(txPackets, stats.txPackets);
     }
 
     private void assertShouldRunComparison(boolean expected, boolean isDebuggable) {
