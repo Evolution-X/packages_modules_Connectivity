@@ -44,3 +44,12 @@ flag {
     description: "Controls whether the setConfiguration API of NAT64 feature is enabled"
     bug: "368456504"
 }
+
+flag {
+    name: "thread_mobile_enabled"
+    is_exported: true
+    is_fixed_read_only: true
+    namespace: "thread_network"
+    description: "Controls whether Thread support for mobile devices is enabled"
+    bug: "368867060"
+}

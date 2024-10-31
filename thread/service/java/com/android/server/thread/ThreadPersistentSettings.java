@@ -77,6 +77,13 @@ public class ThreadPersistentSettings {
     /** Stores the Thread country code, null if no country code is stored. */
     public static final Key<String> THREAD_COUNTRY_CODE = new Key<>("thread_country_code", null);
 
+    /**
+     * Saves the boolean flag for border router being enabled. The value defaults to {@code true} if
+     * this config is missing.
+     */
+    private static final Key<Boolean> CONFIG_BORDER_ROUTER_ENABLED =
+            new Key<>("config_border_router_enabled", true);
+
     /** Stores the Thread NAT64 feature toggle state, true for enabled and false for disabled. */
     private static final Key<Boolean> CONFIG_NAT64_ENABLED =
             new Key<>("config_nat64_enabled", false);
@@ -197,6 +204,7 @@ public class ThreadPersistentSettings {
         if (getConfiguration().equals(configuration)) {
             return false;
         }
+        putObject(CONFIG_BORDER_ROUTER_ENABLED.key, configuration.isBorderRouterEnabled());
         putObject(CONFIG_NAT64_ENABLED.key, configuration.isNat64Enabled());
         putObject(CONFIG_DHCP6_PD_ENABLED.key, configuration.isDhcpv6PdEnabled());
         writeToStoreFile();
@@ -206,6 +214,7 @@ public class ThreadPersistentSettings {
     /** Retrieve the {@link ThreadConfiguration} from the persistent settings. */
     public ThreadConfiguration getConfiguration() {
         return new ThreadConfiguration.Builder()
+                .setBorderRouterEnabled(get(CONFIG_BORDER_ROUTER_ENABLED))
                 .setNat64Enabled(get(CONFIG_NAT64_ENABLED))
                 .setDhcpv6PdEnabled(get(CONFIG_DHCP6_PD_ENABLED))
                 .build();
