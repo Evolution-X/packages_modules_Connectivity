@@ -19,6 +19,7 @@ package android.net;
 import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
@@ -29,6 +30,7 @@ import android.app.usage.NetworkStatsManager;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.media.MediaPlayer;
+import android.net.netstats.StatsResult;
 import android.os.Binder;
 import android.os.Build;
 import android.os.RemoteException;
@@ -40,8 +42,6 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Iterator;
-import java.util.Objects;
 
 
 /**
@@ -963,13 +963,13 @@ public class TrafficStats {
                 || android.os.Process.myUid() != uid) {
             return UNSUPPORTED;
         }
-        final NetworkStats stats;
+        final StatsResult stats;
         try {
-            stats = getStatsService().getTypelessUidStats(uid);
+            stats = getStatsService().getUidStats(uid);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        return getValueForTypeFromFirstEntry(stats, type);
+        return getEntryValueForType(stats, type);
     }
 
     /** @hide */
@@ -977,13 +977,13 @@ public class TrafficStats {
         if (!isEntryValueTypeValid(type)) {
             return UNSUPPORTED;
         }
-        final NetworkStats stats;
+        final StatsResult stats;
         try {
-            stats = getStatsService().getTypelessTotalStats();
+            stats = getStatsService().getTotalStats();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        return getValueForTypeFromFirstEntry(stats, type);
+        return getEntryValueForType(stats, type);
     }
 
     /** @hide */
@@ -991,13 +991,13 @@ public class TrafficStats {
         if (!isEntryValueTypeValid(type)) {
             return UNSUPPORTED;
         }
-        final NetworkStats stats;
+        final StatsResult stats;
         try {
-            stats = getStatsService().getTypelessIfaceStats(iface);
+            stats = getStatsService().getIfaceStats(iface);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        return getValueForTypeFromFirstEntry(stats, type);
+        return getEntryValueForType(stats, type);
     }
 
     /**
@@ -1127,18 +1127,18 @@ public class TrafficStats {
     public static final int TYPE_TX_PACKETS = 3;
 
     /** @hide */
-    private static long getEntryValueForType(@NonNull NetworkStats.Entry entry, int type) {
-        Objects.requireNonNull(entry);
+    private static long getEntryValueForType(@Nullable StatsResult stats, int type) {
+        if (stats == null) return UNSUPPORTED;
         if (!isEntryValueTypeValid(type)) return UNSUPPORTED;
         switch (type) {
             case TYPE_RX_BYTES:
-                return entry.getRxBytes();
+                return stats.rxBytes;
             case TYPE_RX_PACKETS:
-                return entry.getRxPackets();
+                return stats.rxPackets;
             case TYPE_TX_BYTES:
-                return entry.getTxBytes();
+                return stats.txBytes;
             case TYPE_TX_PACKETS:
-                return entry.getTxPackets();
+                return stats.txPackets;
             default:
                 throw new IllegalStateException("Bug: Invalid type: "
                         + type + " should not reach here.");
@@ -1156,14 +1156,6 @@ public class TrafficStats {
             default :
                 return false;
         }
-    }
-
-    /** @hide */
-    public static long getValueForTypeFromFirstEntry(@NonNull NetworkStats stats, int type) {
-        Objects.requireNonNull(stats);
-        Iterator<NetworkStats.Entry> iter = stats.iterator();
-        if (!iter.hasNext()) return UNSUPPORTED;
-        return getEntryValueForType(iter.next(), type);
     }
 }
 
