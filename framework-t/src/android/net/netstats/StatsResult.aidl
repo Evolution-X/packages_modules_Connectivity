@@ -1,11 +1,11 @@
-/*
- * Copyright (C) 2020 The Android Open Source Project
+/**
+ * Copyright (c) 2024, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package android.net;
-
-import android.net.LinkAddress;
-import android.net.wifi.SoftApConfiguration;
+package android.net.netstats;
 
 /**
- * Configuration details for requesting tethering.
+ * A lightweight class to pass result of TrafficStats#get{Total|Iface|Uid}Stats.
+ *
  * @hide
  */
-parcelable TetheringRequestParcel {
-    int tetheringType;
-    LinkAddress localIPv4Address;
-    LinkAddress staticClientAddress;
-    boolean exemptFromEntitlementCheck;
-    boolean showProvisioningUi;
-    int connectivityScope;
-    SoftApConfiguration softApConfig;
+@JavaDerive(equals=true, toString=true)
+@JavaOnlyImmutable
+parcelable StatsResult {
+    long rxBytes;
+    long rxPackets;
+    long txBytes;
+    long txPackets;
 }

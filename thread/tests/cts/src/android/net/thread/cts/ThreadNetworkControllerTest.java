@@ -922,6 +922,27 @@ public class ThreadNetworkControllerTest {
 
     @Test
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
+    public void activateEphemeralKeyMode_notBorderRouter_failsWithFailedPrecondition()
+            throws Exception {
+        setConfigurationAndWait(
+                mController,
+                new ThreadConfiguration.Builder().setBorderRouterEnabled(false).build());
+        grantPermissions(THREAD_NETWORK_PRIVILEGED);
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        mController.activateEphemeralKeyMode(
+                Duration.ofSeconds(1), mExecutor, newOutcomeReceiver(future));
+
+        var thrown =
+                assertThrows(
+                        ExecutionException.class,
+                        () -> future.get(CALLBACK_TIMEOUT_MILLIS, MILLISECONDS));
+        var threadException = (ThreadNetworkException) thrown.getCause();
+        assertThat(threadException.getErrorCode()).isEqualTo(ERROR_FAILED_PRECONDITION);
+    }
+
+    @Test
+    @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void deactivateEphemeralKeyMode_withoutPrivilegedPermission_throwsSecurityException()
             throws Exception {
         dropAllPermissions();
@@ -929,6 +950,26 @@ public class ThreadNetworkControllerTest {
         assertThrows(
                 SecurityException.class,
                 () -> mController.deactivateEphemeralKeyMode(mExecutor, v -> {}));
+    }
+
+    @Test
+    @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
+    public void deactivateEphemeralKeyMode_notBorderRouter_failsWithFailedPrecondition()
+            throws Exception {
+        setConfigurationAndWait(
+                mController,
+                new ThreadConfiguration.Builder().setBorderRouterEnabled(false).build());
+        grantPermissions(THREAD_NETWORK_PRIVILEGED);
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        mController.deactivateEphemeralKeyMode(mExecutor, newOutcomeReceiver(future));
+
+        var thrown =
+                assertThrows(
+                        ExecutionException.class,
+                        () -> future.get(CALLBACK_TIMEOUT_MILLIS, MILLISECONDS));
+        var threadException = (ThreadNetworkException) thrown.getCause();
+        assertThat(threadException.getErrorCode()).isEqualTo(ERROR_FAILED_PRECONDITION);
     }
 
     @Test
@@ -1151,9 +1192,15 @@ public class ThreadNetworkControllerTest {
         CompletableFuture<Void> setFuture2 = new CompletableFuture<>();
         ConfigurationListener listener = new ConfigurationListener(mController);
         ThreadConfiguration config1 =
-                new ThreadConfiguration.Builder().setNat64Enabled(true).build();
+                new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(true)
+                        .setNat64Enabled(true)
+                        .build();
         ThreadConfiguration config2 =
-                new ThreadConfiguration.Builder().setNat64Enabled(false).build();
+                new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(false)
+                        .setNat64Enabled(false)
+                        .build();
 
         try {
             runAsShell(

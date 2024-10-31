@@ -19,28 +19,28 @@ package android.net.cts;
 import static android.os.Process.INVALID_UID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.INetworkStatsService;
 import android.net.TrafficStats;
+import android.net.connectivity.android.net.netstats.StatsResult;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
-import android.test.AndroidTestCase;
-import android.util.SparseArray;
 
 import androidx.test.InstrumentationRegistry;
-import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.util.CollectionUtils;
+import com.android.testutils.ConnectivityModuleTest;
 import com.android.testutils.DevSdkIgnoreRule;
+import com.android.testutils.DevSdkIgnoreRunner;
 
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -48,37 +48,20 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
-@RunWith(AndroidJUnit4.class)
+@ConnectivityModuleTest
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2) // Mainline NetworkStats starts from T.
+@RunWith(DevSdkIgnoreRunner.class)
 public class NetworkStatsBinderTest {
-    // NOTE: These are shamelessly copied from TrafficStats.
-    private static final int TYPE_RX_BYTES = 0;
-    private static final int TYPE_RX_PACKETS = 1;
-    private static final int TYPE_TX_BYTES = 2;
-    private static final int TYPE_TX_PACKETS = 3;
-
-    @Rule
-    public DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule(
-            Build.VERSION_CODES.Q /* ignoreClassUpTo */);
-
-    private final SparseArray<Function<Integer, Long>> mUidStatsQueryOpArray = new SparseArray<>();
-
-    @Before
-    public void setUp() throws Exception {
-        mUidStatsQueryOpArray.put(TYPE_RX_BYTES, uid -> TrafficStats.getUidRxBytes(uid));
-        mUidStatsQueryOpArray.put(TYPE_RX_PACKETS, uid -> TrafficStats.getUidRxPackets(uid));
-        mUidStatsQueryOpArray.put(TYPE_TX_BYTES, uid -> TrafficStats.getUidTxBytes(uid));
-        mUidStatsQueryOpArray.put(TYPE_TX_PACKETS, uid -> TrafficStats.getUidTxPackets(uid));
-    }
-
-    private long getUidStatsFromBinder(int uid, int type) throws Exception {
-        Method getServiceMethod = Class.forName("android.os.ServiceManager")
+    @Nullable
+    private StatsResult getUidStatsFromBinder(int uid) throws Exception {
+        final Method getServiceMethod = Class.forName("android.os.ServiceManager")
                 .getDeclaredMethod("getService", new Class[]{String.class});
-        IBinder binder = (IBinder) getServiceMethod.invoke(null, Context.NETWORK_STATS_SERVICE);
-        INetworkStatsService nss = INetworkStatsService.Stub.asInterface(binder);
-        return nss.getUidStats(uid, type);
+        final IBinder binder = (IBinder) getServiceMethod.invoke(
+                null, Context.NETWORK_STATS_SERVICE);
+        final INetworkStatsService nss = INetworkStatsService.Stub.asInterface(binder);
+        return nss.getUidStats(uid);
     }
 
     private int getFirstAppUidThat(@NonNull Predicate<Integer> predicate) {
@@ -108,38 +91,34 @@ public class NetworkStatsBinderTest {
         if (notMyUid != INVALID_UID) testUidList.add(notMyUid);
 
         for (final int uid : testUidList) {
-            for (int i = 0; i < mUidStatsQueryOpArray.size(); i++) {
-                final int type = mUidStatsQueryOpArray.keyAt(i);
-                try {
-                    final long uidStatsFromBinder = getUidStatsFromBinder(uid, type);
-                    final long uidTrafficStats = mUidStatsQueryOpArray.get(type).apply(uid);
+            try {
+                final StatsResult uidStatsFromBinder = getUidStatsFromBinder(uid);
 
-                    // Verify that UNSUPPORTED is returned if the uid is not current app uid.
-                    if (uid != myUid) {
-                        assertEquals(uidStatsFromBinder, TrafficStats.UNSUPPORTED);
-                    }
+                if (uid != myUid) {
+                    // Verify that null is returned if the uid is not current app uid.
+                    assertNull(uidStatsFromBinder);
+                } else {
                     // Verify that returned result is the same with the result get from
                     // TrafficStats.
-                    // TODO: If the test is flaky then it should instead assert that the values
-                    //  are approximately similar.
-                    assertEquals("uidStats is not matched for query type " + type
-                                    + ", uid=" + uid + ", myUid=" + myUid, uidTrafficStats,
-                            uidStatsFromBinder);
-                } catch (IllegalAccessException e) {
-                    /* Java language access prevents exploitation. */
-                    return;
-                } catch (InvocationTargetException e) {
-                    /* Underlying method has been changed. */
-                    return;
-                } catch (ClassNotFoundException e) {
-                    /* not vulnerable if hidden API no longer available */
-                    return;
-                } catch (NoSuchMethodException e) {
-                    /* not vulnerable if hidden API no longer available */
-                    return;
-                } catch (RemoteException e) {
-                    return;
+                    assertEquals(uidStatsFromBinder.rxBytes, TrafficStats.getUidRxBytes(uid));
+                    assertEquals(uidStatsFromBinder.rxPackets, TrafficStats.getUidRxPackets(uid));
+                    assertEquals(uidStatsFromBinder.txBytes, TrafficStats.getUidTxBytes(uid));
+                    assertEquals(uidStatsFromBinder.txPackets, TrafficStats.getUidTxPackets(uid));
                 }
+            } catch (IllegalAccessException e) {
+                /* Java language access prevents exploitation. */
+                return;
+            } catch (InvocationTargetException e) {
+                /* Underlying method has been changed. */
+                return;
+            } catch (ClassNotFoundException e) {
+                /* not vulnerable if hidden API no longer available */
+                return;
+            } catch (NoSuchMethodException e) {
+                /* not vulnerable if hidden API no longer available */
+                return;
+            } catch (RemoteException e) {
+                return;
             }
         }
     }

@@ -41,6 +41,7 @@ import java.util.Collection;
 public final class ThreadConfigurationTest {
     @Rule public final ThreadFeatureCheckerRule mThreadRule = new ThreadFeatureCheckerRule();
 
+    public final boolean mIsBorderRouterEnabled;
     public final boolean mIsNat64Enabled;
     public final boolean mIsDhcpv6PdEnabled;
 
@@ -48,14 +49,16 @@ public final class ThreadConfigurationTest {
     public static Collection configArguments() {
         return Arrays.asList(
                 new Object[][] {
-                    {false, false}, // All disabled
-                    {true, false}, // NAT64 enabled
-                    {false, true}, // DHCP6-PD enabled
-                    {true, true}, // All enabled
+                    {false, false, false}, // All disabled
+                    {false, true, false}, // NAT64 enabled
+                    {false, false, true}, // DHCP6-PD enabled
+                    {true, true, true}, // All enabled
                 });
     }
 
-    public ThreadConfigurationTest(boolean isNat64Enabled, boolean isDhcpv6PdEnabled) {
+    public ThreadConfigurationTest(
+            boolean isBorderRouterEnabled, boolean isNat64Enabled, boolean isDhcpv6PdEnabled) {
+        mIsBorderRouterEnabled = isBorderRouterEnabled;
         mIsNat64Enabled = isNat64Enabled;
         mIsDhcpv6PdEnabled = isDhcpv6PdEnabled;
     }
@@ -64,6 +67,7 @@ public final class ThreadConfigurationTest {
     public void parcelable_parcelingIsLossLess() {
         ThreadConfiguration config =
                 new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(mIsBorderRouterEnabled)
                         .setNat64Enabled(mIsNat64Enabled)
                         .setDhcpv6PdEnabled(mIsDhcpv6PdEnabled)
                         .build();
@@ -74,10 +78,12 @@ public final class ThreadConfigurationTest {
     public void builder_correctValuesAreSet() {
         ThreadConfiguration config =
                 new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(mIsBorderRouterEnabled)
                         .setNat64Enabled(mIsNat64Enabled)
                         .setDhcpv6PdEnabled(mIsDhcpv6PdEnabled)
                         .build();
 
+        assertThat(config.isBorderRouterEnabled()).isEqualTo(mIsBorderRouterEnabled);
         assertThat(config.isNat64Enabled()).isEqualTo(mIsNat64Enabled);
         assertThat(config.isDhcpv6PdEnabled()).isEqualTo(mIsDhcpv6PdEnabled);
     }
@@ -86,6 +92,7 @@ public final class ThreadConfigurationTest {
     public void builderConstructor_configsAreEqual() {
         ThreadConfiguration config1 =
                 new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(mIsBorderRouterEnabled)
                         .setNat64Enabled(mIsNat64Enabled)
                         .setDhcpv6PdEnabled(mIsDhcpv6PdEnabled)
                         .build();

@@ -34,8 +34,10 @@
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS"/>
     <uses-permission android:name="android.permission.MANAGE_USB" />
+    <!-- MANAGE_USERS is for accessing multi-user APIs, note that QUERY_USERS should
+         not be used since it is not a privileged permission until U. -->
+    <uses-permission android:name="android.permission.MANAGE_USERS"/>
     <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
-    <uses-permission android:name="android.permission.QUERY_USERS"/>
     <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
     <uses-permission android:name="android.permission.READ_NETWORK_USAGE_HISTORY" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>

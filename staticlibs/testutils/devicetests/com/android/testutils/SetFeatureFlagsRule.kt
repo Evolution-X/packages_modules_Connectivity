@@ -57,6 +57,7 @@ class SetFeatureFlagsRule(
      * @param enabled The desired state (true for enabled, false for disabled) of the feature flag.
      */
     @Target(AnnotationTarget.FUNCTION)
+    @Repeatable
     @Retention(AnnotationRetention.RUNTIME)
     annotation class FeatureFlag(val name: String, val enabled: Boolean = true)
 

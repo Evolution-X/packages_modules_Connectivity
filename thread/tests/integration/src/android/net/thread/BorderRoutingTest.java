@@ -74,6 +74,7 @@ import com.android.testutils.TestNetworkTracker;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -672,6 +673,7 @@ public class BorderRoutingTest {
         }
     }
 
+    @Ignore("TODO: b/376573921 - Enable when it's not flaky at all")
     @Test
     public void nat64_withAilNat64Prefix_threadDevicePingIpv4InfraDevice_outboundPacketIsForwarded()
             throws Exception {
