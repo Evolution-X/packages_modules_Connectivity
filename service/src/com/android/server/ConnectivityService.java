@@ -121,6 +121,7 @@ import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_SELF_CER
 import static android.net.connectivity.ConnectivityCompatChanges.NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.VPN_UID;
+import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 import static android.system.OsConstants.ETH_P_ALL;
 import static android.system.OsConstants.IPPROTO_TCP;
 import static android.system.OsConstants.IPPROTO_UDP;
@@ -145,10 +146,12 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermissionOr;
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
+import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 import static com.android.server.connectivity.ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS;
 import static com.android.server.connectivity.ConnectivityFlags.REQUEST_RESTRICTED_WIFI;
+import static com.android.server.connectivity.ConnectivityFlags.WIFI_DATA_INACTIVITY_TIMEOUT;
 
 import android.Manifest;
 import android.annotation.CheckResult;
@@ -1610,6 +1613,18 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     connectivityServiceInternalHandler);
         }
 
+        /** Returns the data inactivity timeout to be used for cellular networks */
+        public int getDefaultCellularDataInactivityTimeout() {
+            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING,
+                    CELLULAR_DATA_INACTIVITY_TIMEOUT, 10);
+        }
+
+        /** Returns the data inactivity timeout to be used for WiFi networks */
+        public int getDefaultWifiDataInactivityTimeout() {
+            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING,
+                    WIFI_DATA_INACTIVITY_TIMEOUT, 15);
+        }
+
         /**
          * @see DeviceConfigUtils#isTetheringFeatureEnabled
          */
@@ -1958,8 +1973,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // But reading the trunk stable flags from mainline modules is not supported yet.
         // So enabling this feature on V+ release.
         mTrackMultiNetworkActivities = mDeps.isAtLeastV();
+        final int defaultCellularDataInactivityTimeout =
+                mDeps.getDefaultCellularDataInactivityTimeout();
+        final int defaultWifiDataInactivityTimeout =
+                mDeps.getDefaultWifiDataInactivityTimeout();
         mNetworkActivityTracker = new LegacyNetworkActivityTracker(mContext, mNetd, mHandler,
-                mTrackMultiNetworkActivities);
+                mTrackMultiNetworkActivities, defaultCellularDataInactivityTimeout,
+                defaultWifiDataInactivityTimeout);
 
         final NetdCallback netdCallback = new NetdCallback();
         try {
@@ -13027,6 +13047,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // Key is netId. Value is configured idle timer information.
         private final SparseArray<IdleTimerParams> mActiveIdleTimers = new SparseArray<>();
         private final boolean mTrackMultiNetworkActivities;
+        private final int mDefaultCellularDataInactivityTimeout;
+        private final int mDefaultWifiDataInactivityTimeout;
         // Store netIds of Wi-Fi networks whose idletimers report that they are active
         private final Set<Integer> mActiveWifiNetworks = new ArraySet<>();
         // Store netIds of cellular networks whose idletimers report that they are active
@@ -13043,11 +13065,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
 
         LegacyNetworkActivityTracker(@NonNull Context context, @NonNull INetd netd,
-                @NonNull Handler handler, boolean trackMultiNetworkActivities) {
+                @NonNull Handler handler, boolean trackMultiNetworkActivities,
+                int defaultCellularDataInactivityTimeout, int defaultWifiDataInactivityTimeout) {
             mContext = context;
             mNetd = netd;
             mHandler = handler;
             mTrackMultiNetworkActivities = trackMultiNetworkActivities;
+            mDefaultCellularDataInactivityTimeout = defaultCellularDataInactivityTimeout;
+            mDefaultWifiDataInactivityTimeout = defaultWifiDataInactivityTimeout;
         }
 
         private void ensureRunningOnConnectivityServiceThread() {
@@ -13247,13 +13272,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     NetworkCapabilities.TRANSPORT_CELLULAR)) {
                 timeout = Settings.Global.getInt(mContext.getContentResolver(),
                         ConnectivitySettingsManager.DATA_ACTIVITY_TIMEOUT_MOBILE,
-                        10);
+                        mDefaultCellularDataInactivityTimeout);
                 type = NetworkCapabilities.TRANSPORT_CELLULAR;
             } else if (networkAgent.networkCapabilities.hasTransport(
                     NetworkCapabilities.TRANSPORT_WIFI)) {
                 timeout = Settings.Global.getInt(mContext.getContentResolver(),
                         ConnectivitySettingsManager.DATA_ACTIVITY_TIMEOUT_WIFI,
-                        15);
+                        mDefaultWifiDataInactivityTimeout);
                 type = NetworkCapabilities.TRANSPORT_WIFI;
             } else {
                 return false; // do not track any other networks
@@ -13377,6 +13402,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         public void dump(IndentingPrintWriter pw) {
             pw.print("mTrackMultiNetworkActivities="); pw.println(mTrackMultiNetworkActivities);
+
+            pw.print("mDefaultCellularDataInactivityTimeout=");
+            pw.println(mDefaultCellularDataInactivityTimeout);
+            pw.print("mDefaultWifiDataInactivityTimeout=");
+            pw.println(mDefaultWifiDataInactivityTimeout);
+
             pw.print("mIsDefaultNetworkActive="); pw.println(mIsDefaultNetworkActive);
             pw.print("mDefaultNetwork="); pw.println(mDefaultNetwork);
             pw.println("Idle timers:");
