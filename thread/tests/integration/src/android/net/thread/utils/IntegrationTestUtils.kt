@@ -590,6 +590,27 @@ object IntegrationTestUtils {
         return ftd.omrAddress
     }
 
+    /** Enables Thread and joins the specified Thread network. */
+    @JvmStatic
+    fun enableThreadAndJoinNetwork(dataset: ActiveOperationalDataset) {
+        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
+        OtDaemonController().factoryReset();
+
+        val context: Context = requireNotNull(ApplicationProvider.getApplicationContext());
+        val controller = requireNotNull(ThreadNetworkControllerWrapper.newInstance(context));
+        controller.setEnabledAndWait(true);
+        controller.joinAndWait(dataset);
+    }
+
+    /** Leaves the Thread network and disables Thread. */
+    @JvmStatic
+    fun leaveNetworkAndDisableThread() {
+        val context: Context = requireNotNull(ApplicationProvider.getApplicationContext());
+        val controller = requireNotNull(ThreadNetworkControllerWrapper.newInstance(context));
+        controller.leaveAndWait();
+        controller.setEnabledAndWait(false);
+    }
+
     private open class DefaultDiscoveryListener : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
