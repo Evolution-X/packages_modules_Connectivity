@@ -24,6 +24,8 @@ import android.net.Uri;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.google.auto.value.AutoValue;
+
 /** Class to handle downloads for Certificate Transparency. */
 public class DownloadHelper {
 
@@ -53,25 +55,22 @@ public class DownloadHelper {
     }
 
     /**
-     * Returns true if the specified download completed successfully.
+     * Returns the status of the provided download id.
      *
      * @param downloadId the download.
-     * @return true if the download completed successfully.
+     * @return {@link DownloadStatus} of the download.
      */
-    public boolean isSuccessful(long downloadId) {
+    public DownloadStatus getDownloadStatus(long downloadId) {
+        DownloadStatus.Builder builder = DownloadStatus.builder().setDownloadId(downloadId);
         try (Cursor cursor = mDownloadManager.query(new Query().setFilterById(downloadId))) {
-            if (cursor == null) {
-                return false;
-            }
-            if (cursor.moveToFirst()) {
-                int status =
-                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                if (DownloadManager.STATUS_SUCCESSFUL == status) {
-                    return true;
-                }
+            if (cursor != null && cursor.moveToFirst()) {
+                builder.setStatus(
+                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)));
+                builder.setReason(
+                        cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_REASON)));
             }
         }
-        return false;
+        return builder.build();
     }
 
     /**
@@ -86,5 +85,59 @@ public class DownloadHelper {
             return null;
         }
         return mDownloadManager.getUriForDownloadedFile(downloadId);
+    }
+
+    /** A wrapper around the status and reason Ids returned by the {@link DownloadManager}. */
+    @AutoValue
+    public abstract static class DownloadStatus {
+
+        abstract long downloadId();
+
+        abstract int status();
+
+        abstract int reason();
+
+        boolean isSuccessful() {
+            return status() == DownloadManager.STATUS_SUCCESSFUL;
+        }
+
+        boolean isStorageError() {
+            int status = status();
+            int reason = reason();
+            return status == DownloadManager.STATUS_FAILED
+                    && (reason == DownloadManager.ERROR_DEVICE_NOT_FOUND
+                            || reason == DownloadManager.ERROR_FILE_ERROR
+                            || reason == DownloadManager.ERROR_FILE_ALREADY_EXISTS
+                            || reason == DownloadManager.ERROR_INSUFFICIENT_SPACE);
+        }
+
+        boolean isHttpError() {
+            int status = status();
+            int reason = reason();
+            return status == DownloadManager.STATUS_FAILED
+                    && (reason == DownloadManager.ERROR_HTTP_DATA_ERROR
+                            || reason == DownloadManager.ERROR_TOO_MANY_REDIRECTS
+                            || reason == DownloadManager.ERROR_UNHANDLED_HTTP_CODE
+                            // If an HTTP error occurred, reason will hold the HTTP status code.
+                            || (400 <= reason && reason < 600));
+        }
+
+        @AutoValue.Builder
+        abstract static class Builder {
+            abstract Builder setDownloadId(long downloadId);
+
+            abstract Builder setStatus(int status);
+
+            abstract Builder setReason(int reason);
+
+            abstract DownloadStatus build();
+        }
+
+        static Builder builder() {
+            return new AutoValue_DownloadHelper_DownloadStatus.Builder()
+                    .setDownloadId(-1)
+                    .setStatus(-1)
+                    .setReason(-1);
+        }
     }
 }
