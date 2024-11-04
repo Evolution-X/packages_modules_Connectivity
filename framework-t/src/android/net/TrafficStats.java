@@ -17,8 +17,6 @@
 package android.net;
 
 import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
-import static android.net.NetworkStats.UID_ALL;
-import static android.os.Process.SYSTEM_UID;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIVATE;
 
@@ -188,8 +186,6 @@ public class TrafficStats {
     private static INetworkStatsService sStatsService;
     @GuardedBy("TrafficStats.class")
     private static INetworkStatsService sStatsServiceForTest = null;
-    @GuardedBy("TrafficStats.class")
-    private static int sMyUidForTest = UID_ALL;
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 130143562)
     private synchronized static INetworkStatsService getStatsService() {
@@ -202,12 +198,7 @@ public class TrafficStats {
     }
 
     /** @hide */
-    protected static int getMyUid() {
-        synchronized (TrafficStats.class) {
-            if (sMyUidForTest != UID_ALL) {
-                return sMyUidForTest;
-            }
-        }
+    private static int getMyUid() {
         return android.os.Process.myUid();
     }
 
@@ -220,18 +211,6 @@ public class TrafficStats {
     public static void setServiceForTest(INetworkStatsService statsService) {
         synchronized (TrafficStats.class) {
             sStatsServiceForTest = statsService;
-        }
-    }
-
-    /**
-     * Set myUid for test, or UID_ALL to reset.
-     *
-     * @hide
-     */
-    @VisibleForTesting(visibility = PRIVATE)
-    public static void setMyUidForTest(int myUid) {
-        synchronized (TrafficStats.class) {
-            sMyUidForTest = myUid;
         }
     }
 
@@ -1006,13 +985,6 @@ public class TrafficStats {
 
     /** @hide */
     public static long getUidStats(int uid, int type) {
-        // Perform a quick check on the UID to avoid unnecessary work.
-        // This mirrors a similar check on the service side, but is primarily for
-        // efficiency rather than security, as user-space checks can be bypassed.
-        final int myUid = getMyUid();
-        if (!isEntryValueTypeValid(type) || (myUid != SYSTEM_UID && myUid != uid)) {
-            return UNSUPPORTED;
-        }
         final StatsResult stats;
         try {
             stats = getStatsService().getUidStats(uid);
@@ -1024,9 +996,6 @@ public class TrafficStats {
 
     /** @hide */
     public static long getTotalStats(int type) {
-        if (!isEntryValueTypeValid(type)) {
-            return UNSUPPORTED;
-        }
         final StatsResult stats;
         try {
             stats = getStatsService().getTotalStats();
@@ -1038,9 +1007,6 @@ public class TrafficStats {
 
     /** @hide */
     public static long getIfaceStats(String iface, int type) {
-        if (!isEntryValueTypeValid(type)) {
-            return UNSUPPORTED;
-        }
         final StatsResult stats;
         try {
             stats = getStatsService().getIfaceStats(iface);
