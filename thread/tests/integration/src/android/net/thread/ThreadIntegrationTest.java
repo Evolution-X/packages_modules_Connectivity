@@ -29,6 +29,7 @@ import static android.net.thread.utils.IntegrationTestUtils.getPrefixesFromNetDa
 import static android.net.thread.utils.IntegrationTestUtils.getThreadNetwork;
 import static android.net.thread.utils.IntegrationTestUtils.isInMulticastGroup;
 import static android.net.thread.utils.IntegrationTestUtils.waitFor;
+import static android.net.thread.utils.ThreadNetworkControllerWrapper.JOIN_TIMEOUT;
 
 import static com.android.compatibility.common.util.SystemUtil.runShellCommand;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
@@ -55,6 +56,7 @@ import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.net.thread.utils.ThreadNetworkControllerWrapper;
+import android.net.thread.utils.ThreadStateListener;
 import android.os.SystemClock;
 
 import androidx.test.core.app.ApplicationProvider;
@@ -138,6 +140,8 @@ public class ThreadIntegrationTest {
 
     @After
     public void tearDown() throws Exception {
+        ThreadStateListener.stopAllListeners();
+
         mController.setTestNetworkAsUpstreamAndWait(null);
         mController.leaveAndWait();
         mController.setConfigurationAndWait(DEFAULT_CONFIG);
@@ -265,6 +269,20 @@ public class ThreadIntegrationTest {
         mController.joinAndWait(DEFAULT_DATASET);
 
         assertTunInterfaceMemberOfGroup(GROUP_ADDR_ALL_ROUTERS);
+    }
+
+    @Test
+    public void joinNetwork_joinTheSameNetworkTwice_neverDetached() throws Exception {
+        mController.joinAndWait(DEFAULT_DATASET);
+        mController.waitForRole(DEVICE_ROLE_LEADER, JOIN_TIMEOUT);
+
+        var listener = ThreadStateListener.startListener(mController.get());
+        mController.joinAndWait(DEFAULT_DATASET);
+
+        assertThat(
+                        listener.pollForAnyRoleOf(
+                                List.of(DEVICE_ROLE_DETACHED, DEVICE_ROLE_STOPPED), JOIN_TIMEOUT))
+                .isNull();
     }
 
     @Test
