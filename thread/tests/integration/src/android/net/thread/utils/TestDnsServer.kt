@@ -16,18 +16,16 @@
 
 package android.net.thread.utils
 
-import android.net.thread.utils.IntegrationTestUtils.pollForPacket
 import android.system.OsConstants.IPPROTO_IP
 import android.system.OsConstants.IPPROTO_UDP
 import com.android.net.module.util.DnsPacket
 import com.android.net.module.util.PacketBuilder
-import com.android.net.module.util.Struct
 import com.android.net.module.util.structs.Ipv4Header
 import com.android.net.module.util.structs.UdpHeader
 import com.android.testutils.PollPacketReader
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
-import kotlin.concurrent.thread
 
 /**
  * A class that simulates a DNS server.
@@ -41,11 +39,12 @@ import kotlin.concurrent.thread
 class TestDnsServer(
     private val packetReader: PollPacketReader,
     private val serverAddress: InetAddress,
-    private val answerRecords: List<DnsPacket.DnsRecord>,
-) {
-    private val TAG = TestDnsServer::class.java.simpleName
-    private val DNS_UDP_PORT = 53
-    private var workerThread: Thread? = null
+    private val serverAnswers: List<DnsPacket.DnsRecord>,
+) : TestUdpServer(packetReader, InetSocketAddress(serverAddress, DNS_UDP_PORT)) {
+    companion object {
+        private val TAG = TestDnsServer::class.java.simpleName
+        private const val DNS_UDP_PORT = 53
+    }
 
     private class TestDnsPacket : DnsPacket {
 
@@ -61,49 +60,12 @@ class TestDnsServer(
         val records = super.mRecords
     }
 
-    /**
-     * Starts the DNS server to respond to DNS requests.
-     *
-     * <p> The server polls the DNS requests from the {@code packetReader} and responds with the
-     * {@code answerRecords}. The server will automatically stop when it fails to poll a DNS request
-     * within the timeout (3000 ms, as defined in IntegrationTestUtils).
-     */
-    fun start() {
-        workerThread = thread {
-            var requestPacket: ByteArray
-            while (true) {
-                requestPacket = pollForDnsPacket() ?: break
-                val buf = ByteBuffer.wrap(requestPacket)
-                packetReader.sendResponse(buildDnsResponse(buf, answerRecords))
-            }
-        }
-    }
-
-    /** Stops the DNS server. */
-    fun stop() {
-        workerThread?.join()
-    }
-
-    private fun pollForDnsPacket(): ByteArray? {
-        val filter =
-            fun(packet: ByteArray): Boolean {
-                val buf = ByteBuffer.wrap(packet)
-                val ipv4Header = Struct.parse(Ipv4Header::class.java, buf) ?: return false
-                val udpHeader = Struct.parse(UdpHeader::class.java, buf) ?: return false
-                return ipv4Header.dstIp == serverAddress && udpHeader.dstPort == DNS_UDP_PORT
-            }
-        return pollForPacket(packetReader, filter)
-    }
-
-    private fun buildDnsResponse(
-        requestPacket: ByteBuffer,
-        serverAnswers: List<DnsPacket.DnsRecord>,
+    override fun buildResponse(
+        requestIpv4Header: Ipv4Header,
+        requestUdpHeader: UdpHeader,
+        requestUdpPayload: ByteArray,
     ): ByteBuffer? {
-        val requestIpv4Header = Struct.parse(Ipv4Header::class.java, requestPacket) ?: return null
-        val requestUdpHeader = Struct.parse(UdpHeader::class.java, requestPacket) ?: return null
-        val remainingRequestPacket = ByteArray(requestPacket.remaining())
-        requestPacket.get(remainingRequestPacket)
-        val requestDnsPacket = TestDnsPacket(remainingRequestPacket)
+        val requestDnsPacket = TestDnsPacket(requestUdpPayload)
         val requestDnsHeader = requestDnsPacket.header
 
         val answerRecords =
