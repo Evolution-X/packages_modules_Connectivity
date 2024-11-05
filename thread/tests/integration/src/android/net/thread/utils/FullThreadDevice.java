@@ -234,8 +234,8 @@ public final class FullThreadDevice {
         return matcher.group(4);
     }
 
-    /** Sends a UDP message to given IPv6 address and port. */
-    public void udpSend(String message, Inet6Address serverAddr, int serverPort) {
+    /** Sends a UDP message to given IP address and port. */
+    public void udpSend(String message, InetAddress serverAddr, int serverPort) {
         executeCommand("udp send %s %d %s", serverAddr.getHostAddress(), serverPort, message);
     }
 
