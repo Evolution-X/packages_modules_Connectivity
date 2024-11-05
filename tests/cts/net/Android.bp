@@ -70,6 +70,14 @@ java_defaults {
         ":ConnectivityTestPreparer",
         ":CtsCarrierServicePackage",
     ],
+    errorprone: {
+        enabled: true,
+        // Error-prone checking only warns of problems when building. To make the build fail with
+        // these errors, list the specific error-prone problems below.
+        javacflags: [
+            "-Xep:NullablePrimitive:ERROR",
+        ],
+    },
 }
 
 // Networking CTS tests for development and release. These tests always target the platform SDK
