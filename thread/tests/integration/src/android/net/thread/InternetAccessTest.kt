@@ -32,6 +32,7 @@ import android.net.thread.utils.IntegrationTestUtils.tearDownInfraNetwork
 import android.net.thread.utils.IntegrationTestUtils.waitFor
 import android.net.thread.utils.OtDaemonController
 import android.net.thread.utils.TestDnsServer
+import android.net.thread.utils.TestUdpEchoServer
 import android.net.thread.utils.ThreadFeatureCheckerRule
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThreadDevice
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature
@@ -48,6 +49,7 @@ import com.android.testutils.TestNetworkTracker
 import com.google.common.truth.Truth.assertThat
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.time.Duration
 import org.junit.After
 import org.junit.Before
@@ -64,6 +66,7 @@ class InternetAccessTest {
     private val TAG = BorderRoutingTest::class.java.simpleName
     private val NUM_FTD = 1
     private val DNS_SERVER_ADDR = parseNumericAddress("8.8.8.8") as Inet4Address
+    private val UDP_ECHO_SERVER_ADDRESS = InetSocketAddress(parseNumericAddress("1.2.3.4"), 12345)
     private val ANSWER_RECORDS =
         listOf(
             DnsPacket.DnsRecord.makeAOrAAAARecord(
@@ -94,6 +97,7 @@ class InternetAccessTest {
     private lateinit var infraNetworkReader: PollPacketReader
     private lateinit var infraDevice: InfraNetworkDevice
     private lateinit var dnsServer: TestDnsServer
+    private lateinit var udpEchoServer: TestUdpEchoServer
 
     @Before
     @Throws(Exception::class)
@@ -111,12 +115,15 @@ class InternetAccessTest {
         controller.setEnabledAndWait(true)
         controller.joinAndWait(DEFAULT_DATASET)
 
-        // Creates a infra network device.
+        // Create an infra network device.
         infraNetworkReader = newPacketReader(infraNetworkTracker.testIface, handler)
         infraDevice = startInfraDeviceAndWaitForOnLinkAddr(infraNetworkReader)
 
         // Create a DNS server
         dnsServer = TestDnsServer(infraNetworkReader, DNS_SERVER_ADDR, ANSWER_RECORDS)
+
+        // Create a UDP echo server
+        udpEchoServer = TestUdpEchoServer(infraNetworkReader, UDP_ECHO_SERVER_ADDRESS)
 
         // Create Ftds
         for (i in 0 until NUM_FTD) {
@@ -132,6 +139,7 @@ class InternetAccessTest {
         tearDownInfraNetwork(infraNetworkTracker)
 
         dnsServer.stop()
+        udpEchoServer.stop()
 
         handlerThread.quitSafely()
         handlerThread.join()
@@ -164,6 +172,20 @@ class InternetAccessTest {
 
         assertThat(ftd.resolveHost("google.com", TYPE_A)).isEmpty()
         assertThat(ftd.resolveHost("google.com", TYPE_AAAA)).isEmpty()
+    }
+
+    @Test
+    fun nat64Enabled_threadDeviceSendsUdpToEchoServer_replyIsReceived() {
+        controller.setNat64EnabledAndWait(true)
+        waitFor({ otCtl.hasNat64PrefixInNetdata() }, Duration.ofSeconds(10))
+        val ftd = ftds[0]
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET)
+        udpEchoServer.start()
+
+        ftd.udpOpen()
+        ftd.udpSend("Hello,Thread", UDP_ECHO_SERVER_ADDRESS.address, UDP_ECHO_SERVER_ADDRESS.port)
+        val reply = ftd.udpReceive()
+        assertThat(reply).isEqualTo("Hello,Thread")
     }
 
     private fun extractIpv4AddressFromMappedAddress(address: InetAddress): Inet4Address {
