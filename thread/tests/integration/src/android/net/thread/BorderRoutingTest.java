@@ -18,8 +18,9 @@ package android.net.thread;
 
 import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
 import static android.net.InetAddresses.parseNumericAddress;
-import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
 import static android.net.thread.utils.IntegrationTestUtils.buildIcmpv4EchoReply;
+import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
+import static android.net.thread.utils.IntegrationTestUtils.enableThreadAndJoinNetwork;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv4Packet;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv6Packet;
@@ -27,6 +28,7 @@ import static android.net.thread.utils.IntegrationTestUtils.isFrom;
 import static android.net.thread.utils.IntegrationTestUtils.isInMulticastGroup;
 import static android.net.thread.utils.IntegrationTestUtils.isTo;
 import static android.net.thread.utils.IntegrationTestUtils.joinNetworkAndWaitForOmr;
+import static android.net.thread.utils.IntegrationTestUtils.leaveNetworkAndDisableThread;
 import static android.net.thread.utils.IntegrationTestUtils.newPacketReader;
 import static android.net.thread.utils.IntegrationTestUtils.pollForPacket;
 import static android.net.thread.utils.IntegrationTestUtils.sendUdpMessage;
@@ -73,7 +75,9 @@ import com.android.testutils.PollPacketReader;
 import com.android.testutils.TestNetworkTracker;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -116,7 +120,7 @@ public class BorderRoutingTest {
     private final Context mContext = ApplicationProvider.getApplicationContext();
     private final ThreadNetworkControllerWrapper mController =
             ThreadNetworkControllerWrapper.newInstance(mContext);
-    private OtDaemonController mOtCtl;
+    private final OtDaemonController mOtCtl = new OtDaemonController();
     private HandlerThread mHandlerThread;
     private Handler mHandler;
     private TestNetworkTracker mInfraNetworkTracker;
@@ -124,20 +128,24 @@ public class BorderRoutingTest {
     private PollPacketReader mInfraNetworkReader;
     private InfraNetworkDevice mInfraDevice;
 
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+        enableThreadAndJoinNetwork(DEFAULT_DATASET);
+    }
+
+    @AfterClass
+    public static void afterClass() throws Exception {
+        leaveNetworkAndDisableThread();
+    }
+
     @Before
     public void setUp() throws Exception {
-        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
-        mOtCtl = new OtDaemonController();
-        mOtCtl.factoryReset();
-
         mHandlerThread = new HandlerThread(getClass().getSimpleName());
         mHandlerThread.start();
         mHandler = new Handler(mHandlerThread.getLooper());
         mFtds = new ArrayList<>();
 
         setUpInfraNetwork();
-        mController.setEnabledAndWait(true);
-        mController.joinAndWait(DEFAULT_DATASET);
 
         // Creates a infra network device.
         mInfraNetworkReader = newPacketReader(mInfraNetworkTracker.getTestIface(), mHandler);
@@ -152,8 +160,6 @@ public class BorderRoutingTest {
     @After
     public void tearDown() throws Exception {
         mController.setTestNetworkAsUpstreamAndWait(null);
-        mController.leaveAndWait();
-        tearDownInfraNetwork();
 
         mHandlerThread.quitSafely();
         mHandlerThread.join();
