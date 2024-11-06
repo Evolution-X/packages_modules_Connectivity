@@ -671,11 +671,12 @@ filegroup {
     visibility: ["//visibility:private"],
 }
 
+// Sources outside of com.android.net.module.util should not be added because many modules depend on
+// them and need jarjar rules
 filegroup {
     name: "net-utils-all-srcs",
     srcs: [
         "device/**/*.java",
-        ":framework-connectivity-shared-srcs",
         ":net-utils-framework-common-srcs",
     ],
     visibility: ["//visibility:private"],
