@@ -32,4 +32,7 @@ android_test {
     ],
     host_required: ["net-tests-utils-host-common"],
     sdk_version: "test_current",
+    data: [
+        ":ConnectivityTestPreparer",
+    ],
 }
