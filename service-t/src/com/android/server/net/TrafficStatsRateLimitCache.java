@@ -19,9 +19,8 @@ package com.android.server.net;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.net.NetworkStats;
-import android.util.LruCache;
 
-import com.android.internal.annotations.GuardedBy;
+import com.android.net.module.util.LruCacheWithExpiry;
 
 import java.time.Clock;
 import java.util.Objects;
@@ -31,9 +30,8 @@ import java.util.function.Supplier;
  * A thread-safe cache for storing and retrieving {@link NetworkStats.Entry} objects,
  * with an adjustable expiry duration to manage data freshness.
  */
-class TrafficStatsRateLimitCache {
-    private final Clock mClock;
-    private final long mExpiryDurationMs;
+class TrafficStatsRateLimitCache extends
+        LruCacheWithExpiry<TrafficStatsRateLimitCache.TrafficStatsCacheKey, NetworkStats.Entry> {
 
     /**
      * Constructs a new {@link TrafficStatsRateLimitCache} with the specified expiry duration.
@@ -43,19 +41,17 @@ class TrafficStatsRateLimitCache {
      * @param maxSize Maximum number of entries.
      */
     TrafficStatsRateLimitCache(@NonNull Clock clock, long expiryDurationMs, int maxSize) {
-        mClock = clock;
-        mExpiryDurationMs = expiryDurationMs;
-        mMap = new LruCache<>(maxSize);
+        super(clock, expiryDurationMs, maxSize, it -> !it.isEmpty());
     }
 
-    private static class TrafficStatsCacheKey {
+    public static class TrafficStatsCacheKey {
         @Nullable
-        public final String iface;
-        public final int uid;
+        private final String mIface;
+        private final int mUid;
 
         TrafficStatsCacheKey(@Nullable String iface, int uid) {
-            this.iface = iface;
-            this.uid = uid;
+            this.mIface = iface;
+            this.mUid = uid;
         }
 
         @Override
@@ -63,28 +59,14 @@ class TrafficStatsRateLimitCache {
             if (this == o) return true;
             if (!(o instanceof TrafficStatsCacheKey)) return false;
             TrafficStatsCacheKey that = (TrafficStatsCacheKey) o;
-            return uid == that.uid && Objects.equals(iface, that.iface);
+            return mUid == that.mUid && Objects.equals(mIface, that.mIface);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(iface, uid);
+            return Objects.hash(mIface, mUid);
         }
     }
-
-    private static class TrafficStatsCacheValue {
-        public final long timestamp;
-        @NonNull
-        public final NetworkStats.Entry entry;
-
-        TrafficStatsCacheValue(long timestamp, NetworkStats.Entry entry) {
-            this.timestamp = timestamp;
-            this.entry = entry;
-        }
-    }
-
-    @GuardedBy("mMap")
-    private final LruCache<TrafficStatsCacheKey, TrafficStatsCacheValue> mMap;
 
     /**
      * Retrieves a {@link NetworkStats.Entry} from the cache, associated with the given key.
@@ -95,16 +77,7 @@ class TrafficStatsRateLimitCache {
      */
     @Nullable
     NetworkStats.Entry get(String iface, int uid) {
-        final TrafficStatsCacheKey key = new TrafficStatsCacheKey(iface, uid);
-        synchronized (mMap) { // Synchronize for thread-safety
-            final TrafficStatsCacheValue value = mMap.get(key);
-            if (value != null && !isExpired(value.timestamp)) {
-                return value.entry;
-            } else {
-                mMap.remove(key); // Remove expired entries
-                return null;
-            }
-        }
+        return super.get(new TrafficStatsCacheKey(iface, uid));
     }
 
     /**
@@ -122,19 +95,7 @@ class TrafficStatsRateLimitCache {
     @Nullable
     NetworkStats.Entry getOrCompute(String iface, int uid,
             @NonNull Supplier<NetworkStats.Entry> supplier) {
-        synchronized (mMap) {
-            final NetworkStats.Entry cachedValue = get(iface, uid);
-            if (cachedValue != null) {
-                return cachedValue;
-            }
-
-            // Entry not found or expired, compute it
-            final NetworkStats.Entry computedEntry = supplier.get();
-            if (computedEntry != null && !computedEntry.isEmpty()) {
-                put(iface, uid, computedEntry);
-            }
-            return computedEntry;
-        }
+        return super.getOrCompute(new TrafficStatsCacheKey(iface, uid), supplier);
     }
 
     /**
@@ -145,23 +106,7 @@ class TrafficStatsRateLimitCache {
      * @param entry The {@link NetworkStats.Entry} to store in the cache.
      */
     void put(String iface, int uid, @NonNull final NetworkStats.Entry entry) {
-        Objects.requireNonNull(entry);
-        final TrafficStatsCacheKey key = new TrafficStatsCacheKey(iface, uid);
-        synchronized (mMap) { // Synchronize for thread-safety
-            mMap.put(key, new TrafficStatsCacheValue(mClock.millis(), entry));
-        }
+        super.put(new TrafficStatsCacheKey(iface, uid), entry);
     }
 
-    /**
-     * Clear the cache.
-     */
-    void clear() {
-        synchronized (mMap) {
-            mMap.evictAll();
-        }
-    }
-
-    private boolean isExpired(long timestamp) {
-        return mClock.millis() > timestamp + mExpiryDurationMs;
-    }
 }
