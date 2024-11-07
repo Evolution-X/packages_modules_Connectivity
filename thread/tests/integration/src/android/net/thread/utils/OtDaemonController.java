@@ -144,6 +144,18 @@ public final class OtDaemonController {
         executeCommand("netdata register");
     }
 
+    public int getTrelPort() {
+        return Integer.parseInt(executeCommandAndParse("trel port").get(0));
+    }
+
+    public String getExtendedAddr() {
+        return executeCommandAndParse("extaddr").get(0);
+    }
+
+    public String getExtendedPanId() {
+        return executeCommandAndParse("extpanid").get(0);
+    }
+
     public String executeCommand(String cmd) {
         return SystemUtil.runShellCommand(OT_CTL + " " + cmd);
     }
