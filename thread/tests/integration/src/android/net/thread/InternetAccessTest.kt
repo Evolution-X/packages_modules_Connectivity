@@ -24,7 +24,9 @@ import android.net.InetAddresses.parseNumericAddress
 import android.net.thread.utils.FullThreadDevice
 import android.net.thread.utils.InfraNetworkDevice
 import android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET
+import android.net.thread.utils.IntegrationTestUtils.enableThreadAndJoinNetwork
 import android.net.thread.utils.IntegrationTestUtils.joinNetworkAndWaitForOmr
+import android.net.thread.utils.IntegrationTestUtils.leaveNetworkAndDisableThread
 import android.net.thread.utils.IntegrationTestUtils.newPacketReader
 import android.net.thread.utils.IntegrationTestUtils.setUpInfraNetwork
 import android.net.thread.utils.IntegrationTestUtils.startInfraDeviceAndWaitForOnLinkAddr
@@ -52,7 +54,9 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.time.Duration
 import org.junit.After
+import org.junit.AfterClass
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,27 +67,42 @@ import org.junit.runner.RunWith
 @RequiresSimulationThreadDevice
 @LargeTest
 class InternetAccessTest {
-    private val TAG = BorderRoutingTest::class.java.simpleName
-    private val NUM_FTD = 1
-    private val DNS_SERVER_ADDR = parseNumericAddress("8.8.8.8") as Inet4Address
-    private val UDP_ECHO_SERVER_ADDRESS = InetSocketAddress(parseNumericAddress("1.2.3.4"), 12345)
-    private val ANSWER_RECORDS =
-        listOf(
-            DnsPacket.DnsRecord.makeAOrAAAARecord(
-                ANSECTION,
-                "google.com",
-                CLASS_IN,
-                30 /* ttl */,
-                parseNumericAddress("1.2.3.4"),
-            ),
-            DnsPacket.DnsRecord.makeAOrAAAARecord(
-                ANSECTION,
-                "google.com",
-                CLASS_IN,
-                30 /* ttl */,
-                parseNumericAddress("2001::234"),
-            ),
-        )
+    companion object {
+        private val TAG = BorderRoutingTest::class.java.simpleName
+        private val NUM_FTD = 1
+        private val DNS_SERVER_ADDR = parseNumericAddress("8.8.8.8") as Inet4Address
+        private val UDP_ECHO_SERVER_ADDRESS =
+            InetSocketAddress(parseNumericAddress("1.2.3.4"), 12345)
+        private val ANSWER_RECORDS =
+            listOf(
+                DnsPacket.DnsRecord.makeAOrAAAARecord(
+                    ANSECTION,
+                    "google.com",
+                    CLASS_IN,
+                    30 /* ttl */,
+                    parseNumericAddress("1.2.3.4"),
+                ),
+                DnsPacket.DnsRecord.makeAOrAAAARecord(
+                    ANSECTION,
+                    "google.com",
+                    CLASS_IN,
+                    30 /* ttl */,
+                    parseNumericAddress("2001::234"),
+                ),
+            )
+
+        @BeforeClass
+        @JvmStatic
+        fun beforeClass() {
+            enableThreadAndJoinNetwork(DEFAULT_DATASET)
+        }
+
+        @AfterClass
+        @JvmStatic
+        fun afterClass() {
+            leaveNetworkAndDisableThread()
+        }
+    }
 
     @get:Rule val threadRule = ThreadFeatureCheckerRule()
 
@@ -102,9 +121,7 @@ class InternetAccessTest {
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
         otCtl = OtDaemonController()
-        otCtl.factoryReset()
 
         handlerThread = HandlerThread(javaClass.simpleName)
         handlerThread.start()
@@ -112,8 +129,6 @@ class InternetAccessTest {
         ftds = ArrayList()
 
         infraNetworkTracker = setUpInfraNetwork(context, controller)
-        controller.setEnabledAndWait(true)
-        controller.joinAndWait(DEFAULT_DATASET)
 
         // Create an infra network device.
         infraNetworkReader = newPacketReader(infraNetworkTracker.testIface, handler)
@@ -135,7 +150,6 @@ class InternetAccessTest {
     @Throws(Exception::class)
     fun tearDown() {
         controller.setTestNetworkAsUpstreamAndWait(null)
-        controller.leaveAndWait()
         tearDownInfraNetwork(infraNetworkTracker)
 
         dnsServer.stop()

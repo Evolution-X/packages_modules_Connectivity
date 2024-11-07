@@ -35,12 +35,12 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.RemoteException;
 import android.util.ArrayMap;
-import android.util.IndentingPrintWriter;
 
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 
+import java.io.PrintWriter;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -459,34 +459,27 @@ public class PrivateAddressCoordinator {
         }
     }
 
-    // TODO: dump PrivateAddressCoordinator when dumping RoutingCoordinatorService.
-    void dump(final IndentingPrintWriter pw) {
+    // TODO: dump PrivateAddressCoordinator when dumping RoutingCoordinatorService and apply
+    // indentation.
+    void dump(final PrintWriter pw) {
         pw.println("mTetheringPrefixes:");
-        pw.increaseIndent();
         for (IpPrefix prefix : mTetheringPrefixes) {
             pw.println(prefix);
         }
-        pw.decreaseIndent();
 
         pw.println("mUpstreamPrefixMap:");
-        pw.increaseIndent();
         for (int i = 0; i < mUpstreamPrefixMap.size(); i++) {
             pw.println(mUpstreamPrefixMap.keyAt(i) + " - " + mUpstreamPrefixMap.valueAt(i));
         }
-        pw.decreaseIndent();
 
         pw.println("mDownstreams:");
-        pw.increaseIndent();
         for (LinkAddress downstream : mDownstreams.values()) {
             pw.println(downstream);
         }
-        pw.decreaseIndent();
 
         pw.println("mCachedAddresses:");
-        pw.increaseIndent();
         for (int i = 0; i < mCachedAddresses.size(); i++) {
             pw.println(mCachedAddresses.keyAt(i) + " - " + mCachedAddresses.valueAt(i));
         }
-        pw.decreaseIndent();
     }
 }
