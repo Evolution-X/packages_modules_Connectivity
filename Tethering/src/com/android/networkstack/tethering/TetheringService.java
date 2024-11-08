@@ -28,6 +28,7 @@ import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.dhcp.IDhcpServer.STATUS_UNKNOWN_ERROR;
 
+import android.app.AppOpsManager;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
@@ -138,8 +139,10 @@ public class TetheringService extends Service {
                     listener)) {
                 return;
             }
-            // TODO(b/216524590): Add UID/packageName of caller to TetheringRequest here
-            mTethering.startTethering(new TetheringRequest(request), callerPkg, listener);
+            TetheringRequest external = new TetheringRequest(request);
+            external.setUid(getBinderCallingUid());
+            external.setPackageName(callerPkg);
+            mTethering.startTethering(external, callerPkg, listener);
         }
 
         @Override
@@ -238,6 +241,12 @@ public class TetheringService extends Service {
                 final String callingAttributionTag, final boolean onlyAllowPrivileged,
                 final IIntResultListener listener) {
             try {
+                if (!checkPackageNameMatchesUid(getBinderCallingUid(), callerPkg)) {
+                    Log.e(TAG, "Package name " + callerPkg + " does not match UID "
+                            + getBinderCallingUid());
+                    listener.onResult(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+                    return true;
+                }
                 if (!hasTetherChangePermission(callerPkg, callingAttributionTag,
                         onlyAllowPrivileged)) {
                     listener.onResult(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
@@ -256,6 +265,12 @@ public class TetheringService extends Service {
 
         private boolean checkAndNotifyCommonError(final String callerPkg,
                 final String callingAttributionTag, final ResultReceiver receiver) {
+            if (!checkPackageNameMatchesUid(getBinderCallingUid(), callerPkg)) {
+                Log.e(TAG, "Package name " + callerPkg + " does not match UID "
+                        + getBinderCallingUid());
+                receiver.send(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION, null);
+                return true;
+            }
             if (!hasTetherChangePermission(callerPkg, callingAttributionTag,
                     false /* onlyAllowPrivileged */)) {
                 receiver.send(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION, null);
@@ -290,9 +305,9 @@ public class TetheringService extends Service {
 
             if (mTethering.isTetherProvisioningRequired()) return false;
 
-            int uid = Binder.getCallingUid();
+            int uid = getBinderCallingUid();
 
-            // If callerPkg's uid is not same as Binder.getCallingUid(),
+            // If callerPkg's uid is not same as getBinderCallingUid(),
             // checkAndNoteWriteSettingsOperation will return false and the operation will be
             // denied.
             return mService.checkAndNoteWriteSettingsOperation(mService, uid, callerPkg,
@@ -304,6 +319,14 @@ public class TetheringService extends Service {
 
             return mService.checkCallingOrSelfPermission(
                     ACCESS_NETWORK_STATE) == PERMISSION_GRANTED;
+        }
+
+        private int getBinderCallingUid() {
+            return mService.getBinderCallingUid();
+        }
+
+        private boolean checkPackageNameMatchesUid(final int uid, final String callerPkg) {
+            return mService.checkPackageNameMatchesUid(mService, uid, callerPkg);
         }
     }
 
@@ -319,6 +342,32 @@ public class TetheringService extends Service {
             boolean throwException) {
         return mSettingsShim.checkAndNoteWriteSettingsOperation(context, uid, callingPackage,
                 callingAttributionTag, throwException);
+    }
+
+    /**
+     * Check if the package name matches the uid.
+     */
+    @VisibleForTesting
+    boolean checkPackageNameMatchesUid(@NonNull Context context, int uid,
+            @NonNull String callingPackage) {
+        try {
+            final AppOpsManager mAppOps = context.getSystemService(AppOpsManager.class);
+            if (mAppOps == null) {
+                return false;
+            }
+            mAppOps.checkPackage(uid, callingPackage);
+        } catch (SecurityException e) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Wrapper for the Binder calling UID, used for mocks.
+     */
+    @VisibleForTesting
+    int getBinderCallingUid() {
+        return Binder.getCallingUid();
     }
 
     /**
