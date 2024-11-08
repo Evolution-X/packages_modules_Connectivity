@@ -46,5 +46,10 @@ package android.net {
     method @Deprecated @NonNull public java.util.List<java.lang.String> getTetherableWifiRegexs();
   }
 
+  public static final class TetheringManager.TetheringRequest implements android.os.Parcelable {
+    method @FlaggedApi("com.android.net.flags.tethering_request_with_soft_ap_config") @Nullable public String getPackageName();
+    method @FlaggedApi("com.android.net.flags.tethering_request_with_soft_ap_config") public int getUid();
+  }
+
 }
 
