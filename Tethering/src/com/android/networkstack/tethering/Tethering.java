@@ -216,10 +216,10 @@ public class Tethering {
      * Cookie added when registering {@link android.net.TetheringManager.TetheringEventCallback}.
      */
     private static class CallbackCookie {
-        public final boolean hasListClientsPermission;
+        public final boolean hasSystemPrivilege;
 
-        private CallbackCookie(boolean hasListClientsPermission) {
-            this.hasListClientsPermission = hasListClientsPermission;
+        private CallbackCookie(boolean hasSystemPrivilege) {
+            this.hasSystemPrivilege = hasSystemPrivilege;
         }
     }
 
@@ -263,7 +263,6 @@ public class Tethering {
     private boolean mRndisEnabled;       // track the RNDIS function enabled state
     private boolean mNcmEnabled;         // track the NCM function enabled state
     private Network mTetherUpstream;
-    private TetherStatesParcel mTetherStatesParcel;
     private boolean mDataSaverEnabled = false;
     private String mWifiP2pTetherInterface = null;
     private int mOffloadStatus = TETHER_HARDWARE_OFFLOAD_STOPPED;
@@ -1091,16 +1090,44 @@ public class Tethering {
     }
 
     // TODO: Figure out how to update for local hotspot mode interfaces.
-    private void sendTetherStateChangedBroadcast() {
+    private void notifyTetherStatesChanged() {
         if (!isTetheringSupported()) return;
 
+        sendTetherStatesChangedCallback();
+        sendTetherStatesChangedBroadcast();
+
+        int downstreamTypesMask = DOWNSTREAM_NONE;
+        for (int i = 0; i < mTetherStates.size(); i++) {
+            final TetherState tetherState = mTetherStates.valueAt(i);
+            final int type = tetherState.ipServer.interfaceType();
+            if (tetherState.lastState != IpServer.STATE_TETHERED) continue;
+            switch (type) {
+                case TETHERING_USB:
+                case TETHERING_WIFI:
+                case TETHERING_BLUETOOTH:
+                    downstreamTypesMask |= (1 << type);
+                    break;
+                default:
+                    // Do nothing.
+                    break;
+            }
+        }
+        mNotificationUpdater.onDownstreamChanged(downstreamTypesMask);
+    }
+
+    /**
+     * Builds a TetherStatesParcel for the specified CallbackCookie.
+     *
+     * @param cookie CallbackCookie of the receiving app.
+     * @return TetherStatesParcel with information redacted for the specified cookie.
+     */
+    private TetherStatesParcel buildTetherStatesParcel(CallbackCookie cookie) {
         final ArrayList<TetheringInterface> available = new ArrayList<>();
         final ArrayList<TetheringInterface> tethered = new ArrayList<>();
         final ArrayList<TetheringInterface> localOnly = new ArrayList<>();
         final ArrayList<TetheringInterface> errored = new ArrayList<>();
         final ArrayList<Integer> lastErrors = new ArrayList<>();
 
-        int downstreamTypesMask = DOWNSTREAM_NONE;
         for (int i = 0; i < mTetherStates.size(); i++) {
             final TetherState tetherState = mTetherStates.valueAt(i);
             final int type = tetherState.ipServer.interfaceType();
@@ -1118,41 +1145,16 @@ public class Tethering {
                     case TETHERING_USB:
                     case TETHERING_WIFI:
                     case TETHERING_BLUETOOTH:
-                        downstreamTypesMask |= (1 << type);
                         break;
                     default:
                         // Do nothing.
+                        break;
                 }
                 tethered.add(tetheringIface);
             }
         }
 
-        mTetherStatesParcel = buildTetherStatesParcel(available, localOnly, tethered, errored,
-                lastErrors);
-        reportTetherStateChanged(mTetherStatesParcel);
-
-        mContext.sendStickyBroadcastAsUser(buildStateChangeIntent(available, localOnly, tethered,
-                errored), UserHandle.ALL);
-        if (DBG) {
-            Log.d(TAG, String.format(
-                    "reportTetherStateChanged %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
-                    "avail", TextUtils.join(",", available),
-                    "local_only", TextUtils.join(",", localOnly),
-                    "tether", TextUtils.join(",", tethered),
-                    "error", TextUtils.join(",", errored)));
-        }
-
-        mNotificationUpdater.onDownstreamChanged(downstreamTypesMask);
-    }
-
-    private TetherStatesParcel buildTetherStatesParcel(
-            final ArrayList<TetheringInterface> available,
-            final ArrayList<TetheringInterface> localOnly,
-            final ArrayList<TetheringInterface> tethered,
-            final ArrayList<TetheringInterface> errored,
-            final ArrayList<Integer> lastErrors) {
         final TetherStatesParcel parcel = new TetherStatesParcel();
-
         parcel.availableList = available.toArray(new TetheringInterface[0]);
         parcel.tetheredList = tethered.toArray(new TetheringInterface[0]);
         parcel.localOnlyList = localOnly.toArray(new TetheringInterface[0]);
@@ -1161,23 +1163,23 @@ public class Tethering {
         for (int i = 0; i < lastErrors.size(); i++) {
             parcel.lastErrorList[i] = lastErrors.get(i);
         }
-
         return parcel;
     }
 
-    private Intent buildStateChangeIntent(final ArrayList<TetheringInterface> available,
-            final ArrayList<TetheringInterface> localOnly,
-            final ArrayList<TetheringInterface> tethered,
-            final ArrayList<TetheringInterface> errored) {
+    private void sendTetherStatesChangedBroadcast() {
         final Intent bcast = new Intent(ACTION_TETHER_STATE_CHANGED);
         bcast.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
 
-        bcast.putStringArrayListExtra(EXTRA_AVAILABLE_TETHER, toIfaces(available));
-        bcast.putStringArrayListExtra(EXTRA_ACTIVE_LOCAL_ONLY, toIfaces(localOnly));
-        bcast.putStringArrayListExtra(EXTRA_ACTIVE_TETHER, toIfaces(tethered));
-        bcast.putStringArrayListExtra(EXTRA_ERRORED_TETHER, toIfaces(errored));
-
-        return bcast;
+        TetherStatesParcel parcel = buildTetherStatesParcel(null);
+        bcast.putStringArrayListExtra(
+                EXTRA_AVAILABLE_TETHER, toIfaces(Arrays.asList(parcel.availableList)));
+        bcast.putStringArrayListExtra(
+                EXTRA_ACTIVE_LOCAL_ONLY, toIfaces(Arrays.asList(parcel.localOnlyList)));
+        bcast.putStringArrayListExtra(
+                EXTRA_ACTIVE_TETHER, toIfaces(Arrays.asList(parcel.tetheredList)));
+        bcast.putStringArrayListExtra(
+                EXTRA_ERRORED_TETHER, toIfaces(Arrays.asList(parcel.erroredIfaceList)));
+        mContext.sendStickyBroadcastAsUser(bcast, UserHandle.ALL);
     }
 
     private class StateReceiver extends BroadcastReceiver {
@@ -2391,19 +2393,18 @@ public class Tethering {
 
     /** Register tethering event callback */
     void registerTetheringEventCallback(ITetheringEventCallback callback) {
-        final boolean hasListPermission =
-                hasCallingPermission(NETWORK_SETTINGS)
-                        || hasCallingPermission(PERMISSION_MAINLINE_NETWORK_STACK)
-                        || hasCallingPermission(NETWORK_STACK);
+        final boolean hasSystemPrivilege = hasCallingPermission(NETWORK_SETTINGS)
+                || hasCallingPermission(PERMISSION_MAINLINE_NETWORK_STACK)
+                || hasCallingPermission(NETWORK_STACK);
         mHandler.post(() -> {
-            mTetheringEventCallbacks.register(callback, new CallbackCookie(hasListPermission));
+            CallbackCookie cookie = new CallbackCookie(hasSystemPrivilege);
+            mTetheringEventCallbacks.register(callback, cookie);
             final TetheringCallbackStartedParcel parcel = new TetheringCallbackStartedParcel();
             parcel.supportedTypes = mSupportedTypeBitmap;
             parcel.upstreamNetwork = mTetherUpstream;
             parcel.config = mConfig.toStableParcelable();
-            parcel.states =
-                    mTetherStatesParcel != null ? mTetherStatesParcel : emptyTetherStatesParcel();
-            parcel.tetheredClients = hasListPermission
+            parcel.states = buildTetherStatesParcel(cookie);
+            parcel.tetheredClients = hasSystemPrivilege
                     ? mConnectedClientsTracker.getLastTetheredClients()
                     : Collections.emptyList();
             parcel.offloadStatus = mOffloadStatus;
@@ -2413,17 +2414,6 @@ public class Tethering {
                 // Not really very much to do here.
             }
         });
-    }
-
-    private TetherStatesParcel emptyTetherStatesParcel() {
-        final TetherStatesParcel parcel = new TetherStatesParcel();
-        parcel.availableList = new TetheringInterface[0];
-        parcel.tetheredList = new TetheringInterface[0];
-        parcel.localOnlyList = new TetheringInterface[0];
-        parcel.erroredIfaceList = new TetheringInterface[0];
-        parcel.lastErrorList = new int[0];
-
-        return parcel;
     }
 
     private boolean hasCallingPermission(@NonNull String permission) {
@@ -2484,18 +2474,32 @@ public class Tethering {
         }
     }
 
-    private void reportTetherStateChanged(TetherStatesParcel states) {
+    private void sendTetherStatesChangedCallback() {
         final int length = mTetheringEventCallbacks.beginBroadcast();
         try {
             for (int i = 0; i < length; i++) {
                 try {
-                    mTetheringEventCallbacks.getBroadcastItem(i).onTetherStatesChanged(states);
+                    TetherStatesParcel parcel = buildTetherStatesParcel(
+                            (CallbackCookie) mTetheringEventCallbacks.getBroadcastCookie(i));
+                    mTetheringEventCallbacks.getBroadcastItem(i).onTetherStatesChanged(parcel);
                 } catch (RemoteException e) {
                     // Not really very much to do here.
                 }
             }
         } finally {
             mTetheringEventCallbacks.finishBroadcast();
+        }
+
+        if (DBG) {
+            // Use a CallbackCookie with system privilege so nothing is redacted.
+            TetherStatesParcel parcel =
+                    buildTetherStatesParcel(new CallbackCookie(true /* hasSystemPrivilege */));
+            Log.d(TAG, String.format(
+                    "sendTetherStatesChangedCallback %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
+                    "avail", TextUtils.join(",", Arrays.asList(parcel.availableList)),
+                    "local_only", TextUtils.join(",", Arrays.asList(parcel.localOnlyList)),
+                    "tether", TextUtils.join(",", Arrays.asList(parcel.tetheredList)),
+                    "error", TextUtils.join(",", Arrays.asList(parcel.erroredIfaceList))));
         }
     }
 
@@ -2506,7 +2510,7 @@ public class Tethering {
                 try {
                     final CallbackCookie cookie =
                             (CallbackCookie) mTetheringEventCallbacks.getBroadcastCookie(i);
-                    if (!cookie.hasListClientsPermission) continue;
+                    if (!cookie.hasSystemPrivilege) continue;
                     mTetheringEventCallbacks.getBroadcastItem(i).onTetherClientsChanged(clients);
                 } catch (RemoteException e) {
                     // Not really very much to do here.
@@ -2741,7 +2745,7 @@ public class Tethering {
                     return;
             }
             mTetherMainSM.sendMessage(which, state, 0, who);
-            sendTetherStateChangedBroadcast();
+            notifyTetherStatesChanged();
         }
 
         @Override
