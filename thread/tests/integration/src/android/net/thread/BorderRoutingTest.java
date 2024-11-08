@@ -18,8 +18,8 @@ package android.net.thread;
 
 import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
 import static android.net.InetAddresses.parseNumericAddress;
-import static android.net.thread.utils.IntegrationTestUtils.buildIcmpv4EchoReply;
 import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
+import static android.net.thread.utils.IntegrationTestUtils.buildIcmpv4EchoReply;
 import static android.net.thread.utils.IntegrationTestUtils.enableThreadAndJoinNetwork;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv4Packet;

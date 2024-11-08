@@ -36,5 +36,6 @@ android_test {
         "cts",
         "general-tests",
     ],
+    data: [":ConnectivityTestPreparer"],
     host_required: ["net-tests-utils-host-common"],
 }

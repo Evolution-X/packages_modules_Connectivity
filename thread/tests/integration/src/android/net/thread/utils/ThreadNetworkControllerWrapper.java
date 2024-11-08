@@ -37,6 +37,7 @@ import android.net.thread.ThreadNetworkManager;
 import android.os.OutcomeReceiver;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -53,6 +54,9 @@ public final class ThreadNetworkControllerWrapper {
 
     private final ThreadNetworkController mController;
 
+    private final List<Integer> mDeviceRoleUpdates = new ArrayList<>();
+    @Nullable private StateCallback mStateCallback;
+
     /**
      * Returns a new {@link ThreadNetworkControllerWrapper} instance or {@code null} if Thread
      * feature is not supported on this device.
@@ -68,6 +72,15 @@ public final class ThreadNetworkControllerWrapper {
 
     private ThreadNetworkControllerWrapper(ThreadNetworkController controller) {
         mController = controller;
+    }
+
+    /**
+     * Returns the underlying {@link ThreadNetworkController} object or {@code null} if the current
+     * platform doesn't support it.
+     */
+    @Nullable
+    public ThreadNetworkController get() {
+        return mController;
     }
 
     /**
