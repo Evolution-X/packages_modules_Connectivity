@@ -97,11 +97,7 @@ java_test_host {
         "general-tests",
         "cts",
         "mts-networking",
-        "mcts-networking",
         "mts-tethering",
-        "mcts-tethering",
-        "mcts-wifi",
-        "mcts-dnsresolver",
     ],
     device_common_data: [":ConnectivityTestPreparer"],
 }
