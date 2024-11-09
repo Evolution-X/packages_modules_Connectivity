@@ -19,7 +19,10 @@ package {
 
 java_defaults {
     name: "CtsTetheringTestDefaults",
-    defaults: ["cts_defaults"],
+    defaults: [
+        "cts_defaults",
+        "framework-connectivity-test-defaults",
+    ],
 
     libs: [
         "android.test.base.stubs.system",
