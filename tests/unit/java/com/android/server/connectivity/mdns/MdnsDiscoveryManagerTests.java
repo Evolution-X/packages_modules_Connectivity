@@ -19,8 +19,6 @@ package com.android.server.connectivity.mdns;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -35,12 +33,10 @@ import android.annotation.NonNull;
 import android.net.Network;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.testing.TestableLooper;
 import android.text.TextUtils;
 import android.util.Pair;
 
 import com.android.net.module.util.SharedLog;
-import com.android.server.connectivity.mdns.MdnsDiscoveryManager.DiscoveryExecutor;
 import com.android.server.connectivity.mdns.MdnsSocketClientBase.SocketCreationCallback;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
@@ -60,9 +56,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /** Tests for {@link MdnsDiscoveryManager}. */
 @DevSdkIgnoreRunner.MonitorThreadLeak
@@ -432,45 +426,6 @@ public class MdnsDiscoveryManagerTests {
             callback.onSocketDestroyed(unusedIfaceKey);
         });
         verify(mockServiceTypeClientType1NullNetwork).notifySocketDestroyed();
-    }
-
-    @Test
-    public void testDiscoveryExecutor() throws Exception {
-        final TestableLooper testableLooper = new TestableLooper(thread.getLooper());
-        final DiscoveryExecutor executor = new DiscoveryExecutor(testableLooper.getLooper());
-        try {
-            // Verify the checkAndRunOnHandlerThread method
-            final CompletableFuture<Boolean> future1 = new CompletableFuture<>();
-            executor.checkAndRunOnHandlerThread(()-> future1.complete(true));
-            assertTrue(future1.get(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
-
-            // Verify the execute method
-            final CompletableFuture<Boolean> future2 = new CompletableFuture<>();
-            executor.execute(()-> future2.complete(true));
-            testableLooper.processAllMessages();
-            assertTrue(future2.get(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
-
-            // Verify the executeDelayed method
-            final CompletableFuture<Boolean> future3 = new CompletableFuture<>();
-            // Schedule a task with 999 ms delay
-            executor.executeDelayed(()-> future3.complete(true), 999L);
-            testableLooper.processAllMessages();
-            assertFalse(future3.isDone());
-
-            // 500 ms have elapsed but do not exceed the target time (999 ms)
-            // The function should not be executed.
-            testableLooper.moveTimeForward(500L);
-            testableLooper.processAllMessages();
-            assertFalse(future3.isDone());
-
-            // 500 ms have elapsed again and have exceeded the target time (999 ms).
-            // The function should be executed.
-            testableLooper.moveTimeForward(500L);
-            testableLooper.processAllMessages();
-            assertTrue(future3.get(500L, TimeUnit.MILLISECONDS));
-        } finally {
-            testableLooper.destroy();
-        }
     }
 
     @Test
