@@ -18,8 +18,6 @@ package com.android.server.connectivity.mdns;
 
 import android.annotation.Nullable;
 
-import androidx.annotation.VisibleForTesting;
-
 import com.android.server.connectivity.mdns.MdnsServiceInfo.TextEntry;
 
 import java.io.IOException;
@@ -29,7 +27,6 @@ import java.util.List;
 import java.util.Objects;
 
 /** An mDNS "TXT" record, which contains a list of {@link TextEntry}. */
-@VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
 public class MdnsTextRecord extends MdnsRecord {
     private List<TextEntry> entries;
 
