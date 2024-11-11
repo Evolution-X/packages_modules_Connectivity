@@ -100,6 +100,15 @@ public final class NetworkStackConstants {
     public static final int IPV4_ADDR_LEN = 4;
     public static final int IPV4_FLAG_MF = 0x2000;
     public static final int IPV4_FLAG_DF = 0x4000;
+    public static final int IPV4_PROTOCOL_IGMP = 2;
+    public static final int IPV4_IGMP_MIN_SIZE = 8;
+    public static final int IPV4_IGMP_GROUP_RECORD_SIZE = 8;
+    public static final int IPV4_IGMP_TYPE_V1_REPORT = 0x12;
+    public static final int IPV4_IGMP_TYPE_V2_JOIN_REPORT = 0x16;
+    public static final int IPV4_IGMP_TYPE_V2_LEAVE_REPORT = 0x17;
+    public static final int IPV4_IGMP_TYPE_V3_REPORT = 0x22;
+    public static final int IPV4_OPTION_TYPE_ROUTER_ALERT = 0x94;
+    public static final int IPV4_OPTION_LEN_ROUTER_ALERT = 4;
     // getSockOpt() for v4 MTU
     public static final int IP_MTU = 14;
     public static final Inet4Address IPV4_ADDR_ALL = makeInet4Address(
