@@ -18,15 +18,12 @@ package com.android.server.connectivity.mdns;
 
 import android.annotation.Nullable;
 
-import androidx.annotation.VisibleForTesting;
-
 import com.android.net.module.util.DnsUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
 
 /** An mDNS "PTR" record, which holds a name (the "pointer"). */
-@VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
 public class MdnsPointerRecord extends MdnsRecord {
     private String[] pointer;
 

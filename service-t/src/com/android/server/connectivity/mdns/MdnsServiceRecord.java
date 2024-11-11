@@ -18,8 +18,6 @@ package com.android.server.connectivity.mdns;
 
 import android.annotation.Nullable;
 
-import androidx.annotation.VisibleForTesting;
-
 import com.android.net.module.util.DnsUtils;
 
 import java.io.IOException;
@@ -28,7 +26,6 @@ import java.util.Locale;
 import java.util.Objects;
 
 /** An mDNS "SRV" record, which contains service information. */
-@VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
 public class MdnsServiceRecord extends MdnsRecord {
     public static final int PROTO_NONE = 0;
     public static final int PROTO_TCP = 1;
