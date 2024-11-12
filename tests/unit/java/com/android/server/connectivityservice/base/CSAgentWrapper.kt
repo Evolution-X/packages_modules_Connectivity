@@ -181,6 +181,7 @@ class CSAgentWrapper(
         cb.eventuallyExpect<Lost> { it.network == agent.network }
     }
 
+    fun setTeardownDelayMillis(delayMillis: Int) = agent.setTeardownDelayMillis(delayMillis)
     fun unregisterAfterReplacement(timeoutMs: Int) = agent.unregisterAfterReplacement(timeoutMs)
 
     fun sendLocalNetworkConfig(lnc: LocalNetworkConfig) = agent.sendLocalNetworkConfig(lnc)
