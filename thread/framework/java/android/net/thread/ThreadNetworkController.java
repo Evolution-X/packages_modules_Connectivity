@@ -908,7 +908,6 @@ public final class ThreadNetworkController {
 
         for (int i = 0; i < channelMaxPowers.size(); i++) {
             int channel = channelMaxPowers.keyAt(i);
-            int maxPower = channelMaxPowers.get(channel);
 
             if ((channel < ActiveOperationalDataset.CHANNEL_MIN_24_GHZ)
                     || (channel > ActiveOperationalDataset.CHANNEL_MAX_24_GHZ)) {
