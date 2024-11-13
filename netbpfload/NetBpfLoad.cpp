@@ -300,6 +300,9 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
     const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
 
+    const int first_api_level = base::GetIntProperty("ro.board.first_api_level",
+                                                     effective_api_level);
+
     // last in U QPR2 beta1
     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
     // first in U QPR2 beta~2
@@ -394,33 +397,48 @@ static int doLoad(char** argv, char * const envp[]) {
         }
     }
 
+    /* Android 14/U should only launch on 64-bit kernels
+     *   T launches on 5.10/5.15
+     *   U launches on 5.15/6.1
+     * So >=5.16 implies isKernel64Bit()
+     *
+     * We thus added a test to V VTS which requires 5.16+ devices to use 64-bit kernels.
+     *
+     * Starting with Android V, which is the first to support a post 6.1 Linux Kernel,
+     * we also require 64-bit userspace.
+     *
+     * There are various known issues with 32-bit userspace talking to various
+     * kernel interfaces (especially CAP_NET_ADMIN ones) on a 64-bit kernel.
+     * Some of these have userspace or kernel workarounds/hacks.
+     * Some of them don't...
+     * We're going to be removing the hacks.
+     * (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
+     * Note: this check/enforcement only applies to *system* userspace code,
+     * it does not affect unprivileged apps, the 32-on-64 compatibility
+     * problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
+     *
+     * Additionally the 32-bit kernel jit support is poor,
+     * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
+     */
     if (isUserspace32bit() && isAtLeastKernelVersion(6, 2, 0)) {
-        /* Android 14/U should only launch on 64-bit kernels
-         *   T launches on 5.10/5.15
-         *   U launches on 5.15/6.1
-         * So >=5.16 implies isKernel64Bit()
-         *
-         * We thus added a test to V VTS which requires 5.16+ devices to use 64-bit kernels.
-         *
-         * Starting with Android V, which is the first to support a post 6.1 Linux Kernel,
-         * we also require 64-bit userspace.
-         *
-         * There are various known issues with 32-bit userspace talking to various
-         * kernel interfaces (especially CAP_NET_ADMIN ones) on a 64-bit kernel.
-         * Some of these have userspace or kernel workarounds/hacks.
-         * Some of them don't...
-         * We're going to be removing the hacks.
-         * (for example "ANDROID: xfrm: remove in_compat_syscall() checks").
-         * Note: this check/enforcement only applies to *system* userspace code,
-         * it does not affect unprivileged apps, the 32-on-64 compatibility
-         * problems are AFAIK limited to various CAP_NET_ADMIN protected interfaces.
-         *
-         * Additionally the 32-bit kernel jit support is poor,
-         * and 32-bit userspace on 64-bit kernel bpf ringbuffer compatibility is broken.
-         */
-        ALOGE("64-bit userspace required on 6.2+ kernels.");
-        // Stuff won't work reliably, but exempt TVs & Arm Wear devices
-        if (!isTV() && !(isWear() && isArm())) return 1;
+        // Stuff won't work reliably, but...
+        if (isTV()) {
+            // exempt TVs... they don't really need functional advanced networking
+            ALOGW("[TV] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (isWear() && isArm()) {
+            // exempt Arm Wear devices (arm32 ABI is far less problematic than x86-32)
+            ALOGW("[Arm Wear] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (first_api_level <= __ANDROID_API_T__ && isArm()) {
+            // also exempt Arm devices upgrading with major kernel rev from T-
+            // might possibly be better for them to run with a newer kernel...
+            ALOGW("[Arm KernelUpRev] 32-bit userspace unsupported on 6.2+ kernels.");
+        } else if (isArm()) {
+            ALOGE("[Arm] 64-bit userspace required on 6.2+ kernels (%d).", first_api_level);
+            return 1;
+        } else { // x86 since RiscV cannot be 32-bit
+            ALOGE("[x86] 64-bit userspace required on 6.2+ kernels.");
+            return 1;
+        }
     }
 
     // Ensure we can determine the Android build type.
