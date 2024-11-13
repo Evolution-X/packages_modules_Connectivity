@@ -50,6 +50,15 @@ flag {
 }
 
 flag {
+  name: "tethering_with_soft_ap_config"
+  is_exported: true
+  namespace: "android_core_networking"
+  description: "The flag controls the access for the parcelable TetheringRequest with getSoftApConfiguration/setSoftApConfiguration API"
+  bug: "216524590"
+  is_fixed_read_only: true
+}
+
+flag {
   name: "request_restricted_wifi"
   is_exported: true
   namespace: "android_core_networking"

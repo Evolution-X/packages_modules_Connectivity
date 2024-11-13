@@ -47,8 +47,8 @@ package android.net {
   }
 
   public static final class TetheringManager.TetheringRequest implements android.os.Parcelable {
-    method @FlaggedApi("com.android.net.flags.tethering_request_with_soft_ap_config") @Nullable public String getPackageName();
-    method @FlaggedApi("com.android.net.flags.tethering_request_with_soft_ap_config") public int getUid();
+    method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") @Nullable public String getPackageName();
+    method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") public int getUid();
   }
 
 }
