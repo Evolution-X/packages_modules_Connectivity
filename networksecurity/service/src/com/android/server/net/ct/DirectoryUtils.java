@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.server.net.ct;
 
 import android.annotation.SuppressLint;
@@ -29,13 +30,30 @@ class DirectoryUtils {
             throw new IOException("Unable to make directory " + dir.getCanonicalPath());
         }
         setWorldReadable(dir);
+        // Needed for the log list file to be accessible.
+        setWorldExecutable(dir);
     }
 
     // CT files and directories are readable by all apps.
     @SuppressLint("SetWorldReadable")
     static void setWorldReadable(File file) throws IOException {
-        if (!file.setReadable(true, false)) {
+        if (!file.setReadable(/* readable= */ true, /* ownerOnly= */ false)) {
             throw new IOException("Failed to set " + file.getCanonicalPath() + " readable");
+        }
+    }
+
+    // CT directories are executable by all apps, to allow access to the log list by anything on the
+    // device.
+    static void setWorldExecutable(File file) throws IOException {
+        if (!file.isDirectory()) {
+            // Only directories need to be marked as executable to allow for access
+            // to the files inside.
+            // See https://www.redhat.com/en/blog/linux-file-permissions-explained for more details.
+            return;
+        }
+
+        if (!file.setExecutable(/* executable= */ true, /* ownerOnly= */ false)) {
+            throw new IOException("Failed to set " + file.getCanonicalPath() + " executable");
         }
     }
 
