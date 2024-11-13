@@ -699,7 +699,7 @@ public class TetheringManager {
         /**
          * @hide
          */
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         public TetheringRequest(@NonNull final TetheringRequestParcel request) {
             mRequestParcel = request;
         }
@@ -708,7 +708,7 @@ public class TetheringManager {
             mRequestParcel = in.readParcelable(TetheringRequestParcel.class.getClassLoader());
         }
 
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @NonNull
         public static final Creator<TetheringRequest> CREATOR = new Creator<>() {
             @Override
@@ -722,13 +722,13 @@ public class TetheringManager {
             }
         };
 
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @Override
         public int describeContents() {
             return 0;
         }
 
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @Override
         public void writeToParcel(@NonNull Parcel dest, int flags) {
             dest.writeParcelable(mRequestParcel, flags);
@@ -820,7 +820,7 @@ public class TetheringManager {
              * @param softApConfig SoftApConfiguration to use.
              * @throws IllegalArgumentException if the tethering type isn't TETHERING_WIFI.
              */
-            @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+            @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
             @RequiresPermission(android.Manifest.permission.TETHER_PRIVILEGED)
             @NonNull
             public Builder setSoftApConfiguration(@Nullable SoftApConfiguration softApConfig) {
@@ -915,7 +915,7 @@ public class TetheringManager {
         /**
          * Get the desired SoftApConfiguration of the request, if one was specified.
          */
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @Nullable
         public SoftApConfiguration getSoftApConfiguration() {
             return mRequestParcel.softApConfig;
@@ -944,7 +944,7 @@ public class TetheringManager {
          * {@link Process#INVALID_UID} if unset.
          * @hide
          */
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @SystemApi(client = MODULE_LIBRARIES)
         public int getUid() {
             return mRequestParcel.uid;
@@ -955,7 +955,7 @@ public class TetheringManager {
          * unset.
          * @hide
          */
-        @FlaggedApi(Flags.FLAG_TETHERING_REQUEST_WITH_SOFT_AP_CONFIG)
+        @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
         @SystemApi(client = MODULE_LIBRARIES)
         @Nullable
         public String getPackageName() {
