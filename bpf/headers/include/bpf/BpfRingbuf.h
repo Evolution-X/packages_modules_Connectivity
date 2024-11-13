@@ -99,6 +99,7 @@ class BpfRingbufBase {
   // 32-bit kernel will just ignore the high-order bits.
   std::atomic_uint64_t* mConsumerPos = nullptr;
   std::atomic_uint32_t* mProducerPos = nullptr;
+  std::atomic_uint32_t* mLength = nullptr;
 
   // In order to guarantee atomic access in a 32 bit userspace environment, atomic_uint64_t is used
   // in addition to std::atomic<T>::is_always_lock_free that guarantees that read / write operations
@@ -247,7 +248,8 @@ inline base::Result<int> BpfRingbufBase::ConsumeAll(
     //   u32 len;
     //   u32 pg_off;
     // };
-    uint32_t length = *reinterpret_cast<volatile uint32_t*>(start_ptr);
+    mLength = reinterpret_cast<decltype(mLength)>(start_ptr);
+    uint32_t length = mLength->load(std::memory_order_acquire);
 
     // If the sample isn't committed, we're caught up with the producer.
     if (length & BPF_RINGBUF_BUSY_BIT) return count;
