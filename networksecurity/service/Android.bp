@@ -32,6 +32,15 @@ java_library {
         "service-connectivity-pre-jarjar",
     ],
 
+    static_libs: [
+        "auto_value_annotations",
+    ],
+
+    plugins: [
+        "auto_value_plugin",
+        "auto_annotation_plugin",
+    ],
+
     // This is included in service-connectivity which is 30+
     // TODO (b/293613362): allow APEXes to have service jars with higher min_sdk than the APEX
     // (service-connectivity is only used on 31+) and use 31 here
