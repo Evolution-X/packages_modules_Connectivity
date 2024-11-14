@@ -31,6 +31,8 @@ import android.net.Uri;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.server.net.ct.DownloadHelper.DownloadStatus;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -115,11 +117,11 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleMetadataCompleteSuccessful() {
+    public void testDownloader_metadataDownloadSuccess_startContentDownload() {
         long metadataId = 123;
         mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        when(mDownloadHelper.isSuccessful(metadataId)).thenReturn(true);
-
+        when(mDownloadHelper.getDownloadStatus(metadataId))
+                .thenReturn(makeSuccessfulDownloadStatus(metadataId));
         long contentId = 666;
         String contentUrl = "http://test-content.org";
         mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUrl);
@@ -132,23 +134,28 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleMetadataCompleteFailed() {
+    public void testDownloader_metadataDownloadFail_doNotStartContentDownload() {
         long metadataId = 123;
         mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        when(mDownloadHelper.isSuccessful(metadataId)).thenReturn(false);
-
         String contentUrl = "http://test-content.org";
         mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUrl);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
+        // In all these failure cases we give up on the download.
+        when(mDownloadHelper.getDownloadStatus(metadataId))
+                .thenReturn(
+                        makeHttpErrorDownloadStatus(metadataId),
+                        makeStorageErrorDownloadStatus(metadataId));
 
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(metadataId));
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
 
         verify(mDownloadHelper, never()).startDownload(contentUrl);
     }
 
     @Test
-    public void testDownloader_handleContentCompleteInstallSuccessful() throws Exception {
-        String version = "666";
+    public void testDownloader_contentDownloadSuccess_installSuccess_updateDataStore()
+            throws Exception {
+        String version = "456";
         long contentId = 666;
         File logListFile = File.createTempFile("log_list", "json");
         Uri contentUri = Uri.fromFile(logListFile);
@@ -157,8 +164,8 @@ public class CertificateTransparencyDownloaderTest {
         Uri metadataUri = Uri.fromFile(metadataFile);
         mCertificateTransparencyDownloader.setPublicKey(
                 Base64.getEncoder().encodeToString(mPublicKey.getEncoded()));
-
-        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+        setUpContentDownloadCompleteSuccessful(
+                version, metadataId, metadataUri, contentId, contentUri);
         when(mCertificateTransparencyInstaller.install(
                         eq(Config.COMPATIBILITY_VERSION), any(), eq(version)))
                 .thenReturn(true);
@@ -166,7 +173,6 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
         assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
         assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
-
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
 
@@ -178,16 +184,38 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleContentCompleteInstallFails() throws Exception {
-        String version = "666";
+    public void testDownloader_contentDownloadFail_doNotInstall() throws Exception {
+        mDataStore.setProperty(Config.VERSION_PENDING, "123");
+        long contentId = 666;
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
+        // In all these failure cases we give up on the download.
+        when(mDownloadHelper.getDownloadStatus(contentId))
+                .thenReturn(
+                        makeHttpErrorDownloadStatus(contentId),
+                        makeStorageErrorDownloadStatus(contentId));
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        verify(mCertificateTransparencyInstaller, never()).install(any(), any(), any());
+        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
+        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
+        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+    }
+
+    @Test
+    public void testDownloader_contentDownloadSuccess_installFail_doNotUpdateDataStore()
+            throws Exception {
+        String version = "456";
         long contentId = 666;
         File logListFile = File.createTempFile("log_list", "json");
         Uri contentUri = Uri.fromFile(logListFile);
         long metadataId = 123;
         File metadataFile = sign(logListFile);
         Uri metadataUri = Uri.fromFile(metadataFile);
-
-        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+        setUpContentDownloadCompleteSuccessful(
+                version, metadataId, metadataUri, contentId, contentUri);
         when(mCertificateTransparencyInstaller.install(
                         eq(Config.COMPATIBILITY_VERSION), any(), eq(version)))
                 .thenReturn(false);
@@ -201,14 +229,15 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleContentCompleteVerificationFails() throws IOException {
-        String version = "666";
+    public void testDownloader_contentDownloadSuccess_verificationFail_doNotInstall()
+            throws IOException {
+        String version = "456";
         long contentId = 666;
         Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
         long metadataId = 123;
         Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-wrong_metadata", "sig"));
-
-        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+        setUpContentDownloadCompleteSuccessful(
+                version, metadataId, metadataUri, contentId, contentUri);
 
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
@@ -221,17 +250,17 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_handleContentCompleteMissingVerificationPublicKey()
+    public void testDownloader_contentDownloadSuccess_missingVerificationPublicKey_doNotInstall()
             throws Exception {
-        String version = "666";
+        String version = "456";
         long contentId = 666;
         File logListFile = File.createTempFile("log_list", "json");
         Uri contentUri = Uri.fromFile(logListFile);
         long metadataId = 123;
         File metadataFile = sign(logListFile);
         Uri metadataUri = Uri.fromFile(metadataFile);
-
-        setUpDownloadComplete(version, metadataId, metadataUri, contentId, contentUri);
+        setUpContentDownloadCompleteSuccessful(
+                version, metadataId, metadataUri, contentId, contentUri);
 
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
@@ -248,7 +277,7 @@ public class CertificateTransparencyDownloaderTest {
                 .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
     }
 
-    private void setUpDownloadComplete(
+    private void setUpContentDownloadCompleteSuccessful(
             String version, long metadataId, Uri metadataUri, long contentId, Uri contentUri)
             throws IOException {
         mDataStore.setProperty(Config.VERSION_PENDING, version);
@@ -259,8 +288,32 @@ public class CertificateTransparencyDownloaderTest {
 
         mDataStore.setPropertyLong(Config.CONTENT_URL_KEY, contentId);
         mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUri.toString());
-        when(mDownloadHelper.isSuccessful(contentId)).thenReturn(true);
+        when(mDownloadHelper.getDownloadStatus(contentId))
+                .thenReturn(makeSuccessfulDownloadStatus(contentId));
         when(mDownloadHelper.getUri(contentId)).thenReturn(contentUri);
+    }
+
+    private DownloadStatus makeSuccessfulDownloadStatus(long downloadId) {
+        return DownloadStatus.builder()
+                .setDownloadId(downloadId)
+                .setStatus(DownloadManager.STATUS_SUCCESSFUL)
+                .build();
+    }
+
+    private DownloadStatus makeStorageErrorDownloadStatus(long downloadId) {
+        return DownloadStatus.builder()
+                .setDownloadId(downloadId)
+                .setStatus(DownloadManager.STATUS_FAILED)
+                .setReason(DownloadManager.ERROR_INSUFFICIENT_SPACE)
+                .build();
+    }
+
+    private DownloadStatus makeHttpErrorDownloadStatus(long downloadId) {
+        return DownloadStatus.builder()
+                .setDownloadId(downloadId)
+                .setStatus(DownloadManager.STATUS_FAILED)
+                .setReason(DownloadManager.ERROR_HTTP_DATA_ERROR)
+                .build();
     }
 
     private File sign(File file) throws IOException, GeneralSecurityException {

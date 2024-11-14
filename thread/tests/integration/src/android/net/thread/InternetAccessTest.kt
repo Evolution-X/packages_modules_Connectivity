@@ -28,12 +28,10 @@ import android.net.thread.utils.IntegrationTestUtils.enableThreadAndJoinNetwork
 import android.net.thread.utils.IntegrationTestUtils.joinNetworkAndWaitForOmr
 import android.net.thread.utils.IntegrationTestUtils.leaveNetworkAndDisableThread
 import android.net.thread.utils.IntegrationTestUtils.newPacketReader
-import android.net.thread.utils.IntegrationTestUtils.setUpInfraNetwork
-import android.net.thread.utils.IntegrationTestUtils.startInfraDeviceAndWaitForOnLinkAddr
-import android.net.thread.utils.IntegrationTestUtils.tearDownInfraNetwork
 import android.net.thread.utils.IntegrationTestUtils.waitFor
 import android.net.thread.utils.OtDaemonController
 import android.net.thread.utils.TestDnsServer
+import android.net.thread.utils.TestTunNetworkUtils
 import android.net.thread.utils.TestUdpEchoServer
 import android.net.thread.utils.ThreadFeatureCheckerRule
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThreadDevice
@@ -128,11 +126,11 @@ class InternetAccessTest {
         handler = Handler(handlerThread.looper)
         ftds = ArrayList()
 
-        infraNetworkTracker = setUpInfraNetwork(context, controller)
+        infraNetworkTracker = TestTunNetworkUtils.setUpInfraNetwork(context, controller)
 
         // Create an infra network device.
         infraNetworkReader = newPacketReader(infraNetworkTracker.testIface, handler)
-        infraDevice = startInfraDeviceAndWaitForOnLinkAddr(infraNetworkReader)
+        infraDevice = TestTunNetworkUtils.startInfraDeviceAndWaitForOnLinkAddr(infraNetworkReader)
 
         // Create a DNS server
         dnsServer = TestDnsServer(infraNetworkReader, DNS_SERVER_ADDR, ANSWER_RECORDS)
@@ -150,7 +148,7 @@ class InternetAccessTest {
     @Throws(Exception::class)
     fun tearDown() {
         controller.setTestNetworkAsUpstreamAndWait(null)
-        tearDownInfraNetwork(infraNetworkTracker)
+        TestTunNetworkUtils.tearDownAllInfraNetworks()
 
         dnsServer.stop()
         udpEchoServer.stop()
