@@ -200,6 +200,24 @@ class InternetAccessTest {
         assertThat(reply).isEqualTo("Hello,Thread")
     }
 
+    @Test
+    fun nat64Enabled_afterInfraNetworkSwitch_threadDeviceSendsUdpToEchoServer_replyIsReceived() {
+        controller.setNat64EnabledAndWait(true)
+        waitFor({ otCtl.hasNat64PrefixInNetdata() }, Duration.ofSeconds(10))
+        infraNetworkTracker = TestTunNetworkUtils.setUpInfraNetwork(context, controller)
+        infraNetworkReader = newPacketReader(infraNetworkTracker.testIface, handler)
+        udpEchoServer = TestUdpEchoServer(infraNetworkReader, UDP_ECHO_SERVER_ADDRESS)
+        val ftd = ftds[0]
+        joinNetworkAndWaitForOmr(ftd, DEFAULT_DATASET)
+        waitFor({ otCtl.hasNat64PrefixInNetdata() }, Duration.ofSeconds(10))
+        udpEchoServer.start()
+
+        ftd.udpOpen()
+        ftd.udpSend("Hello,Thread", UDP_ECHO_SERVER_ADDRESS.address, UDP_ECHO_SERVER_ADDRESS.port)
+        val reply = ftd.udpReceive()
+        assertThat(reply).isEqualTo("Hello,Thread")
+    }
+
     private fun extractIpv4AddressFromMappedAddress(address: InetAddress): Inet4Address {
         return InetAddress.getByAddress(address.address.slice(12 until 16).toByteArray())
             as Inet4Address
