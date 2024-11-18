@@ -42,6 +42,7 @@ cc_library_shared {
     ],
     llndk: {
         symbol_file: "libconnectivity_native.map.txt",
+        moved_to_apex: true,
     },
     stubs: {
         symbol_file: "libconnectivity_native.map.txt",
