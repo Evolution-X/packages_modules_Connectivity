@@ -52,118 +52,124 @@ public class QueryTaskConfig {
     final int transactionId;
     @VisibleForTesting
     final boolean expectUnicastResponse;
-    private final int queriesPerBurst;
-    private final int timeBetweenBurstsInMs;
-    private final int burstCounter;
-    final long delayBeforeTaskWithoutBackoffMs;
-    private final boolean isFirstBurst;
-    private final long queryIndex;
+    private final int queryIndex;
+    private final int queryMode;
 
-    QueryTaskConfig(long queryIndex, int transactionId,
-            boolean expectUnicastResponse, boolean isFirstBurst, int burstCounter,
-            int queriesPerBurst, int timeBetweenBurstsInMs,
-            long delayBeforeTaskWithoutBackoffMs) {
+    QueryTaskConfig(int queryMode, int queryIndex, int transactionId,
+            boolean expectUnicastResponse) {
+        this.queryMode = queryMode;
         this.transactionId = transactionId;
-        this.expectUnicastResponse = expectUnicastResponse;
-        this.queriesPerBurst = queriesPerBurst;
-        this.timeBetweenBurstsInMs = timeBetweenBurstsInMs;
-        this.burstCounter = burstCounter;
-        this.delayBeforeTaskWithoutBackoffMs = delayBeforeTaskWithoutBackoffMs;
-        this.isFirstBurst = isFirstBurst;
         this.queryIndex = queryIndex;
+        this.expectUnicastResponse = expectUnicastResponse;
     }
 
     QueryTaskConfig(int queryMode) {
-        this.queriesPerBurst = QUERIES_PER_BURST;
-        this.burstCounter = 0;
-        this.transactionId = 1;
-        this.expectUnicastResponse = true;
-        this.isFirstBurst = true;
-        // Config the scan frequency based on the scan mode.
-        if (queryMode == AGGRESSIVE_QUERY_MODE) {
-            this.timeBetweenBurstsInMs = INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS;
-            this.delayBeforeTaskWithoutBackoffMs =
-                    TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS;
-        } else if (queryMode == PASSIVE_QUERY_MODE) {
-            // In passive scan mode, sends a single burst of QUERIES_PER_BURST queries, and then
-            // in each TIME_BETWEEN_BURSTS interval, sends QUERIES_PER_BURST_PASSIVE_MODE
-            // queries.
-            this.timeBetweenBurstsInMs = MAX_TIME_BETWEEN_ACTIVE_PASSIVE_BURSTS_MS;
-            this.delayBeforeTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
-        } else {
-            // In active scan mode, sends a burst of QUERIES_PER_BURST queries,
-            // TIME_BETWEEN_QUERIES_IN_BURST_MS apart, then waits for the scan interval, and
-            // then repeats. The scan interval starts as INITIAL_TIME_BETWEEN_BURSTS_MS and
-            // doubles until it maxes out at TIME_BETWEEN_BURSTS_MS.
-            this.timeBetweenBurstsInMs = INITIAL_TIME_BETWEEN_BURSTS_MS;
-            this.delayBeforeTaskWithoutBackoffMs = TIME_BETWEEN_QUERIES_IN_BURST_MS;
-        }
-        this.queryIndex = 0;
+        this(queryMode, 0, 1, true);
     }
 
-    long getDelayBeforeNextTaskWithoutBackoff(boolean isFirstQueryInBurst,
-            boolean isLastQueryInBurst, int queryMode) {
-        if (isFirstQueryInBurst && queryMode == AGGRESSIVE_QUERY_MODE) {
-            return 0;
+    private static int getBurstIndex(int queryIndex, int queryMode) {
+        if (queryMode == PASSIVE_QUERY_MODE && queryIndex >= QUERIES_PER_BURST) {
+            // In passive mode, after the first burst of QUERIES_PER_BURST queries, subsequent
+            // bursts have QUERIES_PER_BURST_PASSIVE_MODE queries.
+            final int queryIndexAfterFirstBurst = queryIndex - QUERIES_PER_BURST;
+            return 1 + (queryIndexAfterFirstBurst / QUERIES_PER_BURST_PASSIVE_MODE);
+        } else {
+            return queryIndex / QUERIES_PER_BURST;
         }
-        if (isLastQueryInBurst) {
-            return timeBetweenBurstsInMs;
+    }
+
+    private static int getQueryIndexInBurst(int queryIndex, int queryMode) {
+        if (queryMode == PASSIVE_QUERY_MODE && queryIndex >= QUERIES_PER_BURST) {
+            final int queryIndexAfterFirstBurst = queryIndex - QUERIES_PER_BURST;
+            return queryIndexAfterFirstBurst % QUERIES_PER_BURST_PASSIVE_MODE;
+        } else {
+            return queryIndex % QUERIES_PER_BURST;
+        }
+    }
+
+    private static boolean isFirstBurst(int queryIndex, int queryMode) {
+        return getBurstIndex(queryIndex, queryMode) == 0;
+    }
+
+    private static boolean isFirstQueryInBurst(int queryIndex, int queryMode) {
+        return getQueryIndexInBurst(queryIndex, queryMode) == 0;
+    }
+
+    // TODO: move delay calculations to MdnsQueryScheduler
+    long getDelayBeforeTaskWithoutBackoff() {
+        return getDelayBeforeTaskWithoutBackoff(queryIndex, queryMode);
+    }
+
+    private static long getDelayBeforeTaskWithoutBackoff(int queryIndex, int queryMode) {
+        final int burstIndex = getBurstIndex(queryIndex, queryMode);
+        final int queryIndexInBurst = getQueryIndexInBurst(queryIndex, queryMode);
+        if (queryIndexInBurst == 0) {
+            return getTimeToBurstMs(burstIndex, queryMode);
+        } else if (queryIndexInBurst == 1 && queryMode == AGGRESSIVE_QUERY_MODE) {
+            // In aggressive mode, the first 2 queries are sent without delay.
+            return 0;
         }
         return queryMode == AGGRESSIVE_QUERY_MODE
                 ? TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS
                 : TIME_BETWEEN_QUERIES_IN_BURST_MS;
     }
 
-    boolean getNextExpectUnicastResponse(boolean isLastQueryInBurst, int queryMode) {
-        if (!isLastQueryInBurst) {
-            return false;
-        }
+    private boolean getExpectUnicastResponse(int queryIndex, int queryMode) {
         if (queryMode == AGGRESSIVE_QUERY_MODE) {
-            return true;
+            if (isFirstQueryInBurst(queryIndex, queryMode)) {
+                return true;
+            }
         }
         return alwaysAskForUnicastResponse;
     }
 
-    int getNextTimeBetweenBurstsMs(boolean isLastQueryInBurst, int queryMode) {
-        if (!isLastQueryInBurst) {
-            return timeBetweenBurstsInMs;
+    /**
+     * Shifts a value left by the specified number of bits, coercing to at most maxValue.
+     *
+     * <p>This allows calculating min(value*2^shift, maxValue) without overflow.
+     */
+    private static int boundedLeftShift(int value, int shift, int maxValue) {
+        // There must be at least one leading zero for positive values, so the maximum left shift
+        // without overflow is the number of leading zeros minus one.
+        final int maxShift = Integer.numberOfLeadingZeros(value) - 1;
+        if (shift > maxShift) {
+            // The shift would overflow positive integers, so is greater than maxValue.
+            return maxValue;
         }
-        final int maxTimeBetweenBursts = queryMode == AGGRESSIVE_QUERY_MODE
-                ? MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS : MAX_TIME_BETWEEN_ACTIVE_PASSIVE_BURSTS_MS;
-        return Math.min(timeBetweenBurstsInMs * 2, maxTimeBetweenBursts);
+        return Math.min(value << shift, maxValue);
+    }
+
+    private static int getTimeToBurstMs(int burstIndex, int queryMode) {
+        if (burstIndex == 0) {
+            // No delay before the first burst
+            return 0;
+        }
+        switch (queryMode) {
+            case PASSIVE_QUERY_MODE:
+                return MAX_TIME_BETWEEN_ACTIVE_PASSIVE_BURSTS_MS;
+            case AGGRESSIVE_QUERY_MODE:
+                return boundedLeftShift(INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS,
+                        burstIndex - 1,
+                        MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS);
+            default: // ACTIVE_QUERY_MODE
+                return boundedLeftShift(INITIAL_TIME_BETWEEN_BURSTS_MS,
+                        burstIndex - 1,
+                        MAX_TIME_BETWEEN_ACTIVE_PASSIVE_BURSTS_MS);
+        }
     }
 
     /**
      * Get new QueryTaskConfig for next run.
      */
     public QueryTaskConfig getConfigForNextRun(int queryMode) {
-        long newQueryCount = queryIndex + 1;
+        final int newQueryIndex = queryIndex + 1;
         int newTransactionId = transactionId + 1;
         if (newTransactionId > UNSIGNED_SHORT_MAX_VALUE) {
             newTransactionId = 1;
         }
 
-        int newQueriesPerBurst = queriesPerBurst;
-        int newBurstCounter = burstCounter + 1;
-        final boolean isFirstQueryInBurst = newBurstCounter == 1;
-        final boolean isLastQueryInBurst = newBurstCounter == queriesPerBurst;
-        boolean newIsFirstBurst = isFirstBurst && !isLastQueryInBurst;
-        if (isLastQueryInBurst) {
-            newBurstCounter = 0;
-            // In passive scan mode, sends a single burst of QUERIES_PER_BURST queries, and
-            // then in each TIME_BETWEEN_BURSTS interval, sends QUERIES_PER_BURST_PASSIVE_MODE
-            // queries.
-            if (isFirstBurst && queryMode == PASSIVE_QUERY_MODE) {
-                newQueriesPerBurst = QUERIES_PER_BURST_PASSIVE_MODE;
-            }
-        }
-
-        return new QueryTaskConfig(newQueryCount, newTransactionId,
-                getNextExpectUnicastResponse(isLastQueryInBurst, queryMode), newIsFirstBurst,
-                newBurstCounter, newQueriesPerBurst,
-                getNextTimeBetweenBurstsMs(isLastQueryInBurst, queryMode),
-                getDelayBeforeNextTaskWithoutBackoff(
-                        isFirstQueryInBurst, isLastQueryInBurst, queryMode));
+        return new QueryTaskConfig(queryMode, newQueryIndex, newTransactionId,
+                getExpectUnicastResponse(newQueryIndex, queryMode));
     }
 
     /**
@@ -171,7 +177,7 @@ public class QueryTaskConfig {
      */
     public boolean shouldUseQueryBackoff(int numOfQueriesBeforeBackoff) {
         // Don't enable backoff mode during the burst or in the first burst
-        if (burstCounter != 0 || isFirstBurst) {
+        if (!isFirstQueryInBurst(queryIndex, queryMode) || isFirstBurst(queryIndex, queryMode)) {
             return false;
         }
         return queryIndex > numOfQueriesBeforeBackoff;
