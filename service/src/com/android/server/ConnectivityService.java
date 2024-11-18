@@ -275,6 +275,7 @@ import android.net.netd.aidl.NativeUidRangeConfig;
 import android.net.networkstack.ModuleNetworkStackClient;
 import android.net.networkstack.NetworkStackClientBase;
 import android.net.networkstack.aidl.NetworkMonitorParameters;
+import android.net.platform.flags.Flags;
 import android.net.resolv.aidl.DnsHealthEventParcel;
 import android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener;
 import android.net.resolv.aidl.Nat64PrefixEventParcel;
@@ -348,6 +349,7 @@ import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.InterfaceParams;
+import com.android.net.module.util.LinkPropertiesUtils;
 import com.android.net.module.util.LinkPropertiesUtils.CompareOrUpdateResult;
 import com.android.net.module.util.LinkPropertiesUtils.CompareResult;
 import com.android.net.module.util.LocationPermissionChecker;
@@ -409,6 +411,7 @@ import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -1129,6 +1132,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     // This is null if mCloseQuicConnection is false
     @Nullable
     private final QuicConnectionCloser mQuicConnectionCloser;
+
+    // A map from IP address to networks. Only the handler thread is allowed to access this field.
+    @Nullable @VisibleForTesting final Map<InetAddress, Set<NetworkAgentInfo>> mIpToNetworksMap;
 
     /**
      * Implements support for the legacy "one network per network type" model.
@@ -1859,6 +1865,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 final SparseArray<NetworkAgentInfo> networkForNetId, final Handler handler) {
             return new QuicConnectionCloser(networkForNetId, handler);
         }
+
+        /** Whether the flag for connectivity service socket destroy is enabled or not. */
+        public boolean flagConnectivityServiceDestroySocket() {
+            return Flags.connectivityServiceDestroySocket();
+        }
     }
 
     public ConnectivityService(Context context) {
@@ -1993,6 +2004,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
             mSatelliteAccessController = null;
         }
 
+        if (mDeps.flagConnectivityServiceDestroySocket()) {
+            mIpToNetworksMap = new HashMap<>();
+        } else {
+            mIpToNetworksMap = null;
+        }
         // To ensure uid state is synchronized with Network Policy, register for
         // NetworkPolicyManagerService events must happen prior to NetworkPolicyManagerService
         // reading existing policy from disk.
@@ -4586,6 +4602,21 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 (mMulticastRoutingCoordinatorService != null));
         pw.println("Background firewall chain enabled: " + mBackgroundFirewallChainEnabled);
         pw.println("IngressToVpnAddressFiltering: " + mIngressToVpnAddressFiltering);
+
+        if (mIpToNetworksMap != null) {
+            pw.println();
+            pw.println("mIpToNetworksMap:");
+            pw.increaseIndent();
+            for (Map.Entry<InetAddress, Set<NetworkAgentInfo>> info : mIpToNetworksMap.entrySet()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(info.getKey()).append(": ");
+                for (NetworkAgentInfo nai : info.getValue()) {
+                    sb.append("{").append(nai.network).append("}");
+                }
+                pw.println(sb);
+            }
+            pw.decreaseIndent();
+        }
     }
 
     private void dumpNetworks(IndentingPrintWriter pw) {
@@ -5732,6 +5763,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // for an unnecessarily long time.
             destroyNativeNetwork(nai);
         }
+        updateIpAddressesForNetwork(nai, nai.linkProperties, null);
         if (!nai.isCreated() && !mDeps.isAtLeastT()) {
             // Backwards compatibility: send onNetworkDestroyed even if network was never created.
             // This can never run if the code above runs because shouldDestroyNativeNetwork is
@@ -9850,10 +9882,47 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
             networkAgent.networkMonitor().notifyLinkPropertiesChanged(
                     new LinkProperties(newLp, true /* parcelSensitiveFields */));
+            updateIpAddressesForNetwork(networkAgent, oldLp, newLp);
             notifyNetworkCallbacks(networkAgent, CALLBACK_IP_CHANGED);
         }
 
         mKeepaliveTracker.handleCheckKeepalivesStillValid(networkAgent);
+    }
+
+    private void updateIpAddressesForNetwork(
+            NetworkAgentInfo nai, LinkProperties oldLp, LinkProperties newLp) {
+        ensureRunningOnConnectivityServiceThread();
+        if (mIpToNetworksMap == null) {
+            return;
+        }
+
+        final CompareResult<LinkAddress> result =
+                LinkPropertiesUtils.compareAllAddresses(oldLp, newLp);
+
+        if (!result.added.isEmpty()) {
+            for (LinkAddress la : result.added) {
+                if (la.getAddress() instanceof Inet6Address
+                        && la.getAddress().isLinkLocalAddress()) {
+                    // Some NetworkAgents may not report IPv6 link local address to CS, thus socket
+                    // destruction on the address will be done at handling RTM_DELADDR and the
+                    // address doesn't need to be added to mIpToNetworksMap.
+                    continue;
+                }
+                mIpToNetworksMap.computeIfAbsent(la.getAddress(), k -> new ArraySet<>()).add(nai);
+            }
+        }
+
+        if (!result.removed.isEmpty()) {
+            for (LinkAddress la : result.removed) {
+                final Set<NetworkAgentInfo> networks = mIpToNetworksMap.get(la.getAddress());
+                if (networks != null) {
+                    networks.remove(nai);
+                    if (networks.isEmpty()) {
+                        mIpToNetworksMap.remove(la.getAddress());
+                    }
+                }
+            }
+        }
     }
 
     private void applyInitialLinkProperties(@NonNull NetworkAgentInfo nai) {

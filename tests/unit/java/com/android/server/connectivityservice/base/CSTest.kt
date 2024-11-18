@@ -427,6 +427,8 @@ open class CSTest {
                 networkForNetId: SparseArray<NetworkAgentInfo>,
                 handler: Handler
         ): QuicConnectionCloser = quicConnectionCloser
+
+        override fun flagConnectivityServiceDestroySocket() = true
     }
 
     inner class PermDeps : PermissionMonitor.Dependencies() {
