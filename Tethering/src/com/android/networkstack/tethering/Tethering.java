@@ -109,6 +109,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -216,9 +217,11 @@ public class Tethering {
      * Cookie added when registering {@link android.net.TetheringManager.TetheringEventCallback}.
      */
     private static class CallbackCookie {
+        public final int uid;
         public final boolean hasSystemPrivilege;
 
-        private CallbackCookie(boolean hasSystemPrivilege) {
+        private CallbackCookie(int uid, boolean hasSystemPrivilege) {
+            this.uid = uid;
             this.hasSystemPrivilege = hasSystemPrivilege;
         }
     }
@@ -1116,7 +1119,9 @@ public class Tethering {
     }
 
     /**
-     * Builds a TetherStatesParcel for the specified CallbackCookie.
+     * Builds a TetherStatesParcel for the specified CallbackCookie. SoftApConfiguration will only
+     * be included if the cookie has the same uid as the app that specified the configuration, or
+     * if the cookie has system privilege.
      *
      * @param cookie CallbackCookie of the receiving app.
      * @return TetherStatesParcel with information redacted for the specified cookie.
@@ -1132,7 +1137,11 @@ public class Tethering {
             final TetherState tetherState = mTetherStates.valueAt(i);
             final int type = tetherState.ipServer.interfaceType();
             final String iface = mTetherStates.keyAt(i);
-            final TetheringInterface tetheringIface = new TetheringInterface(type, iface);
+            final TetheringRequest request = tetherState.ipServer.getTetheringRequest();
+            final boolean includeSoftApConfig = request != null && cookie != null
+                    && (cookie.uid == request.getUid() || cookie.hasSystemPrivilege);
+            final TetheringInterface tetheringIface = new TetheringInterface(type, iface,
+                    includeSoftApConfig ? request.getSoftApConfiguration() : null);
             if (tetherState.lastError != TETHER_ERROR_NO_ERROR) {
                 errored.add(tetheringIface);
                 lastErrors.add(tetherState.lastError);
@@ -1170,7 +1179,7 @@ public class Tethering {
         final Intent bcast = new Intent(ACTION_TETHER_STATE_CHANGED);
         bcast.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
 
-        TetherStatesParcel parcel = buildTetherStatesParcel(null);
+        TetherStatesParcel parcel = buildTetherStatesParcel(null /* cookie */);
         bcast.putStringArrayListExtra(
                 EXTRA_AVAILABLE_TETHER, toIfaces(Arrays.asList(parcel.availableList)));
         bcast.putStringArrayListExtra(
@@ -2194,9 +2203,9 @@ public class Tethering {
                         break;
                     }
                     case EVENT_REQUEST_CHANGE_DOWNSTREAM: {
-                        final int tetheringType = message.arg1;
-                        final Boolean enabled = (Boolean) message.obj;
-                        enableTetheringInternal(tetheringType, enabled, null);
+                        final boolean enabled = message.arg1 == 1;
+                        final TetheringRequest request = (TetheringRequest) message.obj;
+                        enableTetheringInternal(request.getTetheringType(), enabled, null);
                         break;
                     }
                     default:
@@ -2393,11 +2402,12 @@ public class Tethering {
 
     /** Register tethering event callback */
     void registerTetheringEventCallback(ITetheringEventCallback callback) {
+        final int uid = mDeps.getBinderCallingUid();
         final boolean hasSystemPrivilege = hasCallingPermission(NETWORK_SETTINGS)
                 || hasCallingPermission(PERMISSION_MAINLINE_NETWORK_STACK)
                 || hasCallingPermission(NETWORK_STACK);
         mHandler.post(() -> {
-            CallbackCookie cookie = new CallbackCookie(hasSystemPrivilege);
+            CallbackCookie cookie = new CallbackCookie(uid, hasSystemPrivilege);
             mTetheringEventCallbacks.register(callback, cookie);
             final TetheringCallbackStartedParcel parcel = new TetheringCallbackStartedParcel();
             parcel.supportedTypes = mSupportedTypeBitmap;
@@ -2492,8 +2502,8 @@ public class Tethering {
 
         if (DBG) {
             // Use a CallbackCookie with system privilege so nothing is redacted.
-            TetherStatesParcel parcel =
-                    buildTetherStatesParcel(new CallbackCookie(true /* hasSystemPrivilege */));
+            TetherStatesParcel parcel = buildTetherStatesParcel(
+                    new CallbackCookie(Process.SYSTEM_UID, true /* hasSystemPrivilege */));
             Log.d(TAG, String.format(
                     "sendTetherStatesChangedCallback %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
                     "avail", TextUtils.join(",", Arrays.asList(parcel.availableList)),
@@ -2773,9 +2783,9 @@ public class Tethering {
         }
 
         @Override
-        public void requestEnableTethering(int tetheringType, boolean enabled) {
+        public void requestEnableTethering(TetheringRequest request, boolean enabled) {
             mTetherMainSM.sendMessage(TetherMainSM.EVENT_REQUEST_CHANGE_DOWNSTREAM,
-                    tetheringType, 0, enabled ? Boolean.TRUE : Boolean.FALSE);
+                    enabled ? 1 : 0, 0, request);
         }
     }
 
