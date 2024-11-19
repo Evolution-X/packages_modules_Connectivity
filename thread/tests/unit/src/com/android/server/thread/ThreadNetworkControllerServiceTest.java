@@ -17,6 +17,7 @@
 package com.android.server.thread;
 
 import static android.Manifest.permission.NETWORK_SETTINGS;
+import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
@@ -34,6 +35,7 @@ import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_
 
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_INVALID_STATE;
+import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
@@ -85,6 +87,7 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserManager;
 import android.os.test.TestLooper;
+import android.provider.DeviceConfig;
 import android.util.AtomicFile;
 
 import androidx.test.annotation.UiThreadTest;
@@ -102,6 +105,7 @@ import com.android.server.thread.openthread.MeshcopTxtAttributes;
 import com.android.server.thread.openthread.OtDaemonConfiguration;
 import com.android.server.thread.openthread.testing.FakeOtDaemon;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -258,6 +262,13 @@ public final class ThreadNetworkControllerServiceTest {
         mService.setTestNetworkAgent(mMockNetworkAgent);
     }
 
+    @After
+    public void tearDown() throws Exception {
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                () -> DeviceConfig.deleteProperty("thread_network", "TrelFeature__enabled"));
+    }
+
     @Test
     public void initialize_tunInterfaceAndNsdPublisherSetToOtDaemon() throws Exception {
         when(mMockTunIfController.getTunFd()).thenReturn(mMockTunFd);
@@ -321,6 +332,33 @@ public final class ThreadNetworkControllerServiceTest {
                         new OtDaemonConfiguration.Builder().setNat64Enabled(true).build(),
                         null /* receiver */);
         verify(mFakeOtDaemon, times(1)).setNat64Cidr(eq(TEST_NAT64_CIDR.toString()), any());
+    }
+
+    @Test
+    public void initialize_trelFeatureDisabled_trelDisabledAtOtDaemon() throws Exception {
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                () ->
+                        DeviceConfig.setProperty(
+                                "thread_network", "TrelFeature__enabled", "false", false));
+
+        mService.initialize();
+        mTestLooper.dispatchAll();
+
+        assertThat(mFakeOtDaemon.isTrelEnabled()).isFalse();
+    }
+
+    @Test
+    public void initialize_trelFeatureEnabled_setTrelEnabledAtOtDamon() throws Exception {
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                () ->
+                        DeviceConfig.setProperty(
+                                "thread_network", "TrelFeature__enabled", "true", false));
+        mService.initialize();
+        mTestLooper.dispatchAll();
+
+        assertThat(mFakeOtDaemon.isTrelEnabled()).isTrue();
     }
 
     @Test

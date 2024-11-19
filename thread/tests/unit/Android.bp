@@ -35,6 +35,7 @@ android_test {
     static_libs: [
         "androidx.test.rules",
         "frameworks-base-testutils",
+        "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         "framework-connectivity-t-pre-jarjar",
         "framework-location.stubs.module_lib",

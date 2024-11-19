@@ -48,4 +48,10 @@
     <test class="com.android.tradefed.testtype.AndroidJUnitTest" >
         <option name="package" value="com.android.thread.tests.integration" />
     </test>
+
+    <!-- Enable TREL for integration tests -->
+    <target_preparer class="com.android.tradefed.targetprep.FeatureFlagTargetPreparer">
+        <option name="flag-value"
+                value="thread_network/TrelFeature__enabled=true"/>
+    </target_preparer>
 </configuration>
