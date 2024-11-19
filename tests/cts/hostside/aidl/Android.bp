@@ -19,8 +19,7 @@ package {
 
 java_test_helper_library {
     name: "CtsHostsideNetworkTestsAidl",
-    sdk_version: "current",
-    min_sdk_version: "30",
+    sdk_version: "system_current",
     srcs: [
         "com/android/cts/net/hostside/*.aidl",
         "com/android/cts/net/hostside/*.java",

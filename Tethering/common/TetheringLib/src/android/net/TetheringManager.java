@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -207,6 +208,20 @@ public class TetheringManager {
      * @hide
      */
     public static final int MAX_TETHERING_TYPE = TETHERING_VIRTUAL;
+
+    private static String typeToString(@TetheringType int type) {
+        switch (type) {
+            case TETHERING_INVALID: return "TETHERING_INVALID";
+            case TETHERING_WIFI: return "TETHERING_WIFI";
+            case TETHERING_USB: return "TETHERING_USB";
+            case TETHERING_BLUETOOTH: return "TETHERING_BLUETOOTH";
+            case TETHERING_WIFI_P2P: return "TETHERING_WIFI_P2P";
+            case TETHERING_NCM: return "TETHERING_NCM";
+            case TETHERING_ETHERNET: return "TETHERING_ETHERNET";
+            default:
+                return "TETHERING_UNKNOWN(" + type + ")";
+        }
+    }
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -689,6 +704,17 @@ public class TetheringManager {
     })
     public @interface ConnectivityScope {}
 
+    private static String connectivityScopeToString(@ConnectivityScope int scope) {
+        switch (scope) {
+            case CONNECTIVITY_SCOPE_GLOBAL:
+                return "CONNECTIVITY_SCOPE_GLOBAL";
+            case CONNECTIVITY_SCOPE_LOCAL:
+                return "CONNECTIVITY_SCOPE_LOCAL";
+            default:
+                return "CONNECTIVITY_SCOPE_UNKNOWN(" + scope + ")";
+        }
+    }
+
     /**
      *  Use with {@link #startTethering} to specify additional parameters when starting tethering.
      */
@@ -972,15 +998,31 @@ public class TetheringManager {
 
         /** String of TetheringRequest detail. */
         public String toString() {
-            return "TetheringRequest [ type= " + mRequestParcel.tetheringType
-                    + ", localIPv4Address= " + mRequestParcel.localIPv4Address
-                    + ", staticClientAddress= " + mRequestParcel.staticClientAddress
-                    + ", exemptFromEntitlementCheck= " + mRequestParcel.exemptFromEntitlementCheck
-                    + ", showProvisioningUi= " + mRequestParcel.showProvisioningUi
-                    + ", softApConfig= " + mRequestParcel.softApConfig
-                    + ", uid= " + mRequestParcel.uid
-                    + ", packageName= " + mRequestParcel.packageName
-                    + " ]";
+            StringJoiner sj = new StringJoiner(", ", "TetheringRequest[ ", " ]");
+            sj.add(typeToString(mRequestParcel.tetheringType));
+            if (mRequestParcel.localIPv4Address != null) {
+                sj.add("localIpv4Address=" + mRequestParcel.localIPv4Address);
+            }
+            if (mRequestParcel.staticClientAddress != null) {
+                sj.add("staticClientAddress=" + mRequestParcel.staticClientAddress);
+            }
+            if (mRequestParcel.exemptFromEntitlementCheck) {
+                sj.add("exemptFromEntitlementCheck");
+            }
+            if (mRequestParcel.showProvisioningUi) {
+                sj.add("showProvisioningUi");
+            }
+            sj.add(connectivityScopeToString(mRequestParcel.connectivityScope));
+            if (mRequestParcel.softApConfig != null) {
+                sj.add("softApConfig=" + mRequestParcel.softApConfig);
+            }
+            if (mRequestParcel.uid != Process.INVALID_UID) {
+                sj.add("uid=" + mRequestParcel.uid);
+            }
+            if (mRequestParcel.packageName != null) {
+                sj.add("packageName=" + mRequestParcel.packageName);
+            }
+            return sj.toString();
         }
 
         @Override

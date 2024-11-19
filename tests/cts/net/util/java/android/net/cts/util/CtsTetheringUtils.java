@@ -46,6 +46,7 @@ import android.net.TetheringManager;
 import android.net.TetheringManager.TetheringEventCallback;
 import android.net.TetheringManager.TetheringInterfaceRegexps;
 import android.net.TetheringManager.TetheringRequest;
+import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiClient;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.SoftApCallback;
@@ -491,13 +492,29 @@ public final class CtsTetheringUtils {
         }
     }
 
+    /**
+     * Starts Wi-Fi tethering.
+     */
     public TetheringInterface startWifiTethering(final TestTetheringEventCallback callback)
+            throws InterruptedException {
+        return startWifiTethering(callback, null);
+    }
+
+    /**
+     * Starts Wi-Fi tethering with the specified SoftApConfiguration.
+     */
+    public TetheringInterface startWifiTethering(final TestTetheringEventCallback callback,
+            final SoftApConfiguration softApConfiguration)
             throws InterruptedException {
         final List<String> wifiRegexs = getWifiTetherableInterfaceRegexps(callback);
 
         final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
-        final TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI)
-                .setShouldShowEntitlementUi(false).build();
+        TetheringRequest.Builder builder = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setShouldShowEntitlementUi(false);
+        if (softApConfiguration != null) {
+            builder.setSoftApConfiguration(softApConfiguration);
+        }
+        final TetheringRequest request = builder.build();
 
         return runAsShell(TETHER_PRIVILEGED, () -> {
             mTm.startTethering(request, c -> c.run() /* executor */, startTetheringCallback);
