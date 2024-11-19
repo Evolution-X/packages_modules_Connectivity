@@ -88,14 +88,8 @@ android_test {
     ],
     test_suites: [
         "cts",
-        "mts-dnsresolver",
-        "mts-networking",
         "mts-tethering",
-        "mts-wifi",
-        "mcts-dnsresolver",
-        "mcts-networking",
         "mcts-tethering",
-        "mcts-wifi",
         "general-tests",
     ],
 }
