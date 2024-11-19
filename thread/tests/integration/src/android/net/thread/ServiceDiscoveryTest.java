@@ -50,6 +50,8 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.net.module.util.HexDump;
+
 import com.google.common.truth.Correspondence;
 
 import org.junit.After;
@@ -64,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
@@ -439,6 +442,25 @@ public class ServiceDiscoveryTest {
         assertThat(resolvedService.getAttributes())
                 .comparingValuesUsing(BYTE_ARRAY_EQUALITY)
                 .containsExactly("key1", bytes(0x01, 0x02), "key2", bytes(3));
+    }
+
+    @Test
+    // TODO: move this case out to BorderRoutingTest when the service discovery utilities
+    // are decoupled from this test.
+    public void trelFeatureFlagEnabled_trelServicePublished() throws Exception {
+        NsdServiceInfo discoveredService = discoverService(mNsdManager, "_trel._udp");
+        assertThat(discoveredService).isNotNull();
+        // Resolve service with the current TREL port, otherwise it may return stale service from
+        // a previous infra link setup.
+        NsdServiceInfo trelService =
+                resolveServiceUntil(
+                        mNsdManager, discoveredService, s -> s.getPort() == mOtCtl.getTrelPort());
+
+        Map<String, byte[]> txtMap = trelService.getAttributes();
+        assertThat(HexDump.toHexString(txtMap.get("xa")).toLowerCase(Locale.ROOT))
+                .isEqualTo(mOtCtl.getExtendedAddr().toLowerCase(Locale.ROOT));
+        assertThat(HexDump.toHexString(txtMap.get("xp")).toLowerCase(Locale.ROOT))
+                .isEqualTo(mOtCtl.getExtendedPanId().toLowerCase(Locale.ROOT));
     }
 
     private void registerService(NsdServiceInfo serviceInfo, RegistrationListener listener)
