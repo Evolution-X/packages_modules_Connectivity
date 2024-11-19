@@ -18,6 +18,7 @@ package android.nearby.cts;
 
 import static android.Manifest.permission.BLUETOOTH_PRIVILEGED;
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
 import static android.nearby.PresenceCredential.IDENTITY_TYPE_PRIVATE;
 import static android.nearby.ScanCallback.ERROR_UNSUPPORTED;
@@ -121,7 +122,7 @@ public class NearbyManagerTest {
     @Before
     public void setUp() {
         mUiAutomation.adoptShellPermissionIdentity(READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG,
-                BLUETOOTH_PRIVILEGED);
+                WRITE_ALLOWLISTED_DEVICE_CONFIG, BLUETOOTH_PRIVILEGED);
         String nameSpace = SdkLevel.isAtLeastU() ? DeviceConfig.NAMESPACE_NEARBY
                 : DeviceConfig.NAMESPACE_TETHERING;
         DeviceConfig.setProperty(nameSpace,

@@ -18,6 +18,7 @@ package com.android.testutils
 
 import android.Manifest.permission.READ_DEVICE_CONFIG
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
+import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.provider.DeviceConfig
 import android.util.Log
 import com.android.modules.utils.build.SdkLevel
@@ -87,7 +88,7 @@ class DeviceConfigRule @JvmOverloads constructor(
                     }
                     throw e
                 } cleanupStep {
-                    runAsShell(WRITE_DEVICE_CONFIG) {
+                    runAsShell(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG) {
                         originalConfig.forEach { (key, value) ->
                             Log.i(TAG, "Resetting config \"${key.second}\" to \"$value\"")
                             DeviceConfig.setProperty(
@@ -116,7 +117,8 @@ class DeviceConfigRule @JvmOverloads constructor(
      */
     fun setConfig(namespace: String, key: String, value: String?): String? {
         Log.i(TAG, "Setting config \"$key\" to \"$value\"")
-        val readWritePermissions = arrayOf(READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG)
+        val readWritePermissions =
+            arrayOf(READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG)
 
         val keyPair = Pair(namespace, key)
         val existingValue = runAsShell(*readWritePermissions) {

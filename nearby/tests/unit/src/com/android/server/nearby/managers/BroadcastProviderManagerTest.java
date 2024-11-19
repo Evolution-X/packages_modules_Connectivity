@@ -18,6 +18,7 @@ package com.android.server.nearby.managers;
 
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_ENABLE_PRESENCE_BROADCAST_LEGACY;
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_SUPPORT_TEST_APP;
@@ -88,7 +89,8 @@ public class BroadcastProviderManagerTest {
     @Before
     public void setUp() {
         when(mBroadcastListener.asBinder()).thenReturn(mBinder);
-        mUiAutomation.adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG, READ_DEVICE_CONFIG);
+        mUiAutomation.adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG, READ_DEVICE_CONFIG);
         DeviceConfig.setProperty(
                 NAMESPACE, NEARBY_ENABLE_PRESENCE_BROADCAST_LEGACY, "true", false);
         DeviceConfig.setProperty(
