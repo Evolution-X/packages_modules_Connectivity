@@ -62,8 +62,6 @@ cc_test {
         "cts",
         "general-tests",
         "mts-dnsresolver",
-        "mts-networking",
         "mcts-dnsresolver",
-        "mcts-networking",
     ],
 }
