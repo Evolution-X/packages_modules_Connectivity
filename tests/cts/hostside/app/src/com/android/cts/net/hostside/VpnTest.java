@@ -20,6 +20,7 @@ import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
 import static android.Manifest.permission.NETWORK_SETTINGS;
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 import static android.content.Context.RECEIVER_EXPORTED;
 import static android.content.pm.PackageManager.FEATURE_TELEPHONY;
 import static android.content.pm.PackageManager.FEATURE_WIFI;
@@ -1209,7 +1210,7 @@ public class VpnTest {
                     AUTOMATIC_ON_OFF_KEEPALIVE_VERSION,
                     AUTOMATIC_ON_OFF_KEEPALIVE_ENABLED, false /* makeDefault */);
             return mode;
-        }, READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG);
+        }, READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG);
 
         final IpSecManager ipSec = mTargetContext.getSystemService(IpSecManager.class);
         SocketKeepalive kp = null;
@@ -1249,7 +1250,7 @@ public class VpnTest {
                                 AUTOMATIC_ON_OFF_KEEPALIVE_VERSION,
                                 origMode, false);
                 mCM.setTestLowTcpPollingTimerForKeepalive(0);
-            }, WRITE_DEVICE_CONFIG, NETWORK_SETTINGS);
+            }, WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG, NETWORK_SETTINGS);
         }
     }
 

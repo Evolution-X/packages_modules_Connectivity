@@ -18,6 +18,7 @@ package com.android.server.nearby;
 
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_ENABLE_PRESENCE_BROADCAST_LEGACY;
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_MAINLINE_NANO_APP_MIN_VERSION;
@@ -42,7 +43,8 @@ public final class NearbyConfigurationTest {
     @Before
     public void setUp() {
         InstrumentationRegistry.getInstrumentation().getUiAutomation()
-                .adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG, READ_DEVICE_CONFIG);
+                .adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                        READ_DEVICE_CONFIG);
     }
 
     @Test

@@ -19,6 +19,7 @@ package com.android.server.nearby;
 import static android.Manifest.permission.BLUETOOTH_PRIVILEGED;
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_SUPPORT_TEST_APP;
 
@@ -71,7 +72,8 @@ public final class NearbyServiceTest {
         when(mScanListener.asBinder()).thenReturn(mIBinder);
 
         mUiAutomation.adoptShellPermissionIdentity(
-                READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG, BLUETOOTH_PRIVILEGED);
+                READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                BLUETOOTH_PRIVILEGED);
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
         mService = new NearbyService(mContext);
         mScanRequest = createScanRequest();
