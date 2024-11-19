@@ -42,6 +42,8 @@
             android:debuggable="true">
         <service android:name=".RemoteSocketFactoryService"
              android:exported="true"/>
+        <service android:name=".TetheringHelperService"
+             android:exported="true"/>
     </application>
 
     <!--

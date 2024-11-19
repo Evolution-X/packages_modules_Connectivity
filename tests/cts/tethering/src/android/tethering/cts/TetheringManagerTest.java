@@ -22,6 +22,8 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_DUN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
+import static android.net.TetheringManager.CONNECTIVITY_SCOPE_GLOBAL;
+import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
 import static android.net.TetheringManager.TETHERING_BLUETOOTH;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringManager.TETHERING_NCM;
@@ -244,9 +246,16 @@ public class TetheringManagerTest {
         assertNull(tr.getClientStaticIpv4Address());
         assertFalse(tr.isExemptFromEntitlementCheck());
         assertTrue(tr.getShouldShowEntitlementUi());
+        assertEquals(CONNECTIVITY_SCOPE_GLOBAL, tr.getConnectivityScope());
         assertEquals(softApConfiguration, tr.getSoftApConfiguration());
         assertEquals(INVALID_UID, tr.getUid());
         assertNull(tr.getPackageName());
+        assertEquals(tr.toString(), "TetheringRequest[ "
+                + "TETHERING_WIFI, "
+                + "showProvisioningUi, "
+                + "CONNECTIVITY_SCOPE_GLOBAL, "
+                + "softApConfig=" + softApConfiguration.toString()
+                + " ]");
 
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
@@ -254,6 +263,7 @@ public class TetheringManagerTest {
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false)
+                .setConnectivityScope(CONNECTIVITY_SCOPE_LOCAL)
                 .build();
         int uid = 1000;
         String packageName = "package";
@@ -265,13 +275,26 @@ public class TetheringManagerTest {
         assertEquals(TETHERING_USB, tr2.getTetheringType());
         assertTrue(tr2.isExemptFromEntitlementCheck());
         assertFalse(tr2.getShouldShowEntitlementUi());
+        assertEquals(CONNECTIVITY_SCOPE_LOCAL, tr2.getConnectivityScope());
+        assertNull(tr2.getSoftApConfiguration());
         assertEquals(uid, tr2.getUid());
         assertEquals(packageName, tr2.getPackageName());
+        assertEquals(tr2.toString(), "TetheringRequest[ "
+                + "TETHERING_USB, "
+                + "localIpv4Address=" + localAddr + ", "
+                + "staticClientAddress=" + clientAddr + ", "
+                + "exemptFromEntitlementCheck, "
+                + "CONNECTIVITY_SCOPE_LOCAL, "
+                + "uid=1000, "
+                + "packageName=package"
+                + " ]");
 
         final TetheringRequest tr3 = new TetheringRequest.Builder(TETHERING_USB)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
-                .setShouldShowEntitlementUi(false).build();
+                .setShouldShowEntitlementUi(false)
+                .setConnectivityScope(CONNECTIVITY_SCOPE_LOCAL)
+                .build();
         tr3.setUid(uid);
         tr3.setPackageName(packageName);
         assertEquals(tr2, tr3);
@@ -340,10 +363,14 @@ public class TetheringManagerTest {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
             tetherEventCallback.expectNoTetheringActive();
 
+            SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes("This is an SSID!"
+                            .getBytes(StandardCharsets.UTF_8))).build();
             final TetheringInterface tetheredIface =
-                    mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
+                    mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
 
             assertNotNull(tetheredIface);
+            assertEquals(softApConfig, tetheredIface.getSoftApConfiguration());
             final String wifiTetheringIface = tetheredIface.getInterface();
 
             mCtsTetheringUtils.stopWifiTethering(tetherEventCallback);

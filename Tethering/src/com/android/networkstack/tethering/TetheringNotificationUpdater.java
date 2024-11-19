@@ -85,7 +85,6 @@ public class TetheringNotificationUpdater {
     static final int ROAMING_NOTIFICATION_ID = 1003;
     @VisibleForTesting
     static final int NO_ICON_ID = 0;
-    @VisibleForTesting
     static final int DOWNSTREAM_NONE = 0;
     // Refer to TelephonyManager#getSimCarrierId for more details about carrier id.
     @VisibleForTesting
