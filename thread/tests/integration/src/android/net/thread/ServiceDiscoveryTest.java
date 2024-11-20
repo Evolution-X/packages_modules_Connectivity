@@ -30,6 +30,8 @@ import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -50,6 +52,7 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.HexDump;
 
 import com.google.common.truth.Correspondence;
@@ -445,9 +448,13 @@ public class ServiceDiscoveryTest {
     }
 
     @Test
-    // TODO: move this case out to BorderRoutingTest when the service discovery utilities
+    // TODO: move this case out of ServiceDiscoveryTest when the service discovery utilities
     // are decoupled from this test.
     public void trelFeatureFlagEnabled_trelServicePublished() throws Exception {
+        assumeTrue(
+                DeviceConfigUtils.getDeviceConfigPropertyBoolean(
+                        "thread_network", "TrelFeature__enabled", false));
+
         NsdServiceInfo discoveredService = discoverService(mNsdManager, "_trel._udp");
         assertThat(discoveredService).isNotNull();
         // Resolve service with the current TREL port, otherwise it may return stale service from
@@ -461,6 +468,17 @@ public class ServiceDiscoveryTest {
                 .isEqualTo(mOtCtl.getExtendedAddr().toLowerCase(Locale.ROOT));
         assertThat(HexDump.toHexString(txtMap.get("xp")).toLowerCase(Locale.ROOT))
                 .isEqualTo(mOtCtl.getExtendedPanId().toLowerCase(Locale.ROOT));
+    }
+
+    @Test
+    // TODO: move this case out of ServiceDiscoveryTest when the service discovery utilities
+    // are decoupled from this test.
+    public void trelFeatureFlagDisabled_trelServiceNotPublished() throws Exception {
+        assumeFalse(
+                DeviceConfigUtils.getDeviceConfigPropertyBoolean(
+                        "thread_network", "TrelFeature__enabled", false));
+
+        assertThrows(TimeoutException.class, () -> discoverService(mNsdManager, "_trel._udp"));
     }
 
     private void registerService(NsdServiceInfo serviceInfo, RegistrationListener listener)
