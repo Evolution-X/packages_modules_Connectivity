@@ -63,6 +63,10 @@
 #define BPF_LOAD_SKB_PROTOCOL \
 	BPF_STMT(BPF_LD | BPF_H | BPF_ABS, (__u32)SKF_AD_OFF + SKF_AD_PROTOCOL)
 
+// loads skb->pkt_type (0..7: see uapi/linux/if_packet.h PACKET_* constants)
+#define BPF_LOAD_SKB_PKTTYPE \
+	BPF_STMT(BPF_LD | BPF_B | BPF_ABS, (__u32)SKF_AD_OFF + SKF_AD_PKTTYPE)
+
 // 8-bit load relative to start of link layer (mac/ethernet) header.
 #define BPF_LOAD_MAC_RELATIVE_U8(ofs) \
 	BPF_STMT(BPF_LD | BPF_B | BPF_ABS, (__u32)SKF_LL_OFF + (ofs))
