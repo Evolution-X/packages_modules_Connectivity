@@ -17,6 +17,7 @@
 package android.net.cts
 
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
+import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.provider.DeviceConfig
 import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
 import com.android.net.module.util.NetworkStackConstants
@@ -33,7 +34,7 @@ internal object NetworkValidationTestUtil {
      * Clear the test network validation URLs.
      */
     @JvmStatic fun clearValidationTestUrlsDeviceConfig() {
-        runAsShell(WRITE_DEVICE_CONFIG) {
+        runAsShell(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG) {
             DeviceConfig.setProperty(NAMESPACE_CONNECTIVITY,
                     NetworkStackConstants.TEST_CAPTIVE_PORTAL_HTTPS_URL, null, false)
             DeviceConfig.setProperty(NAMESPACE_CONNECTIVITY,

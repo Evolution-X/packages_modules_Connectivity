@@ -18,6 +18,7 @@ package com.android.server.nearby.provider;
 
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 
 import static com.android.server.nearby.NearbyConfiguration.NEARBY_MAINLINE_NANO_APP_MIN_VERSION;
 import static com.android.server.nearby.provider.ChreCommunication.INVALID_NANO_APP_VERSION;
@@ -76,7 +77,8 @@ public class ChreCommunicationTest {
     @Before
     public void setUp() {
         InstrumentationRegistry.getInstrumentation().getUiAutomation()
-                .adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG, READ_DEVICE_CONFIG);
+                .adoptShellPermissionIdentity(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                        READ_DEVICE_CONFIG);
         DeviceConfig.setProperty(
                 NAMESPACE, NEARBY_MAINLINE_NANO_APP_MIN_VERSION, "1", false);
 

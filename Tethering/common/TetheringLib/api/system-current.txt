@@ -21,8 +21,10 @@ package android.net {
 
   public final class TetheringInterface implements android.os.Parcelable {
     ctor public TetheringInterface(int, @NonNull String);
+    ctor @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") public TetheringInterface(int, @NonNull String, @Nullable android.net.wifi.SoftApConfiguration);
     method public int describeContents();
     method @NonNull public String getInterface();
+    method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") @Nullable @RequiresPermission(value=android.Manifest.permission.NETWORK_SETTINGS, conditional=true) public android.net.wifi.SoftApConfiguration getSoftApConfiguration();
     method public int getType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.TetheringInterface> CREATOR;
