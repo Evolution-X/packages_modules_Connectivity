@@ -156,6 +156,8 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermissionOr;
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
+import static com.android.server.NetIdManager.MAX_NET_ID;
+import static com.android.server.NetIdManager.MIN_NET_ID;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
 import static com.android.server.connectivity.ConnectivityFlags.CLOSE_QUIC_CONNECTION;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
@@ -375,6 +377,7 @@ import com.android.server.connectivity.DnsManager;
 import com.android.server.connectivity.DnsManager.PrivateDnsValidationUpdate;
 import com.android.server.connectivity.DscpPolicyTracker;
 import com.android.server.connectivity.FullScore;
+import com.android.server.connectivity.IntegerRangeUtils;
 import com.android.server.connectivity.InterfaceTracker;
 import com.android.server.connectivity.InvalidTagException;
 import com.android.server.connectivity.KeepaliveResourceUtil;
@@ -1839,6 +1842,21 @@ public class ConnectivityService extends IConnectivityManager.Stub
         public void destroyLiveTcpSocketsByOwnerUids(final Set<Integer> ownerUids)
                 throws SocketException, InterruptedIOException, ErrnoException {
             InetDiagMessage.destroyLiveTcpSocketsByOwnerUids(ownerUids);
+        }
+
+        /**
+         * Destroy live tcp sockets for IP addresses with conditions.
+         *
+         * @param address a local address to destroy sockets
+         * @param netIdRange range of net IDs to destroy sockets
+         * @param uidRanges ranges of UIDs to destroy sockets
+         */
+        public void destroyLiveTcpSocketsByLocalAddress(
+                @NonNull InetAddress address,
+                @Nullable Set<Range<Integer>> netIdRange,
+                @Nullable Set<Range<Integer>> uidRanges)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsByLocalAddress(address, netIdRange, uidRanges);
         }
 
         /**
@@ -5763,7 +5781,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // for an unnecessarily long time.
             destroyNativeNetwork(nai);
         }
-        updateIpAddressesForNetwork(nai, nai.linkProperties, null);
         if (!nai.isCreated() && !mDeps.isAtLeastT()) {
             // Backwards compatibility: send onNetworkDestroyed even if network was never created.
             // This can never run if the code above runs because shouldDestroyNativeNetwork is
@@ -5874,6 +5891,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         } catch (RemoteException | ServiceSpecificException e) {
             loge("Exception destroying network(networkDestroy): " + e);
         }
+        updateIpAddressesAndDestroySockets(nai, nai.linkProperties, null);
         try {
             mDnsResolver.destroyNetworkCache(nai.network.getNetId());
         } catch (RemoteException | ServiceSpecificException e) {
@@ -9882,14 +9900,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
             networkAgent.networkMonitor().notifyLinkPropertiesChanged(
                     new LinkProperties(newLp, true /* parcelSensitiveFields */));
-            updateIpAddressesForNetwork(networkAgent, oldLp, newLp);
+            updateIpAddressesAndDestroySockets(networkAgent, oldLp, newLp);
             notifyNetworkCallbacks(networkAgent, CALLBACK_IP_CHANGED);
         }
 
         mKeepaliveTracker.handleCheckKeepalivesStillValid(networkAgent);
     }
 
-    private void updateIpAddressesForNetwork(
+    private void updateIpAddressesAndDestroySockets(
             NetworkAgentInfo nai, LinkProperties oldLp, LinkProperties newLp) {
         ensureRunningOnConnectivityServiceThread();
         if (mIpToNetworksMap == null) {
@@ -9914,7 +9932,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         if (!result.removed.isEmpty()) {
             for (LinkAddress la : result.removed) {
+                if (la.getAddress() instanceof Inet6Address
+                        && la.getAddress().isLinkLocalAddress()) {
+                    continue;
+                }
                 final Set<NetworkAgentInfo> networks = mIpToNetworksMap.get(la.getAddress());
+                destroySocketsForRemovedAddress(la.getAddress(), nai, networks);
                 if (networks != null) {
                     networks.remove(nai);
                     if (networks.isEmpty()) {
@@ -9922,6 +9945,56 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     }
                 }
             }
+        }
+    }
+
+    private void destroySocketsForRemovedAddress(
+            InetAddress address,
+            @NonNull NetworkAgentInfo targetNai,
+            @NonNull Set<NetworkAgentInfo> networks) {
+        // Logic to destroy sockets(MIN_NET_ID ~ MAX_NET_ID) on networks managed by this service
+        // when IP addresses are removed. Sockets(0 ~ MIN_NET_ID - 1) are for OEM network or legacy
+        // local network. Those are not tracked by this service, thus will be destroyed at the
+        // RTM_DELADDR event handling.
+        final Set<Range<Integer>> netIdRangeSet;
+        final Set<Range<Integer>> uidRangeSet;
+        if (networks.size() == 1) {
+            // Removed IP address was in single network.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = null;
+        } else if (CollectionUtils.all(networks, nai -> !nai.isVPN())) {
+            // If all networks are not VPNs, other networks with the same IP address can be exempted
+            // from this socket destruction. Since there may be remaining socket's which has Fwmark
+            // matched to previously disconnected VPN's netId, It's intended destroying sockets not
+            // matched to exempt networks rather than sockets matched to the target network.
+            final List<Integer> exemptNetIds = new ArrayList<>();
+            for (NetworkAgentInfo nai : networks) {
+                if (nai.network.netId != targetNai.network.netId) {
+                    exemptNetIds.add(nai.network.netId);
+                }
+            }
+            netIdRangeSet = IntegerRangeUtils.rangeWithoutValues(
+                    Range.create(MIN_NET_ID, MAX_NET_ID), exemptNetIds);
+            uidRangeSet = null;
+        } else if (CollectionUtils.all(networks, NetworkAgentInfo::isVPN)) {
+            // Since the UID ranges of VPN networks cannot overlap with each other, if all networks
+            // with the corresponding address were VPNs, sockets included in the UID range of the
+            // target network are selectively removed.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = targetNai.networkCapabilities.getUids();
+        } else {
+            // If there is at least one VPN network among multiple networks with the same address,
+            // there may be sockets with Fwmark value which does not match the netId (e.g. Socket
+            // connections on non-bypassable VPN or socket connections fallen out of split tunnel
+            // for the bypassable VPN), and it is currently too complicated to distinguish them.
+            // Thus sockets in whole netId range will be destroyed based on local IP address.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = null;
+        }
+        try {
+            mDeps.destroyLiveTcpSocketsByLocalAddress(address, netIdRangeSet, uidRangeSet);
+        } catch (Exception e) {
+            loge("Exception destroy TCP sockets on local address: ", e);
         }
     }
 

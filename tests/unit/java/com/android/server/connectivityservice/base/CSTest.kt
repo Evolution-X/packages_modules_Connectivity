@@ -61,6 +61,7 @@ import android.permission.PermissionManager.PermissionResult
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.testing.TestableContext
+import android.util.Range
 import android.util.SparseArray
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.internal.app.IBatteryStats
@@ -84,6 +85,7 @@ import com.android.server.connectivity.QuicConnectionCloser
 import com.android.server.connectivity.SatelliteAccessController
 import com.android.testutils.visibleOnHandlerThread
 import com.android.testutils.waitForIdle
+import java.net.InetAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -287,8 +289,14 @@ open class CSTest {
     }
 
     // Class to be mocked and used to verify destroy sockets methods call
+    // TODO: Move to use TestableCallback-style object with a TrackRecord inside to check.
     open inner class DestroySocketsWrapper {
         open fun destroyLiveTcpSocketsByOwnerUids(ownerUids: Set<Int>) {}
+        open fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            netIdRange: Set<Range<Int>>?,
+            uidRanges: Set<Range<Int>>?
+        ) {}
     }
 
     inner class CSDeps : ConnectivityService.Dependencies() {
@@ -429,6 +437,20 @@ open class CSTest {
         ): QuicConnectionCloser = quicConnectionCloser
 
         override fun flagConnectivityServiceDestroySocket() = true
+
+        override fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            netIdRange: Set<Range<Int>>?,
+            uidRanges: Set<Range<Int>>?
+        ) {
+            // Call mocked destroyLiveTcpSocketsByLocalAddress so that test can verify this method
+            // call
+            destroySocketsWrapper.destroyLiveTcpSocketsByLocalAddress(
+                address,
+                netIdRange,
+                uidRanges
+            )
+        }
     }
 
     inner class PermDeps : PermissionMonitor.Dependencies() {
