@@ -188,8 +188,9 @@ public final class EntitlementManagerTest {
             if (intent != null) {
                 assertUiTetherProvisioningIntent(type, config, receiver, intent);
                 uiProvisionCount++;
+                // If the intent is null, the result is sent by the underlying method.
+                receiver.send(fakeEntitlementResult, null);
             }
-            receiver.send(fakeEntitlementResult, null);
             return intent;
         }
 
@@ -644,6 +645,15 @@ public final class EntitlementManagerTest {
         mEnMgr.startProvisioningIfNeeded(TETHERING_USB, true);
         mLooper.dispatchAll();
         assertEquals(expectedUiProvisionCount, mDeps.uiProvisionCount);
+        if (expectedUiProvisionCount == 0) { // Failed to launch entitlement UI.
+            assertLatestEntitlementResult(TETHERING_USB, TETHER_ERROR_PROVISIONING_FAILED, false);
+            verify(mTetherProvisioningFailedListener).onTetherProvisioningFailed(TETHERING_USB,
+                    FAILED_TETHERING_REASON);
+        } else {
+            assertLatestEntitlementResult(TETHERING_USB, TETHER_ERROR_NO_ERROR, false);
+            verify(mTetherProvisioningFailedListener, never()).onTetherProvisioningFailed(anyInt(),
+                    anyString());
+        }
     }
 
     @Test
