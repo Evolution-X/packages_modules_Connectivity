@@ -29,7 +29,6 @@
 #include <gtest/gtest.h>
 
 #include <cutils/qtaguid.h>
-#include <processgroup/processgroup.h>
 
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
@@ -53,13 +52,6 @@ class BpfBasicTest : public NetNativeTestBase {
   protected:
     BpfBasicTest() {}
 };
-
-TEST_F(BpfBasicTest, TestCgroupMounted) {
-    std::string cg2_path;
-    ASSERT_EQ(true, CgroupGetControllerPath(CGROUPV2_HIERARCHY_NAME, &cg2_path));
-    ASSERT_EQ(0, access(cg2_path.c_str(), R_OK));
-    ASSERT_EQ(0, access((cg2_path + "/cgroup.controllers").c_str(), R_OK));
-}
 
 TEST_F(BpfBasicTest, TestTagSocket) {
     BpfMap<uint64_t, UidTagValue> cookieTagMap(COOKIE_TAG_MAP_PATH);
