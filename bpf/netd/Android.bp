@@ -82,7 +82,6 @@ cc_test {
         "libcutils",
         "liblog",
         "libnetdutils",
-        "libprocessgroup",
     ],
     compile_multilib: "both",
     multilib: {
