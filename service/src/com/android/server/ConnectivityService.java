@@ -1903,6 +1903,18 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
 
         /**
+         * Call {@link InetDiagMessage#destroyLiveTcpSocketsLackingPermission(int, int)}
+         *
+         * @param netId network ID
+         * @param permission network permission
+         */
+        public void destroyLiveTcpSocketsLackingPermission(
+                int netId, int permission)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsLackingPermission(netId, permission);
+        }
+
+        /**
          * Schedule the evaluation timeout.
          *
          * When a network connects, it's "not evaluated" yet. Detection events cause the network
@@ -5820,8 +5832,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         // Delayed teardown.
         if (nai.isCreated() && !nai.isDestroyed()) {
+            destroyLiveTcpSocketsLackingPermission(
+                    nai, getNetworkPermission(nai.networkCapabilities), INetd.PERMISSION_SYSTEM);
             try {
                 mNetd.networkSetPermissionForNetwork(nai.network.netId, INetd.PERMISSION_SYSTEM);
+                // Call again in case sockets were opened after the first time : see
+                // updateNetworkPermissions
+                destroyLiveTcpSocketsLackingPermission(nai,
+                        getNetworkPermission(nai.networkCapabilities), INetd.PERMISSION_SYSTEM);
             } catch (RemoteException e) {
                 Log.d(TAG, "Error marking network restricted during teardown: ", e);
             }
@@ -10615,8 +10633,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
         final int oldPermission = getNetworkPermission(nai.networkCapabilities);
         final int newPermission = getNetworkPermission(newNc);
         if (oldPermission != newPermission && nai.isCreated() && !nai.isVPN()) {
+            destroyLiveTcpSocketsLackingPermission(nai, oldPermission, newPermission);
             try {
                 mNetd.networkSetPermissionForNetwork(nai.network.getNetId(), newPermission);
+                // Destroy sockets again in case any were opened after
+                // destroySocketsLackingPermission is called above and before the permissions is
+                // changed. These sockets won't be able to send any RST packets because they are now
+                // no longer routed, but at least the apps will get errors.
+                destroyLiveTcpSocketsLackingPermission(nai, oldPermission, newPermission);
             } catch (RemoteException | ServiceSpecificException e) {
                 loge("Exception in networkSetPermissionForNetwork: " + e);
             }
@@ -15567,6 +15591,32 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 loge("Exception destroy TCP sockets on local address: ", e);
             }
         }
+    }
 
+    private void destroyLiveTcpSocketsLackingPermission(
+            NetworkAgentInfo nai, int oldPermission, int newPermission) {
+        if (!mDeps.flagConnectivityServiceDestroySocket()) {
+            return;
+        }
+        // Virtual network doesn't have permission set.
+        if (!isPermissionMoreRestrictive(oldPermission, newPermission) || nai.isVPN()) {
+            return;
+        }
+        try {
+            mDeps.destroyLiveTcpSocketsLackingPermission(
+                    nai.network.netId, newPermission);
+        } catch (SocketException | InterruptedIOException | ErrnoException e) {
+            loge("Exception destroy TCP sockets lacking permission: " + e);
+        }
+    }
+
+    private boolean isPermissionMoreRestrictive(int oldPermission, int newPermission) {
+        return switch (newPermission) {
+            case INetd.PERMISSION_NONE -> false;
+            case INetd.PERMISSION_NETWORK -> oldPermission == INetd.PERMISSION_NONE;
+            case INetd.PERMISSION_SYSTEM -> oldPermission == INetd.PERMISSION_NONE
+                    || oldPermission == INetd.PERMISSION_NETWORK;
+            default -> throw new IllegalArgumentException("Invalid permission");
+        };
     }
 }

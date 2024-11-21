@@ -24,6 +24,7 @@ import android.net.ConnectivityManager.BLOCKED_REASON_NONE
 import android.net.ConnectivityManager.FIREWALL_CHAIN_BACKGROUND
 import android.net.ConnectivityManager.FIREWALL_RULE_ALLOW
 import android.net.ConnectivityManager.FIREWALL_RULE_DENY
+import android.net.INetd
 import android.net.LinkAddress
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
@@ -54,7 +55,9 @@ import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.TestableNetworkAgent.Event.OnNetworkDestroyed
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
 import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import java.net.Inet6Address
 import java.net.InetAddress
 import junit.framework.Assert.assertFalse
@@ -66,6 +69,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.any
 import org.mockito.Mockito.anyInt
+import org.mockito.Mockito.doNothing
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
@@ -512,8 +516,8 @@ class CSDestroySocketTest : CSTest() {
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromSingleNetwork() {
-        val addressV6_1 = InetAddress.getByName("2100::1234")
-        val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
+        val addressV6_1 = InetAddress.getByName("2001:DB8:0100::1111")
+        val addressV6_2 = InetAddress.getByName("2001:DB8:0200::2222")
         // add a test network.
         val (agent1, callback1) = prepareNetworkAgent(
             "wlan2",
@@ -523,7 +527,7 @@ class CSDestroySocketTest : CSTest() {
 
         // IP address changed
         val linkProperties2 = makeLp("wlan2")
-        linkProperties2.addLinkAddress(LinkAddress(addressV6_2, 64))
+        linkProperties2.addLinkAddress(addressV6_2.toLinkAddress())
         agent1.sendLinkProperties(linkProperties2)
         callback1.eventuallyExpect<LinkPropertiesChanged> {
             it.network == agent1.network && !it.lp.addresses.contains(addressV6_1)
@@ -549,10 +553,10 @@ class CSDestroySocketTest : CSTest() {
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromMultipleNonVpnNetworks() {
-        val addressV6_1 = InetAddress.getByName("2100::1234")
-        val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
+        val addressV6_1 = InetAddress.getByName("2001:DB8:0100::1111")
+        val addressV6_2 = InetAddress.getByName("2001:DB8:0200::2222")
         val addressV6LinkLocal = InetAddress.getByName("FE80::1234")
-        val addressV4_1 = InetAddress.getByName("203.0.113.10")
+        val addressV4_1 = InetAddress.getByName("192.0.2.10")
 
         // add 4 test networks(non VPN). 3 have a same IP address, and 1 network has different one.
         val (cellAgent, cellCallback) = prepareNetworkAgent(
@@ -654,11 +658,11 @@ class CSDestroySocketTest : CSTest() {
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromMultipleVpnNetworks() {
-        val addressV6_1 = InetAddress.getByName("2100::1234")
-        val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
-        val addressV6_3 = InetAddress.getByName("2234:0207::1234:4321")
+        val addressV6_1 = InetAddress.getByName("2001:DB8:0100::1111")
+        val addressV6_2 = InetAddress.getByName("2001:DB8:0200::2222")
+        val addressV6_3 = InetAddress.getByName("2001:DB8:0333::3333")
         val addressV6LinkLocal = InetAddress.getByName("FE80::1234")
-        val addressV4_1 = InetAddress.getByName("203.0.113.10")
+        val addressV4_1 = InetAddress.getByName("192.0.2.10")
         // add 3 VPN test networks and 1 non-VPN network.
 
         val (vpnAgent1, vpnCallback1) = prepareNetworkAgent(
@@ -705,7 +709,7 @@ class CSDestroySocketTest : CSTest() {
 
         // Change IP addresses network#2
         val linkProperties2 = makeLp("ipsec2")
-        linkProperties2.addLinkAddress(LinkAddress(addressV6_3, 64))
+        linkProperties2.addLinkAddress(addressV6_3.toLinkAddress())
         vpnAgent2.sendLinkProperties(linkProperties2)
         vpnCallback2.eventuallyExpect<LinkPropertiesChanged> { it.network == vpnAgent2.network &&
                 it.lp.interfaceName == "ipsec2" && it.lp.addresses.contains(addressV6_3)
@@ -808,6 +812,60 @@ class CSDestroySocketTest : CSTest() {
             addressV4,
             setOf(Range.create(0, MIN_NET_ID - 1)),
             null /* uidRanges */
+        )
+    }
+
+    @Test
+    fun testDestroySocketsLackingPermissionForPermissionUpdate() {
+        val inOrder = inOrder(destroySocketsWrapper)
+        val addressV6_1 = InetAddress.getByName("2001:DB8:0100::1111")
+        val addressV4_1 = InetAddress.getByName("192.0.2.10")
+
+        doNothing().`when`(netd).networkSetPermissionForNetwork(anyInt(), anyInt())
+
+        val ncRestricted =
+            cellNc().removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+        val ncNotRestricted =
+            cellNc().addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+
+        val (agent, callback) = prepareNetworkAgent(
+            "rmnet1",
+            arrayListOf(addressV6_1.toLinkAddress(), addressV4_1.toLinkAddress()),
+            ncRestricted
+        )
+
+        agent.sendNetworkCapabilities(ncNotRestricted)
+        callback.eventuallyExpect<CapabilitiesChanged> {
+            it.network == agent.network &&
+                    it.caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+        }
+        inOrder.verify(destroySocketsWrapper, never())
+            .destroyLiveTcpSocketsLackingPermission(anyInt(), anyInt())
+        agent.sendNetworkCapabilities(ncRestricted)
+        callback.eventuallyExpect<Lost>()
+        inOrder.verify(destroySocketsWrapper, times(2))
+            .destroyLiveTcpSocketsLackingPermission(
+                agent.network.netId,
+                INetd.PERMISSION_SYSTEM
+            )
+    }
+
+    @Test
+    fun testDestroySocketsLackingPermissionForDelayedTeardown() {
+        val addressV6_1 = InetAddress.getByName("2001:DB8:0100::1111")
+        doNothing().`when`(netd).networkSetPermissionForNetwork(anyInt(), anyInt())
+        val (agent, callback) = prepareNetworkAgent(
+            "rmnet1",
+            arrayListOf(addressV6_1.toLinkAddress()),
+            makeNc(TRANSPORT_CELLULAR)
+        )
+        agent.sendTeardownDelayMs(1)
+        agent.disconnect()
+        agent.eventuallyExpect<OnNetworkDestroyed>()
+
+        verify(destroySocketsWrapper, times(2)).destroyLiveTcpSocketsLackingPermission(
+            agent.network.netId,
+            INetd.PERMISSION_SYSTEM
         )
     }
 }

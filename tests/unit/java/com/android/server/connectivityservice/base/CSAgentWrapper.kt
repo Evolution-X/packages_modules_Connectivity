@@ -320,6 +320,7 @@ class CSAgentWrapper(
     fun sendLocalNetworkConfig(lnc: LocalNetworkConfig) = agent.sendLocalNetworkConfig(lnc)
     fun sendNetworkCapabilities(nc: NetworkCapabilities) = agent.sendNetworkCapabilities(nc)
     fun sendLinkProperties(lp: LinkProperties) = agent.sendLinkProperties(lp)
+    fun sendTeardownDelayMs(delayMs: Int) = agent.setTeardownDelayMillis(delayMs)
 
     fun connectWithCaptivePortal(redirectUrl: String) {
         setCaptivePortal(redirectUrl)

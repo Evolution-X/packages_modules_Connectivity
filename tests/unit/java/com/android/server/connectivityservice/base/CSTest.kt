@@ -304,6 +304,10 @@ open class CSTest {
             address: InetAddress?,
             interfaceId: Int
         ) {}
+        open fun destroyLiveTcpSocketsLackingPermission(
+            netId: Int,
+            permission: Int
+        ) {}
     }
 
     inner class CSDeps : ConnectivityService.Dependencies() {
@@ -469,6 +473,17 @@ open class CSTest {
                 interfaceId
             )
         }
+
+        override fun destroyLiveTcpSocketsLackingPermission(
+            netId: Int,
+            permission: Int
+        ) {
+            destroySocketsWrapper.destroyLiveTcpSocketsLackingPermission(
+                netId,
+                permission
+            )
+        }
+
         var netlinkMessageUpdate = Consumer<NetlinkMessage> {_ -> }
         override fun makeAddressUpdateMonitor(
             h: Handler,
