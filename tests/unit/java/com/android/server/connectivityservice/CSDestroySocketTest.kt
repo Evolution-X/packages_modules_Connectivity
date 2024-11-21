@@ -43,6 +43,10 @@ import android.net.VpnTransportInfo
 import android.os.Build
 import android.util.Range
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener
+import com.android.net.module.util.netlink.NetlinkConstants
+import com.android.net.module.util.netlink.RtNetlinkAddressMessage
+import com.android.net.module.util.netlink.StructIfaddrMsg
+import com.android.net.module.util.netlink.StructNlMsgHdr
 import com.android.server.NetIdManager.MAX_NET_ID
 import com.android.server.NetIdManager.MIN_NET_ID
 import com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS
@@ -61,9 +65,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.any
+import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
+import org.mockito.Mockito.timeout
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
 private const val TIMESTAMP = 1234L
@@ -505,7 +512,6 @@ class CSDestroySocketTest : CSTest() {
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromSingleNetwork() {
-        val inOrder = inOrder(destroySocketsWrapper)
         val addressV6_1 = InetAddress.getByName("2100::1234")
         val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
         // add a test network.
@@ -523,7 +529,7 @@ class CSDestroySocketTest : CSTest() {
             it.network == agent1.network && !it.lp.addresses.contains(addressV6_1)
         }
         // verify destroy sockets on the removed IP address
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
@@ -533,17 +539,16 @@ class CSDestroySocketTest : CSTest() {
         agent1.disconnect()
         agent1.eventuallyExpect<OnNetworkDestroyed>()
         // verify destroy sockets on the removed IP address
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_2,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
         )
-        inOrder.verifyNoMoreInteractions()
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(any(), anyInt())
     }
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromMultipleNonVpnNetworks() {
-        val inOrder = inOrder(destroySocketsWrapper)
         val addressV6_1 = InetAddress.getByName("2100::1234")
         val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
         val addressV6LinkLocal = InetAddress.getByName("FE80::1234")
@@ -588,7 +593,7 @@ class CSDestroySocketTest : CSTest() {
         }
 
         // verify destroy sockets on the removed IP address and exempt netId lists.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(
                 Range.create(MIN_NET_ID, wlanAgent.network.netId - 1),
@@ -598,7 +603,7 @@ class CSDestroySocketTest : CSTest() {
             null
         )
         // verify destroy sockets on the removed IP address
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV4_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
@@ -611,7 +616,7 @@ class CSDestroySocketTest : CSTest() {
             it.network == wlanAgent.network && it.lp.interfaceName == "wlan3"
         }
         // verify destroy sockets on the removed IP address and exempt netId lists.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(
                 Range.create(MIN_NET_ID, ethAgent.network.netId - 1),
@@ -620,7 +625,7 @@ class CSDestroySocketTest : CSTest() {
             null
         )
         // verify not to destroy sockets on the link local address at NetworkAgent update.
-        inOrder.verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(
             addressV6LinkLocal,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
@@ -634,21 +639,21 @@ class CSDestroySocketTest : CSTest() {
         ethAgent.eventuallyExpect<OnNetworkDestroyed>()
 
         // verify destroy sockets on the removed IP address
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_2,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
         )
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
         )
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(any(), anyInt())
     }
 
     @Test
     fun testDestroySocketForRemovedIpAddressFromMultipleVpnNetworks() {
-        val inOrder = inOrder(destroySocketsWrapper)
         val addressV6_1 = InetAddress.getByName("2100::1234")
         val addressV6_2 = InetAddress.getByName("2100:0207::4321:1234")
         val addressV6_3 = InetAddress.getByName("2234:0207::1234:4321")
@@ -684,7 +689,7 @@ class CSDestroySocketTest : CSTest() {
             it.network == vpnAgent1.network && it.lp.interfaceName == "ipsec21"
         }
         // verify destroy sockets on the removed IP address(TEST_IPV6_ADDRESS1) and VPN's uid range.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             vpnAgent1.nc.uids
@@ -692,7 +697,7 @@ class CSDestroySocketTest : CSTest() {
         // verify destroy sockets on the removed IP address(TEST_IPV4_ADDRESS1). network#1 and
         // network#4 use TEST_IPV4_ADDRESS1, however network#4 is not VPN network, so we destroy
         // sockets only based on the removed IP address.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV4_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
@@ -706,13 +711,13 @@ class CSDestroySocketTest : CSTest() {
                 it.lp.interfaceName == "ipsec2" && it.lp.addresses.contains(addressV6_3)
         }
         // verify destroy sockets on the removed IP address(TEST_IPV6_ADDRESS1) and VPN's uid range.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             vpnAgent2.nc.uids
         )
         // verify not to destroy sockets on the link local address at NetworkAgent update.
-        inOrder.verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(
             addressV6LinkLocal,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
@@ -726,20 +731,83 @@ class CSDestroySocketTest : CSTest() {
         testAgent.eventuallyExpect<OnNetworkDestroyed>()
 
         // verify destroy sockets on the removed IP address.
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_3,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
         )
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
             addressV6_2,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
         )
-        inOrder.verify(destroySocketsWrapper).destroyLiveTcpSocketsByLocalAddress(
+        verify(destroySocketsWrapper, times(2)).destroyLiveTcpSocketsByLocalAddress(
             addressV4_1,
             setOf(Range.create(MIN_NET_ID, MAX_NET_ID)),
             null
+        )
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByLocalAddress(any(), anyInt())
+    }
+
+    @Test
+    fun testDestroySocketWithNetlinkMessageForLinkLocalAddress() {
+        val addressV6LinkLocal = InetAddress.getByName("FE80::1234")
+        val testInterfaceId = 10
+        val nlMsgLinkLocalAddressRemoved = RtNetlinkAddressMessage(
+            StructNlMsgHdr(
+                30 /* payload length */,
+                NetlinkConstants.RTM_DELADDR,
+                0 /* flages */,
+                0 /* seq */
+            ),
+            StructIfaddrMsg(
+                10 /* family */,
+                64 /* prefix length */,
+                0 /* flags */,
+                0 /* scope */,
+                testInterfaceId /* interfaceId */
+            ),
+            addressV6LinkLocal,
+            null,
+            0 /* flags */
+        )
+        csHandler.post{deps.netlinkMessageUpdate?.accept(nlMsgLinkLocalAddressRemoved)}
+
+        // verify destroy a socket on link local address with corresponding interface ID.
+        verify(destroySocketsWrapper, timeout(100)).destroyLiveTcpSocketsByLocalAddress(
+            addressV6LinkLocal,
+            testInterfaceId
+        )
+    }
+
+    @Test
+    fun testDestroySocketWithNetlinkMessageForOemNetwork() {
+        val addressV4 = InetAddress.getByName("203.0.113.10")
+        val nlMsgAddressRemoved = RtNetlinkAddressMessage(
+            StructNlMsgHdr(
+                30 /* payload length */,
+                NetlinkConstants.RTM_DELADDR,
+                0 /* flags */,
+                0 /* seq */
+            ),
+            StructIfaddrMsg(
+                10 /* family */,
+                64 /* prefix length */,
+                0 /* flags */,
+                0 /* scope */,
+                5 /* interfaceId */
+            ),
+            addressV4,
+            null,
+            0 /* flags */
+        )
+        csHandler.post{deps.netlinkMessageUpdate?.accept(nlMsgAddressRemoved)}
+
+        // verify destroy non platform socket(netId < MIN_NET_ID) with the RTM_DELADDR message
+        verify(destroySocketsWrapper, timeout(100)).destroyLiveTcpSocketsByLocalAddress(
+            addressV4,
+            setOf(Range.create(0, MIN_NET_ID - 1)),
+            null /* uidRanges */
         )
     }
 }

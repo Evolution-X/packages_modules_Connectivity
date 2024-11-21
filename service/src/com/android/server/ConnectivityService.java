@@ -313,6 +313,7 @@ import android.stats.connectivity.RequestType;
 import android.stats.connectivity.ValidatedState;
 import android.sysprop.NetworkProperties;
 import android.system.ErrnoException;
+import android.system.OsConstants;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -358,8 +359,14 @@ import com.android.net.module.util.LocationPermissionChecker;
 import com.android.net.module.util.PerUidCounter;
 import com.android.net.module.util.PermissionUtils;
 import com.android.net.module.util.RoutingCoordinatorService;
+import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.TcUtils;
+import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.InetDiagMessage;
+import com.android.net.module.util.netlink.NetlinkConstants;
+import com.android.net.module.util.netlink.NetlinkMessage;
+import com.android.net.module.util.netlink.RtNetlinkAddressMessage;
+import com.android.net.module.util.netlink.StructIfaddrMsg;
 import com.android.networkstack.apishim.BroadcastOptionsShimImpl;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.common.BroadcastOptionsShim;
@@ -1138,6 +1145,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     // A map from IP address to networks. Only the handler thread is allowed to access this field.
     @Nullable @VisibleForTesting final Map<InetAddress, Set<NetworkAgentInfo>> mIpToNetworksMap;
+    // NetlinkMonitor for ConnectivityService
+    @Nullable private final AddressUpdateMonitor mAddressUpdateMonitor;
 
     /**
      * Implements support for the legacy "one network per network type" model.
@@ -1481,6 +1490,28 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 // TODO: Integrate into signal dump.
                 dumpNormal(fd, pw, args);
             }
+        }
+    }
+
+    /**
+     * Simple NetlinkMonitor. Listen for address changed events from kernel.
+     * All methods except the constructor must be called on the handler thread.
+     */
+    public static class AddressUpdateMonitor extends NetlinkMonitor {
+        private final Consumer<NetlinkMessage> mNetlinkMessageConsumer;
+
+        AddressUpdateMonitor(Handler h, SharedLog log, String tag,
+                Consumer<NetlinkMessage> netlinkMessageConsumer) {
+            super(h, log, tag, OsConstants.NETLINK_ROUTE,
+                    (NetlinkConstants.RTMGRP_IPV4_IFADDR
+                            | NetlinkConstants.RTMGRP_IPV6_IFADDR));
+            mNetlinkMessageConsumer = netlinkMessageConsumer;
+        }
+
+        @Override
+        protected void processNetlinkMessage(
+                @NonNull NetlinkMessage nlMsg, long whenMs) {
+            mNetlinkMessageConsumer.accept(nlMsg);
         }
     }
 
@@ -1860,6 +1891,18 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
 
         /**
+         * Destroy live tcp sockets for IP addresses with conditions.
+         *
+         * @param address a local address to destroy sockets
+         * @param interfaceId interface ID
+         */
+        public void destroyLiveTcpSocketsByLocalAddress(
+                @NonNull InetAddress address, int interfaceId)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsByLocalAddress(address, interfaceId);
+        }
+
+        /**
          * Schedule the evaluation timeout.
          *
          * When a network connects, it's "not evaluated" yet. Detection events cause the network
@@ -1887,6 +1930,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
         /** Whether the flag for connectivity service socket destroy is enabled or not. */
         public boolean flagConnectivityServiceDestroySocket() {
             return Flags.connectivityServiceDestroySocket();
+        }
+
+        /**
+         * Create a AddressUpdateMonitor instance.
+         */
+        public AddressUpdateMonitor makeAddressUpdateMonitor(
+                @NonNull Handler h, @NonNull SharedLog log, @NonNull String tag,
+                @NonNull Consumer<NetlinkMessage> consumer) {
+            return new AddressUpdateMonitor(h, log, tag, consumer);
         }
     }
 
@@ -2024,8 +2076,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         if (mDeps.flagConnectivityServiceDestroySocket()) {
             mIpToNetworksMap = new HashMap<>();
+            mAddressUpdateMonitor = mDeps.makeAddressUpdateMonitor(
+                    mHandler, new SharedLog(20, TAG), TAG,
+                    this::processNetlinkAddressUpdateMessage);
         } else {
             mIpToNetworksMap = null;
+            mAddressUpdateMonitor = null;
         }
         // To ensure uid state is synchronized with Network Policy, register for
         // NetworkPolicyManagerService events must happen prior to NetworkPolicyManagerService
@@ -4231,6 +4287,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
             mBroadcastReceiveHelper.callOnUserAddedForExistingUsers();
             permissionMonitorInitializeDone.open();
         });
+        if (mAddressUpdateMonitor != null) {
+            mHandler.post(() -> mAddressUpdateMonitor.start());
+        }
         mProxyTracker.loadGlobalProxy();
         registerDnsResolverUnsolicitedEventListener();
 
@@ -9993,7 +10052,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         try {
             mDeps.destroyLiveTcpSocketsByLocalAddress(address, netIdRangeSet, uidRangeSet);
-        } catch (Exception e) {
+        } catch (SocketException | InterruptedIOException | ErrnoException e) {
             loge("Exception destroy TCP sockets on local address: ", e);
         }
     }
@@ -15478,4 +15537,36 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mQuicConnectionCloser.unregisterQuicConnectionClosePayload(pfd);
     }
 
+    // Currently this only handles message type RTM_DELADDR to destroy sockets for the deleted
+    // address, we could make this a dispatcher method if we have more use cases in the future.
+    private void processNetlinkAddressUpdateMessage(NetlinkMessage nlMsg) {
+        if (!(nlMsg instanceof RtNetlinkAddressMessage msg)) {
+            return;
+        }
+        if (msg.getHeader().nlmsg_type != NetlinkConstants.RTM_DELADDR) {
+            return;
+        }
+
+        final StructIfaddrMsg ifaddrMsg = msg.getIfaddrHeader();
+        final InetAddress removedAddress = msg.getIpAddress();
+        if (removedAddress instanceof Inet6Address && removedAddress.isLinkLocalAddress()) {
+            try {
+                mDeps.destroyLiveTcpSocketsByLocalAddress(removedAddress, ifaddrMsg.index);
+            } catch (SocketException | InterruptedIOException | ErrnoException e) {
+                loge("Exception destroying TCP sockets on local address with interfaceId: ", e);
+            }
+        } else {
+            // Range of netId for networks that ConnectivityService isn't aware of. OEM & legacy
+            // local networks are included in this scope.
+            try {
+                mDeps.destroyLiveTcpSocketsByLocalAddress(
+                        removedAddress,
+                        Set.of(Range.create(0, MIN_NET_ID - 1)), null /* uidRanges */
+                );
+            } catch (SocketException | InterruptedIOException | ErrnoException e) {
+                loge("Exception destroy TCP sockets on local address: ", e);
+            }
+        }
+
+    }
 }

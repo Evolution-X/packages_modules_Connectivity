@@ -68,6 +68,8 @@ import com.android.internal.app.IBatteryStats
 import com.android.internal.util.test.BroadcastInterceptingContext
 import com.android.modules.utils.build.SdkLevel
 import com.android.net.module.util.ArrayTrackRecord
+import com.android.net.module.util.SharedLog
+import com.android.net.module.util.netlink.NetlinkMessage
 import com.android.networkstack.apishim.common.UnsupportedApiLevelException
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator
@@ -90,6 +92,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.function.BiConsumer
+import java.util.function.Consumer
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.FUNCTION
 import kotlin.test.assertNotNull
@@ -297,6 +300,10 @@ open class CSTest {
             netIdRange: Set<Range<Int>>?,
             uidRanges: Set<Range<Int>>?
         ) {}
+        open fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress?,
+            interfaceId: Int
+        ) {}
     }
 
     inner class CSDeps : ConnectivityService.Dependencies() {
@@ -323,7 +330,6 @@ open class CSTest {
                 listener: BiConsumer<Int, Int>,
                 handler: Handler
         ) = if (SdkLevel.isAtLeastT()) mock<CarrierPrivilegeAuthenticator>() else null
-
         var satelliteNetworkFallbackUidUpdate = BiConsumer<Set<Int>, Set<Int>> {_, _ -> }
         override fun makeSatelliteAccessController(
             context: Context,
@@ -450,6 +456,28 @@ open class CSTest {
                 netIdRange,
                 uidRanges
             )
+        }
+
+        override fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            interfaceId: Int
+        ) {
+            // Call mocked destroyLiveTcpSocketsByLocalAddress so that test can verify this method
+            // call
+            destroySocketsWrapper.destroyLiveTcpSocketsByLocalAddress(
+                address,
+                interfaceId
+            )
+        }
+        var netlinkMessageUpdate = Consumer<NetlinkMessage> {_ -> }
+        override fun makeAddressUpdateMonitor(
+            h: Handler,
+            log: SharedLog,
+            tag: String,
+            consumer: Consumer<NetlinkMessage>
+        ): ConnectivityService.AddressUpdateMonitor {
+            netlinkMessageUpdate = consumer
+            return ConnectivityService.AddressUpdateMonitor(h, log, tag, consumer)
         }
     }
 
