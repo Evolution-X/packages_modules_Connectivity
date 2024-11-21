@@ -16,7 +16,6 @@
 package com.android.server.net.ct;
 
 import android.annotation.RequiresApi;
-import android.content.Context;
 import android.os.Build;
 import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
@@ -35,10 +34,11 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
     private final DataStore mDataStore;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
 
-    CertificateTransparencyFlagsListener(Context context) {
-        mDataStore = new DataStore(Config.PREFERENCES_FILE);
-        mCertificateTransparencyDownloader =
-                new CertificateTransparencyDownloader(context, mDataStore);
+    CertificateTransparencyFlagsListener(
+            DataStore dataStore,
+            CertificateTransparencyDownloader certificateTransparencyDownloader) {
+        mDataStore = dataStore;
+        mCertificateTransparencyDownloader = certificateTransparencyDownloader;
     }
 
     void initialize() {
