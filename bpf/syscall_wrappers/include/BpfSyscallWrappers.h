@@ -28,6 +28,7 @@ namespace android {
 namespace bpf {
 
 using ::android::base::borrowed_fd;
+using ::android::base::unique_fd;
 
 inline uint64_t ptr_to_u64(const void * const x) {
     return (uint64_t)(uintptr_t)x;
@@ -182,10 +183,8 @@ inline int retrieveProgram(const char* pathname) {
 }
 
 inline bool usableProgram(const char* pathname) {
-    int fd = retrieveProgram(pathname);
-    bool ok = (fd >= 0);
-    if (ok) close(fd);
-    return ok;
+    unique_fd fd(retrieveProgram(pathname));
+    return fd.ok();
 }
 
 inline int attachProgram(bpf_attach_type type, const borrowed_fd& prog_fd,
