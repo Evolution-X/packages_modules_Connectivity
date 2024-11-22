@@ -725,3 +725,10 @@ java_library {
     ],
     apex_available: ["com.android.wifi"],
 }
+
+genrule {
+    name: "statslog-framework-connectivity-java-gen",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --java $(out) --module connectivity --javaPackage com.android.net.module.util --javaClass FrameworkConnectivityStatsLog",
+    out: ["com/android/net/module/util/FrameworkConnectivityStatsLog.java"],
+}
