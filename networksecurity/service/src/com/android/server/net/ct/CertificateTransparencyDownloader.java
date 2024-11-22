@@ -88,12 +88,17 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
     }
 
     void setPublicKey(String publicKey) throws GeneralSecurityException {
-        mPublicKey =
-                Optional.of(
-                        KeyFactory.getInstance("RSA")
-                                .generatePublic(
-                                        new X509EncodedKeySpec(
-                                                Base64.getDecoder().decode(publicKey))));
+        try {
+            mPublicKey =
+                    Optional.of(
+                            KeyFactory.getInstance("RSA")
+                                    .generatePublic(
+                                            new X509EncodedKeySpec(
+                                                    Base64.getDecoder().decode(publicKey))));
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Invalid public key Base64 encoding", e);
+            mPublicKey = Optional.empty();
+        }
     }
 
     @VisibleForTesting

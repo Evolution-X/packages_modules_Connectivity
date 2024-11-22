@@ -8,3 +8,12 @@ flag {
     bug: "319829948"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "certificate_transparency_job"
+    is_exported: true
+    namespace: "network_security"
+    description: "Enable daily job service for certificate transparency instead of flags listener"
+    bug: "319829948"
+    is_fixed_read_only: true
+}

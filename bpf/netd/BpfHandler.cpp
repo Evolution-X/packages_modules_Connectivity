@@ -97,6 +97,7 @@ static Status initPrograms(const char* cg2_path) {
         ALOGE("Failed to open the cgroup directory: %s", strerror(err));
         return statusFromErrno(err, "Open the cgroup directory failed");
     }
+
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_ALLOWLIST_PROG_PATH));
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_DENYLIST_PROG_PATH));
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_EGRESS_PROG_PATH));

@@ -13,6 +13,9 @@
   "postsubmit": [
     {
       "name": "ThreadNetworkMultiDeviceTests"
+    },
+    {
+      "name": "ThreadNetworkTrelDisabledTests"
     }
   ]
 }
