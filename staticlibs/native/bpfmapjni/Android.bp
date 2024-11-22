@@ -26,6 +26,7 @@ cc_library_static {
     header_libs: [
         "bpf_headers",
         "jni_headers",
+        "libbase_headers",
     ],
     shared_libs: [
         "liblog",

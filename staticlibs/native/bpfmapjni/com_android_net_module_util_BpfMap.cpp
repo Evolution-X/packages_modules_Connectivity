@@ -24,37 +24,38 @@
 #include "nativehelper/scoped_primitive_array.h"
 #include "nativehelper/scoped_utf_chars.h"
 
-#define BPF_FD_JUST_USE_INT
+#include <android-base/unique_fd.h>
 #include "BpfSyscallWrappers.h"
-
 #include "bpf/KernelUtils.h"
 
 namespace android {
+
+using ::android::base::unique_fd;
 
 static jint com_android_net_module_util_BpfMap_nativeBpfFdGet(JNIEnv *env, jclass clazz,
         jstring path, jint mode, jint keySize, jint valueSize) {
     ScopedUtfChars pathname(env, path);
 
-    jint fd = -1;
+    unique_fd fd;
     switch (mode) {
       case 0:
-        fd = bpf::mapRetrieveRW(pathname.c_str());
+        fd.reset(bpf::mapRetrieveRW(pathname.c_str()));
         break;
       case BPF_F_RDONLY:
-        fd = bpf::mapRetrieveRO(pathname.c_str());
+        fd.reset(bpf::mapRetrieveRO(pathname.c_str()));
         break;
       case BPF_F_WRONLY:
-        fd = bpf::mapRetrieveWO(pathname.c_str());
+        fd.reset(bpf::mapRetrieveWO(pathname.c_str()));
         break;
       case BPF_F_RDONLY|BPF_F_WRONLY:
-        fd = bpf::mapRetrieveExclusiveRW(pathname.c_str());
+        fd.reset(bpf::mapRetrieveExclusiveRW(pathname.c_str()));
         break;
       default:
         errno = EINVAL;
         break;
     }
 
-    if (fd < 0) {
+    if (!fd.ok()) {
         jniThrowErrnoException(env, "nativeBpfFdGet", errno);
         return -1;
     }
@@ -62,18 +63,16 @@ static jint com_android_net_module_util_BpfMap_nativeBpfFdGet(JNIEnv *env, jclas
     if (bpf::isAtLeastKernelVersion(4, 14, 0)) {
         // These likely fail with -1 and set errno to EINVAL on <4.14
         if (bpf::bpfGetFdKeySize(fd) != keySize) {
-            close(fd);
             jniThrowErrnoException(env, "nativeBpfFdGet KeySize", EBADFD);
             return -1;
         }
         if (bpf::bpfGetFdValueSize(fd) != valueSize) {
-            close(fd);
             jniThrowErrnoException(env, "nativeBpfFdGet ValueSize", EBADFD);
             return -1;
         }
     }
 
-    return fd;
+    return fd.release();
 }
 
 static void com_android_net_module_util_BpfMap_nativeWriteToMapEntry(JNIEnv *env, jobject self,
