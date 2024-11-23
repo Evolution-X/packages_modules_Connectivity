@@ -215,9 +215,6 @@ public class EthernetTracker {
         // Note: processNetlinkMessage is called on the handler thread.
         @Override
         protected void processNetlinkMessage(NetlinkMessage nlMsg, long whenMs) {
-            // ignore all updates when ethernet is disabled.
-            if (mEthernetState == ETHERNET_STATE_DISABLED) return;
-
             if (nlMsg instanceof RtNetlinkLinkMessage) {
                 processRtNetlinkLinkMessage((RtNetlinkLinkMessage) nlMsg);
             } else {
@@ -596,10 +593,13 @@ public class EthernetTracker {
             // Read the flags before attempting to bring up the interface. If the interface is
             // already running an UP event is created after adding the interface.
             config = NetdUtils.getInterfaceConfigParcel(mNetd, iface);
-            if (NetdUtils.hasFlag(config, INetd.IF_STATE_DOWN)) {
+            // Only bring the interface up when ethernet is enabled.
+            if (mEthernetState == ETHERNET_STATE_ENABLED) {
                 // As a side-effect, NetdUtils#setInterfaceUp() also clears the interface's IPv4
                 // address and readds it which *could* lead to unexpected behavior in the future.
                 NetdUtils.setInterfaceUp(mNetd, iface);
+            } else if (mEthernetState == ETHERNET_STATE_DISABLED) {
+                NetdUtils.setInterfaceDown(mNetd, iface);
             }
         } catch (IllegalStateException e) {
             // Either the system is crashing or the interface has disappeared. Just ignore the
@@ -646,6 +646,10 @@ public class EthernetTracker {
     }
 
     private void setInterfaceAdministrativeState(String iface, boolean up, EthernetCallback cb) {
+        if (mEthernetState == ETHERNET_STATE_DISABLED) {
+            cb.onError("Cannot enable/disable interface when ethernet is disabled");
+            return;
+        }
         if (getInterfaceState(iface) == EthernetManager.STATE_ABSENT) {
             cb.onError("Failed to enable/disable absent interface: " + iface);
             return;
@@ -965,20 +969,24 @@ public class EthernetTracker {
 
             mEthernetState = newState;
 
-            if (enabled) {
-                trackAvailableInterfaces();
-            } else {
-                // TODO: maybe also disable server mode interface as well.
-                untrackFactoryInterfaces();
+            // Interface in server mode should also be included.
+            ArrayList<String> interfaces =
+                    new ArrayList<>(
+                    List.of(mFactory.getAvailableInterfaces(/* includeRestricted */ true)));
+
+            if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER) {
+                interfaces.add(mTetheringInterface);
+            }
+
+            for (String iface : interfaces) {
+                if (enabled) {
+                    NetdUtils.setInterfaceUp(mNetd, iface);
+                } else {
+                    NetdUtils.setInterfaceDown(mNetd, iface);
+                }
             }
             broadcastEthernetStateChange(mEthernetState);
         });
-    }
-
-    private void untrackFactoryInterfaces() {
-        for (String iface : mFactory.getAvailableInterfaces(true /* includeRestricted */)) {
-            stopTrackingInterface(iface);
-        }
     }
 
     private void unicastEthernetStateChange(@NonNull IEthernetServiceListener listener,

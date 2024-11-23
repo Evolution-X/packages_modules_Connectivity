@@ -16,23 +16,19 @@
 
 #pragma once
 
+#include <android-base/unique_fd.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <linux/bpf.h>
 #include <linux/unistd.h>
 #include <sys/file.h>
 
-#ifdef BPF_FD_JUST_USE_INT
-  #define BPF_FD_TYPE int
-  #define BPF_FD_TO_U32(x) static_cast<__u32>(x)
-#else
-  #include <android-base/unique_fd.h>
-  #define BPF_FD_TYPE base::unique_fd&
-  #define BPF_FD_TO_U32(x) static_cast<__u32>((x).get())
-#endif
 
 namespace android {
 namespace bpf {
+
+using ::android::base::borrowed_fd;
+using ::android::base::unique_fd;
 
 inline uint64_t ptr_to_u64(const void * const x) {
     return (uint64_t)(uintptr_t)x;
@@ -69,58 +65,59 @@ inline int createMap(bpf_map_type map_type, uint32_t key_size, uint32_t value_si
 //   'inner_map_fd' is basically a template specifying {map_type, key_size, value_size, max_entries, map_flags}
 //   of the inner map type (and possibly only key_size/value_size actually matter?).
 inline int createOuterMap(bpf_map_type map_type, uint32_t key_size, uint32_t value_size,
-                          uint32_t max_entries, uint32_t map_flags, const BPF_FD_TYPE inner_map_fd) {
+                          uint32_t max_entries, uint32_t map_flags,
+                          const borrowed_fd& inner_map_fd) {
     return bpf(BPF_MAP_CREATE, {
                                        .map_type = map_type,
                                        .key_size = key_size,
                                        .value_size = value_size,
                                        .max_entries = max_entries,
                                        .map_flags = map_flags,
-                                       .inner_map_fd = BPF_FD_TO_U32(inner_map_fd),
+                                       .inner_map_fd = static_cast<__u32>(inner_map_fd.get()),
                                });
 }
 
-inline int writeToMapEntry(const BPF_FD_TYPE map_fd, const void* key, const void* value,
+inline int writeToMapEntry(const borrowed_fd& map_fd, const void* key, const void* value,
                            uint64_t flags) {
     return bpf(BPF_MAP_UPDATE_ELEM, {
-                                            .map_fd = BPF_FD_TO_U32(map_fd),
+                                            .map_fd = static_cast<__u32>(map_fd.get()),
                                             .key = ptr_to_u64(key),
                                             .value = ptr_to_u64(value),
                                             .flags = flags,
                                     });
 }
 
-inline int findMapEntry(const BPF_FD_TYPE map_fd, const void* key, void* value) {
+inline int findMapEntry(const borrowed_fd& map_fd, const void* key, void* value) {
     return bpf(BPF_MAP_LOOKUP_ELEM, {
-                                            .map_fd = BPF_FD_TO_U32(map_fd),
+                                            .map_fd = static_cast<__u32>(map_fd.get()),
                                             .key = ptr_to_u64(key),
                                             .value = ptr_to_u64(value),
                                     });
 }
 
-inline int deleteMapEntry(const BPF_FD_TYPE map_fd, const void* key) {
+inline int deleteMapEntry(const borrowed_fd& map_fd, const void* key) {
     return bpf(BPF_MAP_DELETE_ELEM, {
-                                            .map_fd = BPF_FD_TO_U32(map_fd),
+                                            .map_fd = static_cast<__u32>(map_fd.get()),
                                             .key = ptr_to_u64(key),
                                     });
 }
 
-inline int getNextMapKey(const BPF_FD_TYPE map_fd, const void* key, void* next_key) {
+inline int getNextMapKey(const borrowed_fd& map_fd, const void* key, void* next_key) {
     return bpf(BPF_MAP_GET_NEXT_KEY, {
-                                             .map_fd = BPF_FD_TO_U32(map_fd),
+                                             .map_fd = static_cast<__u32>(map_fd.get()),
                                              .key = ptr_to_u64(key),
                                              .next_key = ptr_to_u64(next_key),
                                      });
 }
 
-inline int getFirstMapKey(const BPF_FD_TYPE map_fd, void* firstKey) {
+inline int getFirstMapKey(const borrowed_fd& map_fd, void* firstKey) {
     return getNextMapKey(map_fd, NULL, firstKey);
 }
 
-inline int bpfFdPin(const BPF_FD_TYPE map_fd, const char* pathname) {
+inline int bpfFdPin(const borrowed_fd& map_fd, const char* pathname) {
     return bpf(BPF_OBJ_PIN, {
                                     .pathname = ptr_to_u64(pathname),
-                                    .bpf_fd = BPF_FD_TO_U32(map_fd),
+                                    .bpf_fd = static_cast<__u32>(map_fd.get()),
                             });
 }
 
@@ -131,22 +128,15 @@ inline int bpfFdGet(const char* pathname, uint32_t flag) {
                             });
 }
 
-int bpfGetFdMapId(const BPF_FD_TYPE map_fd);
+int bpfGetFdMapId(const borrowed_fd& map_fd);
 
 inline int bpfLock(int fd, short type) {
     if (fd < 0) return fd;  // pass any errors straight through
 #ifdef BPF_MAP_LOCKLESS_FOR_TEST
     return fd;
 #endif
-#ifdef BPF_FD_JUST_USE_INT
     int mapId = bpfGetFdMapId(fd);
     int saved_errno = errno;
-#else
-    base::unique_fd ufd(fd);
-    int mapId = bpfGetFdMapId(ufd);
-    int saved_errno = errno;
-    (void)ufd.release();
-#endif
     // 4.14+ required to fetch map id, but we don't want to call isAtLeastKernelVersion
     if (mapId == -1 && saved_errno == EINVAL) return fd;
     if (mapId <= 0) abort();  // should not be possible
@@ -193,37 +183,35 @@ inline int retrieveProgram(const char* pathname) {
 }
 
 inline bool usableProgram(const char* pathname) {
-    int fd = retrieveProgram(pathname);
-    bool ok = (fd >= 0);
-    if (ok) close(fd);
-    return ok;
+    unique_fd fd(retrieveProgram(pathname));
+    return fd.ok();
 }
 
-inline int attachProgram(bpf_attach_type type, const BPF_FD_TYPE prog_fd,
-                         const BPF_FD_TYPE cg_fd, uint32_t flags = 0) {
+inline int attachProgram(bpf_attach_type type, const borrowed_fd& prog_fd,
+                         const borrowed_fd& cg_fd, uint32_t flags = 0) {
     return bpf(BPF_PROG_ATTACH, {
-                                        .target_fd = BPF_FD_TO_U32(cg_fd),
-                                        .attach_bpf_fd = BPF_FD_TO_U32(prog_fd),
+                                        .target_fd = static_cast<__u32>(cg_fd.get()),
+                                        .attach_bpf_fd = static_cast<__u32>(prog_fd.get()),
                                         .attach_type = type,
                                         .attach_flags = flags,
                                 });
 }
 
-inline int detachProgram(bpf_attach_type type, const BPF_FD_TYPE cg_fd) {
+inline int detachProgram(bpf_attach_type type, const borrowed_fd& cg_fd) {
     return bpf(BPF_PROG_DETACH, {
-                                        .target_fd = BPF_FD_TO_U32(cg_fd),
+                                        .target_fd = static_cast<__u32>(cg_fd.get()),
                                         .attach_type = type,
                                 });
 }
 
-inline int queryProgram(const BPF_FD_TYPE cg_fd,
+inline int queryProgram(const borrowed_fd& cg_fd,
                         enum bpf_attach_type attach_type,
                         __u32 query_flags = 0,
                         __u32 attach_flags = 0) {
     int prog_id = -1;  // equivalent to an array of one integer.
     bpf_attr arg = {
             .query = {
-                    .target_fd = BPF_FD_TO_U32(cg_fd),
+                    .target_fd = static_cast<__u32>(cg_fd.get()),
                     .attach_type = attach_type,
                     .query_flags = query_flags,
                     .attach_flags = attach_flags,
@@ -237,21 +225,21 @@ inline int queryProgram(const BPF_FD_TYPE cg_fd,
     return prog_id;  // return actual id
 }
 
-inline int detachSingleProgram(bpf_attach_type type, const BPF_FD_TYPE prog_fd,
-                               const BPF_FD_TYPE cg_fd) {
+inline int detachSingleProgram(bpf_attach_type type, const borrowed_fd& prog_fd,
+                               const borrowed_fd& cg_fd) {
     return bpf(BPF_PROG_DETACH, {
-                                        .target_fd = BPF_FD_TO_U32(cg_fd),
-                                        .attach_bpf_fd = BPF_FD_TO_U32(prog_fd),
+                                        .target_fd = static_cast<__u32>(cg_fd.get()),
+                                        .attach_bpf_fd = static_cast<__u32>(prog_fd.get()),
                                         .attach_type = type,
                                 });
 }
 
 // Available in 4.12 and later kernels.
-inline int runProgram(const BPF_FD_TYPE prog_fd, const void* data,
+inline int runProgram(const borrowed_fd& prog_fd, const void* data,
                       const uint32_t data_size) {
     return bpf(BPF_PROG_RUN, {
                                      .test = {
-                                             .prog_fd = BPF_FD_TO_U32(prog_fd),
+                                             .prog_fd = static_cast<__u32>(prog_fd.get()),
                                              .data_size_in = data_size,
                                              .data_in = ptr_to_u64(data),
                                      },
@@ -265,10 +253,10 @@ inline int runProgram(const BPF_FD_TYPE prog_fd, const void* data,
 // supported/returned by the running kernel.  We do this by checking it is fully
 // within the bounds of the struct size as reported by the kernel.
 #define DEFINE_BPF_GET_FD(TYPE, NAME, FIELD) \
-inline int bpfGetFd ## NAME(const BPF_FD_TYPE fd) { \
+inline int bpfGetFd ## NAME(const borrowed_fd& fd) { \
     struct bpf_ ## TYPE ## _info info = {}; \
     union bpf_attr attr = { .info = { \
-        .bpf_fd = BPF_FD_TO_U32(fd), \
+        .bpf_fd = static_cast<__u32>(fd.get()), \
         .info_len = sizeof(info), \
         .info = ptr_to_u64(&info), \
     }}; \
@@ -283,19 +271,16 @@ inline int bpfGetFd ## NAME(const BPF_FD_TYPE fd) { \
 
 // All 7 of these fields are already present in Linux v4.14 (even ACK 4.14-P)
 // while BPF_OBJ_GET_INFO_BY_FD is not implemented at all in v4.9 (even ACK 4.9-Q)
-DEFINE_BPF_GET_FD(map, MapType, type)            // int bpfGetFdMapType(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(map, MapId, id)                // int bpfGetFdMapId(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(map, KeySize, key_size)        // int bpfGetFdKeySize(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(map, ValueSize, value_size)    // int bpfGetFdValueSize(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(map, MaxEntries, max_entries)  // int bpfGetFdMaxEntries(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(map, MapFlags, map_flags)      // int bpfGetFdMapFlags(const BPF_FD_TYPE map_fd)
-DEFINE_BPF_GET_FD(prog, ProgId, id)              // int bpfGetFdProgId(const BPF_FD_TYPE prog_fd)
+DEFINE_BPF_GET_FD(map, MapType, type)            // int bpfGetFdMapType(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(map, MapId, id)                // int bpfGetFdMapId(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(map, KeySize, key_size)        // int bpfGetFdKeySize(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(map, ValueSize, value_size)    // int bpfGetFdValueSize(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(map, MaxEntries, max_entries)  // int bpfGetFdMaxEntries(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(map, MapFlags, map_flags)      // int bpfGetFdMapFlags(const borrowed_fd& map_fd)
+DEFINE_BPF_GET_FD(prog, ProgId, id)              // int bpfGetFdProgId(const borrowed_fd& prog_fd)
 
 #undef DEFINE_BPF_GET_FD
 
 }  // namespace bpf
 }  // namespace android
 
-#undef BPF_FD_TO_U32
-#undef BPF_FD_TYPE
-#undef BPF_FD_JUST_USE_INT
