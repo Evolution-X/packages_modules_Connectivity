@@ -62,6 +62,7 @@ import android.os.HandlerThread;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.UserHandle;
 import android.platform.test.annotations.AppModeFull;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -103,8 +104,8 @@ public class NetworkStatsManagerTest {
     public final DevSdkIgnoreRule ignoreRule = new DevSdkIgnoreRule(Build.VERSION_CODES.Q);
 
     private static final String LOG_TAG = "NetworkStatsManagerTest";
-    private static final String APPOPS_SET_SHELL_COMMAND = "appops set {0} {1} {2}";
-    private static final String APPOPS_GET_SHELL_COMMAND = "appops get {0} {1}";
+    private static final String APPOPS_SET_SHELL_COMMAND = "appops set --user {0} {1} {2} {3}";
+    private static final String APPOPS_GET_SHELL_COMMAND = "appops get --user {0} {1} {2}";
 
     private static final long MINUTE = 1000 * 60;
     private static final int TIMEOUT_MILLIS = 15000;
@@ -290,12 +291,14 @@ public class NetworkStatsManagerTest {
     }
 
     private void setAppOpsMode(String appop, String mode) throws Exception {
-        final String command = MessageFormat.format(APPOPS_SET_SHELL_COMMAND, mPkg, appop, mode);
+        final String command = MessageFormat.format(APPOPS_SET_SHELL_COMMAND,
+                UserHandle.myUserId(), mPkg, appop, mode);
         SystemUtil.runShellCommand(mInstrumentation, command);
     }
 
     private String getAppOpsMode(String appop) throws Exception {
-        final String command = MessageFormat.format(APPOPS_GET_SHELL_COMMAND, mPkg, appop);
+        final String command = MessageFormat.format(APPOPS_GET_SHELL_COMMAND,
+                UserHandle.myUserId(), mPkg, appop);
         String result = SystemUtil.runShellCommand(mInstrumentation, command);
         if (result == null) {
             Log.w(LOG_TAG, "App op " + appop + " could not be read.");

@@ -53,6 +53,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.ConditionVariable;
 import android.os.IBinder;
+import android.os.UserHandle;
 import android.system.Os;
 import android.system.OsConstants;
 import android.telephony.SubscriptionManager;
@@ -145,7 +146,8 @@ public final class CtsNetUtils {
         for (final String pkg : new String[] {"com.android.shell", mContext.getPackageName()}) {
             final String cmd =
                     String.format(
-                            "appops set %s %s %s",
+                            "appops set --user %d %s %s %s",
+                            UserHandle.myUserId(), // user id
                             pkg, // Package name
                             opName, // Appop
                             (allow ? "allow" : "deny")); // Action
