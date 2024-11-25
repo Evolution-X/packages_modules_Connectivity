@@ -17,6 +17,7 @@
 package com.android.server.thread;
 
 import static android.Manifest.permission.NETWORK_SETTINGS;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
 import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
@@ -266,6 +267,7 @@ public final class ThreadNetworkControllerServiceTest {
     public void tearDown() throws Exception {
         runAsShell(
                 WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
                 () -> DeviceConfig.deleteProperty("thread_network", "TrelFeature__enabled"));
     }
 
@@ -338,6 +340,7 @@ public final class ThreadNetworkControllerServiceTest {
     public void initialize_trelFeatureDisabled_trelDisabledAtOtDaemon() throws Exception {
         runAsShell(
                 WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
                 () ->
                         DeviceConfig.setProperty(
                                 "thread_network", "TrelFeature__enabled", "false", false));
@@ -352,6 +355,7 @@ public final class ThreadNetworkControllerServiceTest {
     public void initialize_trelFeatureEnabled_setTrelEnabledAtOtDamon() throws Exception {
         runAsShell(
                 WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
                 () ->
                         DeviceConfig.setProperty(
                                 "thread_network", "TrelFeature__enabled", "true", false));
