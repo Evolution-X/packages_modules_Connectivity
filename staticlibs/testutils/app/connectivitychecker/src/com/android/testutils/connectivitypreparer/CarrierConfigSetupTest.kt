@@ -123,7 +123,13 @@ class CarrierConfigSetupTest {
             """telephony/com\.android\.internal\.telephony\.flags\.force_iwlan_mms:""" +
                     """.*ENABLED \(system\)""")
         ParcelFileDescriptor.AutoCloseInputStream(
-            uiAutomation.executeShellCommand("printflags")).bufferedReader().use { reader ->
+            // If the command fails (for example if printflags is missing) this will return false
+            // and the IWLAN disable will be skipped, which should be fine at it only helps with
+            // flakiness.
+            // This uses "sh -c" to cover that case as if "printflags" is used directly and the
+            // binary is missing, the remote end will crash and the InputStream EOF is never
+            // reached, so the read would hang.
+            uiAutomation.executeShellCommand("sh -c printflags")).bufferedReader().use { reader ->
                 return reader.lines().anyMatch {
                     it.contains(flagEnabledRegex)
                 }
