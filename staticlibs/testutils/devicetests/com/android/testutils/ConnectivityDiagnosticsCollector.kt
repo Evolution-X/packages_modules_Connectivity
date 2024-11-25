@@ -76,11 +76,13 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         private const val MAX_DUMPS = 20
 
         private val TAG = ConnectivityDiagnosticsCollector::class.simpleName
+        @JvmStatic
         var instance: ConnectivityDiagnosticsCollector? = null
     }
 
     private var failureHeader: String? = null
     private val buffer = ByteArrayOutputStream()
+    private val failureHeaderExtras = mutableMapOf<String, Any>()
     private val collectorDir: File by lazy {
         createAndEmptyDirectory(COLLECTOR_DIR)
     }
@@ -218,6 +220,8 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         val canUseShell = !isAtLeastS() ||
                 instr.uiAutomation.getAdoptedShellPermissions().isNullOrEmpty()
         val headerObj = JSONObject()
+        failureHeaderExtras.forEach { (k, v) -> headerObj.put(k, v) }
+        failureHeaderExtras.clear()
         if (canUseShell) {
             runAsShell(READ_PRIVILEGED_PHONE_STATE, NETWORK_SETTINGS) {
                 headerObj.apply {
@@ -330,6 +334,15 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
                 "dumpsys connectivity --dump-priority HIGH")).use {
             it.copyTo(buffer)
         }
+    }
+
+    /**
+     * Add a key->value attribute to the failure data, to be written to the diagnostics file.
+     *
+     * <p>This is to be called by tests that know they will fail.
+     */
+    fun addFailureAttribute(key: String, value: Any) {
+        failureHeaderExtras[key] = value
     }
 
     private fun maybeWriteExceptionContext(writer: PrintWriter, exceptionContext: Throwable?) {

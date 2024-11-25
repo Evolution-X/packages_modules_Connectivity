@@ -39,10 +39,13 @@ import android.platform.test.annotations.AppModeFull;
 import android.system.ErrnoException;
 import android.system.OsConstants;
 import android.util.ArraySet;
+import android.util.Log;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.net.module.util.CollectionUtils;
 import com.android.testutils.AutoReleaseNetworkCallbackRule;
+import com.android.testutils.ConnectivityDiagnosticsCollector;
 import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.DeviceConfigRule;
 
@@ -51,6 +54,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Set;
 
 @DevSdkIgnoreRunner.RestoreDefaultNetwork
@@ -70,13 +75,34 @@ public class MultinetworkApiTest {
     private static final String TAG = "MultinetworkNativeApiTest";
     static final String GOOGLE_PRIVATE_DNS_SERVER = "dns.google";
 
+    public static class QueryTestResult {
+        public final int sourcePort;
+        public final int attempts;
+        public final int errNo;
+
+        public QueryTestResult(int sourcePort, int attempts, int errNo) {
+            this.sourcePort = sourcePort;
+            this.attempts = attempts;
+            this.errNo = errNo;
+        }
+
+        @Override
+        public String toString() {
+            return "QueryTestResult{"
+                    + "sourcePort=" + sourcePort
+                    + ", attempts=" + attempts
+                    + ", errNo=" + errNo
+                    + '}';
+        }
+    }
+
     /**
      * @return 0 on success
      */
     private static native int runGetaddrinfoCheck(long networkHandle);
     private static native int runSetprocnetwork(long networkHandle);
     private static native int runSetsocknetwork(long networkHandle);
-    private static native int runDatagramCheck(long networkHandle);
+    private static native QueryTestResult runDatagramCheck(long networkHandle, int sourcePort);
     private static native void runResNapiMalformedCheck(long networkHandle);
     private static native void runResNcancelCheck(long networkHandle);
     private static native void runResNqueryCheck(long networkHandle);
@@ -165,14 +191,69 @@ public class MultinetworkApiTest {
         }
     }
 
+    private void runNativeDatagramTransmissionDiagnostics(Network network,
+            QueryTestResult failedResult) {
+        final ConnectivityDiagnosticsCollector collector = ConnectivityDiagnosticsCollector
+                .getInstance();
+        if (collector == null) {
+            Log.e(TAG, "Missing ConnectivityDiagnosticsCollector, not adding diagnostics");
+            return;
+        }
+
+        final int numReruns = 10;
+        final ArrayList<QueryTestResult> reruns = new ArrayList<>(numReruns);
+        for (int i = 0; i < numReruns; i++) {
+            final QueryTestResult rerunResult =
+                    runDatagramCheck(network.getNetworkHandle(), 0 /* sourcePort */);
+            Log.d(TAG, "Rerun result " + i + ": " + rerunResult);
+            reruns.add(rerunResult);
+        }
+        // Rerun on the original port after trying the other ports, to check that the results are
+        // consistent, as opposed to the network recovering halfway through.
+        int originalPortFailedReruns = 0;
+        for (int i = 0; i < numReruns; i++) {
+            final QueryTestResult originalPortRerun = runDatagramCheck(network.getNetworkHandle(),
+                    failedResult.sourcePort);
+            Log.d(TAG, "Rerun result " + i + " with original port: " + originalPortRerun);
+            if (originalPortRerun.errNo != 0) {
+                originalPortFailedReruns++;
+            }
+        }
+
+        final int noRetrySuccessResults = reruns.stream()
+                .filter(result -> result.errNo == 0 && result.attempts == 1)
+                .mapToInt(result -> 1)
+                .sum();
+        final int failedResults = reruns.stream()
+                .filter(result -> result.errNo != 0)
+                .mapToInt(result -> 1)
+                .sum();
+        collector.addFailureAttribute("numReruns", numReruns);
+        collector.addFailureAttribute("noRetrySuccessReruns", noRetrySuccessResults);
+        collector.addFailureAttribute("failedReruns", failedResults);
+        collector.addFailureAttribute("originalPortFailedReruns", originalPortFailedReruns);
+    }
+
     @Test
     public void testNativeDatagramTransmission() throws Exception {
         for (Network network : getTestableNetworks()) {
-            int errno = runDatagramCheck(network.getNetworkHandle());
-            if (errno != 0) {
-                throw new ErrnoException(
-                        "DatagramCheck on " + mCM.getNetworkInfo(network), -errno);
+            final QueryTestResult result = runDatagramCheck(network.getNetworkHandle(),
+                    0 /* sourcePort */);
+            if (result.errNo == 0) {
+                continue;
             }
+            final NetworkCapabilities nc = mCM.getNetworkCapabilities(network);
+            final int[] transports = nc != null ? nc.getTransportTypes() : null;
+            if (CollectionUtils.contains(transports, TRANSPORT_WIFI)) {
+                runNativeDatagramTransmissionDiagnostics(network, result);
+            }
+
+            // Log the whole result (with source port and attempts) to logcat, but use only the
+            // errno and transport in the fail message so similar failures have consistent messages
+            final String error = "DatagramCheck on transport " + Arrays.toString(transports)
+                    + " failed: " + result.errNo;
+            Log.e(TAG, error + ", result: " + result);
+            fail(error);
         }
     }
 
