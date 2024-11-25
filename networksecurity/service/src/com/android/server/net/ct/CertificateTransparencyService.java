@@ -28,8 +28,6 @@ import com.android.server.SystemService;
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 public class CertificateTransparencyService extends ICertificateTransparencyManager.Stub {
 
-    private final DataStore mDataStore;
-    private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
     private final CertificateTransparencyFlagsListener mFlagsListener;
     private final CertificateTransparencyJob mCertificateTransparencyJob;
 
@@ -44,15 +42,21 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
 
     /** Creates a new {@link CertificateTransparencyService} object. */
     public CertificateTransparencyService(Context context) {
-        mDataStore = new DataStore(Config.PREFERENCES_FILE);
-        mCertificateTransparencyDownloader =
-                new CertificateTransparencyDownloader(context, mDataStore);
+        DataStore dataStore = new DataStore(Config.PREFERENCES_FILE);
+        DownloadHelper downloadHelper = new DownloadHelper(context);
+        SignatureVerifier signatureVerifier = new SignatureVerifier(context);
+        CertificateTransparencyDownloader downloader =
+                new CertificateTransparencyDownloader(
+                        context,
+                        dataStore,
+                        downloadHelper,
+                        signatureVerifier,
+                        new CertificateTransparencyInstaller());
+
         mFlagsListener =
-                new CertificateTransparencyFlagsListener(
-                        mDataStore, mCertificateTransparencyDownloader);
+                new CertificateTransparencyFlagsListener(dataStore, signatureVerifier, downloader);
         mCertificateTransparencyJob =
-                new CertificateTransparencyJob(
-                        context, mDataStore, mCertificateTransparencyDownloader, mFlagsListener);
+                new CertificateTransparencyJob(context, dataStore, downloader);
     }
 
     /**
