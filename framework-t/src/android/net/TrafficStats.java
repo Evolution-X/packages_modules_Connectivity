@@ -184,7 +184,9 @@ public class TrafficStats {
 
     @GuardedBy("TrafficStats.class")
     private static INetworkStatsService sStatsService;
-    @GuardedBy("TrafficStats.class")
+
+    // The variable will only be accessed in the test, which is effectively
+    // single-threaded.
     private static INetworkStatsService sStatsServiceForTest = null;
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 130143562)
@@ -209,9 +211,7 @@ public class TrafficStats {
      */
     @VisibleForTesting(visibility = PRIVATE)
     public static void setServiceForTest(INetworkStatsService statsService) {
-        synchronized (TrafficStats.class) {
-            sStatsServiceForTest = statsService;
-        }
+        sStatsServiceForTest = statsService;
     }
 
     /**
