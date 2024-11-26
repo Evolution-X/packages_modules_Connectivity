@@ -90,7 +90,6 @@ cc_library_shared {
     static_libs: [
         "libnet_utils_device_common_bpfjni",
         "libnet_utils_device_common_bpfutils",
-        "libnet_utils_device_common_timerfdjni",
     ],
     shared_libs: [
         "liblog",
@@ -126,6 +125,7 @@ cc_library_shared {
         "libmodules-utils-build",
         "libnetjniutils",
         "libnet_utils_device_common_bpfjni",
+        "libnet_utils_device_common_timerfdjni",
         "netd_aidl_interface-lateststable-ndk",
     ],
     shared_libs: [
