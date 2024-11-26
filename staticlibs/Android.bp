@@ -32,6 +32,8 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
+// This library shouldn't be used anymore (no class should be added), and per-user libraries like
+// net-utils-service-connectivity or net-utils-framework-wifi should be used instead.
 java_library {
     name: "net-utils-device-common",
     srcs: [
