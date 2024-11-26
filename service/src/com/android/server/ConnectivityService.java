@@ -8343,6 +8343,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 enforceNetworkStackOrSettingsPermission();
                 // Fall-through since other checks are the same with normal requests.
             case REQUEST:
+            case RESERVATION:
                 networkCapabilities = new NetworkCapabilities(networkCapabilities);
                 enforceNetworkRequestPermissions(networkCapabilities, callingPackageName,
                         callingAttributionTag, callingUid);
