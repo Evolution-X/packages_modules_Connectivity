@@ -22,14 +22,10 @@ import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.DnsResolver
 import android.net.InetAddresses.parseNumericAddress
-import android.net.LinkAddress
-import android.net.LinkProperties
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.net.MacAddress
 import android.net.Network
-import android.net.NetworkAgentConfig
-import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_TEMPORARILY_NOT_METERED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
@@ -50,16 +46,10 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.platform.test.annotations.AppModeFull
 import android.provider.DeviceConfig.NAMESPACE_TETHERING
-import android.system.ErrnoException
-import android.system.Os
-import android.system.OsConstants.AF_INET6
-import android.system.OsConstants.EADDRNOTAVAIL
-import android.system.OsConstants.ENETUNREACH
 import android.system.OsConstants.ETH_P_IPV6
 import android.system.OsConstants.IPPROTO_IPV6
 import android.system.OsConstants.IPPROTO_UDP
 import android.system.OsConstants.RT_SCOPE_LINK
-import android.system.OsConstants.SOCK_DGRAM
 import android.util.Log
 import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry
@@ -103,7 +93,6 @@ import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChange
 import com.android.testutils.PollPacketReader
 import com.android.testutils.TestDnsPacket
 import com.android.testutils.TestableNetworkAgent
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertEmpty
 import com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk30
@@ -244,16 +233,12 @@ class NsdManagerTest {
         val tnm = context.getSystemService(TestNetworkManager::class.java)!!
         val iface = tnm.createTapInterface()
         val cb = TestableNetworkCallback()
-        val testNetworkSpecifier = TestNetworkSpecifier(iface.interfaceName)
         cm.requestNetwork(
-            NetworkRequest.Builder()
-                .removeCapability(NET_CAPABILITY_TRUSTED)
-                .addTransportType(TRANSPORT_TEST)
-                .setNetworkSpecifier(testNetworkSpecifier)
-                .build(),
+            TestableNetworkAgent.makeNetworkRequestForInterface(iface.interfaceName),
             cb
         )
-        val agent = registerTestNetworkAgent(iface.interfaceName)
+        val agent = TestableNetworkAgent.createOnInterface(context, handlerThread.looper,
+            iface.interfaceName, TIMEOUT_MS)
         val network = agent.network ?: fail("Registered agent should have a network")
 
         cb.eventuallyExpect<LinkPropertiesChanged>(TIMEOUT_MS) {
@@ -266,57 +251,6 @@ class NsdManagerTest {
             it.caps.hasCapability(NET_CAPABILITY_VALIDATED)
         }
         return TestTapNetwork(iface, cb, agent, network)
-    }
-
-    private fun registerTestNetworkAgent(ifaceName: String): TestableNetworkAgent {
-        val lp = LinkProperties().apply {
-            interfaceName = ifaceName
-        }
-        val agent = TestableNetworkAgent(
-            context,
-            handlerThread.looper,
-                NetworkCapabilities().apply {
-                    removeCapability(NET_CAPABILITY_TRUSTED)
-                    addTransportType(TRANSPORT_TEST)
-                    setNetworkSpecifier(TestNetworkSpecifier(ifaceName))
-                },
-            lp,
-            NetworkAgentConfig.Builder().build()
-        )
-        val network = agent.register()
-        agent.markConnected()
-        agent.expectCallback<OnNetworkCreated>()
-
-        // Wait until the link-local address can be used. Address flags are not available without
-        // elevated permissions, so check that bindSocket works.
-        PollingCheck.check("No usable v6 address on interface after $TIMEOUT_MS ms", TIMEOUT_MS) {
-            // To avoid race condition between socket connection succeeding and interface returning
-            // a non-empty address list. Verify that interface returns a non-empty list, before
-            // trying the socket connection.
-            if (NetworkInterface.getByName(ifaceName).interfaceAddresses.isEmpty()) {
-                return@check false
-            }
-
-            val sock = Os.socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)
-            tryTest {
-                network.bindSocket(sock)
-                Os.connect(sock, parseNumericAddress("ff02::fb%$ifaceName"), 12345)
-                true
-            }.catch<ErrnoException> {
-                if (it.errno != ENETUNREACH && it.errno != EADDRNOTAVAIL) {
-                    throw it
-                }
-                false
-            } cleanup {
-                Os.close(sock)
-            }
-        }
-
-        lp.setLinkAddresses(NetworkInterface.getByName(ifaceName).interfaceAddresses.map {
-            LinkAddress(it.address, it.networkPrefixLength.toInt())
-        })
-        agent.sendLinkProperties(lp)
-        return agent
     }
 
     private fun makeTestServiceInfo(network: Network? = null) = NsdServiceInfo().also {
@@ -573,7 +507,9 @@ class NsdManagerTest {
             assertEquals(testNetwork1.network, serviceLost.serviceInfo.network)
 
             val newAgent = runAsShell(MANAGE_TEST_NETWORKS) {
-                registerTestNetworkAgent(testNetwork1.iface.interfaceName)
+                TestableNetworkAgent.createOnInterface(context, handlerThread.looper,
+                    testNetwork1.iface.interfaceName,
+                    TIMEOUT_MS)
             }
             val newNetwork = newAgent.network ?: fail("Registered agent should have a network")
             val serviceDiscovered3 = discoveryRecord.expectCallback<ServiceFound>()
