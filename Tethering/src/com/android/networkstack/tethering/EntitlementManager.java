@@ -167,6 +167,11 @@ public class EntitlementManager {
                 } else {
                     mLog.e("Current user (" + currentUserId
                             + ") is not allowed to perform entitlement check.");
+                    // If the user is not allowed to perform an entitlement check
+                    // (e.g., a non-admin user), notify the receiver immediately.
+                    // This is necessary because the entitlement check app cannot
+                    // be launched to conduct the check and deliver the results.
+                    receiver.send(TETHER_ERROR_PROVISIONING_FAILED, null);
                     return null;
                 }
             } else {
