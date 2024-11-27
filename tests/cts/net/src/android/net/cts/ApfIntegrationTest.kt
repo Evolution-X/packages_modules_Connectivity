@@ -19,6 +19,7 @@
 
 package android.net.cts
 
+import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
@@ -165,7 +166,7 @@ class ApfIntegrationTest {
             // created.
             // APF adb cmds are only implemented in ApfFilter.java. Enable experiment to prevent
             // LegacyApfFilter.java from being used.
-            runAsShell(WRITE_DEVICE_CONFIG) {
+            runAsShell(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG) {
                 DeviceConfig.setProperty(
                         NAMESPACE_CONNECTIVITY,
                         APF_NEW_RA_FILTER_VERSION,

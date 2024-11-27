@@ -77,6 +77,7 @@ import android.telephony.CarrierConfigManager;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 
+import androidx.annotation.NonNull;
 import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
@@ -225,19 +226,23 @@ public class TetheringManagerTest {
 
     }
 
-    @Test
-    public void testTetheringRequest() {
-        SoftApConfiguration softApConfiguration;
+    private SoftApConfiguration createSoftApConfiguration(@NonNull String ssid) {
+        SoftApConfiguration config;
         if (SdkLevel.isAtLeastT()) {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes(
-                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
+            config = new SoftApConfiguration.Builder()
+                    .setWifiSsid(WifiSsid.fromBytes(ssid.getBytes(StandardCharsets.UTF_8)))
                     .build();
         } else {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setSsid("This is an SSID!")
+            config = new SoftApConfiguration.Builder()
+                    .setSsid(ssid)
                     .build();
         }
+        return config;
+    }
+
+    @Test
+    public void testTetheringRequest() {
+        SoftApConfiguration softApConfiguration = createSoftApConfiguration("SSID");
         final TetheringRequest tr = new TetheringRequest.Builder(TETHERING_WIFI)
                 .setSoftApConfiguration(softApConfiguration)
                 .build();
@@ -302,17 +307,7 @@ public class TetheringManagerTest {
 
     @Test
     public void testTetheringRequestSetSoftApConfigurationFailsWhenNotWifi() {
-        final SoftApConfiguration softApConfiguration;
-        if (SdkLevel.isAtLeastT()) {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes(
-                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
-                    .build();
-        } else {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setSsid("This is an SSID!")
-                    .build();
-        }
+        final SoftApConfiguration softApConfiguration = createSoftApConfiguration("SSID");
         for (int type : List.of(TETHERING_USB, TETHERING_BLUETOOTH, TETHERING_WIFI_P2P,
                 TETHERING_NCM, TETHERING_ETHERNET)) {
             try {
@@ -326,17 +321,7 @@ public class TetheringManagerTest {
 
     @Test
     public void testTetheringRequestParcelable() {
-        final SoftApConfiguration softApConfiguration;
-        if (SdkLevel.isAtLeastT()) {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes(
-                            "This is an SSID!".getBytes(StandardCharsets.UTF_8)))
-                    .build();
-        } else {
-            softApConfiguration = new SoftApConfiguration.Builder()
-                    .setSsid("This is an SSID!")
-                    .build();
-        }
+        final SoftApConfiguration softApConfiguration = createSoftApConfiguration("SSID");
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
         final TetheringRequest withConfig = new TetheringRequest.Builder(TETHERING_WIFI)
@@ -363,9 +348,7 @@ public class TetheringManagerTest {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
             tetherEventCallback.expectNoTetheringActive();
 
-            SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes("This is an SSID!"
-                            .getBytes(StandardCharsets.UTF_8))).build();
+            SoftApConfiguration softApConfig = createSoftApConfiguration("SSID");
             final TetheringInterface tetheredIface =
                     mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
 
