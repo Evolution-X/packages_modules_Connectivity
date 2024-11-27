@@ -115,11 +115,14 @@ class CertificateTransparencyFlagsListener implements DeviceConfig.OnPropertiesC
 
         // TODO: handle the case where there is already a pending download.
 
-        mDataStore.setProperty(Config.VERSION_PENDING, newVersion);
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, newContentUrl);
-        mDataStore.setProperty(Config.METADATA_URL_PENDING, newMetadataUrl);
+        mDataStore.setProperty(Config.CONTENT_URL, newContentUrl);
+        mDataStore.setProperty(Config.METADATA_URL, newMetadataUrl);
         mDataStore.store();
 
-        mCertificateTransparencyDownloader.startMetadataDownload(newMetadataUrl);
+        if (mCertificateTransparencyDownloader.startMetadataDownload() == -1) {
+            Log.e(TAG, "Metadata download not started.");
+        } else if (Config.DEBUG) {
+            Log.d(TAG, "Metadata download started successfully.");
+        }
     }
 }
