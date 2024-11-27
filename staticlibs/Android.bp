@@ -734,3 +734,27 @@ genrule {
     cmd: "$(location stats-log-api-gen) --java $(out) --module connectivity --javaPackage com.android.net.module.util --javaClass FrameworkConnectivityStatsLog",
     out: ["com/android/net/module/util/FrameworkConnectivityStatsLog.java"],
 }
+
+java_library {
+    name: "net-utils-service-vcn",
+    sdk_version: "module_current",
+    min_sdk_version: "30",
+    srcs: [
+        "device/com/android/net/module/util/HandlerUtils.java",
+    ],
+    libs: [
+        "framework-annotations-lib",
+    ],
+    visibility: [
+        // TODO: b/374174952 Remove it when VCN modularization is released
+        "//frameworks/base/packages/Vcn/service-b",
+
+        "//packages/modules/Connectivity/service-b",
+    ],
+    apex_available: [
+        // TODO: b/374174952 Remove it when VCN modularization is released
+        "//apex_available:platform",
+
+        "com.android.tethering",
+    ],
+}
