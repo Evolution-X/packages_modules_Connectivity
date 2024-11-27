@@ -18,11 +18,13 @@ package com.android.server.net.ct;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import android.app.DownloadManager;
 import android.content.Context;
@@ -33,6 +35,8 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.server.net.ct.DownloadHelper.DownloadStatus;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,7 +71,10 @@ public class CertificateTransparencyDownloaderTest {
     private Context mContext;
     private File mTempFile;
     private DataStore mDataStore;
+    private SignatureVerifier mSignatureVerifier;
     private CertificateTransparencyDownloader mCertificateTransparencyDownloader;
+
+    private long mNextDownloadId = 666;
 
     @Before
     public void setUp() throws IOException, GeneralSecurityException {
@@ -82,23 +89,37 @@ public class CertificateTransparencyDownloaderTest {
         mTempFile = File.createTempFile("datastore-test", ".properties");
         mDataStore = new DataStore(mTempFile);
         mDataStore.load();
+        mSignatureVerifier = new SignatureVerifier(mContext);
 
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
-                        mContext, mDataStore, mDownloadHelper, mCertificateTransparencyInstaller);
+                        mContext,
+                        mDataStore,
+                        mDownloadHelper,
+                        mSignatureVerifier,
+                        mCertificateTransparencyInstaller);
     }
 
     @After
     public void tearDown() {
         mTempFile.delete();
-        mCertificateTransparencyDownloader.resetPublicKey();
+        mSignatureVerifier.resetPublicKey();
+    }
+
+    @Test
+    public void testDownloader_startPublicKeyDownload() {
+        String publicKeyUrl = "http://test-public-key.org";
+        long downloadId = preparePublicKeyDownload(publicKeyUrl);
+
+        assertThat(mCertificateTransparencyDownloader.isPublicKeyDownloadId(downloadId)).isFalse();
+        mCertificateTransparencyDownloader.startPublicKeyDownload(publicKeyUrl);
+        assertThat(mCertificateTransparencyDownloader.isPublicKeyDownloadId(downloadId)).isTrue();
     }
 
     @Test
     public void testDownloader_startMetadataDownload() {
         String metadataUrl = "http://test-metadata.org";
-        long downloadId = 666;
-        when(mDownloadHelper.startDownload(metadataUrl)).thenReturn(downloadId);
+        long downloadId = prepareMetadataDownload(metadataUrl);
 
         assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(downloadId)).isFalse();
         mCertificateTransparencyDownloader.startMetadataDownload(metadataUrl);
@@ -108,8 +129,7 @@ public class CertificateTransparencyDownloaderTest {
     @Test
     public void testDownloader_startContentDownload() {
         String contentUrl = "http://test-content.org";
-        long downloadId = 666;
-        when(mDownloadHelper.startDownload(contentUrl)).thenReturn(downloadId);
+        long downloadId = prepareContentDownload(contentUrl);
 
         assertThat(mCertificateTransparencyDownloader.isContentDownloadId(downloadId)).isFalse();
         mCertificateTransparencyDownloader.startContentDownload(contentUrl);
@@ -117,16 +137,65 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_metadataDownloadSuccess_startContentDownload() {
-        long metadataId = 123;
-        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        when(mDownloadHelper.getDownloadStatus(metadataId))
-                .thenReturn(makeSuccessfulDownloadStatus(metadataId));
-        long contentId = 666;
-        String contentUrl = "http://test-content.org";
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUrl);
-        when(mDownloadHelper.startDownload(contentUrl)).thenReturn(contentId);
+    public void testDownloader_publicKeyDownloadSuccess_updatePublicKey_startMetadataDownload()
+            throws Exception {
+        long publicKeyId = prepareSuccessfulPublicKeyDownload(writePublicKeyToFile(mPublicKey));
+        long metadataId = prepareMetadataDownload("http://test-metadata.org");
 
+        assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isFalse();
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(publicKeyId));
+
+        assertThat(mSignatureVerifier.getPublicKey()).hasValue(mPublicKey);
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isTrue();
+    }
+
+    @Test
+    public void
+            testDownloader_publicKeyDownloadSuccess_updatePublicKeyFail_doNotStartMetadataDownload()
+                    throws Exception {
+        long publicKeyId =
+                prepareSuccessfulPublicKeyDownload(
+                        writeToFile("i_am_not_a_base64_encoded_public_key".getBytes()));
+        long metadataId = prepareMetadataDownload("http://test-metadata.org");
+
+        assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isFalse();
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(publicKeyId));
+
+        assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isFalse();
+        verify(mDownloadHelper, never()).startDownload(anyString());
+    }
+
+    @Test
+    public void testDownloader_publicKeyDownloadFail_doNotUpdatePublicKey() throws Exception {
+        long publicKeyId =
+                prepareFailedPublicKeyDownload(
+                        // Failure cases where we give up on the download.
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
+        long metadataId = prepareMetadataDownload("http://test-metadata.org");
+
+        assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isFalse();
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
+        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(metadataId)).isFalse();
+        verify(mDownloadHelper, never()).startDownload(anyString());
+    }
+
+    @Test
+    public void testDownloader_metadataDownloadSuccess_startContentDownload() {
+        long metadataId = prepareSuccessfulMetadataDownload(new File("log_list.sig"));
+        long contentId = prepareContentDownload("http://test-content.org");
+
+        assertThat(mCertificateTransparencyDownloader.isContentDownloadId(contentId)).isFalse();
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(metadataId));
 
@@ -135,141 +204,166 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void testDownloader_metadataDownloadFail_doNotStartContentDownload() {
-        long metadataId = 123;
-        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        String contentUrl = "http://test-content.org";
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUrl);
+        long metadataId =
+                prepareFailedMetadataDownload(
+                        // Failure cases where we give up on the download.
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        DownloadManager.ERROR_HTTP_DATA_ERROR);
         Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
-        // In all these failure cases we give up on the download.
-        when(mDownloadHelper.getDownloadStatus(metadataId))
-                .thenReturn(
-                        makeHttpErrorDownloadStatus(metadataId),
-                        makeStorageErrorDownloadStatus(metadataId));
+        long contentId = prepareContentDownload("http://test-content.org");
 
+        assertThat(mCertificateTransparencyDownloader.isContentDownloadId(contentId)).isFalse();
         mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
         mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
 
-        verify(mDownloadHelper, never()).startDownload(contentUrl);
+        assertThat(mCertificateTransparencyDownloader.isContentDownloadId(contentId)).isFalse();
+        verify(mDownloadHelper, never()).startDownload(anyString());
     }
 
     @Test
     public void testDownloader_contentDownloadSuccess_installSuccess_updateDataStore()
             throws Exception {
-        String version = "456";
-        long contentId = 666;
-        File logListFile = File.createTempFile("log_list", "json");
-        Uri contentUri = Uri.fromFile(logListFile);
-        long metadataId = 123;
+        String newVersion = "456";
+        File logListFile = makeLogListFile(newVersion);
         File metadataFile = sign(logListFile);
-        Uri metadataUri = Uri.fromFile(metadataFile);
-        mCertificateTransparencyDownloader.setPublicKey(
-                Base64.getEncoder().encodeToString(mPublicKey.getEncoded()));
-        setUpContentDownloadCompleteSuccessful(
-                version, metadataId, metadataUri, contentId, contentUri);
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        prepareSuccessfulMetadataDownload(metadataFile);
+        long contentId = prepareSuccessfulContentDownload(logListFile);
         when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), eq(version)))
+                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
                 .thenReturn(true);
 
-        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
-        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
-        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+        assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
 
-        verify(mCertificateTransparencyInstaller, times(1))
-                .install(eq(Config.COMPATIBILITY_VERSION), any(), eq(version));
-        assertThat(mDataStore.getProperty(Config.VERSION)).isEqualTo(version);
-        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isEqualTo(contentUri.toString());
-        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isEqualTo(metadataUri.toString());
+        assertInstallSuccessful(newVersion);
     }
 
     @Test
     public void testDownloader_contentDownloadFail_doNotInstall() throws Exception {
-        mDataStore.setProperty(Config.VERSION_PENDING, "123");
-        long contentId = 666;
+        long contentId =
+                prepareFailedContentDownload(
+                        // Failure cases where we give up on the download.
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        DownloadManager.ERROR_HTTP_DATA_ERROR);
         Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
-        // In all these failure cases we give up on the download.
-        when(mDownloadHelper.getDownloadStatus(contentId))
-                .thenReturn(
-                        makeHttpErrorDownloadStatus(contentId),
-                        makeStorageErrorDownloadStatus(contentId));
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
         mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
         mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
 
         verify(mCertificateTransparencyInstaller, never()).install(any(), any(), any());
-        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
-        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
-        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+        assertNoVersionIsInstalled();
     }
 
     @Test
     public void testDownloader_contentDownloadSuccess_installFail_doNotUpdateDataStore()
             throws Exception {
-        String version = "456";
-        long contentId = 666;
-        File logListFile = File.createTempFile("log_list", "json");
-        Uri contentUri = Uri.fromFile(logListFile);
-        long metadataId = 123;
+        File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
-        Uri metadataUri = Uri.fromFile(metadataFile);
-        setUpContentDownloadCompleteSuccessful(
-                version, metadataId, metadataUri, contentId, contentUri);
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        prepareSuccessfulMetadataDownload(metadataFile);
+        long contentId = prepareSuccessfulContentDownload(logListFile);
         when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), eq(version)))
+                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
                 .thenReturn(false);
 
+        assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
 
-        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
-        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
-        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+        assertNoVersionIsInstalled();
     }
 
     @Test
     public void testDownloader_contentDownloadSuccess_verificationFail_doNotInstall()
-            throws IOException {
-        String version = "456";
-        long contentId = 666;
-        Uri contentUri = Uri.fromFile(File.createTempFile("log_list", "json"));
-        long metadataId = 123;
-        Uri metadataUri = Uri.fromFile(File.createTempFile("log_list-wrong_metadata", "sig"));
-        setUpContentDownloadCompleteSuccessful(
-                version, metadataId, metadataUri, contentId, contentUri);
+            throws Exception {
+        File logListFile = makeLogListFile("456");
+        File metadataFile = File.createTempFile("log_list-wrong_metadata", "sig");
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        prepareSuccessfulMetadataDownload(metadataFile);
+        long contentId = prepareSuccessfulContentDownload(logListFile);
 
+        assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
 
         verify(mCertificateTransparencyInstaller, never())
-                .install(eq(Config.COMPATIBILITY_VERSION), any(), eq(version));
-        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
-        assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
-        assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+                .install(eq(Config.COMPATIBILITY_VERSION), any(), anyString());
+        assertNoVersionIsInstalled();
     }
 
     @Test
     public void testDownloader_contentDownloadSuccess_missingVerificationPublicKey_doNotInstall()
             throws Exception {
-        String version = "456";
-        long contentId = 666;
-        File logListFile = File.createTempFile("log_list", "json");
-        Uri contentUri = Uri.fromFile(logListFile);
-        long metadataId = 123;
+        File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
-        Uri metadataUri = Uri.fromFile(metadataFile);
-        setUpContentDownloadCompleteSuccessful(
-                version, metadataId, metadataUri, contentId, contentUri);
+        mSignatureVerifier.resetPublicKey();
+        prepareSuccessfulMetadataDownload(metadataFile);
+        long contentId = prepareSuccessfulContentDownload(logListFile);
 
+        assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
                 mContext, makeDownloadCompleteIntent(contentId));
 
         verify(mCertificateTransparencyInstaller, never())
-                .install(eq(Config.COMPATIBILITY_VERSION), any(), eq(version));
+                .install(eq(Config.COMPATIBILITY_VERSION), any(), anyString());
+        assertNoVersionIsInstalled();
+    }
+
+    @Test
+    public void testDownloader_endToEndSuccess_installNewVersion() throws Exception {
+        String newVersion = "456";
+        File logListFile = makeLogListFile(newVersion);
+        File metadataFile = sign(logListFile);
+        File publicKeyFile = writePublicKeyToFile(mPublicKey);
+
+        assertNoVersionIsInstalled();
+
+        // 1. Start download of public key.
+        String publicKeyUrl = "http://test-public-key.org";
+        long publicKeyId = preparePublicKeyDownload(publicKeyUrl);
+
+        mCertificateTransparencyDownloader.startPublicKeyDownload(publicKeyUrl);
+
+        // 2. On successful public key download, set the key and start the metatadata download.
+        setSuccessfulDownload(publicKeyId, publicKeyFile);
+        long metadataId = prepareMetadataDownload("http://test-metadata.org");
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(publicKeyId));
+
+        // 3. On successful metadata download, start the content download.
+        setSuccessfulDownload(metadataId, metadataFile);
+        long contentId = prepareContentDownload("http://test-content.org");
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(metadataId));
+
+        // 4. On successful content download, verify the signature and install the new version.
+        setSuccessfulDownload(contentId, logListFile);
+        when(mCertificateTransparencyInstaller.install(
+                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
+                .thenReturn(true);
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(contentId));
+
+        assertInstallSuccessful(newVersion);
+    }
+
+    private void assertNoVersionIsInstalled() {
         assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
         assertThat(mDataStore.getProperty(Config.CONTENT_URL)).isNull();
         assertThat(mDataStore.getProperty(Config.METADATA_URL)).isNull();
+    }
+
+    private void assertInstallSuccessful(String version) {
+        assertThat(mDataStore.getProperty(Config.VERSION)).isEqualTo(version);
+        assertThat(mDataStore.getProperty(Config.CONTENT_URL))
+                .isEqualTo(mDataStore.getProperty(Config.CONTENT_URL_PENDING));
+        assertThat(mDataStore.getProperty(Config.METADATA_URL))
+                .isEqualTo(mDataStore.getProperty(Config.METADATA_URL_PENDING));
     }
 
     private Intent makeDownloadCompleteIntent(long downloadId) {
@@ -277,20 +371,103 @@ public class CertificateTransparencyDownloaderTest {
                 .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
     }
 
-    private void setUpContentDownloadCompleteSuccessful(
-            String version, long metadataId, Uri metadataUri, long contentId, Uri contentUri)
-            throws IOException {
-        mDataStore.setProperty(Config.VERSION_PENDING, version);
+    private long prepareDownloadId(String url) {
+        long downloadId = mNextDownloadId++;
+        when(mDownloadHelper.startDownload(url)).thenReturn(downloadId);
+        return downloadId;
+    }
 
-        mDataStore.setPropertyLong(Config.METADATA_URL_KEY, metadataId);
-        mDataStore.setProperty(Config.METADATA_URL_PENDING, metadataUri.toString());
-        when(mDownloadHelper.getUri(metadataId)).thenReturn(metadataUri);
+    private long preparePublicKeyDownload(String url) {
+        long downloadId = prepareDownloadId(url);
+        mDataStore.setProperty(Config.PUBLIC_KEY_URL_PENDING, url);
+        return downloadId;
+    }
 
-        mDataStore.setPropertyLong(Config.CONTENT_URL_KEY, contentId);
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, contentUri.toString());
-        when(mDownloadHelper.getDownloadStatus(contentId))
-                .thenReturn(makeSuccessfulDownloadStatus(contentId));
-        when(mDownloadHelper.getUri(contentId)).thenReturn(contentUri);
+    private long prepareMetadataDownload(String url) {
+        long downloadId = prepareDownloadId(url);
+        mDataStore.setProperty(Config.METADATA_URL_PENDING, url);
+        return downloadId;
+    }
+
+    private long prepareContentDownload(String url) {
+        long downloadId = prepareDownloadId(url);
+        mDataStore.setProperty(Config.CONTENT_URL_PENDING, url);
+        return downloadId;
+    }
+
+    private long prepareSuccessfulDownload(String propertyKey) {
+        long downloadId = mNextDownloadId++;
+        mDataStore.setPropertyLong(propertyKey, downloadId);
+        when(mDownloadHelper.getDownloadStatus(downloadId))
+                .thenReturn(makeSuccessfulDownloadStatus(downloadId));
+        return downloadId;
+    }
+
+    private long prepareSuccessfulDownload(String propertyKey, File file) {
+        long downloadId = prepareSuccessfulDownload(propertyKey);
+        when(mDownloadHelper.getUri(downloadId)).thenReturn(Uri.fromFile(file));
+        return downloadId;
+    }
+
+    private long prepareSuccessfulPublicKeyDownload(File file) {
+        long downloadId = prepareSuccessfulDownload(Config.PUBLIC_KEY_URL_KEY, file);
+        mDataStore.setProperty(
+                Config.METADATA_URL_PENDING, "http://public-key-was-downloaded-here.org");
+        return downloadId;
+    }
+
+    private long prepareSuccessfulMetadataDownload(File file) {
+        long downloadId = prepareSuccessfulDownload(Config.METADATA_URL_KEY, file);
+        mDataStore.setProperty(
+                Config.METADATA_URL_PENDING, "http://metadata-was-downloaded-here.org");
+        return downloadId;
+    }
+
+    private long prepareSuccessfulContentDownload(File file) {
+        long downloadId = prepareSuccessfulDownload(Config.CONTENT_URL_KEY, file);
+        mDataStore.setProperty(
+                Config.CONTENT_URL_PENDING, "http://content-was-downloaded-here.org");
+        return downloadId;
+    }
+
+    private void setSuccessfulDownload(long downloadId, File file) {
+        when(mDownloadHelper.getDownloadStatus(downloadId))
+                .thenReturn(makeSuccessfulDownloadStatus(downloadId));
+        when(mDownloadHelper.getUri(downloadId)).thenReturn(Uri.fromFile(file));
+    }
+
+    private long prepareFailedDownload(String propertyKey, int... downloadManagerErrors) {
+        long downloadId = mNextDownloadId++;
+        mDataStore.setPropertyLong(propertyKey, downloadId);
+        DownloadStatus firstError =
+                DownloadStatus.builder()
+                        .setDownloadId(downloadId)
+                        .setStatus(DownloadManager.STATUS_FAILED)
+                        .setReason(downloadManagerErrors[0])
+                        .build();
+        DownloadStatus[] otherErrors = new DownloadStatus[downloadManagerErrors.length - 1];
+        for (int i = 1; i < downloadManagerErrors.length; i++) {
+            otherErrors[i - 1] =
+                    DownloadStatus.builder()
+                            .setDownloadId(downloadId)
+                            .setStatus(DownloadManager.STATUS_FAILED)
+                            .setReason(downloadManagerErrors[i])
+                            .build();
+        }
+        when(mDownloadHelper.getDownloadStatus(downloadId)).thenReturn(firstError, otherErrors);
+        return downloadId;
+    }
+
+    private long prepareFailedPublicKeyDownload(int... downloadManagerErrors) {
+        return prepareFailedDownload(Config.PUBLIC_KEY_URL_KEY, downloadManagerErrors);
+    }
+
+    private long prepareFailedMetadataDownload(int... downloadManagerErrors) {
+        return prepareFailedDownload(Config.METADATA_URL_KEY, downloadManagerErrors);
+    }
+
+    private long prepareFailedContentDownload(int... downloadManagerErrors) {
+        return prepareFailedDownload(Config.CONTENT_URL_KEY, downloadManagerErrors);
     }
 
     private DownloadStatus makeSuccessfulDownloadStatus(long downloadId) {
@@ -300,20 +477,29 @@ public class CertificateTransparencyDownloaderTest {
                 .build();
     }
 
-    private DownloadStatus makeStorageErrorDownloadStatus(long downloadId) {
-        return DownloadStatus.builder()
-                .setDownloadId(downloadId)
-                .setStatus(DownloadManager.STATUS_FAILED)
-                .setReason(DownloadManager.ERROR_INSUFFICIENT_SPACE)
-                .build();
+    private File writePublicKeyToFile(PublicKey publicKey)
+            throws IOException, GeneralSecurityException {
+        return writeToFile(Base64.getEncoder().encode(publicKey.getEncoded()));
     }
 
-    private DownloadStatus makeHttpErrorDownloadStatus(long downloadId) {
-        return DownloadStatus.builder()
-                .setDownloadId(downloadId)
-                .setStatus(DownloadManager.STATUS_FAILED)
-                .setReason(DownloadManager.ERROR_HTTP_DATA_ERROR)
-                .build();
+    private File writeToFile(byte[] bytes) throws IOException, GeneralSecurityException {
+        File file = File.createTempFile("temp_file", "tmp");
+
+        try (OutputStream outputStream = new FileOutputStream(file)) {
+            outputStream.write(bytes);
+        }
+
+        return file;
+    }
+
+    private File makeLogListFile(String version) throws IOException, JSONException {
+        File logListFile = File.createTempFile("log_list", "json");
+
+        try (OutputStream outputStream = new FileOutputStream(logListFile)) {
+            outputStream.write(new JSONObject().put("version", version).toString().getBytes(UTF_8));
+        }
+
+        return logListFile;
     }
 
     private File sign(File file) throws IOException, GeneralSecurityException {

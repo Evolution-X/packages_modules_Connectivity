@@ -55,4 +55,13 @@ final class Config {
     static final String METADATA_URL_PENDING = "metadata_url_pending";
     static final String METADATA_URL = "metadata_url";
     static final String METADATA_URL_KEY = "metadata_url_key";
+    static final String PUBLIC_KEY_URL_PENDING = "public_key_url_pending";
+    static final String PUBLIC_KEY_URL = "public_key_url";
+    static final String PUBLIC_KEY_URL_KEY = "public_key_url_key";
+
+    // URLs
+    static final String URL_BASE = "https://www.gstatic.com/android/certificate_transparency/";
+    static final String URL_LOG_LIST = URL_BASE + "log_list.json";
+    static final String URL_SIGNATURE = URL_BASE + "log_list.sig";
+    static final String URL_PUBLIC_KEY = URL_BASE + "log_list.pub";
 }

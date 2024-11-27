@@ -24,10 +24,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.SystemClock;
-import android.provider.DeviceConfig;
 import android.util.Log;
-
-import java.util.HashMap;
 
 /** Implementation of the Certificate Transparency job */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -40,18 +37,14 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private final Context mContext;
     private final DataStore mDataStore;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
-    // TODO(b/374692404): remove dependency to flags.
-    private final CertificateTransparencyFlagsListener mFlagsListener;
     private final AlarmManager mAlarmManager;
 
     /** Creates a new {@link CertificateTransparencyJob} object. */
     public CertificateTransparencyJob(
             Context context,
             DataStore dataStore,
-            CertificateTransparencyDownloader certificateTransparencyDownloader,
-            CertificateTransparencyFlagsListener flagsListener) {
+            CertificateTransparencyDownloader certificateTransparencyDownloader) {
         mContext = context;
-        mFlagsListener = flagsListener;
         mDataStore = dataStore;
         mCertificateTransparencyDownloader = certificateTransparencyDownloader;
         mAlarmManager = context.getSystemService(AlarmManager.class);
@@ -81,7 +74,15 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Log.w(TAG, "Received unexpected broadcast with action " + intent);
             return;
         }
-        mFlagsListener.onPropertiesChanged(
-                new DeviceConfig.Properties(Config.NAMESPACE_NETWORK_SECURITY, new HashMap<>()));
+        if (Config.DEBUG) {
+            Log.d(TAG, "Starting CT daily job.");
+        }
+
+        mDataStore.setProperty(Config.CONTENT_URL_PENDING, Config.URL_LOG_LIST);
+        mDataStore.setProperty(Config.METADATA_URL_PENDING, Config.URL_SIGNATURE);
+        mDataStore.setProperty(Config.PUBLIC_KEY_URL_PENDING, Config.URL_PUBLIC_KEY);
+        mDataStore.store();
+
+        mCertificateTransparencyDownloader.startPublicKeyDownload(Config.URL_PUBLIC_KEY);
     }
 }
