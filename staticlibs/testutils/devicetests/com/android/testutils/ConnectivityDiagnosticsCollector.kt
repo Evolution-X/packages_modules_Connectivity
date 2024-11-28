@@ -112,7 +112,7 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
     override fun onSetUp() {
         assertNull(instance, "ConnectivityDiagnosticsCollectors were set up multiple times")
         instance = this
-        TryTestConfig.setDiagnosticsCollector { throwable ->
+        TryTestConfig.swapDiagnosticsCollector { throwable ->
             if (runOnFailure(throwable)) {
                 collectTestFailureDiagnostics(throwable)
             }
