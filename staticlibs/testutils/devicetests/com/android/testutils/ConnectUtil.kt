@@ -53,6 +53,10 @@ private const val WIFI_ERROR_IN_PROGRESS = 1
 private const val WIFI_ERROR_BUSY = 2
 
 class ConnectUtil(private val context: Context) {
+    companion object {
+        @JvmStatic
+        val VIRTUAL_SSIDS = listOf("VirtWifi", "AndroidWifi")
+    }
     private val TAG = ConnectUtil::class.java.simpleName
 
     private val cm = context.getSystemService(ConnectivityManager::class.java)
@@ -207,9 +211,8 @@ class ConnectUtil(private val context: Context) {
      */
     private fun maybeConfigureVirtualNetwork(scanResults: List<ScanResult>): WifiConfiguration? {
         // Virtual wifi networks used on the emulator and cloud testing infrastructure
-        val virtualSsids = listOf("VirtWifi", "AndroidWifi")
         Log.d(TAG, "Wifi scan results: $scanResults")
-        val virtualScanResult = scanResults.firstOrNull { virtualSsids.contains(it.SSID) }
+        val virtualScanResult = scanResults.firstOrNull { VIRTUAL_SSIDS.contains(it.SSID) }
                 ?: return null
 
         // Only add the virtual configuration if the virtual AP is detected in scans
