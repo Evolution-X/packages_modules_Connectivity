@@ -952,9 +952,8 @@ public class ConnectivityManagerTest {
         final List<InetAddress> cellNetworkAddresses = cellLinkProperties.getAddresses();
         // In userdebug build, on cellular network, if the onNetwork check failed, we also try to
         // re-verify it by obtaining the IP address through DNS query.
-        boolean isUserDebug = Build.isDebuggable();
         if (cellAddress instanceof Inet6Address) {
-            if (isUserDebug && !cellNetworkAddresses.contains(cellAddress)) {
+            if (DeviceInfoUtils.isDebuggable() && !cellNetworkAddresses.contains(cellAddress)) {
                 final InetAddress ipv6AddressThroughDns = InetAddresses.parseNumericAddress(
                         getDeviceIpv6AddressThroughDnsQuery(cellNetwork));
                 assertContains(cellNetworkAddresses, ipv6AddressThroughDns);

@@ -16,6 +16,10 @@
 
 package com.android.testutils;
 
+import static com.android.modules.utils.build.SdkLevel.isAtLeastS;
+
+import android.os.Build;
+import android.os.SystemProperties;
 import android.os.VintfRuntimeInfo;
 import android.text.TextUtils;
 import android.util.Pair;
@@ -172,5 +176,15 @@ public class DeviceInfoUtils {
         final KVersion current = DeviceInfoUtils.getMajorMinorSubminorVersion(kernelVersion);
         final KVersion from = DeviceInfoUtils.getMajorMinorSubminorVersion(version);
         return current.isAtLeast(from);
+    }
+
+    /**
+     * Check if the current build is a debuggable build.
+     */
+    public static boolean isDebuggable() {
+        if (isAtLeastS()) {
+            return Build.isDebuggable();
+        }
+        return SystemProperties.getInt("ro.debuggable", 0) == 1;
     }
 }
