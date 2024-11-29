@@ -47,21 +47,17 @@ final class Config {
     static final String FLAG_PUBLIC_KEY = FLAGS_PREFIX + "public_key";
 
     // properties
-    static final String VERSION_PENDING = "version_pending";
     static final String VERSION = "version";
-    static final String CONTENT_URL_PENDING = "content_url_pending";
     static final String CONTENT_URL = "content_url";
-    static final String CONTENT_URL_KEY = "content_url_key";
-    static final String METADATA_URL_PENDING = "metadata_url_pending";
+    static final String CONTENT_DOWNLOAD_ID = "content_download_id";
     static final String METADATA_URL = "metadata_url";
-    static final String METADATA_URL_KEY = "metadata_url_key";
-    static final String PUBLIC_KEY_URL_PENDING = "public_key_url_pending";
+    static final String METADATA_DOWNLOAD_ID = "metadata_download_id";
     static final String PUBLIC_KEY_URL = "public_key_url";
-    static final String PUBLIC_KEY_URL_KEY = "public_key_url_key";
+    static final String PUBLIC_KEY_DOWNLOAD_ID = "public_key_download_id";
 
     // URLs
-    static final String URL_BASE = "https://www.gstatic.com/android/certificate_transparency/";
-    static final String URL_LOG_LIST = URL_BASE + "log_list.json";
-    static final String URL_SIGNATURE = URL_BASE + "log_list.sig";
-    static final String URL_PUBLIC_KEY = URL_BASE + "log_list.pub";
+    static final String URL_PREFIX = "https://www.gstatic.com/android/certificate_transparency/";
+    static final String URL_LOG_LIST = URL_PREFIX + "log_list.json";
+    static final String URL_SIGNATURE = URL_PREFIX + "log_list.sig";
+    static final String URL_PUBLIC_KEY = URL_PREFIX + "log_list.pub";
 }
