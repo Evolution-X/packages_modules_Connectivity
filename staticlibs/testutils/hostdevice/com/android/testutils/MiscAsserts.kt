@@ -20,6 +20,7 @@ package com.android.testutils
 
 import com.android.testutils.FunctionalUtils.ThrowingRunnable
 import java.lang.reflect.Modifier
+import java.util.concurrent.TimeUnit
 import java.util.function.BooleanSupplier
 import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
@@ -134,7 +135,7 @@ fun assertEventuallyTrue(
     // on host). When waiting for a condition during tests the device would generally not go into
     // deep sleep, and the polling sleep would go over the timeout anyway in that case, so this is
     // fine.
-    val limit = System.nanoTime() + timeoutMs * 1000
+    val limit = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
     while (!fn.asBoolean) {
         if (System.nanoTime() > limit) {
             fail(descr)
