@@ -247,3 +247,11 @@ package android.net {
 
 }
 
+package android.net.http {
+
+  public abstract class HttpEngine {
+    method @FlaggedApi("android.net.http.preload_httpengine_in_zygote") public static void preload();
+  }
+
+}
+
