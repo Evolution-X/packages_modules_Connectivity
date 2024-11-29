@@ -78,11 +78,15 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Log.d(TAG, "Starting CT daily job.");
         }
 
-        mDataStore.setProperty(Config.CONTENT_URL_PENDING, Config.URL_LOG_LIST);
-        mDataStore.setProperty(Config.METADATA_URL_PENDING, Config.URL_SIGNATURE);
-        mDataStore.setProperty(Config.PUBLIC_KEY_URL_PENDING, Config.URL_PUBLIC_KEY);
+        mDataStore.setProperty(Config.CONTENT_URL, Config.URL_LOG_LIST);
+        mDataStore.setProperty(Config.METADATA_URL, Config.URL_SIGNATURE);
+        mDataStore.setProperty(Config.PUBLIC_KEY_URL, Config.URL_PUBLIC_KEY);
         mDataStore.store();
 
-        mCertificateTransparencyDownloader.startPublicKeyDownload(Config.URL_PUBLIC_KEY);
+        if (mCertificateTransparencyDownloader.startPublicKeyDownload() == -1) {
+            Log.e(TAG, "Public key download not started.");
+        } else if (Config.DEBUG) {
+            Log.d(TAG, "Public key download started successfully.");
+        }
     }
 }
