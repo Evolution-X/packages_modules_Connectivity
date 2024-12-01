@@ -21,6 +21,8 @@ package android.net.cts
 
 import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
+import android.content.pm.PackageManager
+import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
 import android.net.Network
@@ -50,6 +52,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
+import android.os.UserManager
 import android.platform.test.annotations.AppModeFull
 import android.provider.DeviceConfig
 import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
@@ -141,15 +144,34 @@ class ApfIntegrationTest {
         fun turnScreenOff() {
             if (!wakeLock.isHeld()) wakeLock.acquire()
             runShellCommandOrThrow("input keyevent KEYCODE_SLEEP")
-            val result = pollingCheck({ !powerManager.isInteractive() }, timeout_ms = 2000)
-            assertThat(result).isTrue()
+            waitForInteractiveState(false)
         }
 
         fun turnScreenOn() {
             if (wakeLock.isHeld()) wakeLock.release()
             runShellCommandOrThrow("input keyevent KEYCODE_WAKEUP")
-            val result = pollingCheck({ powerManager.isInteractive() }, timeout_ms = 2000)
-            assertThat(result).isTrue()
+            waitForInteractiveState(true)
+        }
+
+        private fun waitForInteractiveState(interactive: Boolean) {
+            // TODO(b/366037029): This test condition should be removed once
+            // PowerManager#isInteractive is fully implemented on automotive
+            // form factor with visible background user.
+            if (isAutomotiveWithVisibleBackgroundUser()) {
+                // Wait for 2 seconds to ensure the interactive state is updated.
+                // This is a workaround for b/366037029.
+                Thread.sleep(2000L)
+            } else {
+                val result = pollingCheck({ powerManager.isInteractive() }, timeout_ms = 2000)
+                assertThat(result).isEqualTo(interactive)
+            }
+        }
+
+        private fun isAutomotiveWithVisibleBackgroundUser(): Boolean {
+            val packageManager = context.getPackageManager()
+            val userManager = context.getSystemService(UserManager::class.java)!!
+            return (packageManager.hasSystemFeature(FEATURE_AUTOMOTIVE)
+                    && userManager.isVisibleBackgroundUsersSupported)
         }
 
         @BeforeClass
@@ -157,9 +179,11 @@ class ApfIntegrationTest {
         @Suppress("ktlint:standard:no-multi-spaces")
         fun setupOnce() {
             // TODO: assertions thrown in @BeforeClass / @AfterClass are not well supported in the
-            // test infrastructure. Consider saving excepion and throwing it in setUp().
+            // test infrastructure. Consider saving exception and throwing it in setUp().
+
             // APF must run when the screen is off and the device is not interactive.
             turnScreenOff()
+
             // Wait for APF to become active.
             Thread.sleep(1000)
             // TODO: check that there is no active wifi network. Otherwise, ApfFilter has already been
