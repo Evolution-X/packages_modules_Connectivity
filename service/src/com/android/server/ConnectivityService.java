@@ -48,6 +48,7 @@ import static android.net.ConnectivityManager.CALLBACK_LOCAL_NETWORK_INFO_CHANGE
 import static android.net.ConnectivityManager.CALLBACK_LOSING;
 import static android.net.ConnectivityManager.CALLBACK_LOST;
 import static android.net.ConnectivityManager.CALLBACK_PRECHECK;
+import static android.net.ConnectivityManager.CALLBACK_RESERVED;
 import static android.net.ConnectivityManager.CALLBACK_RESUMED;
 import static android.net.ConnectivityManager.CALLBACK_SUSPENDED;
 import static android.net.ConnectivityManager.CALLBACK_UNAVAIL;
@@ -8211,6 +8212,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         flags = maybeAppendDeclaredMethod(flags, CALLBACK_BLK_CHANGED, "BLK", sb);
         flags = maybeAppendDeclaredMethod(flags, CALLBACK_LOCAL_NETWORK_INFO_CHANGED,
                 "LOCALINF", sb);
+        flags = maybeAppendDeclaredMethod(flags, CALLBACK_RESERVED, "RES", sb);
         if (flags != 0) {
             sb.append("|0x").append(Integer.toHexString(flags));
         }
