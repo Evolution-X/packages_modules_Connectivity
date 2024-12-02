@@ -130,7 +130,7 @@ public class NetworkRequestTest {
         verifyNoCapabilities(builder.build());
     }
 
-    @Test @IgnoreUpTo(Build.VERSION_CODES.Q)
+    @Test
     public void testTemporarilyNotMeteredCapability() {
         assertTrue(new NetworkRequest.Builder()
                 .addCapability(NET_CAPABILITY_TEMPORARILY_NOT_METERED).build()
@@ -157,7 +157,6 @@ public class NetworkRequestTest {
     }
 
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.Q)
     public void testSpecifier() {
         assertNull(new NetworkRequest.Builder().build().getNetworkSpecifier());
         final WifiNetworkSpecifier specifier = new WifiNetworkSpecifier.Builder()
@@ -192,7 +191,6 @@ public class NetworkRequestTest {
     }
 
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.Q)
     public void testRequestorPackageName() {
         assertNull(new NetworkRequest.Builder().build().getRequestorPackageName());
         final String pkgName = "android.net.test";
@@ -216,7 +214,6 @@ public class NetworkRequestTest {
     }
 
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.Q)
     public void testCanBeSatisfiedBy() {
         final LocalNetworkSpecifier specifier1 = new LocalNetworkSpecifier(1234 /* id */);
         final LocalNetworkSpecifier specifier2 = new LocalNetworkSpecifier(5678 /* id */);
@@ -284,7 +281,6 @@ public class NetworkRequestTest {
     }
 
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.Q)
     public void testInvariantInCanBeSatisfiedBy() {
         // Test invariant that result of NetworkRequest.canBeSatisfiedBy() should be the same with
         // NetworkCapabilities.satisfiedByNetworkCapabilities().
@@ -388,7 +384,7 @@ public class NetworkRequestTest {
                 otherUidsRequest.canBeSatisfiedBy(ncWithOtherUid));
     }
 
-    @Test @IgnoreUpTo(Build.VERSION_CODES.Q)
+    @Test
     public void testRequestorUid() {
         final NetworkCapabilities nc = new NetworkCapabilities();
         // Verify default value is INVALID_UID
