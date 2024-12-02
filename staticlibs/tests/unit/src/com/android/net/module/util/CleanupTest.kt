@@ -17,14 +17,19 @@
 package com.android.net.module.util
 
 import android.util.Log
+import com.android.testutils.TryTestConfig
 import com.android.testutils.tryTest
+import java.util.function.Consumer
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.test.fail
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
-import kotlin.test.fail
 
 private val TAG = CleanupTest::class.simpleName
 
@@ -33,6 +38,18 @@ class CleanupTest {
     class TestException1 : Exception()
     class TestException2 : Exception()
     class TestException3 : Exception()
+
+    private var originalDiagnosticsCollector: Consumer<Throwable>? = null
+
+    @Before
+    fun setUp() {
+        originalDiagnosticsCollector = TryTestConfig.swapDiagnosticsCollector(null)
+    }
+
+    @After
+    fun tearDown() {
+        TryTestConfig.swapDiagnosticsCollector(originalDiagnosticsCollector)
+    }
 
     @Test
     fun testNotThrow() {
@@ -219,5 +236,75 @@ class CleanupTest {
         assertTrue(thrown.suppressedExceptions[0] is TestException2)
         assertTrue(thrown.suppressedExceptions[1] is TestException3)
         assert(x == 7)
+    }
+
+    @Test
+    fun testNoErrorReportingWhenCaught() {
+        var error: Throwable? = null
+        TryTestConfig.swapDiagnosticsCollector {
+            error = it
+        }
+        var x = 1
+        tryTest {
+            x = 2
+            throw TestException1()
+            x = 3
+        }.catch<TestException1> {
+            x = 4
+        } cleanup {
+            x = 5
+        }
+
+        assertEquals(5, x)
+        assertNull(error)
+    }
+
+    @Test
+    fun testErrorReportingInTry() {
+        var error: Throwable? = null
+        TryTestConfig.swapDiagnosticsCollector {
+            assertNull(error)
+            error = it
+        }
+        var x = 1
+        assertFailsWith<TestException1> {
+            tryTest {
+                x = 2
+                throw TestException1()
+                x = 3
+            } cleanupStep {
+                throw TestException2()
+                x = 4
+            } cleanup {
+                x = 5
+            }
+        }
+
+        assertEquals(5, x)
+        assertTrue(error is TestException1)
+    }
+
+    @Test
+    fun testErrorReportingInCatch() {
+        var error: Throwable? = null
+        TryTestConfig.swapDiagnosticsCollector {
+            assertNull(error)
+            error = it
+        }
+        var x = 1
+        assertFailsWith<TestException2> {
+            tryTest {
+                throw TestException1()
+                x = 2
+            }.catch<TestException1> {
+                throw TestException2()
+                x = 3
+            } cleanup {
+                x = 4
+            }
+        }
+
+        assertEquals(4, x)
+        assertTrue(error is TestException2)
     }
 }
