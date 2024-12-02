@@ -19,7 +19,7 @@ package com.android.net.module.util
 import android.util.SparseArray
 import androidx.test.filters.SmallTest
 import androidx.test.runner.AndroidJUnit4
-import com.android.testutils.assertThrows
+import kotlin.test.assertContentEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
@@ -195,5 +195,89 @@ class CollectionUtilsTest {
         assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1))
         assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1Copy))
         assertEquals(2, CollectionUtils.getIndexForValue(sparseArray, value2))
+    }
+
+    @Test
+    fun testConcatEmptyByteArrays() {
+        assertContentEquals(
+                byteArrayOf(),
+                CollectionUtils.concatArrays(byteArrayOf(), byteArrayOf())
+        )
+    }
+
+    @Test
+    fun testConcatEmptyStringArrays() {
+        assertContentEquals(
+                arrayOf<String>(),
+                CollectionUtils.concatArrays(
+                        String::class.java,
+                        arrayOf<String>(),
+                        arrayOf<String>()
+                )
+        )
+    }
+
+    @Test
+    fun testConcatByteArrays() {
+        val byteArr1 = byteArrayOf(1, 2, 3)
+        val byteArr2 = byteArrayOf(4, 5, 6)
+        val byteArr3 = byteArrayOf()
+        val byteArrExpected = byteArrayOf(1, 2, 3, 4, 5, 6)
+        assertContentEquals(
+                byteArrExpected,
+                CollectionUtils.concatArrays(byteArr1, byteArr2, byteArr3)
+        )
+    }
+
+    @Test
+    fun testConcatStringArrays() {
+        val stringArr1 = arrayOf("1", "2", "3")
+        val stringArr2 = arrayOf("4", "5", "6")
+        val strinvArr3 = arrayOf<String>()
+        val stringArrExpected = arrayOf("1", "2", "3", "4", "5", "6")
+        assertContentEquals(
+                stringArrExpected,
+                CollectionUtils.concatArrays(String::class.java, stringArr1, stringArr2, strinvArr3)
+        )
+    }
+
+    @Test
+    fun testPrependByteArrays() {
+        val byteArr2 = byteArrayOf(4, 5, 6)
+        val byteArrExpected = byteArrayOf(1, 2, 3, 4, 5, 6)
+        assertContentEquals(
+                byteArrExpected,
+                CollectionUtils.prependArray(byteArr2, 1, 2, 3)
+        )
+    }
+
+    @Test
+    fun testPrependStringArrays() {
+        val stringArr2 = arrayOf("4", "5", "6")
+        val stringArrExpected = arrayOf("1", "2", "3", "4", "5", "6")
+        assertContentEquals(
+                stringArrExpected,
+                CollectionUtils.prependArray(String::class.java, stringArr2, "1", "2", "3")
+        )
+    }
+
+    @Test
+    fun testAppendByteArrays() {
+        val byteArr1 = byteArrayOf(1, 2, 3)
+        val byteArrExpected = byteArrayOf(1, 2, 3, 4, 5, 6)
+        assertContentEquals(
+                byteArrExpected,
+                CollectionUtils.appendArray(byteArr1, 4, 5, 6)
+        )
+    }
+
+    @Test
+    fun testAppendStringArrays() {
+        val stringArr1 = arrayOf("1", "2", "3")
+        val stringArrExpected = arrayOf("1", "2", "3", "4", "5", "6")
+        assertContentEquals(
+                stringArrExpected,
+                CollectionUtils.appendArray(String::class.java, stringArr1, "4", "5", "6")
+        )
     }
 }
