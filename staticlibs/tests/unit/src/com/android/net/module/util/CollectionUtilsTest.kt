@@ -183,17 +183,17 @@ class CollectionUtilsTest {
 
     @Test
     fun testGetIndexForValue() {
-        val sparseArray = SparseArray<String>();
-        sparseArray.put(5, "hello");
-        sparseArray.put(10, "abcd");
-        sparseArray.put(20, null);
+        val sparseArray = SparseArray<String>()
+        sparseArray.put(5, "hello")
+        sparseArray.put(10, "abcd")
+        sparseArray.put(20, null)
 
-        val value1 = "abcd";
+        val value1 = "abcd"
         val value1Copy = String(value1.toCharArray())
-        val value2 = null;
+        val value2 = null
 
-        assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1));
-        assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1Copy));
-        assertEquals(2, CollectionUtils.getIndexForValue(sparseArray, value2));
+        assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1))
+        assertEquals(1, CollectionUtils.getIndexForValue(sparseArray, value1Copy))
+        assertEquals(2, CollectionUtils.getIndexForValue(sparseArray, value2))
     }
 }
