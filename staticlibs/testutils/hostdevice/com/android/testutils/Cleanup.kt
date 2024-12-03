@@ -75,13 +75,21 @@ import javax.annotation.CheckReturnValue
  */
 
 object TryTestConfig {
-    internal var diagnosticsCollector: Consumer<Throwable>? = null
+    private var diagnosticsCollector: Consumer<Throwable>? = null
 
     /**
      * Set the diagnostics collector to be used in case of failure in [tryTest].
+     *
+     * @return The previous collector.
      */
-    fun setDiagnosticsCollector(collector: Consumer<Throwable>) {
+    fun swapDiagnosticsCollector(collector: Consumer<Throwable>?): Consumer<Throwable>? {
+        val oldCollector = diagnosticsCollector
         diagnosticsCollector = collector
+        return oldCollector
+    }
+
+    fun reportError(e: Throwable) {
+        diagnosticsCollector?.accept(e)
     }
 }
 
@@ -90,14 +98,10 @@ fun <T> tryTest(block: () -> T) = TryExpr(
         try {
             Result.success(block())
         } catch (e: Throwable) {
-            TryTestConfig.diagnosticsCollector?.accept(e)
             Result.failure(e)
-        })
+        }, skipErrorReporting = false)
 
-// Some downstream branches have an older kotlin that doesn't know about value classes.
-// TODO : Change this to "value class" when aosp no longer merges into such branches.
-@Suppress("INLINE_CLASS_DEPRECATED")
-inline class TryExpr<T>(val result: Result<T>) {
+class TryExpr<T>(val result: Result<T>, val skipErrorReporting: Boolean) {
     inline infix fun <reified E : Throwable> catch(block: (E) -> T): TryExpr<T> {
         val originalException = result.exceptionOrNull()
         if (originalException !is E) return this
@@ -105,23 +109,32 @@ inline class TryExpr<T>(val result: Result<T>) {
             Result.success(block(originalException))
         } catch (e: Throwable) {
             Result.failure(e)
-        })
+        }, this.skipErrorReporting)
     }
 
     @CheckReturnValue
     inline infix fun cleanupStep(block: () -> Unit): TryExpr<T> {
+        // Report errors before the cleanup step, but after catch blocks that may suppress it
+        val originalException = result.exceptionOrNull()
+        var nextSkipErrorReporting = skipErrorReporting
+        if (!skipErrorReporting && originalException != null) {
+            TryTestConfig.reportError(originalException)
+            nextSkipErrorReporting = true
+        }
         try {
             block()
         } catch (e: Throwable) {
-            val originalException = result.exceptionOrNull()
-            return TryExpr(if (null == originalException) {
-                Result.failure(e)
+            return if (null == originalException) {
+                if (!skipErrorReporting) {
+                    TryTestConfig.reportError(e)
+                }
+                TryExpr(Result.failure(e), skipErrorReporting = true)
             } else {
                 originalException.addSuppressed(e)
-                Result.failure(originalException)
-            })
+                TryExpr(Result.failure(originalException), true)
+            }
         }
-        return this
+        return TryExpr(result, nextSkipErrorReporting)
     }
 
     inline infix fun cleanup(block: () -> Unit): T = cleanupStep(block).result.getOrThrow()
