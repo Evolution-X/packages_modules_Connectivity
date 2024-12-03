@@ -121,7 +121,6 @@ import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_SELF_CER
 import static android.net.connectivity.ConnectivityCompatChanges.NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.VPN_UID;
-import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 import static android.system.OsConstants.ETH_P_ALL;
 import static android.system.OsConstants.IPPROTO_TCP;
 import static android.system.OsConstants.IPPROTO_UDP;
@@ -149,6 +148,7 @@ import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
+import static com.android.server.connectivity.ConnectivityFlags.NAMESPACE_TETHERING_BOOT;
 import static com.android.server.connectivity.ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS;
 import static com.android.server.connectivity.ConnectivityFlags.REQUEST_RESTRICTED_WIFI;
 import static com.android.server.connectivity.ConnectivityFlags.WIFI_DATA_INACTIVITY_TIMEOUT;
@@ -1615,13 +1615,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         /** Returns the data inactivity timeout to be used for cellular networks */
         public int getDefaultCellularDataInactivityTimeout() {
-            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING,
+            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING_BOOT,
                     CELLULAR_DATA_INACTIVITY_TIMEOUT, 10);
         }
 
         /** Returns the data inactivity timeout to be used for WiFi networks */
         public int getDefaultWifiDataInactivityTimeout() {
-            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING,
+            return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING_BOOT,
                     WIFI_DATA_INACTIVITY_TIMEOUT, 15);
         }
 
