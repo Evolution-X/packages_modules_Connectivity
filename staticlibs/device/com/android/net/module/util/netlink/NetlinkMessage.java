@@ -150,6 +150,8 @@ public class NetlinkMessage {
                 return (NetlinkMessage) RtNetlinkNeighborMessage.parse(nlmsghdr, byteBuffer);
             case NetlinkConstants.RTM_NEWNDUSEROPT:
                 return (NetlinkMessage) NduseroptMessage.parse(nlmsghdr, byteBuffer);
+            case NetlinkConstants.RTM_NEWPREFIX:
+                return (NetlinkMessage) RtNetlinkPrefixMessage.parse(nlmsghdr, byteBuffer);
             default: return null;
         }
     }
