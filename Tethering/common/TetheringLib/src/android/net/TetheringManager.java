@@ -258,8 +258,18 @@ public class TetheringManager {
             TETHER_ERROR_INTERNAL_ERROR,
             TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION,
             TETHER_ERROR_UNKNOWN_TYPE,
+            TETHER_ERROR_DUPLICATE_REQUEST,
     })
     public @interface StartTetheringError {
+    }
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(value = {
+            TETHER_ERROR_NO_ERROR,
+            TETHER_ERROR_UNKNOWN_REQUEST,
+    })
+    public @interface StopTetheringError {
     }
 
     public static final int TETHER_ERROR_NO_ERROR = 0;
@@ -279,6 +289,10 @@ public class TetheringManager {
     public static final int TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION = 14;
     public static final int TETHER_ERROR_NO_ACCESS_TETHERING_PERMISSION = 15;
     public static final int TETHER_ERROR_UNKNOWN_TYPE = 16;
+    @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
+    public static final int TETHER_ERROR_UNKNOWN_REQUEST = 17;
+    @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
+    public static final int TETHER_ERROR_DUPLICATE_REQUEST = 18;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -1117,6 +1131,24 @@ public class TetheringManager {
     }
 
     /**
+     * Callback for use with {@link #stopTethering} to find out whether stop tethering succeeded.
+     */
+    @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
+    public interface StopTetheringCallback {
+        /**
+         * Called when tethering has been successfully stopped.
+         */
+        default void onStopTetheringSucceeded() {}
+
+        /**
+         * Called when starting tethering failed.
+         *
+         * @param error The error that caused the failure.
+         */
+        default void onStopTetheringFailed(@StopTetheringError final int error) {}
+    }
+
+    /**
      * Starts tethering and runs tether provisioning for the given type if needed. If provisioning
      * fails, stopTethering will be called automatically.
      *
@@ -1201,6 +1233,20 @@ public class TetheringManager {
                 // results in a TETHER_STATE_CHANGE broadcast.
             }
         }));
+    }
+
+    /**
+     * Stops tethering for the given request. Operation will fail with
+     * {@link #TETHER_ERROR_UNKNOWN_REQUEST} if there is no request that matches it.
+     */
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.TETHER_PRIVILEGED,
+            android.Manifest.permission.WRITE_SETTINGS
+    })
+    @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
+    public void stopTethering(@NonNull TetheringRequest request,
+            @NonNull final Executor executor, @NonNull final StopTetheringCallback callback) {
+        throw new UnsupportedOperationException();
     }
 
     /**
