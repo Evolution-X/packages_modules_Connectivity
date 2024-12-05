@@ -1032,7 +1032,7 @@ public class TetheringTest {
         verify(mWifiManager).updateInterfaceIpState(TEST_WLAN_IFNAME, expectedState);
         verifyNoMoreInteractions(mWifiManager);
 
-        verify(mUpstreamNetworkMonitor).startObserveAllNetworks();
+        verify(mUpstreamNetworkMonitor).startObserveUpstreamNetworks();
         if (isLocalOnly) {
             // There are 2 IpServer state change events: STATE_AVAILABLE -> STATE_LOCAL_ONLY.
             verify(mNotificationUpdater, times(2)).onDownstreamChanged(DOWNSTREAM_NONE);
@@ -1260,7 +1260,7 @@ public class TetheringTest {
         // Start USB tethering with no current upstream.
         prepareUsbTethering();
         sendUsbBroadcast(true, true, TETHER_USB_RNDIS_FUNCTION);
-        inOrder.verify(mUpstreamNetworkMonitor).startObserveAllNetworks();
+        inOrder.verify(mUpstreamNetworkMonitor).startObserveUpstreamNetworks();
         inOrder.verify(mUpstreamNetworkMonitor).setTryCell(true);
 
         // Pretend cellular connected and expect the upstream to be set.
@@ -1859,7 +1859,7 @@ public class TetheringTest {
         // Start USB tethering with no current upstream.
         prepareUsbTethering();
         sendUsbBroadcast(true, true, TETHER_USB_RNDIS_FUNCTION);
-        inOrder.verify(mUpstreamNetworkMonitor).startObserveAllNetworks();
+        inOrder.verify(mUpstreamNetworkMonitor).startObserveUpstreamNetworks();
         inOrder.verify(mUpstreamNetworkMonitor).setTryCell(true);
         ArgumentCaptor<NetworkCallback> captor = ArgumentCaptor.forClass(NetworkCallback.class);
         inOrder.verify(mCm).requestNetwork(any(), eq(0), eq(TYPE_MOBILE_DUN), any(),
@@ -2587,7 +2587,7 @@ public class TetheringTest {
         verify(mNetd, times(1)).tetherStartWithConfiguration(any());
         verifyNoMoreInteractions(mNetd);
         verifyTetheringBroadcast(TEST_P2P_IFNAME, EXTRA_ACTIVE_LOCAL_ONLY);
-        verify(mUpstreamNetworkMonitor, times(1)).startObserveAllNetworks();
+        verify(mUpstreamNetworkMonitor, times(1)).startObserveUpstreamNetworks();
         // There are 2 IpServer state change events: STATE_AVAILABLE -> STATE_LOCAL_ONLY
         verify(mNotificationUpdater, times(2)).onDownstreamChanged(DOWNSTREAM_NONE);
 
@@ -3757,7 +3757,7 @@ public class TetheringTest {
         verifyInterfaceServingModeStarted(TEST_P2P_IFNAME);
         verifyTetheringBroadcast(TEST_P2P_IFNAME, EXTRA_AVAILABLE_TETHER);
         verifyTetheringBroadcast(TEST_P2P_IFNAME, EXTRA_ACTIVE_LOCAL_ONLY);
-        verify(mUpstreamNetworkMonitor).startObserveAllNetworks();
+        verify(mUpstreamNetworkMonitor).startObserveUpstreamNetworks();
         // Verify never enable upstream if only P2P active.
         verify(mUpstreamNetworkMonitor, never()).setTryCell(true);
         assertEquals(TETHER_ERROR_NO_ERROR, mTethering.getLastErrorForTest(TEST_P2P_IFNAME));
