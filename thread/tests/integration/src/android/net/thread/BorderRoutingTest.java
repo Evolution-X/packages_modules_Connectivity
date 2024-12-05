@@ -16,7 +16,6 @@
 
 package android.net.thread;
 
-import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
 import static android.net.thread.utils.IntegrationTestUtils.buildIcmpv4EchoReply;
@@ -38,7 +37,6 @@ import static android.system.OsConstants.ICMP_ECHO;
 
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REPLY_TYPE;
 import static com.android.net.module.util.NetworkStackConstants.ICMPV6_ECHO_REQUEST_TYPE;
-import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -56,7 +54,6 @@ import android.net.LinkProperties;
 import android.net.RouteInfo;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.InfraNetworkDevice;
-import android.net.thread.utils.IntegrationTestUtils;
 import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.TestTunNetworkUtils;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
