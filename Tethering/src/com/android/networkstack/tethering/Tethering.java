@@ -451,6 +451,10 @@ public class Tethering {
         return mSettingsObserver;
     }
 
+    boolean isTetheringWithSoftApConfigEnabled() {
+        return mDeps.isTetheringWithSoftApConfigEnabled();
+    }
+
     /**
      * Start to register callbacks.
      * Call this function when tethering is ready to handle callback events.

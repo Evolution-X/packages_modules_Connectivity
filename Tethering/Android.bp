@@ -63,6 +63,7 @@ java_defaults {
     static_libs: [
         "androidx.annotation_annotation",
         "connectivity-net-module-utils-bpf",
+        "com.android.net.flags-aconfig-java",
         "modules-utils-build",
         "modules-utils-statemachine",
         "networkstack-client",

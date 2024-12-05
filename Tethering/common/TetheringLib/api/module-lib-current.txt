@@ -22,7 +22,7 @@ package android.net {
     method public boolean isTetheringSupported(@NonNull String);
     method public void requestLatestTetheringEntitlementResult(int, @NonNull android.os.ResultReceiver, boolean);
     method @Deprecated public int setUsbTethering(boolean);
-    method @RequiresPermission(anyOf={android.Manifest.permission.TETHER_PRIVILEGED, android.Manifest.permission.WRITE_SETTINGS}) public void startTethering(int, @NonNull java.util.concurrent.Executor, @NonNull android.net.TetheringManager.StartTetheringCallback);
+    method @RequiresPermission(android.Manifest.permission.TETHER_PRIVILEGED) public void startTethering(int, @NonNull java.util.concurrent.Executor, @NonNull android.net.TetheringManager.StartTetheringCallback);
     method @Deprecated public int tether(@NonNull String);
     method @Deprecated public int untether(@NonNull String);
   }
