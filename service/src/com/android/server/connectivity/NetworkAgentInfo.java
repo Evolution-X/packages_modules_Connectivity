@@ -25,6 +25,9 @@ import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkCapabilities.transportNamesOf;
+import static android.system.OsConstants.EIO;
+import static android.system.OsConstants.EEXIST;
+import static android.system.OsConstants.ENOENT;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -57,9 +60,11 @@ import android.net.TcpKeepalivePacketData;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.ServiceSpecificException;
 import android.os.SystemClock;
 import android.telephony.data.EpsBearerQosSessionAttributes;
 import android.telephony.data.NrQosSessionAttributes;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Pair;
@@ -70,6 +75,7 @@ import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.WakeupMessage;
 import com.android.net.module.util.HandlerUtils;
 import com.android.server.ConnectivityService;
+import com.android.server.ConnectivityService.CaptivePortalImpl;
 
 import java.io.PrintWriter;
 import java.net.Inet4Address;
@@ -574,6 +580,10 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     // For fast lookups. Indexes into mInactivityTimers by request ID.
     private final SparseArray<InactivityTimer> mInactivityTimerForRequest = new SparseArray<>();
 
+    // Map of delegated UIDs used to bypass VPN and its captive portal app caller.
+    private final ArrayMap<CaptivePortalImpl, Integer> mCaptivePortalDelegateUids =
+            new ArrayMap<>();
+
     // Inactivity expiry timer. Armed whenever mInactivityTimers is non-empty, regardless of
     // whether the network is inactive or not. Always set to the expiry of the mInactivityTimers
     // that expires last. When the timer fires, all inactivity state is cleared, and if the network
@@ -626,6 +636,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     private final Context mContext;
     private final Handler mHandler;
     private final QosCallbackTracker mQosCallbackTracker;
+    private final INetd mNetd;
 
     private final long mCreationTime;
 
@@ -655,6 +666,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         mConnServiceDeps = deps;
         setScore(score); // uses members connService, networkCapabilities and networkAgentConfig
         clatd = new Nat464Xlat(this, netd, dnsResolver, deps);
+        mNetd = netd;
         mContext = context;
         mHandler = handler;
         this.factorySerialNumber = factorySerialNumber;
@@ -1547,6 +1559,52 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
                 nc, hasAutomotiveFeature, deps, authenticator)) {
             nc.setAllowedUids(new ArraySet<>());
         }
+    }
+
+    private int allowBypassVpnOnNetwork(boolean allow, int uid, int netId) {
+        try {
+            mNetd.networkAllowBypassVpnOnNetwork(allow, uid, netId);
+            return 0;
+        } catch (RemoteException e) {
+            // Netd has crashed, and this process is about to crash as well.
+            return EIO;
+        } catch (ServiceSpecificException e) {
+            return e.errorCode;
+        }
+    }
+
+    /**
+     * Set the delegate UID of the app that is allowed to perform network traffic for captive
+     * portal login, and configure the netd bypass rule with this delegated UID.
+     *
+     * @param caller the captive portal app to that delegated UID
+     * @param uid the delegated UID of the captive portal app.
+     * @return Return 0 if set the UID and VPN bypass rule successfully or bypass rule corresponding
+     *                to this UID already exists otherwise return errno.
+     */
+    public int setCaptivePortalDelegateUid(@NonNull final CaptivePortalImpl caller, int uid) {
+        final int errorCode = allowBypassVpnOnNetwork(true /* allow */, uid, network.netId);
+        if (errorCode == 0 || errorCode == EEXIST) {
+            mCaptivePortalDelegateUids.put(caller, uid);
+        }
+        return errorCode == EEXIST ? 0 : errorCode;
+    }
+
+    /**
+     * Remove the delegate UID of the app that is allowed to perform network traffic for captive
+     * portal login, and remove the netd bypass rule if no other caller is delegating this UID.
+     *
+     * @param caller the captive portal app to that delegated UID.
+     * @return Return 0 if remove the UID and VPN bypass rule successfully or bypass rule
+     *                corresponding to this UID doesn't exist otherwise return errno.
+     */
+    public int removeCaptivePortalDelegateUid(@NonNull final CaptivePortalImpl caller) {
+        final Integer maybeDelegateUid = mCaptivePortalDelegateUids.remove(caller);
+        if (maybeDelegateUid == null) return 0;
+        if (mCaptivePortalDelegateUids.values().contains(maybeDelegateUid)) return 0;
+        final int errorCode =
+                allowBypassVpnOnNetwork(false /* allow */, maybeDelegateUid, network.netId);
+        return errorCode == ENOENT ? 0 : errorCode;
     }
 
     private static boolean areAllowedUidsAcceptableFromNetworkAgent(
