@@ -133,9 +133,11 @@ public class TetheringService extends Service {
         @Override
         public void startTethering(TetheringRequestParcel request, String callerPkg,
                 String callingAttributionTag, IIntResultListener listener) {
+            boolean onlyAllowPrivileged = request.exemptFromEntitlementCheck
+                    || request.interfaceName != null;
             if (checkAndNotifyCommonError(callerPkg,
                     callingAttributionTag,
-                    request.exemptFromEntitlementCheck /* onlyAllowPrivileged */,
+                    onlyAllowPrivileged,
                     listener)) {
                 return;
             }
@@ -284,6 +286,10 @@ public class TetheringService extends Service {
             return false;
         }
 
+        private boolean hasNetworkSettingsPermission() {
+            return checkCallingOrSelfPermission(NETWORK_SETTINGS);
+        }
+
         private boolean hasNetworkStackPermission() {
             return checkCallingOrSelfPermission(NETWORK_STACK)
                     || checkCallingOrSelfPermission(PERMISSION_MAINLINE_NETWORK_STACK);
@@ -299,7 +305,8 @@ public class TetheringService extends Service {
 
         private boolean hasTetherChangePermission(final String callerPkg,
                 final String callingAttributionTag, final boolean onlyAllowPrivileged) {
-            if (onlyAllowPrivileged && !hasNetworkStackPermission()) return false;
+            if (onlyAllowPrivileged && !hasNetworkStackPermission()
+                    && !hasNetworkSettingsPermission()) return false;
 
             if (hasTetherPrivilegedPermission()) return true;
 

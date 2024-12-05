@@ -665,7 +665,8 @@ public class Tethering {
             // If tethering is already enabled with a different request,
             // disable before re-enabling.
             if (unfinishedRequest != null && !unfinishedRequest.equals(request)) {
-                enableTetheringInternal(type, false /* disabled */, null);
+                enableTetheringInternal(type, false /* disabled */,
+                        unfinishedRequest.getInterfaceName(), null);
                 mEntitlementMgr.stopProvisioningIfNeeded(type);
             }
             mActiveTetheringRequests.put(type, request);
@@ -676,7 +677,7 @@ public class Tethering {
                 mEntitlementMgr.startProvisioningIfNeeded(type,
                         request.getShouldShowEntitlementUi());
             }
-            enableTetheringInternal(type, true /* enabled */, listener);
+            enableTetheringInternal(type, true /* enabled */, request.getInterfaceName(), listener);
             mTetheringMetrics.createBuilder(type, callerPkg);
         });
     }
@@ -689,7 +690,7 @@ public class Tethering {
     void stopTetheringInternal(int type) {
         mActiveTetheringRequests.remove(type);
 
-        enableTetheringInternal(type, false /* disabled */, null);
+        enableTetheringInternal(type, false /* disabled */, null, null);
         mEntitlementMgr.stopProvisioningIfNeeded(type);
     }
 
@@ -698,7 +699,7 @@ public class Tethering {
      * schedule provisioning rechecks for the specified interface.
      */
     private void enableTetheringInternal(int type, boolean enable,
-            final IIntResultListener listener) {
+            String iface, final IIntResultListener listener) {
         int result = TETHER_ERROR_NO_ERROR;
         switch (type) {
             case TETHERING_WIFI:
@@ -717,7 +718,7 @@ public class Tethering {
                 result = setEthernetTethering(enable);
                 break;
             case TETHERING_VIRTUAL:
-                result = setVirtualMachineTethering(enable);
+                result = setVirtualMachineTethering(enable, iface);
                 break;
             default:
                 Log.w(TAG, "Invalid tether type.");
@@ -972,10 +973,13 @@ public class Tethering {
         }
     }
 
-    private int setVirtualMachineTethering(final boolean enable) {
-        // TODO(340377643): Use bridge ifname when it's introduced, not fixed TAP ifname.
+    private int setVirtualMachineTethering(final boolean enable, String iface) {
         if (enable) {
-            mConfiguredVirtualIface = "avf_tap_fixed";
+            if (TextUtils.isEmpty(iface)) {
+                mConfiguredVirtualIface = "avf_tap_fixed";
+            } else {
+                mConfiguredVirtualIface = iface;
+            }
             enableIpServing(
                     TETHERING_VIRTUAL,
                     mConfiguredVirtualIface,
@@ -2205,7 +2209,7 @@ public class Tethering {
                     case EVENT_REQUEST_CHANGE_DOWNSTREAM: {
                         final boolean enabled = message.arg1 == 1;
                         final TetheringRequest request = (TetheringRequest) message.obj;
-                        enableTetheringInternal(request.getTetheringType(), enabled, null);
+                        enableTetheringInternal(request.getTetheringType(), enabled, null, null);
                         break;
                     }
                     default:

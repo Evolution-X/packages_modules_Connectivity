@@ -92,7 +92,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             assertEquals(downstreamIface.name, iface)
             val request = TetheringRequest.Builder(TETHERING_ETHERNET)
                 .setConnectivityScope(CONNECTIVITY_SCOPE_LOCAL).build()
-            tetheringEventCallback = enableEthernetTethering(
+            tetheringEventCallback = enableTethering(
                 iface, request,
                 null /* any upstream */
             ).apply {
@@ -125,7 +125,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             val request = TetheringRequest.Builder(TETHERING_ETHERNET)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setShouldShowEntitlementUi(false).build()
-            tetheringEventCallback = enableEthernetTethering(
+            tetheringEventCallback = enableTethering(
                 iface, request,
                 null /* any upstream */
             ).apply {

@@ -28,6 +28,7 @@ import static android.net.TetheringManager.TETHERING_BLUETOOTH;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
 import static android.net.TetheringManager.TETHERING_NCM;
 import static android.net.TetheringManager.TETHERING_USB;
+import static android.net.TetheringManager.TETHERING_VIRTUAL;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHERING_WIFI_P2P;
 import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
@@ -94,6 +95,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -303,6 +305,13 @@ public class TetheringManagerTest {
         tr3.setUid(uid);
         tr3.setPackageName(packageName);
         assertEquals(tr2, tr3);
+
+        final String interfaceName = "test_iface";
+        final TetheringRequest tr4 = new TetheringRequest.Builder(TETHERING_VIRTUAL)
+                .setInterfaceName(interfaceName)
+                .setConnectivityScope(CONNECTIVITY_SCOPE_GLOBAL).build();
+        assertEquals(interfaceName, tr4.getInterfaceName());
+        assertEquals(CONNECTIVITY_SCOPE_GLOBAL, tr4.getConnectivityScope());
     }
 
     @Test
@@ -320,23 +329,40 @@ public class TetheringManagerTest {
     }
 
     @Test
+    public void testTetheringRequestSetInterfaceNameFailsExceptTetheringVirtual() {
+        for (int type : List.of(TETHERING_USB, TETHERING_BLUETOOTH, TETHERING_NCM,
+                TETHERING_ETHERNET)) {
+            try {
+                new TetheringRequest.Builder(type).setInterfaceName("test_iface");
+                fail("Was able to set interface name for tethering type " + type);
+            } catch (IllegalArgumentException e) {
+                // Success
+            }
+        }
+    }
+
+    @Test
     public void testTetheringRequestParcelable() {
         final SoftApConfiguration softApConfiguration = createSoftApConfiguration("SSID");
         final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
         final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
-        final TetheringRequest withConfig = new TetheringRequest.Builder(TETHERING_WIFI)
+        final TetheringRequest withApConfig = new TetheringRequest.Builder(TETHERING_WIFI)
                 .setSoftApConfiguration(softApConfiguration)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false).build();
-        final TetheringRequest withoutConfig = new TetheringRequest.Builder(TETHERING_WIFI)
+        final TetheringRequest withoutApConfig = new TetheringRequest.Builder(TETHERING_WIFI)
                 .setStaticIpv4Addresses(localAddr, clientAddr)
                 .setExemptFromEntitlementCheck(true)
                 .setShouldShowEntitlementUi(false).build();
-        assertEquals(withConfig, ParcelUtils.parcelingRoundTrip(withConfig));
-        assertEquals(withoutConfig, ParcelUtils.parcelingRoundTrip(withoutConfig));
-        assertNotEquals(withConfig, ParcelUtils.parcelingRoundTrip(withoutConfig));
-        assertNotEquals(withoutConfig, ParcelUtils.parcelingRoundTrip(withConfig));
+        assertEquals(withApConfig, ParcelUtils.parcelingRoundTrip(withApConfig));
+        assertEquals(withoutApConfig, ParcelUtils.parcelingRoundTrip(withoutApConfig));
+        assertNotEquals(withApConfig, ParcelUtils.parcelingRoundTrip(withoutApConfig));
+        assertNotEquals(withoutApConfig, ParcelUtils.parcelingRoundTrip(withApConfig));
+
+        final TetheringRequest withIfaceName = new TetheringRequest.Builder(TETHERING_VIRTUAL)
+                .setInterfaceName("test_iface").build();
+        assertEquals(withIfaceName, ParcelUtils.parcelingRoundTrip(withIfaceName));
     }
 
     @Test
@@ -417,6 +443,18 @@ public class TetheringManagerTest {
         } finally {
             mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
         }
+    }
+
+    @Test
+    public void testStopTetheringRequest() throws Exception {
+        TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
+        Executor executor = Runnable::run;
+        TetheringManager.StopTetheringCallback callback =
+                new TetheringManager.StopTetheringCallback() {};
+        try {
+            mTM.stopTethering(request, executor, callback);
+            fail("stopTethering should throw UnsupportedOperationException");
+        } catch (UnsupportedOperationException expect) { }
     }
 
     @Test
