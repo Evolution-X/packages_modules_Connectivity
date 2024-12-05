@@ -623,12 +623,14 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         mNat64CidrController.maybeUpdateNat64Cidr();
     }
 
-    private static OtDaemonConfiguration newOtDaemonConfig(
-            @NonNull ThreadConfiguration threadConfig) {
+    private OtDaemonConfiguration newOtDaemonConfig(ThreadConfiguration threadConfig) {
+        int srpServerConfig = R.bool.config_thread_srp_server_wait_for_border_routing_enabled;
+        boolean srpServerWaitEnabled = mResources.get().getBoolean(srpServerConfig);
         return new OtDaemonConfiguration.Builder()
                 .setBorderRouterEnabled(threadConfig.isBorderRouterEnabled())
                 .setNat64Enabled(threadConfig.isNat64Enabled())
                 .setDhcpv6PdEnabled(threadConfig.isDhcpv6PdEnabled())
+                .setSrpServerWaitForBorderRoutingEnabled(srpServerWaitEnabled)
                 .build();
     }
 

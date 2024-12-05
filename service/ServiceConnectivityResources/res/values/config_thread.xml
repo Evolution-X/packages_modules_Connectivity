@@ -71,4 +71,12 @@
     -->
     <string-array name="config_thread_mdns_vendor_specific_txts">
     </string-array>
+
+    <!-- Whether to enable / start SRP server only when border routing is ready. SRP server and
+    border routing are mandatory features required by a Thread Border Router, and it takes 10 to
+    20 seconds to establish border routing. Starting SRP server earlier is useful for use cases
+    where the user needs to know what are the devices in the network before actually needs to reach
+    to the devices, or reaching to Thread end devices doesn't require border routing to work.
+    -->
+    <bool name="config_thread_srp_server_wait_for_border_routing_enabled">true</bool>
 </resources>
