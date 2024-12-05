@@ -33,4 +33,5 @@ parcelable TetheringRequestParcel {
     SoftApConfiguration softApConfig;
     int uid;
     String packageName;
+    String interfaceName;
 }

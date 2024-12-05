@@ -17,9 +17,11 @@
 package com.android.networkstack.tethering;
 
 import static android.Manifest.permission.ACCESS_NETWORK_STATE;
+import static android.Manifest.permission.NETWORK_SETTINGS;
 import static android.Manifest.permission.TETHER_PRIVILEGED;
 import static android.Manifest.permission.WRITE_SETTINGS;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
+import static android.net.TetheringManager.TETHERING_VIRTUAL;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ACCESS_TETHERING_PERMISSION;
 import static android.net.TetheringManager.TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION;
@@ -169,6 +171,10 @@ public final class TetheringServiceTest {
 
     private void runAsTetheringDisallowed(final TestTetheringCall test) throws Exception {
         runTetheringCall(test, false /* isTetheringAllowed */, TETHER_PRIVILEGED);
+    }
+
+    private void runAsNetworkSettings(final TestTetheringCall test) throws Exception {
+        runTetheringCall(test, true /* isTetheringAllowed */, NETWORK_SETTINGS, TETHER_PRIVILEGED);
     }
 
     private void runTetheringCall(final TestTetheringCall test, boolean isTetheringAllowed,
@@ -366,6 +372,32 @@ public final class TetheringServiceTest {
             verify(mTethering).isTetheringSupported();
             verify(mTethering).isTetheringAllowed();
             result.assertResult(TETHER_ERROR_UNSUPPORTED);
+            verifyNoMoreInteractionsForTethering();
+        });
+    }
+
+    @Test
+    public void testStartTetheringWithInterfaceSucceeds() throws Exception {
+        final TetheringRequestParcel request = new TetheringRequestParcel();
+        request.tetheringType = TETHERING_VIRTUAL;
+        request.interfaceName = "avf_tap_fixed";
+
+        runAsNetworkSettings((result) -> {
+            runStartTethering(result, request);
+            verifyNoMoreInteractionsForTethering();
+        });
+    }
+
+    @Test
+    public void testStartTetheringNoNetworkStackPermissionWithInterfaceFails() throws Exception {
+        final TetheringRequestParcel request = new TetheringRequestParcel();
+        request.tetheringType = TETHERING_VIRTUAL;
+        request.interfaceName = "avf_tap_fixed";
+
+        runAsTetherPrivileged((result) -> {
+            mTetheringConnector.startTethering(request, TEST_CALLER_PKG, TEST_ATTRIBUTION_TAG,
+                    result);
+            result.assertResult(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
             verifyNoMoreInteractionsForTethering();
         });
     }
