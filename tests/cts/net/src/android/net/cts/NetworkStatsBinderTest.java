@@ -114,7 +114,7 @@ public class NetworkStatsBinderTest {
             } catch (ClassNotFoundException e) {
                 /* not vulnerable if hidden API no longer available */
                 return;
-            } catch (NoSuchMethodException e) {
+            } catch (NoSuchMethodException | NoSuchMethodError e) {
                 /* not vulnerable if hidden API no longer available */
                 return;
             } catch (RemoteException e) {

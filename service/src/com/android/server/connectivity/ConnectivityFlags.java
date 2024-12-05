@@ -26,6 +26,11 @@ import com.android.server.ConnectivityService;
  */
 public final class ConnectivityFlags {
     /**
+     * Boot namespace for this module. Values from this should only be read at boot.
+     */
+    public static final String NAMESPACE_TETHERING_BOOT = "tethering_boot";
+
+    /**
      * Minimum module version at which to avoid rematching all requests when a network request is
      * registered, and rematch only the registered requests instead.
      */
