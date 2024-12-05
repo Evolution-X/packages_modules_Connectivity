@@ -89,6 +89,11 @@ class ConnectivityMultiDevicesSnippet : Snippet {
         ctsNetUtils.expectNetworkIsSystemDefault(network)
     }
 
+    @Rpc(description = "Reconnect to wifi if supported.")
+    fun reconnectWifiIfSupported() {
+        ctsNetUtils.reconnectWifiIfSupported()
+    }
+
     @Rpc(description = "Unregister all connections.")
     fun unregisterAll() {
         cbHelper.unregisterAll()
