@@ -332,15 +332,16 @@ public abstract class EthernetTetheringTestBase {
         // seconds. See b/289881008.
         private static final int EXPANDED_TIMEOUT_MS = 30000;
 
-        MyTetheringEventCallback(String iface) {
-            mIface = new TetheringInterface(TETHERING_ETHERNET, iface);
+        MyTetheringEventCallback(int tetheringType, String iface) {
+            mIface = new TetheringInterface(tetheringType, iface);
             mExpectedUpstream = null;
             mAcceptAnyUpstream = true;
         }
 
-        MyTetheringEventCallback(String iface, @NonNull Network expectedUpstream) {
+        MyTetheringEventCallback(
+                int tetheringType, String iface, @NonNull Network expectedUpstream) {
             Objects.requireNonNull(expectedUpstream);
-            mIface = new TetheringInterface(TETHERING_ETHERNET, iface);
+            mIface = new TetheringInterface(tetheringType, iface);
             mExpectedUpstream = expectedUpstream;
             mAcceptAnyUpstream = false;
         }
@@ -392,12 +393,12 @@ public abstract class EthernetTetheringTestBase {
         }
 
         public void awaitInterfaceTethered() throws Exception {
-            assertTrue("Ethernet not tethered after " + EXPANDED_TIMEOUT_MS + "ms",
+            assertTrue("Interface is not tethered after " + EXPANDED_TIMEOUT_MS + "ms",
                     mTetheringStartedLatch.await(EXPANDED_TIMEOUT_MS, TimeUnit.MILLISECONDS));
         }
 
         public void awaitInterfaceLocalOnly() throws Exception {
-            assertTrue("Ethernet not local-only after " + EXPANDED_TIMEOUT_MS + "ms",
+            assertTrue("Interface is not local-only after " + EXPANDED_TIMEOUT_MS + "ms",
                     mLocalOnlyStartedLatch.await(EXPANDED_TIMEOUT_MS, TimeUnit.MILLISECONDS));
         }
 
@@ -501,15 +502,17 @@ public abstract class EthernetTetheringTestBase {
         sCallbackErrors.add(error);
     }
 
-    protected static MyTetheringEventCallback enableEthernetTethering(String iface,
+    protected static MyTetheringEventCallback enableTethering(String iface,
             TetheringRequest request, Network expectedUpstream) throws Exception {
-        // Enable ethernet tethering with null expectedUpstream means the test accept any upstream
-        // after etherent tethering started.
+        // Enable tethering with null expectedUpstream means the test accept any upstream after
+        // tethering started.
         final MyTetheringEventCallback callback;
         if (expectedUpstream != null) {
-            callback = new MyTetheringEventCallback(iface, expectedUpstream);
+            callback =
+                    new MyTetheringEventCallback(
+                            request.getTetheringType(), iface, expectedUpstream);
         } else {
-            callback = new MyTetheringEventCallback(iface);
+            callback = new MyTetheringEventCallback(request.getTetheringType(), iface);
         }
         runAsShell(NETWORK_SETTINGS, () -> {
             sTm.registerTetheringEventCallback(c -> c.run() /* executor */, callback);
@@ -521,7 +524,7 @@ public abstract class EthernetTetheringTestBase {
         StartTetheringCallback startTetheringCallback = new StartTetheringCallback() {
             @Override
             public void onTetheringStarted() {
-                Log.d(TAG, "Ethernet tethering started");
+                Log.d(TAG, "Tethering started");
                 tetheringStartedLatch.countDown();
             }
 
@@ -530,8 +533,8 @@ public abstract class EthernetTetheringTestBase {
                 addCallbackError("Unexpectedly got onTetheringFailed");
             }
         };
-        Log.d(TAG, "Starting Ethernet tethering");
-        runAsShell(TETHER_PRIVILEGED, () -> {
+        Log.d(TAG, "Starting tethering");
+        runAsShell(TETHER_PRIVILEGED, NETWORK_SETTINGS, () -> {
             sTm.startTethering(request, c -> c.run() /* executor */, startTetheringCallback);
             // Binder call is an async call. Need to hold the shell permission until tethering
             // started. This helps to avoid the test become flaky.
@@ -557,7 +560,7 @@ public abstract class EthernetTetheringTestBase {
 
     protected static MyTetheringEventCallback enableEthernetTethering(String iface,
             Network expectedUpstream) throws Exception {
-        return enableEthernetTethering(iface,
+        return enableTethering(iface,
                 new TetheringRequest.Builder(TETHERING_ETHERNET)
                 .setShouldShowEntitlementUi(false).build(), expectedUpstream);
     }
