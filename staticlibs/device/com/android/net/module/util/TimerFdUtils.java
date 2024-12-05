@@ -26,12 +26,13 @@ import java.io.IOException;
  */
 public class TimerFdUtils {
     static {
-        if (Process.myUid() == Process.SYSTEM_UID) {
+        final String jniLibName = JniUtil.getJniLibraryName(TimerFdUtils.class.getPackage());
+        if (jniLibName.equals("android_net_connectivity_com_android_net_module_util_jni")) {
             // This library is part of service-connectivity.jar when in the system server,
             // so libservice-connectivity.so is the library to load.
             System.loadLibrary("service-connectivity");
         } else {
-            System.loadLibrary(JniUtil.getJniLibraryName(TimerFdUtils.class.getPackage()));
+            System.loadLibrary(jniLibName);
         }
     }
 
