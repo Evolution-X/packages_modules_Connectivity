@@ -44,6 +44,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -65,6 +66,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.net.ConnectivityManager.NetworkCallback;
+import android.os.Build;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Handler;
@@ -668,5 +670,13 @@ public class ConnectivityManagerTest {
                 anyInt(), any(), anyInt(), any(), anyInt(), any(), anyInt(), anyInt(), any(), any(),
                 // No callbacks overridden -> do not use the optimization
                 eq(~0));
+    }
+
+    @Test
+    public void testLegacyTetherApisThrowUnsupportedOperationExceptionAfterV() {
+        assumeTrue(Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM);
+        final ConnectivityManager manager = new ConnectivityManager(mCtx, mService);
+        assertThrows(UnsupportedOperationException.class, () -> manager.tether("iface"));
+        assertThrows(UnsupportedOperationException.class, () -> manager.untether("iface"));
     }
 }
