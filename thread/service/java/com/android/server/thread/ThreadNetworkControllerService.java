@@ -351,14 +351,14 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         }
 
         otDaemon.initialize(
-                mTunIfController.getTunFd(),
                 shouldEnableThread(),
                 newOtDaemonConfig(mPersistentSettings.getConfiguration()),
+                mTunIfController.getTunFd(),
                 mNsdPublisher,
                 getMeshcopTxtAttributes(mResources.get()),
-                mOtDaemonCallbackProxy,
                 mCountryCodeSupplier.get(),
-                FeatureFlags.isTrelEnabled());
+                FeatureFlags.isTrelEnabled(),
+                mOtDaemonCallbackProxy);
         otDaemon.asBinder().linkToDeath(() -> mHandler.post(this::onOtDaemonDied), 0);
         mOtDaemon = otDaemon;
         mHandler.post(mNat64CidrController::maybeUpdateNat64Cidr);

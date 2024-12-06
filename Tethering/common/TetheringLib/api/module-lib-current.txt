@@ -47,8 +47,13 @@ package android.net {
   }
 
   public static final class TetheringManager.TetheringRequest implements android.os.Parcelable {
+    method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") @Nullable public String getInterfaceName();
     method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") @Nullable public String getPackageName();
     method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") public int getUid();
+  }
+
+  public static class TetheringManager.TetheringRequest.Builder {
+    method @FlaggedApi("com.android.net.flags.tethering_with_soft_ap_config") @NonNull @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_STACK, android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK}) public android.net.TetheringManager.TetheringRequest.Builder setInterfaceName(@Nullable String);
   }
 
 }
