@@ -154,7 +154,9 @@ public class EntitlementManager {
 
             // Only launch entitlement UI for the current user if it is allowed to
             // change tethering. This usually means the system user or the admin users in HSUM.
-            if (SdkLevel.isAtLeastT()) {
+            // TODO (b/382624069): Figure out whether it is safe to call createContextAsUser
+            //  from secondary user. And re-enable the check or remove the code accordingly.
+            if (false) {
                 // Create a user context for the current foreground user as UserManager#isAdmin()
                 // operates on the context user.
                 final int currentUserId = getCurrentUser();
