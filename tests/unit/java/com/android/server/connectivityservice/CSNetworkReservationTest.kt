@@ -16,8 +16,6 @@
 
 package com.android.server
 
-import android.net.ConnectivityManager
-import android.net.ConnectivityManager.NetworkCallback
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
@@ -28,11 +26,15 @@ import android.net.NetworkProvider
 import android.net.NetworkRequest
 import android.net.NetworkScore
 import android.os.Build
-import android.os.Messenger
-import android.os.Process.INVALID_UID
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
+import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
+import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
+import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
+import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.OnNetworkNeeded
+import kotlin.test.assertEquals
+import kotlin.test.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -51,22 +53,12 @@ private const val NO_CB_TIMEOUT_MS = 200L
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.R)
 class CSNetworkReservationTest : CSTest() {
-    // TODO: remove this helper once reserveNetwork is added.
-    // NetworkCallback does not currently do anything. It's just here so the API stays consistent
-    // with the eventual ConnectivityManager API.
-    private fun ConnectivityManager.reserveNetwork(req: NetworkRequest, cb: NetworkCallback) {
-        service.requestNetwork(INVALID_UID, req.networkCapabilities,
-                NetworkRequest.Type.RESERVATION.ordinal, Messenger(csHandler), 0 /* timeout */,
-                null /* binder */, ConnectivityManager.TYPE_NONE, NetworkCallback.FLAG_NONE,
-                context.packageName, context.attributionTag, NetworkCallback.DECLARED_METHODS_ALL)
-    }
-
     fun NetworkCapabilities.copyWithReservationId(resId: Int) = NetworkCapabilities(this).also {
         it.reservationId = resId
     }
 
     @Test
-    fun testReservationTriggersOnNetworkNeeded() {
+    fun testReservationRequest() {
         val provider = NetworkProvider(context, csHandlerThread.looper, "Ethernet provider")
         val blanketOfferCb = TestableNetworkOfferCallback(TIMEOUT_MS, NO_CB_TIMEOUT_MS)
 
@@ -76,12 +68,27 @@ class CSNetworkReservationTest : CSTest() {
         provider.registerNetworkOffer(ETHERNET_SCORE, blanketCaps, {r -> r.run()}, blanketOfferCb)
 
         val req = NetworkRequest.Builder().addTransportType(TRANSPORT_ETHERNET).build()
-        val cb = NetworkCallback()
-        cm.reserveNetwork(req, cb)
+        val cb = TestableNetworkCallback()
+        cm.reserveNetwork(req, csHandler, cb)
 
-        blanketOfferCb.expectOnNetworkNeeded(blanketCaps)
+        // validate the reservation matches the blanket offer.
+        val reservationReq = blanketOfferCb.expectOnNetworkNeeded(blanketCaps).request
+        val reservationId = reservationReq.networkCapabilities.reservationId
 
-        // TODO: also test onNetworkUnneeded is called once ConnectivityManager supports the
-        // reserveNetwork API.
+        // bring up specific reservation offer
+        val specificCaps = ETHERNET_CAPS.copyWithReservationId(reservationId)
+        val specificOfferCb = TestableNetworkOfferCallback(TIMEOUT_MS, NO_CB_TIMEOUT_MS)
+        provider.registerNetworkOffer(ETHERNET_SCORE, specificCaps, {r -> r.run()}, specificOfferCb)
+
+        // validate onReserved was sent to the app
+        val reservedCaps = cb.expect<Reserved>().caps
+        assertEquals(specificCaps, reservedCaps)
+
+        // validate the reservation matches the specific offer.
+        specificOfferCb.expectOnNetworkNeeded(specificCaps)
+
+        // Specific offer goes away
+        provider.unregisterNetworkOffer(specificOfferCb)
+        cb.expect<Unavailable>()
     }
 }
