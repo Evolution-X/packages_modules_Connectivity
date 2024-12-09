@@ -29,7 +29,10 @@ import java.util.function.Supplier;
 /**
  * A thread-safe cache for storing and retrieving {@link NetworkStats.Entry} objects,
  * with an adjustable expiry duration to manage data freshness.
+ *
+ * @deprecated Use {@link LruCacheWithExpiry} instead.
  */
+// TODO: Remove this when service side rate limit cache solution is removed.
 class TrafficStatsRateLimitCache extends
         LruCacheWithExpiry<TrafficStatsRateLimitCache.TrafficStatsCacheKey, NetworkStats.Entry> {
 
@@ -41,7 +44,7 @@ class TrafficStatsRateLimitCache extends
      * @param maxSize Maximum number of entries.
      */
     TrafficStatsRateLimitCache(@NonNull Clock clock, long expiryDurationMs, int maxSize) {
-        super(clock, expiryDurationMs, maxSize, it -> !it.isEmpty());
+        super(()-> clock.millis(), expiryDurationMs, maxSize, it -> !it.isEmpty());
     }
 
     public static class TrafficStatsCacheKey {
