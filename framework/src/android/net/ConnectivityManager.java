@@ -1873,7 +1873,7 @@ public class ConnectivityManager {
     public NetworkCapabilities[] getDefaultNetworkCapabilitiesForUser(int userId) {
         try {
             return mService.getDefaultNetworkCapabilitiesForUser(
-                    userId, mContext.getOpPackageName(), getAttributionTag());
+                    userId, mContext.getOpPackageName(), mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1967,7 +1967,7 @@ public class ConnectivityManager {
             @NonNull String packageName) {
         try {
             return mService.getRedactedLinkPropertiesForPackage(
-                    lp, uid, packageName, getAttributionTag());
+                    lp, uid, packageName, mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1993,7 +1993,7 @@ public class ConnectivityManager {
     public NetworkCapabilities getNetworkCapabilities(@Nullable Network network) {
         try {
             return mService.getNetworkCapabilities(
-                    network, mContext.getOpPackageName(), getAttributionTag());
+                    network, mContext.getOpPackageName(), mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2027,7 +2027,7 @@ public class ConnectivityManager {
             int uid, @NonNull String packageName) {
         try {
             return mService.getRedactedNetworkCapabilitiesForPackage(nc, uid, packageName,
-                    getAttributionTag());
+                    mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2752,18 +2752,10 @@ public class ConnectivityManager {
         checkLegacyRoutingApiAccess();
         try {
             return mService.requestRouteToHostAddress(networkType, hostAddress.getAddress(),
-                    mContext.getOpPackageName(), getAttributionTag());
+                    mContext.getOpPackageName(), mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    /**
-     * @return the context's attribution tag
-     */
-    // TODO: Remove method and replace with direct call once R code is pushed to AOSP
-    private @Nullable String getAttributionTag() {
-        return mContext.getAttributionTag();
     }
 
     /**
@@ -4705,12 +4697,12 @@ public class ConnectivityManager {
                 if (reqType == LISTEN) {
                     request = mService.listenForNetwork(
                             need, messenger, binder, callbackFlags, callingPackageName,
-                            getAttributionTag(), declaredMethodsFlag);
+                            mContext.getAttributionTag(), declaredMethodsFlag);
                 } else {
                     request = mService.requestNetwork(
                             asUid, need, reqType.ordinal(), messenger, timeoutMs, binder,
-                            legacyType, callbackFlags, callingPackageName, getAttributionTag(),
-                            declaredMethodsFlag);
+                            legacyType, callbackFlags, callingPackageName,
+                            mContext.getAttributionTag(), declaredMethodsFlag);
                 }
                 if (request != null) {
                     sCallbacks.put(request, callback);
@@ -5127,7 +5119,7 @@ public class ConnectivityManager {
         try {
             mService.pendingRequestForNetwork(
                     request.networkCapabilities, operation, mContext.getOpPackageName(),
-                    getAttributionTag());
+                    mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         } catch (ServiceSpecificException e) {
@@ -5276,7 +5268,7 @@ public class ConnectivityManager {
         try {
             mService.pendingListenForNetwork(
                     request.networkCapabilities, operation, mContext.getOpPackageName(),
-                    getAttributionTag());
+                    mContext.getAttributionTag());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         } catch (ServiceSpecificException e) {
