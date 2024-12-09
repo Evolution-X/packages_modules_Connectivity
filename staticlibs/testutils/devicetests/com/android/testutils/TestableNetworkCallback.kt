@@ -32,6 +32,7 @@ import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChange
 import com.android.testutils.RecorderCallback.CallbackEntry.LocalInfoChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.Losing
 import com.android.testutils.RecorderCallback.CallbackEntry.Lost
+import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Resumed
 import com.android.testutils.RecorderCallback.CallbackEntry.Suspended
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
@@ -66,6 +67,12 @@ open class RecorderCallback private constructor(
         // constructor by specifying override.
         abstract val network: Network
 
+        data class Reserved private constructor(
+                override val network: Network,
+                val caps: NetworkCapabilities
+        ): CallbackEntry() {
+            constructor(caps: NetworkCapabilities) : this(NULL_NETWORK, caps)
+        }
         data class Available(override val network: Network) : CallbackEntry()
         data class CapabilitiesChanged(
             override val network: Network,
@@ -100,6 +107,8 @@ open class RecorderCallback private constructor(
         // Convenience constants for expecting a type
         companion object {
             @JvmField
+            val RESERVED = Reserved::class
+            @JvmField
             val AVAILABLE = Available::class
             @JvmField
             val NETWORK_CAPS_UPDATED = CapabilitiesChanged::class
@@ -126,6 +135,11 @@ open class RecorderCallback private constructor(
 
     val history = backingRecord.newReadHead()
     val mark get() = history.mark
+
+    override fun onReserved(caps: NetworkCapabilities) {
+        Log.d(logTag, "onReserved $caps")
+        history.add(Reserved(caps))
+    }
 
     override fun onAvailable(network: Network) {
         Log.d(logTag, "onAvailable $network")
