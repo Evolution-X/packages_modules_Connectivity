@@ -18,6 +18,7 @@ package com.android.net.module.util;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
@@ -47,6 +48,11 @@ public class HexDumpTest {
                 HexDump.hexStringToByteArray("abcdef"));
         assertArrayEquals(new byte[]{(byte) 0xAB, (byte) 0xCD, (byte) 0xEF},
                 HexDump.hexStringToByteArray("ABCDEF"));
+    }
+
+    @Test
+    public void testInvalidHexStringToByteArray() {
+        assertThrows(IllegalArgumentException.class, () -> HexDump.hexStringToByteArray("abxX"));
     }
 
     @Test
