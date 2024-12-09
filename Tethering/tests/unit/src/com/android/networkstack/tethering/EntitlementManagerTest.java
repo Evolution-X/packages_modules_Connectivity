@@ -38,7 +38,6 @@ import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.networkstack.apishim.ConstantsShim.KEY_CARRIER_SUPPORTS_TETHERING_BOOL;
-import static com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import static com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
@@ -592,16 +591,8 @@ public final class EntitlementManagerTest {
                 .onTetherProvisioningFailed(TETHERING_WIFI, FAILED_TETHERING_REASON);
     }
 
-    @IgnoreUpTo(SC_V2)
     @Test
-    public void testUiProvisioningMultiUser_aboveT() {
-        doTestUiProvisioningMultiUser(true, 1);
-        doTestUiProvisioningMultiUser(false, 0);
-    }
-
-    @IgnoreAfter(SC_V2)
-    @Test
-    public void testUiProvisioningMultiUser_belowT() {
+    public void testUiProvisioningMultiUser() {
         doTestUiProvisioningMultiUser(true, 1);
         doTestUiProvisioningMultiUser(false, 1);
     }
