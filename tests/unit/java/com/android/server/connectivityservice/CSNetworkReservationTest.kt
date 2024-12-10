@@ -34,7 +34,7 @@ import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
 import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.OnNetworkNeeded
 import kotlin.test.assertEquals
-import kotlin.test.fail
+import kotlin.test.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -90,5 +90,30 @@ class CSNetworkReservationTest : CSTest() {
         // Specific offer goes away
         provider.unregisterNetworkOffer(specificOfferCb)
         cb.expect<Unavailable>()
+    }
+
+    fun TestableNetworkOfferCallback.expectNoCallbackWhere(
+            predicate: (TestableNetworkOfferCallback.CallbackEntry) -> Boolean
+    ) {
+        val event = history.poll(NO_CB_TIMEOUT_MS) { predicate(it) }
+        assertNull(event)
+    }
+
+    @Test
+    fun testReservationRequest_notDeliveredToRegularOffer() {
+        val provider = NetworkProvider(context, csHandlerThread.looper, "Ethernet provider")
+        val offerCb = TestableNetworkOfferCallback(TIMEOUT_MS, NO_CB_TIMEOUT_MS)
+
+        cm.registerNetworkProvider(provider)
+        provider.registerNetworkOffer(ETHERNET_SCORE, ETHERNET_CAPS, {r -> r.run()}, offerCb)
+
+        val req = NetworkRequest.Builder().addTransportType(TRANSPORT_ETHERNET).build()
+        val cb = TestableNetworkCallback()
+        cm.reserveNetwork(req, csHandler, cb)
+
+        // validate the offer does not receive onNetworkNeeded for reservation request
+        offerCb.expectNoCallbackWhere {
+            it is OnNetworkNeeded && it.request.type == NetworkRequest.Type.RESERVATION
+        }
     }
 }
