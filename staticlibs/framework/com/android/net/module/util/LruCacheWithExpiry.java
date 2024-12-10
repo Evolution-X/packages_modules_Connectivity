@@ -22,13 +22,13 @@ import android.util.LruCache;
 
 import com.android.internal.annotations.GuardedBy;
 
-import java.time.Clock;
 import java.util.Objects;
+import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
- * An LRU cache that stores key-value pairs with an expiry time.
+ * A thread-safe LRU cache that stores key-value pairs with an expiry time.
  *
  * <p>This cache uses an {@link LruCache} to store entries and evicts the least
  * recently used entries when the cache reaches its maximum capacity. It also
@@ -41,7 +41,7 @@ import java.util.function.Supplier;
  * @hide
  */
 public class LruCacheWithExpiry<K, V> {
-    private final Clock mClock;
+    private final LongSupplier mTimeSupplier;
     private final long mExpiryDurationMs;
     @GuardedBy("mMap")
     private final LruCache<K, CacheValue<V>> mMap;
@@ -50,16 +50,17 @@ public class LruCacheWithExpiry<K, V> {
     /**
      * Constructs a new {@link LruCacheWithExpiry} with the specified parameters.
      *
-     * @param clock            The {@link Clock} to use for determining timestamps.
+     * @param timeSupplier     The {@link java.util.function.LongSupplier} to use for
+     *                         determining timestamps.
      * @param expiryDurationMs The expiry duration for cached entries in milliseconds.
      * @param maxSize          The maximum number of entries to hold in the cache.
      * @param shouldCacheValue A {@link Predicate} that determines whether a given value should be
      *                         cached. This can be used to filter out certain values from being
      *                         stored in the cache.
      */
-    public LruCacheWithExpiry(@NonNull Clock clock, long expiryDurationMs, int maxSize,
-            Predicate<V> shouldCacheValue) {
-        mClock = clock;
+    public LruCacheWithExpiry(@NonNull LongSupplier timeSupplier, long expiryDurationMs,
+            int maxSize, Predicate<V> shouldCacheValue) {
+        mTimeSupplier = timeSupplier;
         mExpiryDurationMs = expiryDurationMs;
         mMap = new LruCache<>(maxSize);
         mShouldCacheValue = shouldCacheValue;
@@ -119,7 +120,7 @@ public class LruCacheWithExpiry<K, V> {
     public void put(@NonNull K key, @NonNull V value) {
         Objects.requireNonNull(value);
         synchronized (mMap) {
-            mMap.put(key, new CacheValue<>(mClock.millis(), value));
+            mMap.put(key, new CacheValue<>(mTimeSupplier.getAsLong(), value));
         }
     }
 
@@ -133,7 +134,7 @@ public class LruCacheWithExpiry<K, V> {
     }
 
     private boolean isExpired(long timestamp) {
-        return mClock.millis() > timestamp + mExpiryDurationMs;
+        return mTimeSupplier.getAsLong() > timestamp + mExpiryDurationMs;
     }
 
     private static class CacheValue<V> {
