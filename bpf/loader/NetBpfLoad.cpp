@@ -1658,17 +1658,17 @@ static int doLoad(char** argv, char * const envp[]) {
     }
 
     // unreachable before U QPR3
-    {
+    if (exists(uprobestatsBpfLoader)) {
       ALOGI("done, transferring control to uprobestatsbpfload.");
       const char *args[] = {
           uprobestatsBpfLoader,
           NULL,
       };
       execve(args[0], (char **)args, envp);
+      ALOGI("unable to execute uprobestatsbpfload, transferring control to "
+            "platform bpfloader.");
     }
 
-    ALOGI("unable to execute uprobestatsbpfload, transferring control to "
-          "platform bpfloader.");
     // platform BpfLoader *needs* to run as root
     const char * args[] = { platformBpfLoader, NULL, };
     execve(args[0], (char**)args, envp);
