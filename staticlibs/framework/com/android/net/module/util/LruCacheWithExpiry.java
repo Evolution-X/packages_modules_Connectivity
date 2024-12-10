@@ -125,6 +125,25 @@ public class LruCacheWithExpiry<K, V> {
     }
 
     /**
+     * Stores a value in the cache if absent, associated with the given key.
+     *
+     * @param key   The key to associate with the value.
+     * @param value The value to store in the cache.
+     * @return The existing value associated with the key, if present; otherwise, null.
+     */
+    @Nullable
+    public V putIfAbsent(@NonNull K key, @NonNull V value) {
+        Objects.requireNonNull(value);
+        synchronized (mMap) {
+            final V existingValue = get(key);
+            if (existingValue == null) {
+                put(key, value);
+            }
+            return existingValue;
+        }
+    }
+
+    /**
      * Clear the cache.
      */
     public void clear() {
