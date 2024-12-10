@@ -62,6 +62,7 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.module.util.FrameworkConnectivityStatsLog;
 import com.android.net.module.util.SharedLog;
 
 import java.io.PrintWriter;
@@ -154,14 +155,27 @@ public class EntitlementManager {
 
             // Only launch entitlement UI for the current user if it is allowed to
             // change tethering. This usually means the system user or the admin users in HSUM.
-            // TODO (b/382624069): Figure out whether it is safe to call createContextAsUser
-            //  from secondary user. And re-enable the check or remove the code accordingly.
-            if (false) {
+            if (SdkLevel.isAtLeastT()) {
                 // Create a user context for the current foreground user as UserManager#isAdmin()
                 // operates on the context user.
                 final int currentUserId = getCurrentUser();
                 final UserHandle currentUser = UserHandle.of(currentUserId);
-                final Context userContext = mContext.createContextAsUser(currentUser, 0);
+                final Context userContext;
+                try {
+                    // There is no safe way to invoke this method since tethering package
+                    // might not be installed for a certain user on the OEM devices,
+                    // refer to b/382628161.
+                    userContext = mContext.createContextAsUser(currentUser, 0);
+                } catch (IllegalStateException e) {
+                    FrameworkConnectivityStatsLog.write(
+                            FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                            FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_ENTITLEMENT_CREATE_CONTEXT_AS_USER_THROWS
+                    );
+                    // Fallback to startActivity if createContextAsUser failed.
+                    mLog.e("createContextAsUser failed, fallback to startActivity", e);
+                    mContext.startActivity(intent);
+                    return intent;
+                }
                 final UserManager userManager = userContext.getSystemService(UserManager.class);
 
                 if (userManager.isAdminUser()) {

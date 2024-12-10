@@ -38,6 +38,7 @@ import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.networkstack.apishim.ConstantsShim.KEY_CARRIER_SUPPORTS_TETHERING_BOOL;
+import static com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import static com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
@@ -49,6 +50,7 @@ import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -159,9 +161,19 @@ public final class EntitlementManagerTest {
             return super.getSystemServiceName(serviceClass);
         }
 
+        @NonNull
         @Override
         public Context createContextAsUser(UserHandle user, int flags) {
+            if (mCreateContextAsUserException != null) {
+                throw mCreateContextAsUserException;
+            }
             return mMockContext; // Return self for easier test injection.
+        }
+
+        private RuntimeException mCreateContextAsUserException = null;
+
+        private void setCreateContextAsUserException(RuntimeException e) {
+            mCreateContextAsUserException = e;
         }
     }
 
@@ -591,8 +603,24 @@ public final class EntitlementManagerTest {
                 .onTetherProvisioningFailed(TETHERING_WIFI, FAILED_TETHERING_REASON);
     }
 
+    @IgnoreUpTo(SC_V2)
     @Test
-    public void testUiProvisioningMultiUser() {
+    public void testUiProvisioningMultiUser_aboveT_createContextAsUserThrows() {
+        mMockContext.setCreateContextAsUserException(new IllegalStateException());
+        doTestUiProvisioningMultiUser(true, 1);
+        doTestUiProvisioningMultiUser(false, 1);
+    }
+
+    @IgnoreUpTo(SC_V2)
+    @Test
+    public void testUiProvisioningMultiUser_aboveT() {
+        doTestUiProvisioningMultiUser(true, 1);
+        doTestUiProvisioningMultiUser(false, 0);
+    }
+
+    @IgnoreAfter(SC_V2)
+    @Test
+    public void testUiProvisioningMultiUser_belowT() {
         doTestUiProvisioningMultiUser(true, 1);
         doTestUiProvisioningMultiUser(false, 1);
     }
@@ -630,6 +658,7 @@ public final class EntitlementManagerTest {
         doReturn(isAdminUser).when(mUserManager).isAdminUser();
 
         mDeps.reset();
+        clearInvocations(mTetherProvisioningFailedListener);
         mDeps.fakeEntitlementResult = TETHER_ERROR_NO_ERROR;
         mEnMgr.notifyUpstream(true);
         mLooper.dispatchAll();
