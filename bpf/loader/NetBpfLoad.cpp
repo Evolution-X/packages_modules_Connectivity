@@ -1514,6 +1514,7 @@ static int doLoad(char** argv, char * const envp[]) {
         REQUIRE(5, 15, 136)
         REQUIRE(6, 1, 57)
         REQUIRE(6, 6, 0)
+        REQUIRE(6, 12, 0)
 
 #undef REQUIRE
 
