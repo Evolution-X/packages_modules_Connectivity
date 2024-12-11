@@ -1,3 +1,4 @@
 # Classes loaded by SystemServer via their hardcoded name, so they can't be jarjared
 com\.android\.server\.ConnectivityServiceInitializer(\$.+)?
+com\.android\.server\.ConnectivityServiceInitializerB(\$.+)?
 com\.android\.server\.NetworkStatsServiceInitializer(\$.+)?

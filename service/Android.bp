@@ -207,6 +207,7 @@ java_library {
     },
     visibility: [
         "//packages/modules/Connectivity/service-t",
+        "//packages/modules/Connectivity/service-b",
         "//packages/modules/Connectivity/networksecurity:__subpackages__",
         "//packages/modules/Connectivity/tests:__subpackages__",
         "//packages/modules/Connectivity/thread/service:__subpackages__",
@@ -252,7 +253,11 @@ java_defaults {
         "service-networksecurity-pre-jarjar",
         service_remoteauth_pre_jarjar_lib,
         "service-thread-pre-jarjar",
-    ],
+    ] + select(release_flag("RELEASE_MOVE_VCN_TO_MAINLINE"), {
+        true: ["service-connectivity-b-pre-jarjar"],
+        default: [],
+    }),
+
     // The below libraries are not actually needed to build since no source is compiled
     // (only combining prebuilt static_libs), but they are necessary so that R8 has the right
     // references to optimize the code. Without these, there will be missing class warnings and
@@ -338,6 +343,7 @@ java_genrule {
     name: "service-connectivity-jarjar-gen",
     tool_files: [
         ":service-connectivity-pre-jarjar{.jar}",
+        ":service-connectivity-b-pre-jarjar{.jar}",
         ":service-connectivity-tiramisu-pre-jarjar{.jar}",
         "jarjar-excludes.txt",
     ],
@@ -347,6 +353,7 @@ java_genrule {
     out: ["service_connectivity_jarjar_rules.txt"],
     cmd: "$(location jarjar-rules-generator) " +
         "$(location :service-connectivity-pre-jarjar{.jar}) " +
+        "$(location :service-connectivity-b-pre-jarjar{.jar}) " +
         "$(location :service-connectivity-tiramisu-pre-jarjar{.jar}) " +
         "--prefix android.net.connectivity " +
         "--excludes $(location jarjar-excludes.txt) " +
