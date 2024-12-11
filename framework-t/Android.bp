@@ -102,6 +102,7 @@ filegroup {
 java_library {
     name: "framework-connectivity-t-pre-jarjar",
     defaults: ["framework-connectivity-t-defaults"],
+    installable: false,
     libs: [
         "framework-bluetooth.stubs.module_lib",
         "framework-wifi.stubs.module_lib",
