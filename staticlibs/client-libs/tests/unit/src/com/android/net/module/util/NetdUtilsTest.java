@@ -163,7 +163,7 @@ public class NetdUtilsTest {
         setNetworkAddInterfaceOutcome(new ServiceSpecificException(expectedCode), expectedTries);
 
         try {
-            NetdUtils.tetherInterface(mNetd, IFACE, TEST_IPPREFIX, 20, 0);
+            NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, IFACE, TEST_IPPREFIX, 20, 0);
             fail("Expect throw ServiceSpecificException");
         } catch (ServiceSpecificException e) {
             assertEquals(e.errorCode, expectedCode);
@@ -177,7 +177,7 @@ public class NetdUtilsTest {
         setNetworkAddInterfaceOutcome(new RemoteException(), expectedTries);
 
         try {
-            NetdUtils.tetherInterface(mNetd, IFACE, TEST_IPPREFIX, 20, 0);
+            NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, IFACE, TEST_IPPREFIX, 20, 0);
             fail("Expect throw RemoteException");
         } catch (RemoteException e) { }
 
@@ -195,7 +195,7 @@ public class NetdUtilsTest {
     private void verifyTetherInterfaceSucceeds(int expectedTries) throws Exception {
         setNetworkAddInterfaceOutcome(null, expectedTries);
 
-        NetdUtils.tetherInterface(mNetd, IFACE, TEST_IPPREFIX);
+        NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, IFACE, TEST_IPPREFIX);
         verify(mNetd).tetherInterfaceAdd(IFACE);
         verify(mNetd, times(expectedTries)).networkAddInterface(LOCAL_NET_ID, IFACE);
         verify(mNetd, times(2)).networkAddRoute(eq(LOCAL_NET_ID), eq(IFACE), any(), any());
