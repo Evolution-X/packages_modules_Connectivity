@@ -143,6 +143,7 @@ java_library {
 java_library {
     name: "framework-connectivity-pre-jarjar",
     defaults: ["framework-module-defaults"],
+    installable: false,
     min_sdk_version: "30",
     static_libs: [
         "framework-connectivity-pre-jarjar-without-cronet",

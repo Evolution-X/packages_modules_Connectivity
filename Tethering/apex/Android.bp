@@ -155,7 +155,10 @@ bootclasspath_fragment {
         "framework-connectivity",
         "framework-connectivity-t",
         "framework-tethering",
-    ],
+    ] + select(release_flag("RELEASE_MOVE_VCN_TO_MAINLINE"), {
+        true: ["framework-connectivity-b"],
+        default: [],
+    }),
     apex_available: ["com.android.tethering"],
 
     // The bootclasspath_fragments that provide APIs on which this depends.
@@ -195,6 +198,7 @@ bootclasspath_fragment {
             "android.net.http",
             "android.net.netstats",
             "android.net.util",
+            "android.net.vcn",
         ],
 
         // The following packages and all their subpackages currently only
