@@ -189,7 +189,6 @@ public final class PrivateAddressCoordinatorTest {
         final LinkAddress hotspotAddress = requestDownstreamAddress(mHotspotIpServer);
         final IpPrefix hotspotPrefix = asIpPrefix(hotspotAddress);
         assertNotEquals(asIpPrefix(mBluetoothAddress), hotspotPrefix);
-        releaseDownstream(mHotspotIpServer);
 
         // - Test previous enabled hotspot prefix(cached prefix) is reserved.
         when(mPrivateAddressCoordinator.getRandomInt()).thenReturn(
@@ -208,6 +207,7 @@ public final class PrivateAddressCoordinatorTest {
         assertNotEquals(asIpPrefix(mLegacyWifiP2pAddress), etherPrefix);
         assertNotEquals(asIpPrefix(mBluetoothAddress), etherPrefix);
         assertNotEquals(hotspotPrefix, etherPrefix);
+        releaseDownstream(mHotspotIpServer);
         releaseDownstream(mEthernetIpServer);
     }
 
