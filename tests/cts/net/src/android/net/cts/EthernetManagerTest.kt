@@ -77,6 +77,7 @@ import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertThrows
 import com.android.testutils.runAsShell
 import com.android.testutils.waitForIdle
+import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import java.net.Inet6Address
 import java.net.Socket
@@ -1088,5 +1089,25 @@ class EthernetManagerTest {
         // When ethernet is re-enabled, interface will be brought up.
         setEthernetEnabled(true)
         listener.eventuallyExpect(iface, STATE_LINK_UP, ROLE_CLIENT)
+    }
+
+    @Test
+    fun testGetInterfaceList_disableEnableEthernet() {
+        // Test that interface list can be obtained when ethernet is disabled.
+        setEthernetEnabled(false)
+        // Create two test interfaces and check the return list contains the interface names.
+        val iface1 = createInterface()
+        val iface2 = createInterface()
+        var ifaces = em.getInterfaceList()
+        assertThat(ifaces).containsAtLeast(iface1.name, iface2.name)
+
+        // Remove one existing test interface and check the return list doesn't contain the
+        // removed interface name.
+        removeInterface(iface1)
+        ifaces = em.getInterfaceList()
+        assertThat(ifaces).doesNotContain(iface1.name)
+        assertThat(ifaces).contains(iface2.name)
+
+        removeInterface(iface2)
     }
 }

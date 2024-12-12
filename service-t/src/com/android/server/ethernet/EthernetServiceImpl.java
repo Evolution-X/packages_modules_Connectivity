@@ -317,6 +317,6 @@ public class EthernetServiceImpl extends IEthernetManager.Stub {
     @Override
     public List<String> getInterfaceList() {
         PermissionUtils.enforceAccessNetworkStatePermission(mContext, TAG);
-        return mTracker.getInterfaceList();
+        return mTracker.getEthernetInterfaceList();
     }
 }
