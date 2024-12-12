@@ -1482,22 +1482,14 @@ public class MdnsRecordRepository {
 
     private static String[] splitFullyQualifiedName(
             @NonNull NsdServiceInfo info, @NonNull String[] serviceType) {
-        final String[] split = new String[serviceType.length + 1];
-        split[0] = info.getServiceName();
-        System.arraycopy(serviceType, 0, split, 1, serviceType.length);
-
-        return split;
+        return CollectionUtils.prependArray(String.class, serviceType, info.getServiceName());
     }
 
     private static String[] splitServiceType(@NonNull NsdServiceInfo info) {
         // String.split(pattern, 0) removes trailing empty strings, which would appear when
         // splitting "domain.name." (with a dot a the end), so this is what is needed here.
         final String[] split = info.getServiceType().split("\\.", 0);
-        final String[] type = new String[split.length + 1];
-        System.arraycopy(split, 0, type, 0, split.length);
-        type[split.length] = LOCAL_TLD;
-
-        return type;
+        return CollectionUtils.appendArray(String.class, split, LOCAL_TLD);
     }
 
     /** Returns whether there will be an SRV record when registering the {@code info}. */
