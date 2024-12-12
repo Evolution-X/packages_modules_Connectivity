@@ -193,6 +193,16 @@ public class NetworkRequest implements Parcelable {
      *       callbacks about the single, highest scoring current network
      *       (if any) that matches the specified NetworkCapabilities, or
      *
+     *     - RESERVATION requests behave identically to those of type REQUEST.
+     *       For example, unlike LISTEN, they cause networks to remain
+     *       connected, and they match exactly one network (the best one).
+     *       A RESERVATION generates a unique reservationId in its
+     *       NetworkCapabilities by copying the requestId which affects
+     *       matching. A NetworkProvider can register a "blanket" NetworkOffer
+     *       with reservationId = MATCH_ALL_RESERVATIONS to indicate that it
+     *       is capable of generating NetworkOffers in response to RESERVATION
+     *       requests.
+     *
      *     - TRACK_DEFAULT, which causes the framework to issue callbacks for
      *       the single, highest scoring current network (if any) that will
      *       be chosen for an app, but which cannot cause the framework to
@@ -229,6 +239,7 @@ public class NetworkRequest implements Parcelable {
         BACKGROUND_REQUEST,
         TRACK_SYSTEM_DEFAULT,
         LISTEN_FOR_BEST,
+        RESERVATION,
     };
 
     /**
@@ -703,7 +714,7 @@ public class NetworkRequest implements Parcelable {
      * @hide
      */
     public boolean isRequest() {
-        return type == Type.REQUEST || type == Type.BACKGROUND_REQUEST;
+        return type == Type.REQUEST || type == Type.BACKGROUND_REQUEST || type == Type.RESERVATION;
     }
 
     /**
