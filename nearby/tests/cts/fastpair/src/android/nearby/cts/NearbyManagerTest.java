@@ -26,7 +26,6 @@ import static android.nearby.ScanCallback.ERROR_UNSUPPORTED;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assume.assumeTrue;
 
 import android.app.UiAutomation;
 import android.bluetooth.test_utils.EnableBluetoothRule;
@@ -79,10 +78,10 @@ public class NearbyManagerTest {
 
     @ClassRule public static final EnableBluetoothRule sEnableBluetooth = new EnableBluetoothRule();
 
-    private static final byte[] SALT = new byte[]{1, 2};
-    private static final byte[] SECRET_ID = new byte[]{1, 2, 3, 4};
+    private static final byte[] SALT = new byte[] {1, 2};
+    private static final byte[] SECRET_ID = new byte[] {1, 2, 3, 4};
     private static final byte[] META_DATA_ENCRYPTION_KEY = new byte[14];
-    private static final byte[] AUTHENTICITY_KEY = new byte[]{0, 1, 1, 1};
+    private static final byte[] AUTHENTICITY_KEY = new byte[] {0, 1, 1, 1};
     private static final String DEVICE_NAME = "test_device";
     private static final int BLE_MEDIUM = 1;
 
@@ -91,43 +90,45 @@ public class NearbyManagerTest {
     private UiAutomation mUiAutomation =
             InstrumentationRegistry.getInstrumentation().getUiAutomation();
 
-    private ScanRequest mScanRequest = new ScanRequest.Builder()
-            .setScanType(ScanRequest.SCAN_TYPE_FAST_PAIR)
-            .setScanMode(ScanRequest.SCAN_MODE_LOW_LATENCY)
-            .setBleEnabled(true)
-            .build();
+    private ScanRequest mScanRequest =
+            new ScanRequest.Builder()
+                    .setScanType(ScanRequest.SCAN_TYPE_FAST_PAIR)
+                    .setScanMode(ScanRequest.SCAN_MODE_LOW_LATENCY)
+                    .setBleEnabled(true)
+                    .build();
     private PresenceDevice.Builder mBuilder =
             new PresenceDevice.Builder("deviceId", SALT, SECRET_ID, META_DATA_ENCRYPTION_KEY);
 
-    private  ScanCallback mScanCallback = new ScanCallback() {
-        @Override
-        public void onDiscovered(@NonNull NearbyDevice device) {
-        }
+    private ScanCallback mScanCallback =
+            new ScanCallback() {
+                @Override
+                public void onDiscovered(@NonNull NearbyDevice device) {}
 
-        @Override
-        public void onUpdated(@NonNull NearbyDevice device) {
-        }
+                @Override
+                public void onUpdated(@NonNull NearbyDevice device) {}
 
-        @Override
-        public void onLost(@NonNull NearbyDevice device) {
-        }
+                @Override
+                public void onLost(@NonNull NearbyDevice device) {}
 
-        @Override
-        public void onError(int errorCode) {
-        }
-    };
+                @Override
+                public void onError(int errorCode) {}
+            };
 
     private static final Executor EXECUTOR = Executors.newSingleThreadExecutor();
 
     @Before
     public void setUp() {
-        mUiAutomation.adoptShellPermissionIdentity(READ_DEVICE_CONFIG, WRITE_DEVICE_CONFIG,
-                WRITE_ALLOWLISTED_DEVICE_CONFIG, BLUETOOTH_PRIVILEGED);
-        String nameSpace = SdkLevel.isAtLeastU() ? DeviceConfig.NAMESPACE_NEARBY
-                : DeviceConfig.NAMESPACE_TETHERING;
-        DeviceConfig.setProperty(nameSpace,
-                "nearby_enable_presence_broadcast_legacy",
-                "true", false);
+        mUiAutomation.adoptShellPermissionIdentity(
+                READ_DEVICE_CONFIG,
+                WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                BLUETOOTH_PRIVILEGED);
+        String nameSpace =
+                SdkLevel.isAtLeastU()
+                        ? DeviceConfig.NAMESPACE_NEARBY
+                        : DeviceConfig.NAMESPACE_TETHERING;
+        DeviceConfig.setProperty(
+                nameSpace, "nearby_enable_presence_broadcast_legacy", "true", false);
 
         mContext = InstrumentationRegistry.getContext();
         mNearbyManager = mContext.getSystemService(NearbyManager.class);
@@ -144,8 +145,9 @@ public class NearbyManagerTest {
     @SdkSuppress(minSdkVersion = 32, codeName = "T")
     public void test_startScan_noPrivilegedPermission() {
         mUiAutomation.dropShellPermissionIdentity();
-        assertThrows(SecurityException.class, () -> mNearbyManager
-                .startScan(mScanRequest, EXECUTOR, mScanCallback));
+        assertThrows(
+                SecurityException.class,
+                () -> mNearbyManager.startScan(mScanRequest, EXECUTOR, mScanCallback));
     }
 
     @Test
@@ -159,23 +161,25 @@ public class NearbyManagerTest {
     @Test
     @SdkSuppress(minSdkVersion = 32, codeName = "T")
     public void testStartStopBroadcast() throws InterruptedException {
-        PrivateCredential credential = new PrivateCredential.Builder(SECRET_ID, AUTHENTICITY_KEY,
-                META_DATA_ENCRYPTION_KEY, DEVICE_NAME)
-                .setIdentityType(IDENTITY_TYPE_PRIVATE)
-                .build();
+        PrivateCredential credential =
+                new PrivateCredential.Builder(
+                                SECRET_ID, AUTHENTICITY_KEY, META_DATA_ENCRYPTION_KEY, DEVICE_NAME)
+                        .setIdentityType(IDENTITY_TYPE_PRIVATE)
+                        .build();
         BroadcastRequest broadcastRequest =
                 new PresenceBroadcastRequest.Builder(
-                        Collections.singletonList(BLE_MEDIUM), SALT, credential)
+                                Collections.singletonList(BLE_MEDIUM), SALT, credential)
                         .addAction(123)
                         .build();
 
         CountDownLatch latch = new CountDownLatch(1);
-        BroadcastCallback callback = status -> {
-            latch.countDown();
-            assertThat(status).isEqualTo(BroadcastCallback.STATUS_OK);
-        };
-        mNearbyManager.startBroadcast(broadcastRequest, Executors.newSingleThreadExecutor(),
-                callback);
+        BroadcastCallback callback =
+                status -> {
+                    latch.countDown();
+                    assertThat(status).isEqualTo(BroadcastCallback.STATUS_OK);
+                };
+        mNearbyManager.startBroadcast(
+                broadcastRequest, Executors.newSingleThreadExecutor(), callback);
         latch.await(10, TimeUnit.SECONDS);
         mNearbyManager.stopBroadcast(callback);
     }
@@ -197,9 +201,8 @@ public class NearbyManagerTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testsetPoweredOffFindingEphemeralIds() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
@@ -208,24 +211,22 @@ public class NearbyManagerTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testsetPoweredOffFindingEphemeralIds_noPrivilegedPermission() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
 
         mUiAutomation.dropShellPermissionIdentity();
 
-        assertThrows(SecurityException.class,
+        assertThrows(
+                SecurityException.class,
                 () -> mNearbyManager.setPoweredOffFindingEphemeralIds(List.of(new byte[20])));
     }
 
-
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testSetAndGetPoweredOffFindingMode_enabled() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
@@ -234,30 +235,26 @@ public class NearbyManagerTest {
         // enableLocation() has dropped shell permission identity.
         mUiAutomation.adoptShellPermissionIdentity(BLUETOOTH_PRIVILEGED);
 
-        mNearbyManager.setPoweredOffFindingMode(
-                NearbyManager.POWERED_OFF_FINDING_MODE_ENABLED);
+        mNearbyManager.setPoweredOffFindingMode(NearbyManager.POWERED_OFF_FINDING_MODE_ENABLED);
         assertThat(mNearbyManager.getPoweredOffFindingMode())
                 .isEqualTo(NearbyManager.POWERED_OFF_FINDING_MODE_ENABLED);
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testSetAndGetPoweredOffFindingMode_disabled() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
 
-        mNearbyManager.setPoweredOffFindingMode(
-                NearbyManager.POWERED_OFF_FINDING_MODE_DISABLED);
+        mNearbyManager.setPoweredOffFindingMode(NearbyManager.POWERED_OFF_FINDING_MODE_DISABLED);
         assertThat(mNearbyManager.getPoweredOffFindingMode())
                 .isEqualTo(NearbyManager.POWERED_OFF_FINDING_MODE_DISABLED);
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testSetPoweredOffFindingMode_noPrivilegedPermission() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
@@ -265,14 +262,16 @@ public class NearbyManagerTest {
         enableLocation();
         mUiAutomation.dropShellPermissionIdentity();
 
-        assertThrows(SecurityException.class, () -> mNearbyManager
-                .setPoweredOffFindingMode(NearbyManager.POWERED_OFF_FINDING_MODE_ENABLED));
+        assertThrows(
+                SecurityException.class,
+                () ->
+                        mNearbyManager.setPoweredOffFindingMode(
+                                NearbyManager.POWERED_OFF_FINDING_MODE_ENABLED));
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public void testGetPoweredOffFindingMode_noPrivilegedPermission() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         // Only test supporting devices.
         if (mNearbyManager.getPoweredOffFindingMode()
                 == NearbyManager.POWERED_OFF_FINDING_MODE_UNSUPPORTED) return;
