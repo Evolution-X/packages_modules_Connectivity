@@ -75,6 +75,7 @@ java_defaults {
             // the module builds against API (the parcelable declarations exist in framework.aidl)
             "frameworks/base/core/java", // For framework parcelables
             "frameworks/native/aidl/binder", // For PersistableBundle.aidl
+            "packages/modules/Connectivity/Tethering/common/TetheringLib/src",
         ],
     },
     stub_only_libs: [
@@ -335,6 +336,7 @@ droidstubs {
     aidl: {
         include_dirs: [
             "packages/modules/Connectivity/framework/aidl-export",
+            "packages/modules/Connectivity/Tethering/common/TetheringLib/src",
             "frameworks/native/aidl/binder", // For PersistableBundle.aidl
         ],
     },
