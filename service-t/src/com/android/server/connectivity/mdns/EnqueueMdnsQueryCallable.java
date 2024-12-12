@@ -139,11 +139,8 @@ public class EnqueueMdnsQueryCallable implements Callable<Pair<Integer, List<Str
                 // Base service type
                 questions.add(new MdnsPointerRecord(serviceTypeLabels, expectUnicastResponse));
                 for (String subtype : subtypes) {
-                    final String[] labels = new String[serviceTypeLabels.length + 2];
-                    labels[0] = MdnsConstants.SUBTYPE_PREFIX + subtype;
-                    labels[1] = MdnsConstants.SUBTYPE_LABEL;
-                    System.arraycopy(serviceTypeLabels, 0, labels, 2, serviceTypeLabels.length);
-
+                    final String[] labels = MdnsUtils.constructFullSubtype(serviceTypeLabels,
+                            MdnsConstants.SUBTYPE_PREFIX + subtype);
                     questions.add(new MdnsPointerRecord(labels, expectUnicastResponse));
                 }
             }

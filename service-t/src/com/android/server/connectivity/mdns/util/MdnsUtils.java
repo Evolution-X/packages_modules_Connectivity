@@ -28,6 +28,7 @@ import android.os.SystemClock;
 import android.util.ArraySet;
 import android.util.Pair;
 
+import com.android.net.module.util.CollectionUtils;
 import com.android.server.connectivity.mdns.MdnsConstants;
 import com.android.server.connectivity.mdns.MdnsInetAddressRecord;
 import com.android.server.connectivity.mdns.MdnsPacket;
@@ -273,11 +274,8 @@ public class MdnsUtils {
      * of ["_printer", "_sub", "_http", "_tcp"].
      */
     public static String[] constructFullSubtype(String[] serviceType, String subtype) {
-        String[] fullSubtype = new String[serviceType.length + 2];
-        fullSubtype[0] = subtype;
-        fullSubtype[1] = MdnsConstants.SUBTYPE_LABEL;
-        System.arraycopy(serviceType, 0, fullSubtype, 2, serviceType.length);
-        return fullSubtype;
+        return CollectionUtils.prependArray(String.class, serviceType, subtype,
+                MdnsConstants.SUBTYPE_LABEL);
     }
 
     /** A wrapper class of {@link SystemClock} to be mocked in unit tests. */
