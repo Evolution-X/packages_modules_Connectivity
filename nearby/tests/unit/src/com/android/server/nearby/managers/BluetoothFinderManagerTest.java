@@ -18,7 +18,6 @@ package com.android.server.nearby.managers;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -29,12 +28,13 @@ import static org.mockito.Mockito.when;
 import android.hardware.bluetooth.finder.Eid;
 import android.hardware.bluetooth.finder.IBluetoothFinder;
 import android.nearby.PoweredOffFindingEphemeralId;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 
-import com.android.modules.utils.build.SdkLevel;
+import androidx.test.filters.SdkSuppress;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -44,6 +44,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.List;
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
 public class BluetoothFinderManagerTest {
     private BluetoothFinderManager mBluetoothFinderManager;
     private boolean mGetServiceCalled = false;
@@ -71,8 +72,6 @@ public class BluetoothFinderManagerTest {
 
     @Before
     public void setup() {
-        // Replace with minSdkVersion when Build.VERSION_CODES.VANILLA_ICE_CREAM can be used.
-        assumeTrue(SdkLevel.isAtLeastV());
         MockitoAnnotations.initMocks(this);
         mBluetoothFinderManager = new BluetoothFinderManagerSpy();
     }
@@ -80,16 +79,16 @@ public class BluetoothFinderManagerTest {
     @Test
     public void testSendEids() throws Exception {
         byte[] eidBytes1 = {
-                (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
-                (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
-                (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
-                (byte) 0xe1, (byte) 0xde
+            (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
+            (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
+            (byte) 0xe1, (byte) 0xde, (byte) 0x1d, (byte) 0xe1, (byte) 0xde, (byte) 0x1d,
+            (byte) 0xe1, (byte) 0xde
         };
         byte[] eidBytes2 = {
-                (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
-                (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
-                (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
-                (byte) 0xf2, (byte) 0xef
+            (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
+            (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
+            (byte) 0xf2, (byte) 0xef, (byte) 0x2e, (byte) 0xf2, (byte) 0xef, (byte) 0x2e,
+            (byte) 0xf2, (byte) 0xef
         };
         PoweredOffFindingEphemeralId ephemeralId1 = new PoweredOffFindingEphemeralId();
         PoweredOffFindingEphemeralId ephemeralId2 = new PoweredOffFindingEphemeralId();
@@ -105,8 +104,7 @@ public class BluetoothFinderManagerTest {
 
     @Test
     public void testSendEids_remoteException() throws Exception {
-        doThrow(new RemoteException())
-                .when(mIBluetoothFinderMock).sendEids(any());
+        doThrow(new RemoteException()).when(mIBluetoothFinderMock).sendEids(any());
         mBluetoothFinderManager.sendEids(List.of());
 
         // Verify that we get the service again following a RemoteException.
@@ -117,8 +115,7 @@ public class BluetoothFinderManagerTest {
 
     @Test
     public void testSendEids_serviceSpecificException() throws Exception {
-        doThrow(new ServiceSpecificException(1))
-                .when(mIBluetoothFinderMock).sendEids(any());
+        doThrow(new ServiceSpecificException(1)).when(mIBluetoothFinderMock).sendEids(any());
         mBluetoothFinderManager.sendEids(List.of());
     }
 
@@ -134,7 +131,8 @@ public class BluetoothFinderManagerTest {
     @Test
     public void testSetPoweredOffFinderMode_remoteException() throws Exception {
         doThrow(new RemoteException())
-                .when(mIBluetoothFinderMock).setPoweredOffFinderMode(anyBoolean());
+                .when(mIBluetoothFinderMock)
+                .setPoweredOffFinderMode(anyBoolean());
         mBluetoothFinderManager.setPoweredOffFinderMode(true);
 
         // Verify that we get the service again following a RemoteException.
@@ -146,7 +144,8 @@ public class BluetoothFinderManagerTest {
     @Test
     public void testSetPoweredOffFinderMode_serviceSpecificException() throws Exception {
         doThrow(new ServiceSpecificException(1))
-                .when(mIBluetoothFinderMock).setPoweredOffFinderMode(anyBoolean());
+                .when(mIBluetoothFinderMock)
+                .setPoweredOffFinderMode(anyBoolean());
         mBluetoothFinderManager.setPoweredOffFinderMode(true);
     }
 
