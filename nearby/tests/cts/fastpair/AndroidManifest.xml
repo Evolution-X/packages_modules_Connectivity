@@ -21,6 +21,7 @@
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
   <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
   <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+  <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
   <application>
     <uses-library android:name="android.test.runner"/>

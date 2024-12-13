@@ -101,7 +101,7 @@ java_library {
     min_sdk_version: "21",
     lint: {
         error_checks: ["NewApi"],
-
+        baseline_filename: "lint-baseline-service-connectivity-mdns-standalone-build-test.xml",
     },
     srcs: [
         "src/com/android/server/connectivity/mdns/**/*.java",
