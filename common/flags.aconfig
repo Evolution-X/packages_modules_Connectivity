@@ -156,3 +156,12 @@ flag {
   bug: "354619988"
   is_fixed_read_only: true
 }
+
+flag {
+  name: "ipv6_over_ble"
+  is_exported: true
+  namespace: "android_core_networking"
+  description: "API flag for IPv6 over BLE"
+  bug: "372936361"
+  is_fixed_read_only: true
+}
