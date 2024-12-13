@@ -382,6 +382,7 @@ public class NetworkCapabilitiesTest {
             netCap.setAllowedUids(allowedUids);
             netCap.setSubscriptionIds(Set.of(TEST_SUBID1, TEST_SUBID2));
             netCap.setUids(uids);
+            netCap.setReservationId(42);
         }
 
         netCap.setOwnerUid(123);
@@ -1492,5 +1493,43 @@ public class NetworkCapabilitiesTest {
 
         // nc1 and nc2 are the same since invalid capability is ignored
         assertEquals(nc1, nc2);
+    }
+
+    @Test
+    public void testReservationIdMatching() {
+        final NetworkCapabilities requestNc = new NetworkCapabilities();
+        final NetworkCapabilities reservationNc = new NetworkCapabilities();
+        reservationNc.setReservationId(42);
+
+        final NetworkCapabilities reservedNetworkNc = new NetworkCapabilities(reservationNc);
+        final NetworkCapabilities otherNetworkNc = new NetworkCapabilities();
+        final NetworkCapabilities otherReservedNetworkNc = new NetworkCapabilities();
+        otherReservedNetworkNc.setReservationId(99);
+        final NetworkCapabilities offerNc = new NetworkCapabilities();
+        offerNc.setReservationId(NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS);
+
+        // A regular request can match any network or offer except one with MATCH_ALL_RESERVATIONS
+        assertTrue(requestNc.satisfiedByNetworkCapabilities(reservedNetworkNc));
+        assertTrue(requestNc.satisfiedByNetworkCapabilities(otherNetworkNc));
+        assertTrue(requestNc.satisfiedByNetworkCapabilities(otherReservedNetworkNc));
+        assertFalse(requestNc.satisfiedByNetworkCapabilities(offerNc));
+
+        // A reservation request can only match the reservedNetwork and the blanket offer.
+        assertTrue(reservationNc.satisfiedByNetworkCapabilities(reservedNetworkNc));
+        assertFalse(reservationNc.satisfiedByNetworkCapabilities(otherNetworkNc));
+        assertFalse(reservationNc.satisfiedByNetworkCapabilities(otherReservedNetworkNc));
+        assertTrue(reservationNc.satisfiedByNetworkCapabilities(offerNc));
+    }
+
+    @Test @IgnoreUpTo(SC_V2)
+    public void testReservationIdEquals() {
+        final NetworkCapabilities nc = new NetworkCapabilities();
+        nc.setReservationId(42);
+        final NetworkCapabilities other = new NetworkCapabilities(nc);
+
+        assertEquals(nc, other);
+
+        nc.setReservationId(43);
+        assertNotEquals(nc, other);
     }
 }

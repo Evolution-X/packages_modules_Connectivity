@@ -22,6 +22,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
+import android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkProvider
 import android.net.NetworkRequest
@@ -60,22 +61,25 @@ class CSNetworkReservationTest : CSTest() {
                 context.packageName, context.attributionTag, NetworkCallback.DECLARED_METHODS_ALL)
     }
 
+    fun NetworkCapabilities.copyWithReservationId(resId: Int) = NetworkCapabilities(this).also {
+        it.reservationId = resId
+    }
+
     @Test
     fun testReservationTriggersOnNetworkNeeded() {
         val provider = NetworkProvider(context, csHandlerThread.looper, "Ethernet provider")
-        val offerCb = TestableNetworkOfferCallback(TIMEOUT_MS, NO_CB_TIMEOUT_MS)
+        val blanketOfferCb = TestableNetworkOfferCallback(TIMEOUT_MS, NO_CB_TIMEOUT_MS)
 
         cm.registerNetworkProvider(provider)
-        provider.registerNetworkOffer(ETHERNET_SCORE, ETHERNET_CAPS, {r -> r.run()}, offerCb)
 
-        // TODO: add reservationId to offer, so it doesn't match the default request.
-        offerCb.expectOnNetworkNeeded(ETHERNET_CAPS)
+        val blanketCaps = ETHERNET_CAPS.copyWithReservationId(RES_ID_MATCH_ALL_RESERVATIONS)
+        provider.registerNetworkOffer(ETHERNET_SCORE, blanketCaps, {r -> r.run()}, blanketOfferCb)
 
         val req = NetworkRequest.Builder().addTransportType(TRANSPORT_ETHERNET).build()
         val cb = NetworkCallback()
         cm.reserveNetwork(req, cb)
 
-        offerCb.expectOnNetworkNeeded(req.networkCapabilities)
+        blanketOfferCb.expectOnNetworkNeeded(blanketCaps)
 
         // TODO: also test onNetworkUnneeded is called once ConnectivityManager supports the
         // reserveNetwork API.

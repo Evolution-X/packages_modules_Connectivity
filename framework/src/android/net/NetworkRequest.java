@@ -258,6 +258,12 @@ public class NetworkRequest implements Parcelable {
         }
         requestId = rId;
         networkCapabilities = nc;
+        if (type == Type.RESERVATION) {
+            // Conceptually, the reservationId is not related to the requestId; however, the
+            // requestId fulfills the same uniqueness requirements that are needed for the
+            // reservationId, so it can be reused for this purpose.
+            networkCapabilities.setReservationId(rId);
+        }
         this.legacyType = legacyType;
         this.type = type;
     }

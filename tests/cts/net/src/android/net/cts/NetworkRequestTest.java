@@ -16,6 +16,7 @@
 
 package android.net.cts;
 
+import static android.net.ConnectivityManager.TYPE_NONE;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_DUN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_FOTA;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
@@ -553,5 +554,33 @@ public class NetworkRequestTest {
                 .setSsidPattern(new PatternMatcher(TEST_SSID, PatternMatcher.PATTERN_LITERAL))
                 .setBssidPattern(ARBITRARY_ADDRESS, ARBITRARY_ADDRESS)
                 .build();
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    public void testNetworkReservation() {
+        final NetworkCapabilities nc = new NetworkCapabilities();
+        final NetworkCapabilities blanketOffer = new NetworkCapabilities(nc);
+        blanketOffer.setReservationId(NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS);
+        final NetworkCapabilities specificOffer = new NetworkCapabilities(nc);
+        specificOffer.setReservationId(42);
+        final NetworkCapabilities otherSpecificOffer = new NetworkCapabilities(nc);
+        otherSpecificOffer.setReservationId(43);
+        final NetworkCapabilities regularOffer = new NetworkCapabilities(nc);
+
+        final NetworkRequest reservationNR = new NetworkRequest(new NetworkCapabilities(nc),
+                TYPE_NONE, 42 /* rId */, NetworkRequest.Type.RESERVATION);
+        final NetworkRequest requestNR = new NetworkRequest(new NetworkCapabilities(nc),
+                TYPE_NONE, 42 /* rId */, NetworkRequest.Type.REQUEST);
+
+        assertTrue(reservationNR.canBeSatisfiedBy(blanketOffer));
+        assertTrue(reservationNR.canBeSatisfiedBy(specificOffer));
+        assertFalse(reservationNR.canBeSatisfiedBy(otherSpecificOffer));
+        assertFalse(reservationNR.canBeSatisfiedBy(regularOffer));
+
+        assertFalse(requestNR.canBeSatisfiedBy(blanketOffer));
+        assertTrue(requestNR.canBeSatisfiedBy(specificOffer));
+        assertTrue(requestNR.canBeSatisfiedBy(otherSpecificOffer));
+        assertTrue(requestNR.canBeSatisfiedBy(regularOffer));
     }
 }
