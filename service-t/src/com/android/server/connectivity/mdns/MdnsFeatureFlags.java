@@ -89,6 +89,11 @@ public class MdnsFeatureFlags {
             "nsd_cached_services_retention_time";
     public static final int DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS = 10000;
 
+    /**
+     * A feature flag to control whether the accurate delay callback should be enabled.
+     */
+    public static final String NSD_ACCURATE_DELAY_CALLBACK = "nsd_accurate_delay_callback";
+
     // Flag for offload feature
     public final boolean mIsMdnsOffloadFeatureEnabled;
 
@@ -121,6 +126,9 @@ public class MdnsFeatureFlags {
 
     // Retention Time for cached services
     public final long mCachedServicesRetentionTime;
+
+    // Flag for accurate delay callback
+    public final boolean mIsAccurateDelayCallbackEnabled;
 
     @Nullable
     private final FlagOverrideProvider mOverrideProvider;
@@ -218,6 +226,14 @@ public class MdnsFeatureFlags {
     }
 
     /**
+     * Indicates whether {@link #NSD_ACCURATE_DELAY_CALLBACK} is enabled, including for testing.
+     */
+    public boolean isAccurateDelayCallbackEnabled() {
+        return mIsAccurateDelayCallbackEnabled
+                || isForceEnabledForTest(NSD_ACCURATE_DELAY_CALLBACK);
+    }
+
+    /**
      * The constructor for {@link MdnsFeatureFlags}.
      */
     public MdnsFeatureFlags(boolean isOffloadFeatureEnabled,
@@ -231,6 +247,7 @@ public class MdnsFeatureFlags {
             boolean avoidAdvertisingEmptyTxtRecords,
             boolean isCachedServicesRemovalEnabled,
             long cachedServicesRetentionTime,
+            boolean isAccurateDelayCallbackEnabled,
             @Nullable FlagOverrideProvider overrideProvider) {
         mIsMdnsOffloadFeatureEnabled = isOffloadFeatureEnabled;
         mIncludeInetAddressRecordsInProbing = includeInetAddressRecordsInProbing;
@@ -243,6 +260,7 @@ public class MdnsFeatureFlags {
         mAvoidAdvertisingEmptyTxtRecords = avoidAdvertisingEmptyTxtRecords;
         mIsCachedServicesRemovalEnabled = isCachedServicesRemovalEnabled;
         mCachedServicesRetentionTime = cachedServicesRetentionTime;
+        mIsAccurateDelayCallbackEnabled = isAccurateDelayCallbackEnabled;
         mOverrideProvider = overrideProvider;
     }
 
@@ -266,6 +284,7 @@ public class MdnsFeatureFlags {
         private boolean mAvoidAdvertisingEmptyTxtRecords;
         private boolean mIsCachedServicesRemovalEnabled;
         private long mCachedServicesRetentionTime;
+        private boolean mIsAccurateDelayCallbackEnabled;
         private FlagOverrideProvider mOverrideProvider;
 
         /**
@@ -283,6 +302,7 @@ public class MdnsFeatureFlags {
             mAvoidAdvertisingEmptyTxtRecords = true; // Default enabled.
             mIsCachedServicesRemovalEnabled = false;
             mCachedServicesRetentionTime = DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS;
+            mIsAccurateDelayCallbackEnabled = false;
             mOverrideProvider = null;
         }
 
@@ -409,6 +429,16 @@ public class MdnsFeatureFlags {
         }
 
         /**
+         * Set whether the accurate delay callback is enabled.
+         *
+         * @see #NSD_ACCURATE_DELAY_CALLBACK
+         */
+        public Builder setIsAccurateDelayCallbackEnabled(boolean isAccurateDelayCallbackEnabled) {
+            mIsAccurateDelayCallbackEnabled = isAccurateDelayCallbackEnabled;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsFeatureFlags} with the arguments supplied to this builder.
          */
         public MdnsFeatureFlags build() {
@@ -423,6 +453,7 @@ public class MdnsFeatureFlags {
                     mAvoidAdvertisingEmptyTxtRecords,
                     mIsCachedServicesRemovalEnabled,
                     mCachedServicesRetentionTime,
+                    mIsAccurateDelayCallbackEnabled,
                     mOverrideProvider);
         }
     }
