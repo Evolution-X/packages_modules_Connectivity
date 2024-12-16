@@ -43,7 +43,7 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
         return DeviceConfig.getBoolean(
                         Config.NAMESPACE_NETWORK_SECURITY,
                         Config.FLAG_SERVICE_ENABLED,
-                        /* defaultValue= */ true)
+                        /* defaultValue= */ false)
                 && certificateTransparencyService()
                 && certificateTransparencyConfiguration();
     }
