@@ -39,6 +39,8 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
     private final AlarmManager mAlarmManager;
 
+    private boolean mDependenciesReady = false;
+
     /** Creates a new {@link CertificateTransparencyJob} object. */
     public CertificateTransparencyJob(
             Context context,
@@ -51,9 +53,6 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     }
 
     void initialize() {
-        mDataStore.load();
-        mCertificateTransparencyDownloader.initialize();
-
         mContext.registerReceiver(
                 this, new IntentFilter(ACTION_JOB_START), Context.RECEIVER_EXPORTED);
         mAlarmManager.setInexactRepeating(
@@ -76,6 +75,11 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
         }
         if (Config.DEBUG) {
             Log.d(TAG, "Starting CT daily job.");
+        }
+        if (!mDependenciesReady) {
+            mDataStore.load();
+            mCertificateTransparencyDownloader.initialize();
+            mDependenciesReady = true;
         }
 
         mDataStore.setProperty(Config.CONTENT_URL, Config.URL_LOG_LIST);
