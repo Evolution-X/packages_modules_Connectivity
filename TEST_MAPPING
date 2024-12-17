@@ -427,6 +427,9 @@
   "automotive-mumd-presubmit": [
     {
       "name": "CtsNetTestCases"
+    },
+    {
+      "name": "CtsNetTestCasesUpdateStatsPermission"
     }
   ],
   "imports": [
