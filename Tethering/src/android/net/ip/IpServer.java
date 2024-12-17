@@ -16,6 +16,7 @@
 
 package android.net.ip;
 
+import static android.net.INetd.LOCAL_NET_ID;
 import static android.net.RouteInfo.RTN_UNICAST;
 import static android.net.TetheringManager.CONNECTIVITY_SCOPE_GLOBAL;
 import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
@@ -906,7 +907,7 @@ public class IpServer extends StateMachineShim {
             ArraySet<IpPrefix> deprecatedPrefixes, ArraySet<IpPrefix> newPrefixes) {
         // [1] Remove the routes that are deprecated.
         if (!deprecatedPrefixes.isEmpty()) {
-            removeRoutesFromNetworkAndLinkProperties(INetd.LOCAL_NET_ID,
+            removeRoutesFromNetworkAndLinkProperties(LOCAL_NET_ID,
                     getLocalRoutesFor(mIfaceName, deprecatedPrefixes));
         }
 
@@ -918,7 +919,7 @@ public class IpServer extends StateMachineShim {
             }
 
             if (!addedPrefixes.isEmpty()) {
-                addRoutesToNetworkAndLinkProperties(INetd.LOCAL_NET_ID,
+                addRoutesToNetworkAndLinkProperties(LOCAL_NET_ID,
                         getLocalRoutesFor(mIfaceName, addedPrefixes));
             }
         }
@@ -1123,7 +1124,7 @@ public class IpServer extends StateMachineShim {
             }
 
             try {
-                NetdUtils.tetherInterface(mNetd, INetd.LOCAL_NET_ID, mIfaceName,
+                NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, mIfaceName,
                         asIpPrefix(mIpv4Address));
             } catch (RemoteException | ServiceSpecificException | IllegalStateException e) {
                 mLog.e("Error Tethering", e);
@@ -1146,7 +1147,7 @@ public class IpServer extends StateMachineShim {
             stopIPv6();
 
             try {
-                NetdUtils.untetherInterface(mNetd, mIfaceName);
+                NetdUtils.untetherInterface(mNetd, LOCAL_NET_ID, mIfaceName);
             } catch (RemoteException | ServiceSpecificException e) {
                 mLastError = TETHER_ERROR_UNTETHER_IFACE_ERROR;
                 mLog.e("Failed to untether interface: " + e);
@@ -1224,12 +1225,12 @@ public class IpServer extends StateMachineShim {
             }
 
             // Remove deprecated routes from downstream network.
-            removeRoutesFromNetworkAndLinkProperties(INetd.LOCAL_NET_ID,
+            removeRoutesFromNetworkAndLinkProperties(LOCAL_NET_ID,
                     List.of(getDirectConnectedRoute(deprecatedLinkAddress)));
             mLinkProperties.removeLinkAddress(deprecatedLinkAddress);
 
             // Add new routes to downstream network.
-            addRoutesToNetworkAndLinkProperties(INetd.LOCAL_NET_ID,
+            addRoutesToNetworkAndLinkProperties(LOCAL_NET_ID,
                     List.of(getDirectConnectedRoute(mIpv4Address)));
             mLinkProperties.addLinkAddress(mIpv4Address);
 
