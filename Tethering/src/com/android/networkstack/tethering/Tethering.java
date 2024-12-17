@@ -2207,9 +2207,9 @@ public class Tethering {
                         break;
                     }
                     case EVENT_REQUEST_CHANGE_DOWNSTREAM: {
-                        final boolean enabled = message.arg1 == 1;
-                        final TetheringRequest request = (TetheringRequest) message.obj;
-                        enableTetheringInternal(request.getTetheringType(), enabled, null, null);
+                        final int tetheringType = message.arg1;
+                        final Boolean enabled = (Boolean) message.obj;
+                        enableTetheringInternal(tetheringType, enabled, null, null);
                         break;
                     }
                     default:
@@ -2787,9 +2787,9 @@ public class Tethering {
         }
 
         @Override
-        public void requestEnableTethering(TetheringRequest request, boolean enabled) {
+        public void requestEnableTethering(int tetheringType, boolean enabled) {
             mTetherMainSM.sendMessage(TetherMainSM.EVENT_REQUEST_CHANGE_DOWNSTREAM,
-                    enabled ? 1 : 0, 0, request);
+                    tetheringType, 0, enabled ? Boolean.TRUE : Boolean.FALSE);
         }
     }
 
