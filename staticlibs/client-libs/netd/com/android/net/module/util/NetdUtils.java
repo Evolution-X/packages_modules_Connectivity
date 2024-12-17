@@ -161,9 +161,9 @@ public class NetdUtils {
         netd.tetherInterfaceAdd(iface);
         networkAddInterface(netd, netId, iface, maxAttempts, pollingIntervalMs);
         // Activate a route to dest and IPv6 link local.
-        modifyRoute(netd, ModifyOperation.ADD, INetd.LOCAL_NET_ID,
+        modifyRoute(netd, ModifyOperation.ADD, netId,
                 new RouteInfo(dest, null, iface, RTN_UNICAST));
-        modifyRoute(netd, ModifyOperation.ADD, INetd.LOCAL_NET_ID,
+        modifyRoute(netd, ModifyOperation.ADD, netId,
                 new RouteInfo(new IpPrefix("fe80::/64"), null, iface, RTN_UNICAST));
     }
 
@@ -194,12 +194,12 @@ public class NetdUtils {
     }
 
     /** Reset interface for tethering. */
-    public static void untetherInterface(final INetd netd, String iface)
+    public static void untetherInterface(final INetd netd, int netId, String iface)
             throws RemoteException, ServiceSpecificException {
         try {
             netd.tetherInterfaceRemove(iface);
         } finally {
-            netd.networkRemoveInterface(INetd.LOCAL_NET_ID, iface);
+            netd.networkRemoveInterface(netId, iface);
         }
     }
 
