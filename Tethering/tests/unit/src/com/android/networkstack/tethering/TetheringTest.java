@@ -267,8 +267,9 @@ public class TetheringTest {
     private static final String TEST_P2P_REGEX = "test_p2p-p2p\\d-.*";
     private static final String TEST_BT_REGEX = "test_pan\\d";
     private static final int TEST_CALLER_UID = 1000;
+    private static final int TEST_CALLER_UID_2 = 2000;
     private static final String TEST_CALLER_PKG = "com.test.tethering";
-
+    private static final String TEST_CALLER_PKG_2 = "com.test.tethering2";
     private static final int CELLULAR_NETID = 100;
     private static final int WIFI_NETID = 101;
     private static final int DUN_NETID = 102;
@@ -785,7 +786,10 @@ public class TetheringTest {
         if (interfaceName != null) {
             builder.setInterfaceName(interfaceName);
         }
-        return builder.build();
+        TetheringRequest request = builder.build();
+        request.setUid(TEST_CALLER_UID);
+        request.setPackageName(TEST_CALLER_PKG);
+        return request;
     }
 
     @NonNull
@@ -2781,6 +2785,17 @@ public class TetheringTest {
         // Enable USB tethering again with the same request and expect no change to USB.
         mTethering.startTethering(createTetheringRequest(TETHERING_USB), TEST_CALLER_PKG,
                 secondResult);
+        mLooper.dispatchAll();
+        secondResult.assertHasResult();
+        verify(mUsbManager, never()).setCurrentFunctions(UsbManager.FUNCTION_NONE);
+        reset(mUsbManager);
+
+        // Enable USB tethering again with the same request but different uid/package and expect no
+        // change to USB.
+        TetheringRequest differentUidPackage = createTetheringRequest(TETHERING_USB);
+        differentUidPackage.setUid(TEST_CALLER_UID_2);
+        differentUidPackage.setPackageName(TEST_CALLER_PKG_2);
+        mTethering.startTethering(differentUidPackage, TEST_CALLER_PKG_2, secondResult);
         mLooper.dispatchAll();
         secondResult.assertHasResult();
         verify(mUsbManager, never()).setCurrentFunctions(UsbManager.FUNCTION_NONE);
