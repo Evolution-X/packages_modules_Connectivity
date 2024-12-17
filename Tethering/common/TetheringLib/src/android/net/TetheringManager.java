@@ -388,7 +388,9 @@ public class TetheringManager {
         // up and be sent from a worker thread; later, they are always sent from the caller thread.
         // Considering that it's just oneway binder calls, and ordering is preserved, this seems
         // better than inconsistent behavior persisting after boot.
-        if (connector != null) {
+        // If system server restarted, mConnectorSupplier might temporarily return a stale (i.e.
+        // dead) version of TetheringService.
+        if (connector != null && connector.isBinderAlive()) {
             mConnector = ITetheringConnector.Stub.asInterface(connector);
         } else {
             startPollingForConnector();
@@ -423,9 +425,8 @@ public class TetheringManager {
                 } catch (InterruptedException e) {
                     // Not much to do here, the system needs to wait for the connector
                 }
-
                 final IBinder connector = mConnectorSupplier.get();
-                if (connector != null) {
+                if (connector != null && connector.isBinderAlive()) {
                     onTetheringConnected(ITetheringConnector.Stub.asInterface(connector));
                     return;
                 }
