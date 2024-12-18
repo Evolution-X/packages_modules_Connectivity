@@ -44,14 +44,14 @@ class AdvertisingRequestTest {
             serviceType = "_ipp._tcp"
         }
         val beforeParcel = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD)
-                .setAdvertisingConfig(NSD_ADVERTISING_UPDATE_ONLY)
+                .setFlags(NSD_ADVERTISING_UPDATE_ONLY)
                 .setTtl(Duration.ofSeconds(30L))
                 .build()
 
         val afterParcel = parcelingRoundTrip(beforeParcel)
 
         assertEquals(beforeParcel.serviceInfo.serviceType, afterParcel.serviceInfo.serviceType)
-        assertEquals(beforeParcel.advertisingConfig, afterParcel.advertisingConfig)
+        assertEquals(beforeParcel.flags, afterParcel.flags)
     }
 
     @Test
@@ -72,13 +72,13 @@ class AdvertisingRequestTest {
             serviceType = "_ipp._tcp"
         }
         val request = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD)
-                .setAdvertisingConfig(NSD_ADVERTISING_UPDATE_ONLY)
+                .setFlags(NSD_ADVERTISING_UPDATE_ONLY)
                 .setTtl(Duration.ofSeconds(100L))
                 .build()
 
         assertEquals("_ipp._tcp", request.serviceInfo.serviceType)
         assertEquals(PROTOCOL_DNS_SD, request.protocolType)
-        assertEquals(NSD_ADVERTISING_UPDATE_ONLY, request.advertisingConfig)
+        assertEquals(NSD_ADVERTISING_UPDATE_ONLY, request.flags)
         assertEquals(Duration.ofSeconds(100L), request.ttl)
     }
 
@@ -90,11 +90,11 @@ class AdvertisingRequestTest {
         val request1 = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD).build()
         val request2 = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD).build()
         val request3 = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD)
-                .setAdvertisingConfig(NSD_ADVERTISING_UPDATE_ONLY)
+                .setFlags(NSD_ADVERTISING_UPDATE_ONLY)
                 .setTtl(Duration.ofSeconds(120L))
                 .build()
         val request4 = AdvertisingRequest.Builder(info, PROTOCOL_DNS_SD)
-                .setAdvertisingConfig(NSD_ADVERTISING_UPDATE_ONLY)
+                .setFlags(NSD_ADVERTISING_UPDATE_ONLY)
                 .setTtl(Duration.ofSeconds(120L))
                 .build()
 
