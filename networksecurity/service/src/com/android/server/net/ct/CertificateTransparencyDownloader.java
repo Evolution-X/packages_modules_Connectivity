@@ -221,7 +221,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             mDataStore.setProperty(Config.VERSION, version);
 
             // Reset the number of consecutive log list failure updates back to zero.
-            mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* value= */ 0L);
+            mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* value= */ 0);
             mDataStore.store();
         } else {
             if (updateFailureCount()) {
@@ -244,11 +244,11 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
      * @return whether the failure count exceeds the threshold and should be logged.
      */
     private boolean updateFailureCount() {
-        long failure_count = mDataStore.getPropertyLong(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L);
-        long new_failure_count = failure_count + 1L;
+        int failure_count = mDataStore.getPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
+        int new_failure_count = failure_count + 1;
 
-        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
+        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
         mDataStore.store();
 
         boolean shouldReport = new_failure_count >= Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD;

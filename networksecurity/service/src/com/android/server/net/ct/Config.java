@@ -63,5 +63,5 @@ final class Config {
     static final String URL_PUBLIC_KEY = URL_PREFIX + "log_list.pub";
 
     // Threshold amounts
-    static final long LOG_LIST_UPDATE_FAILURE_THRESHOLD = 10L;
+    static final int LOG_LIST_UPDATE_FAILURE_THRESHOLD = 10;
 }
