@@ -29,6 +29,9 @@ import static android.system.OsConstants.EIO;
 import static android.system.OsConstants.EEXIST;
 import static android.system.OsConstants.ENOENT;
 
+import static com.android.net.module.util.FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED;
+import static com.android.net.module.util.FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_DISALLOW_BYPASS_VPN_FOR_DELEGATE_UID_ENOENT;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
@@ -73,6 +76,7 @@ import android.util.SparseArray;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.WakeupMessage;
+import com.android.net.module.util.FrameworkConnectivityStatsLog;
 import com.android.net.module.util.HandlerUtils;
 import com.android.server.ConnectivityService;
 import com.android.server.ConnectivityService.CaptivePortalImpl;
@@ -1604,6 +1608,12 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         if (mCaptivePortalDelegateUids.values().contains(maybeDelegateUid)) return 0;
         final int errorCode =
                 allowBypassVpnOnNetwork(false /* allow */, maybeDelegateUid, network.netId);
+        if (errorCode == ENOENT) {
+            FrameworkConnectivityStatsLog.write(
+                    CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                    CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_DISALLOW_BYPASS_VPN_FOR_DELEGATE_UID_ENOENT
+            );
+        }
         return errorCode == ENOENT ? 0 : errorCode;
     }
 
