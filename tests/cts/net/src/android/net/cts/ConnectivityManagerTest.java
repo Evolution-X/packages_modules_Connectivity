@@ -1615,7 +1615,7 @@ public class ConnectivityManagerTest {
         assumeTrue(mPackageManager.hasSystemFeature(FEATURE_WIFI));
         final ContentResolver resolver = mContext.getContentResolver();
         mCtsNetUtils.ensureWifiConnected();
-        final String ssid = unquoteSSID(mWifiManager.getConnectionInfo().getSSID());
+        final String ssid = unquoteSSID(getSSID());
         final String oldMeteredSetting = getWifiMeteredStatus(ssid);
         final String oldMeteredMultipathPreference = Settings.Global.getString(
                 resolver, NETWORK_METERED_MULTIPATH_PREFERENCE);
@@ -1628,7 +1628,7 @@ public class ConnectivityManagerTest {
             // since R.
             final Network network = setWifiMeteredStatusAndWait(ssid, true /* isMetered */,
                     false /* waitForValidation */);
-            assertEquals(ssid, unquoteSSID(mWifiManager.getConnectionInfo().getSSID()));
+            assertEquals(ssid, unquoteSSID(getSSID()));
             assertEquals(mCm.getNetworkCapabilities(network).hasCapability(
                     NET_CAPABILITY_NOT_METERED), false);
             assertMultipathPreferenceIsEventually(network, initialMeteredPreference,
@@ -2429,7 +2429,7 @@ public class ConnectivityManagerTest {
                 mPackageManager.hasSystemFeature(FEATURE_WIFI));
 
         final Network network = mCtsNetUtils.ensureWifiConnected();
-        final String ssid = unquoteSSID(mWifiManager.getConnectionInfo().getSSID());
+        final String ssid = unquoteSSID(getSSID());
         assertNotNull("Ssid getting from WifiManager is null", ssid);
         // This package should have no NETWORK_SETTINGS permission. Verify that no ssid is contained
         // in the NetworkCapabilities.
@@ -2938,6 +2938,15 @@ public class ConnectivityManagerTest {
         runWithShellPermissionIdentity(() ->
                 networkCallbackRule.registerSystemDefaultNetworkCallback(systemDefaultCallback,
                         new Handler(Looper.getMainLooper())), NETWORK_SETTINGS);
+    }
+
+    /**
+     * It needs android.Manifest.permission.INTERACT_ACROSS_USERS_FULL
+     * to use WifiManager.getConnectionInfo() on the visible background user.
+     */
+    private String getSSID() {
+        return runWithShellPermissionIdentity(() ->
+                mWifiManager.getConnectionInfo().getSSID());
     }
 
     private static final class OnCompleteListenerCallback {
