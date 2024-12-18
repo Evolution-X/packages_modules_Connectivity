@@ -186,6 +186,47 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
+    public void testDownloader_publicKeyDownloadFail_failureThresholdExceeded_logsFailure()
+                throws Exception {
+        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        setFailedDownload(
+                publicKeyId, // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        // TODO(378626065): Verify logged failure via statsd.
+    }
+
+    @Test
+    public void testDownloader_publicKeyDownloadFail_failureThresholdNotMet_doesNotLog()
+                throws Exception {
+        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
+        setFailedDownload(
+                publicKeyId, // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(1);
+        // TODO(378626065): Verify no failure logged via statsd.
+    }
+
+    @Test
     public void testDownloader_metadataDownloadSuccess_startContentDownload() {
         long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
         setSuccessfulDownload(metadataId, new File("log_list.sig"));
@@ -212,6 +253,49 @@ public class CertificateTransparencyDownloaderTest {
         mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isFalse();
+    }
+
+    @Test
+    public void testDownloader_metadataDownloadFail_failureThresholdExceeded_logsFailure()
+                throws Exception {
+        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        setFailedDownload(
+                metadataId,
+                // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        // TODO(378626065): Verify logged failure via statsd.
+    }
+
+    @Test
+    public void testDownloader_metadataDownloadFail_failureThresholdNotMet_doesNotLog()
+                throws Exception {
+        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
+        setFailedDownload(
+                metadataId,
+                // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(1);
+        // TODO(378626065): Verify no failure logged via statsd.
     }
 
     @Test
@@ -254,6 +338,49 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
+    public void testDownloader_contentDownloadFail_failureThresholdExceeded_logsFailure()
+                throws Exception {
+        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        setFailedDownload(
+                contentId,
+                // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        // TODO(378626065): Verify logged failure via statsd.
+    }
+
+    @Test
+    public void testDownloader_contentDownloadFail_failureThresholdNotMet_doesNotLog()
+                throws Exception {
+        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
+        setFailedDownload(
+                contentId,
+                // Failure cases where we give up on the download.
+                DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                DownloadManager.ERROR_HTTP_DATA_ERROR);
+        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
+
+        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(1);
+        // TODO(378626065): Verify no failure logged via statsd.
+    }
+
+    @Test
     public void testDownloader_contentDownloadSuccess_installFail_doNotUpdateDataStore()
             throws Exception {
         File logListFile = makeLogListFile("456");
@@ -272,6 +399,59 @@ public class CertificateTransparencyDownloaderTest {
                 mContext, makeDownloadCompleteIntent(contentId));
 
         assertNoVersionIsInstalled();
+    }
+
+    @Test
+    public void
+            testDownloader_contentDownloadSuccess_installFail_failureThresholdExceeded_logsFailure()
+                    throws Exception {
+        File logListFile = makeLogListFile("456");
+        File metadataFile = sign(logListFile);
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+        setSuccessfulDownload(metadataId, metadataFile);
+        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+        setSuccessfulDownload(contentId, logListFile);
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        when(mCertificateTransparencyInstaller.install(
+                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
+                .thenReturn(false);
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(contentId));
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        // TODO(378626065): Verify logged failure via statsd.
+    }
+
+    @Test
+    public void
+            testDownloader_contentDownloadSuccess_installFail_failureThresholdNotMet_doesNotLog()
+                    throws Exception {
+        File logListFile = makeLogListFile("456");
+        File metadataFile = sign(logListFile);
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+        setSuccessfulDownload(metadataId, metadataFile);
+        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+        setSuccessfulDownload(contentId, logListFile);
+        // Set the failure count to just below the threshold
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
+        when(mCertificateTransparencyInstaller.install(
+                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
+                .thenReturn(false);
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeDownloadCompleteIntent(contentId));
+
+        assertThat(mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L))
+                        .isEqualTo(1);
+        // TODO(378626065): Verify no failure logged via statsd.
     }
 
     @Test

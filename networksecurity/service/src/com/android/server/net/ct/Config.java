@@ -54,10 +54,14 @@ final class Config {
     static final String METADATA_DOWNLOAD_ID = "metadata_download_id";
     static final String PUBLIC_KEY_URL = "public_key_url";
     static final String PUBLIC_KEY_DOWNLOAD_ID = "public_key_download_id";
+    static final String LOG_LIST_UPDATE_FAILURE_COUNT = "log_list_update_failure_count";
 
     // URLs
     static final String URL_PREFIX = "https://www.gstatic.com/android/certificate_transparency/";
     static final String URL_LOG_LIST = URL_PREFIX + "log_list.json";
     static final String URL_SIGNATURE = URL_PREFIX + "log_list.sig";
     static final String URL_PUBLIC_KEY = URL_PREFIX + "log_list.pub";
+
+    // Threshold amounts
+    static final long LOG_LIST_UPDATE_FAILURE_THRESHOLD = 10L;
 }
