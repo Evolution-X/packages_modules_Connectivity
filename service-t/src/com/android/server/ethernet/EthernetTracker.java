@@ -21,6 +21,7 @@ import static android.net.EthernetManager.ETHERNET_STATE_ENABLED;
 import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
+import static com.android.net.module.util.netlink.NetlinkConstants.IFF_UP;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -55,6 +56,7 @@ import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.NetlinkConstants;
 import com.android.net.module.util.netlink.NetlinkMessage;
+import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.RtNetlinkLinkMessage;
 import com.android.net.module.util.netlink.StructIfinfoMsg;
 import com.android.server.connectivity.ConnectivityResources;
@@ -596,14 +598,8 @@ public class EthernetTracker {
             // Read the flags before attempting to bring up the interface. If the interface is
             // already running an UP event is created after adding the interface.
             config = NetdUtils.getInterfaceConfigParcel(mNetd, iface);
-            // Only bring the interface up when ethernet is enabled.
-            if (mIsEthernetEnabled) {
-                // As a side-effect, NetdUtils#setInterfaceUp() also clears the interface's IPv4
-                // address and readds it which *could* lead to unexpected behavior in the future.
-                NetdUtils.setInterfaceUp(mNetd, iface);
-            } else {
-                NetdUtils.setInterfaceDown(mNetd, iface);
-            }
+            // Only bring the interface up when ethernet is enabled, otherwise set interface down.
+            setInterfaceUpState(iface, mIsEthernetEnabled);
         } catch (IllegalStateException e) {
             // Either the system is crashing or the interface has disappeared. Just ignore the
             // error; we haven't modified any state because we only do that if our calls succeed.
@@ -663,15 +659,7 @@ public class EthernetTracker {
             return;
         }
 
-        if (up) {
-            // WARNING! setInterfaceUp() clears the IPv4 address and readds it. Calling
-            // enableInterface() on an active interface can lead to a provisioning failure which
-            // will cause IpClient to be restarted.
-            // TODO: use netlink directly rather than calling into netd.
-            NetdUtils.setInterfaceUp(mNetd, iface);
-        } else {
-            NetdUtils.setInterfaceDown(mNetd, iface);
-        }
+        setInterfaceUpState(iface, up);
         cb.onResult(iface);
     }
 
@@ -973,11 +961,7 @@ public class EthernetTracker {
             }
 
             for (String iface : interfaces) {
-                if (enabled) {
-                    NetdUtils.setInterfaceUp(mNetd, iface);
-                } else {
-                    NetdUtils.setInterfaceDown(mNetd, iface);
-                }
+                setInterfaceUpState(iface, enabled);
             }
             broadcastEthernetStateChange(mIsEthernetEnabled);
         });
@@ -1009,6 +993,12 @@ public class EthernetTracker {
             }
         }
         mListeners.finishBroadcast();
+    }
+
+    private void setInterfaceUpState(@NonNull String interfaceName, boolean up) {
+        if (!NetlinkUtils.setInterfaceFlags(interfaceName, up ? IFF_UP : ~IFF_UP)) {
+            Log.e(TAG, "Failed to set interface " + interfaceName + (up ? " up" : " down"));
+        }
     }
 
     void dump(FileDescriptor fd, IndentingPrintWriter pw, String[] args) {
