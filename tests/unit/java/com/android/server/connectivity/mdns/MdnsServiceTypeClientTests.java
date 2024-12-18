@@ -16,13 +16,13 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.server.connectivity.mdns.MdnsQueryScheduler.INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS;
+import static com.android.server.connectivity.mdns.MdnsQueryScheduler.MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS;
+import static com.android.server.connectivity.mdns.MdnsQueryScheduler.TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.ACTIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.AGGRESSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.PASSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsServiceTypeClient.EVENT_START_QUERYTASK;
-import static com.android.server.connectivity.mdns.QueryTaskConfig.INITIAL_AGGRESSIVE_TIME_BETWEEN_BURSTS_MS;
-import static com.android.server.connectivity.mdns.QueryTaskConfig.MAX_TIME_BETWEEN_AGGRESSIVE_BURSTS_MS;
-import static com.android.server.connectivity.mdns.QueryTaskConfig.TIME_BETWEEN_RETRANSMISSION_QUERIES_IN_BURST_MS;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
