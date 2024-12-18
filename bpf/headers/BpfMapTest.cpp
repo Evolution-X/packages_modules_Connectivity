@@ -250,5 +250,10 @@ TEST_F(BpfMapTest, mapClear) {
     expectMapEmpty(testMap);
 }
 
+TEST_F(BpfMapTest, testGTSbitmapTestOpen) {
+    BpfMap<int, uint64_t> bitmap;
+    ASSERT_RESULT_OK(bitmap.init("/sys/fs/bpf/tethering/map_test_bitmap"));
+}
+
 }  // namespace bpf
 }  // namespace android
