@@ -23,6 +23,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
+import android.os.ConfigUpdate;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -31,8 +32,6 @@ import android.util.Log;
 public class CertificateTransparencyJob extends BroadcastReceiver {
 
     private static final String TAG = "CertificateTransparencyJob";
-
-    private static final String ACTION_JOB_START = "com.android.server.net.ct.action.JOB_START";
 
     private final Context mContext;
     private final DataStore mDataStore;
@@ -55,13 +54,18 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
         mCertificateTransparencyDownloader.initialize();
 
         mContext.registerReceiver(
-                this, new IntentFilter(ACTION_JOB_START), Context.RECEIVER_EXPORTED);
+                this,
+                new IntentFilter(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
+                Context.RECEIVER_EXPORTED);
         mAlarmManager.setInexactRepeating(
                 AlarmManager.ELAPSED_REALTIME,
                 SystemClock.elapsedRealtime(), // schedule first job at earliest convenient time.
                 AlarmManager.INTERVAL_DAY,
                 PendingIntent.getBroadcast(
-                        mContext, 0, new Intent(ACTION_JOB_START), PendingIntent.FLAG_IMMUTABLE));
+                        mContext,
+                        0,
+                        new Intent(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
+                        PendingIntent.FLAG_IMMUTABLE));
 
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyJob scheduled successfully.");
@@ -70,7 +74,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (!ACTION_JOB_START.equals(intent.getAction())) {
+        if (!ConfigUpdate.ACTION_UPDATE_CT_LOGS.equals(intent.getAction())) {
             Log.w(TAG, "Received unexpected broadcast with action " + intent);
             return;
         }
