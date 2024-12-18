@@ -18,6 +18,7 @@ package com.android.networkstack.tethering;
 
 import static android.net.NetworkCapabilities.NET_CAPABILITY_DUN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 
 import static com.android.networkstack.apishim.common.ShimUtils.isAtLeastS;
@@ -40,6 +41,8 @@ import android.util.ArrayMap;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.android.modules.utils.build.SdkLevel;
 
 import java.util.Map;
 import java.util.Objects;
@@ -119,12 +122,15 @@ public class TestConnectivityManager extends ConnectivityManager {
                 && mLegacyTypeMap.isEmpty();
     }
 
-    boolean isListeningForAll() {
-        final NetworkCapabilities empty = new NetworkCapabilities();
-        empty.clearAll();
+    boolean isListeningForUpstream() {
+        final NetworkCapabilities upstreamNc = new NetworkCapabilities();
+        upstreamNc.clearAll();
+        if (SdkLevel.isAtLeastV()) {
+            upstreamNc.addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK);
+        }
 
         for (NetworkRequestInfo nri : mListening.values()) {
-            if (nri.request.networkCapabilities.equalRequestableCapabilities(empty)) {
+            if (nri.request.networkCapabilities.equalRequestableCapabilities(upstreamNc)) {
                 return true;
             }
         }
