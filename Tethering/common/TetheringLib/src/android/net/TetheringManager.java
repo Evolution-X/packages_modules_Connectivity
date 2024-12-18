@@ -1188,6 +1188,17 @@ public class TetheringManager {
         public boolean equals(Object obj) {
             if (this == obj) return true;
             if (!(obj instanceof TetheringRequest otherRequest)) return false;
+            if (!equalsIgnoreUidPackage(otherRequest)) return false;
+            TetheringRequestParcel parcel = getParcel();
+            TetheringRequestParcel otherParcel = otherRequest.getParcel();
+            return parcel.uid == otherParcel.uid
+                    && Objects.equals(parcel.packageName, otherParcel.packageName);
+        }
+
+        /**
+         * @hide
+         */
+        public boolean equalsIgnoreUidPackage(TetheringRequest otherRequest) {
             TetheringRequestParcel parcel = getParcel();
             TetheringRequestParcel otherParcel = otherRequest.getParcel();
             return parcel.tetheringType == otherParcel.tetheringType
@@ -1197,8 +1208,6 @@ public class TetheringManager {
                     && parcel.showProvisioningUi == otherParcel.showProvisioningUi
                     && parcel.connectivityScope == otherParcel.connectivityScope
                     && Objects.equals(parcel.softApConfig, otherParcel.softApConfig)
-                    && parcel.uid == otherParcel.uid
-                    && Objects.equals(parcel.packageName, otherParcel.packageName)
                     && Objects.equals(parcel.interfaceName, otherParcel.interfaceName);
         }
 
