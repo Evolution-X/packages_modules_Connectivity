@@ -110,6 +110,7 @@ import static android.net.NetworkCapabilities.REDACT_FOR_ACCESS_FINE_LOCATION;
 import static android.net.NetworkCapabilities.REDACT_FOR_LOCAL_MAC_ADDRESS;
 import static android.net.NetworkCapabilities.REDACT_FOR_NETWORK_SETTINGS;
 import static android.net.NetworkCapabilities.RES_ID_UNSET;
+import static android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
@@ -6765,7 +6766,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     final NetworkOfferInfo offer =
                             findNetworkOfferInfoByCallback((INetworkOfferCallback) msg.obj);
                     if (null != offer) {
-                        handleUnregisterNetworkOffer(offer);
+                        handleUnregisterNetworkOffer(offer, true /* releaseReservations */);
                     }
                     break;
                 }
@@ -8968,7 +8969,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
         }
         for (final NetworkOfferInfo noi : toRemove) {
-            handleUnregisterNetworkOffer(noi);
+            handleUnregisterNetworkOffer(noi, true /* releaseReservations */);
         }
         if (DBG) log("unregisterNetworkProvider for " + npi.name);
     }
@@ -9401,7 +9402,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         @Override
         public void binderDied() {
-            mHandler.post(() -> handleUnregisterNetworkOffer(this));
+            mHandler.post(() -> handleUnregisterNetworkOffer(this, true /* releaseReservations */));
         }
     }
 
@@ -9440,40 +9441,60 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return;
         }
         final NetworkOfferInfo existingOffer = findNetworkOfferInfoByCallback(newOffer.callback);
+
+        // If a reserved offer is updated, ensure the capabilities are not changed. This ensures
+        // that the reserved offer's capabilities match the ones passed by the onReserved callback,
+        // which is sent only once.
+        //
+        // TODO: consider letting the provider change the capabilities of an offer as long as they
+        // continue to satisfy the capabilities that were passed to onReserved. This is not needed
+        // today, but it shouldn't violate the API contract:
+        // - NetworkOffer capabilities are not promises
+        // - The app making a reservation must never assume that the capabilities of the reserved
+        // network are equal to the ones that were passed to onReserved. There will almost always be
+        // other capabilities, for example, those that change at runtime such as VALIDATED or
+        // NOT_SUSPENDED.
+        if (null != existingOffer
+                && existingOffer.offer.caps.getReservationId() != RES_ID_UNSET
+                && existingOffer.offer.caps.getReservationId() != RES_ID_MATCH_ALL_RESERVATIONS
+                && !newOffer.caps.equals(existingOffer.offer.caps)) {
+            // Reserved offers are not allowed to update their NetworkCapabilities.
+            // Doing so will immediately remove the offer from CS and send onUnavailable to the app.
+            handleUnregisterNetworkOffer(existingOffer, true /* releaseReservations */);
+            existingOffer.offer.notifyUnneeded();
+            logwtf("Reserved offers must never update their reserved NetworkCapabilities");
+            return;
+        }
+
+        final NetworkOfferInfo noi = new NetworkOfferInfo(newOffer);
         if (null != existingOffer) {
-            // TODO: to support updating the score for reserved offers by calling
-            // ConnectivityManager#offerNetwork with the same callback object or via
-            // updateOfferScore, prevent handleUnregisterNetworkOffer() from sending an
-            // onUnavailable() callback here.
-            handleUnregisterNetworkOffer(existingOffer);
+            // Do not send onUnavailable for a reserved offer when updating it.
+            handleUnregisterNetworkOffer(existingOffer, false /* releaseReservations */);
             newOffer.migrateFrom(existingOffer.offer);
             if (DBG) {
                 // handleUnregisterNetworkOffer has already logged the old offer
                 log("update offer from providerId " + newOffer.providerId + " new : " + newOffer);
             }
         } else {
+            final NetworkRequestInfo reservationNri = maybeGetNriForReservedOffer(noi);
+            if (reservationNri != null) {
+                // A NetworkRequest is only allowed to trigger a single reserved offer (and
+                // onReserved() callback). All subsequent offers are ignored. This either indicates
+                // a bug in the provider (e.g., responding twice to the same reservation, or
+                // updating the capabilities of a reserved offer), or multiple providers responding
+                // to the same offer (which could happen, but is not useful to the requesting app).
+                if (reservationNri.getReservedCapabilities() != null) {
+                    loge("A reservation can only trigger a single offer; new offer is ignored.");
+                    return;
+                }
+                // Always update the reserved offer before calling callCallbackForRequest.
+                reservationNri.setReservedCapabilities(noi.offer.caps);
+                callCallbackForRequest(
+                        reservationNri, null /*networkAgent*/, CALLBACK_RESERVED, 0 /*arg1*/);
+            }
             if (DBG) {
                 log("register offer from providerId " + newOffer.providerId + " : " + newOffer);
             }
-        }
-        final NetworkOfferInfo noi = new NetworkOfferInfo(newOffer);
-        final NetworkRequestInfo reservationNri = maybeGetNriForReservedOffer(noi);
-        if (reservationNri != null) {
-            // A NetworkRequest is only allowed to trigger a single reserved offer (and onReserved()
-            // callback). All subsequent offers are ignored. This either indicates a bug in the
-            // provider (e.g., responding twice to the same reservation, or updating the
-            // capabilities of a reserved offer), or multiple providers responding to the same offer
-            // (which could happen, but is not useful to the requesting app).
-            // TODO: add proper support for offer migration; i.e. allow the score of a reservation
-            // offer to be updated.
-            if (reservationNri.getReservedCapabilities() != null) {
-                loge("A reservation can only trigger a single offer; new offer is ignored.");
-                return;
-            }
-            // Always update the reserved offer before calling callCallbackForRequest.
-            reservationNri.setReservedCapabilities(noi.offer.caps);
-            callCallbackForRequest(
-                    reservationNri, null /* networkAgent */, CALLBACK_RESERVED, 0 /* arg1 */);
         }
 
         try {
@@ -9486,7 +9507,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         issueNetworkNeeds(noi);
     }
 
-    private void handleUnregisterNetworkOffer(@NonNull final NetworkOfferInfo noi) {
+    private void handleUnregisterNetworkOffer(@NonNull final NetworkOfferInfo noi,
+                    boolean releaseReservations) {
         ensureRunningOnConnectivityServiceThread();
         if (DBG) {
             log("unregister offer from providerId " + noi.offer.providerId + " : " + noi.offer);
@@ -9504,11 +9526,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // handleRegisterNetworkOffer() in the case of a migration (which would be ignored as it
         // follows an onUnavailable).
         final NetworkRequestInfo nri = maybeGetNriForReservedOffer(noi);
-        if (nri != null) {
+        if (releaseReservations && nri != null) {
             handleRemoveNetworkRequest(nri);
             callCallbackForRequest(nri, null /* networkAgent */, CALLBACK_UNAVAIL, 0 /* arg1 */);
         }
-
         noi.offer.callback.asBinder().unlinkToDeath(noi, 0 /* flags */);
     }
 
