@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.server.net.ct;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -201,9 +202,8 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
 
         String version = null;
         try (InputStream inputStream = mContext.getContentResolver().openInputStream(contentUri)) {
-            version =
-                    new JSONObject(new String(inputStream.readAllBytes(), UTF_8))
-                            .getString("version");
+            version = new JSONObject(new String(inputStream.readAllBytes(), UTF_8))
+                    .getString("version");
         } catch (JSONException | IOException e) {
             Log.e(TAG, "Could not extract version from log list", e);
             return;
@@ -219,13 +219,44 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         if (success) {
             // Update information about the stored version on successful install.
             mDataStore.setProperty(Config.VERSION, version);
+
+            // Reset the number of consecutive log list failure updates back to zero.
+            mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* value= */ 0L);
             mDataStore.store();
+        } else {
+            if (updateFailureCount()) {
+                // TODO(378626065): Report FAILURE_VERSION_ALREADY_EXISTS failure via statsd.
+            }
         }
     }
 
     private void handleDownloadFailed(DownloadStatus status) {
         Log.e(TAG, "Download failed with " + status);
-        // TODO(378626065): Report failure via statsd.
+
+        if (updateFailureCount()) {
+            // TODO(378626065): Report download failure via statsd.
+        }
+    }
+
+    /**
+     * Updates the data store with the current number of consecutive log list update failures.
+     *
+     * @return whether the failure count exceeds the threshold and should be logged.
+     */
+    private boolean updateFailureCount() {
+        long failure_count = mDataStore.getPropertyLong(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0L);
+        long new_failure_count = failure_count + 1L;
+
+        mDataStore.setPropertyLong(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
+        mDataStore.store();
+
+        boolean shouldReport = new_failure_count >= Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD;
+        if (shouldReport) {
+            Log.e(TAG,
+                    "Log list update failure count exceeds threshold: " + new_failure_count);
+        }
+        return shouldReport;
     }
 
     private long download(String url) {
