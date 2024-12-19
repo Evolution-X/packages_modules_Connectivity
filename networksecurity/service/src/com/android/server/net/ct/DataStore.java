@@ -64,4 +64,12 @@ class DataStore extends Properties {
     Object setPropertyLong(String key, long value) {
         return setProperty(key, Long.toString(value));
     }
+
+    int getPropertyInt(String key, int defaultValue) {
+        return Optional.ofNullable(getProperty(key)).map(Integer::parseInt).orElse(defaultValue);
+    }
+
+    Object setPropertyInt(String key, int value) {
+        return setProperty(key, Integer.toString(value));
+    }
 }
