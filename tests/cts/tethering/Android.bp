@@ -34,6 +34,7 @@ java_defaults {
 
     static_libs: [
         "TetheringCommonTests",
+        "com.android.net.flags-aconfig-java",
         "compatibility-device-util-axt",
         "cts-net-utils",
         "net-tests-utils",
