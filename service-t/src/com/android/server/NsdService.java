@@ -1943,6 +1943,8 @@ public class NsdService extends INsdManager.Stub {
                 .setCachedServicesRetentionTime(mDeps.getDeviceConfigPropertyInt(
                         MdnsFeatureFlags.NSD_CACHED_SERVICES_RETENTION_TIME,
                         MdnsFeatureFlags.DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS))
+                .setIsShortHostnamesEnabled(mDeps.isTetheringFeatureNotChickenedOut(
+                        mContext, MdnsFeatureFlags.NSD_USE_SHORT_HOSTNAMES))
                 .setOverrideProvider(new MdnsFeatureFlags.FlagOverrideProvider() {
                     @Override
                     public boolean isForceEnabledForTest(@NonNull String flag) {
