@@ -17,6 +17,7 @@ package android.tethering.test;
 
 import static android.Manifest.permission.MODIFY_PHONE_STATE;
 import static android.Manifest.permission.TETHER_PRIVILEGED;
+import static android.Manifest.permission.WRITE_SETTINGS;
 import static android.content.pm.PackageManager.FEATURE_TELEPHONY;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_DUN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
@@ -71,6 +72,7 @@ import android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiSsid;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.os.ResultReceiver;
@@ -83,6 +85,7 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 import com.android.testutils.ParcelUtils;
 
 import org.junit.After;
@@ -457,12 +460,29 @@ public class TetheringManagerTest {
         } catch (UnsupportedOperationException expect) { }
     }
 
+    private boolean isTetheringWithSoftApConfigEnabled() {
+        return Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM
+                && Flags.tetheringWithSoftApConfig();
+    }
+
     @Test
-    public void testEnableTetheringPermission() throws Exception {
+    public void testStartTetheringNoPermission() throws Exception {
         final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
+
+        // No permission
         mTM.startTethering(new TetheringRequest.Builder(TETHERING_WIFI).build(),
                 c -> c.run() /* executor */, startTetheringCallback);
         startTetheringCallback.expectTetheringFailed(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+
+        // WRITE_SETTINGS not sufficient
+        if (isTetheringWithSoftApConfigEnabled()) {
+            runAsShell(WRITE_SETTINGS, () -> {
+                mTM.startTethering(new TetheringRequest.Builder(TETHERING_WIFI).build(),
+                        c -> c.run() /* executor */, startTetheringCallback);
+                startTetheringCallback.expectTetheringFailed(
+                        TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+            });
+        }
     }
 
     private class EntitlementResultListener implements OnTetheringEntitlementResultListener {
