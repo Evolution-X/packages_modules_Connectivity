@@ -67,6 +67,9 @@ import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_FORCE_USB_FUNCTIONS;
 import static com.android.networkstack.tethering.TetheringNotificationUpdater.DOWNSTREAM_NONE;
 import static com.android.networkstack.tethering.UpstreamNetworkMonitor.isCellular;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_MAIN_SM;
 
 import android.app.usage.NetworkStatsManager;
@@ -145,6 +148,7 @@ import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfac
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceRequestShim;
 import com.android.networkstack.apishim.common.UnsupportedApiLevelException;
 import com.android.networkstack.tethering.metrics.TetheringMetrics;
+import com.android.networkstack.tethering.metrics.TetheringStatsLog;
 import com.android.networkstack.tethering.util.InterfaceSet;
 import com.android.networkstack.tethering.util.PrefixUtils;
 import com.android.networkstack.tethering.util.VersionedBroadcastListener;
@@ -997,6 +1001,23 @@ public class Tethering {
 
     void tether(String iface, int requestedState, final IIntResultListener listener) {
         mHandler.post(() -> {
+            switch (ifaceNameToType(iface)) {
+                case TETHERING_WIFI:
+                    TetheringStatsLog.write(
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI
+                    );
+                    break;
+                case TETHERING_WIFI_P2P:
+                    TetheringStatsLog.write(
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P
+                    );
+                    break;
+                default:
+                    // Do nothing
+                    break;
+            }
             try {
                 listener.onResult(tether(iface, requestedState));
             } catch (RemoteException e) { }
