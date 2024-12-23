@@ -52,10 +52,11 @@ class TestableNetworkOfferCallback(val timeoutMs: Long, private val noCallbackTi
 
     inline fun <reified T : CallbackEntry> expectCallbackThat(
         crossinline predicate: (T) -> Boolean
-    ) {
+    ): T {
         val event = history.poll(timeoutMs)
                 ?: fail("Did not receive callback after ${timeoutMs}ms")
         if (event !is T || !predicate(event)) fail("Received unexpected callback $event")
+        return event
     }
 
     fun expectOnNetworkNeeded(capabilities: NetworkCapabilities) =

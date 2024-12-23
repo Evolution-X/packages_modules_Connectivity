@@ -42,6 +42,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -582,5 +583,16 @@ public class NetworkRequestTest {
         assertTrue(requestNR.canBeSatisfiedBy(specificOffer));
         assertTrue(requestNR.canBeSatisfiedBy(otherSpecificOffer));
         assertTrue(requestNR.canBeSatisfiedBy(regularOffer));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    public void testNetworkRequest_throwsWhenPassingCapsWithReservationId() {
+        final NetworkCapabilities capsWithResId = new NetworkCapabilities();
+        capsWithResId.setReservationId(42);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            new NetworkRequest(capsWithResId, TYPE_NONE, 42 /* rId */, NetworkRequest.Type.REQUEST);
+        });
     }
 }
