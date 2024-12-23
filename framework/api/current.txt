@@ -151,6 +151,7 @@ package android.net {
     method public void onLinkPropertiesChanged(@NonNull android.net.Network, @NonNull android.net.LinkProperties);
     method public void onLosing(@NonNull android.net.Network, int);
     method public void onLost(@NonNull android.net.Network);
+    method @FlaggedApi("com.android.net.flags.ipv6_over_ble") public void onReserved(@NonNull android.net.NetworkCapabilities);
     method public void onUnavailable();
     field public static final int FLAG_INCLUDE_LOCATION_INFO = 1; // 0x1
   }
