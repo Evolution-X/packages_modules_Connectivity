@@ -288,6 +288,7 @@ package android.net.nsd {
     method public java.util.Map<java.lang.String,byte[]> getAttributes();
     method @Deprecated public java.net.InetAddress getHost();
     method @NonNull public java.util.List<java.net.InetAddress> getHostAddresses();
+    method @FlaggedApi("com.android.net.flags.ipv6_over_ble") @Nullable public String getHostname();
     method @Nullable public android.net.Network getNetwork();
     method public int getPort();
     method public String getServiceName();
