@@ -15,12 +15,17 @@
  */
 package com.android.server.net.ct;
 
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +72,7 @@ public class CertificateTransparencyDownloaderTest {
 
     @Mock private DownloadManager mDownloadManager;
     @Mock private CertificateTransparencyInstaller mCertificateTransparencyInstaller;
+    @Mock private CertificateTransparencyLogger mLogger;
 
     private PrivateKey mPrivateKey;
     private PublicKey mPublicKey;
@@ -96,7 +102,8 @@ public class CertificateTransparencyDownloaderTest {
                         mDataStore,
                         new DownloadHelper(mDownloadManager),
                         mSignatureVerifier,
-                        mCertificateTransparencyInstaller);
+                        mCertificateTransparencyInstaller,
+                        mLogger);
 
         prepareDataStore();
         prepareDownloadManager();
@@ -203,7 +210,10 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        // TODO(378626065): Verify logged failure via statsd.
+        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
+                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
+        );
     }
 
     @Test
@@ -223,7 +233,7 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(1);
-        // TODO(378626065): Verify no failure logged via statsd.
+        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
@@ -274,7 +284,10 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        // TODO(378626065): Verify logged failure via statsd.
+        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
+                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
+        );
     }
 
     @Test
@@ -295,7 +308,7 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(1);
-        // TODO(378626065): Verify no failure logged via statsd.
+        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
@@ -356,7 +369,10 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        // TODO(378626065): Verify logged failure via statsd.
+        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
+                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
+        );
     }
 
     @Test
@@ -377,7 +393,7 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(1);
-        // TODO(378626065): Verify no failure logged via statsd.
+        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
@@ -425,7 +441,10 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        // TODO(378626065): Verify logged failure via statsd.
+        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
+                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS,
+                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
+        );
     }
 
     @Test
@@ -451,7 +470,7 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(mDataStore.getPropertyInt(
                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                         .isEqualTo(1);
-        // TODO(378626065): Verify no failure logged via statsd.
+        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
