@@ -34,13 +34,15 @@ public class MdnsAdvertisingOptions {
     private final boolean mIsOnlyUpdate;
     @Nullable
     private final Duration mTtl;
+    private final boolean mSkipProbing;
 
     /**
      * Parcelable constructs for a {@link MdnsAdvertisingOptions}.
      */
-    MdnsAdvertisingOptions(boolean isOnlyUpdate, @Nullable Duration ttl) {
+    MdnsAdvertisingOptions(boolean isOnlyUpdate, @Nullable Duration ttl, boolean skipProbing) {
         this.mIsOnlyUpdate = isOnlyUpdate;
         this.mTtl = ttl;
+        this.mSkipProbing = skipProbing;
     }
 
     /**
@@ -65,6 +67,13 @@ public class MdnsAdvertisingOptions {
      */
     public boolean isOnlyUpdate() {
         return mIsOnlyUpdate;
+    }
+
+    /**
+     * @return {@code true} if the probing step should be skipped.
+     */
+    public boolean skipProbing() {
+        return mSkipProbing;
     }
 
     /**
@@ -104,6 +113,7 @@ public class MdnsAdvertisingOptions {
      */
     public static final class Builder {
         private boolean mIsOnlyUpdate = false;
+        private boolean mSkipProbing = false;
         @Nullable
         private Duration mTtl;
 
@@ -127,10 +137,18 @@ public class MdnsAdvertisingOptions {
         }
 
         /**
+         * Sets whether to skip the probing step.
+         */
+        public Builder setSkipProbing(boolean skipProbing) {
+            this.mSkipProbing = skipProbing;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsAdvertisingOptions} with the arguments supplied to this builder.
          */
         public MdnsAdvertisingOptions build() {
-            return new MdnsAdvertisingOptions(mIsOnlyUpdate, mTtl);
+            return new MdnsAdvertisingOptions(mIsOnlyUpdate, mTtl, mSkipProbing);
         }
     }
 }
