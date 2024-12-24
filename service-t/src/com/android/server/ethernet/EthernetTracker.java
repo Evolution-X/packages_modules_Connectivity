@@ -594,7 +594,6 @@ public class EthernetTracker {
         InterfaceConfigurationParcel config = null;
         // Bring up the interface so we get link status indications.
         try {
-            PermissionUtils.enforceNetworkStackPermission(mContext);
             // Read the flags before attempting to bring up the interface. If the interface is
             // already running an UP event is created after adding the interface.
             config = NetdUtils.getInterfaceConfigParcel(mNetd, iface);
