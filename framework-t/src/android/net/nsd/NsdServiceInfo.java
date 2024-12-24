@@ -211,6 +211,8 @@ public final class NsdServiceInfo implements Parcelable {
         return mHostname;
     }
 
+    // TODO: if setHostname is made public, AdvertisingRequest#FLAG_SKIP_PROBING javadoc must be
+    // updated to mention that hostnames must also be known unique to use that flag.
     /**
      * Set a custom hostname for this service instance for registration.
      *

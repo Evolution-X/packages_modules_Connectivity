@@ -314,6 +314,13 @@ public final class NsdManager {
     /** Dns based service discovery protocol */
     public static final int PROTOCOL_DNS_SD = 0x0001;
 
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"PROTOCOL_"}, value = {
+            PROTOCOL_DNS_SD,
+    })
+    public @interface ProtocolType {}
+
     /**
      * The minimum TTL seconds which is allowed for a service registration.
      *
@@ -1272,7 +1279,7 @@ public final class NsdManager {
         // documented in the NsdServiceInfo.setSubtypes API instead, but this provides a limited
         // option for users of the older undocumented behavior, only for subtype changes.
         if (isSubtypeUpdateRequest(serviceInfo, listener)) {
-            builder.setAdvertisingConfig(AdvertisingRequest.NSD_ADVERTISING_UPDATE_ONLY);
+            builder.setFlags(AdvertisingRequest.NSD_ADVERTISING_UPDATE_ONLY);
         }
         registerService(builder.build(), executor, listener);
     }
@@ -1358,7 +1365,7 @@ public final class NsdManager {
         checkProtocol(protocolType);
         final int key;
         // For update only request, the old listener has to be reused
-        if ((advertisingRequest.getAdvertisingConfig()
+        if ((advertisingRequest.getFlags()
                 & AdvertisingRequest.NSD_ADVERTISING_UPDATE_ONLY) > 0) {
             key = updateRegisteredListener(listener, executor, serviceInfo);
         } else {
