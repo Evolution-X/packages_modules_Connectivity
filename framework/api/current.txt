@@ -103,6 +103,7 @@ package android.net {
     method public void requestNetwork(@NonNull android.net.NetworkRequest, @NonNull android.net.ConnectivityManager.NetworkCallback, int);
     method public void requestNetwork(@NonNull android.net.NetworkRequest, @NonNull android.net.ConnectivityManager.NetworkCallback, @NonNull android.os.Handler, int);
     method public void requestNetwork(@NonNull android.net.NetworkRequest, @NonNull android.app.PendingIntent);
+    method @FlaggedApi("com.android.net.flags.ipv6_over_ble") public void reserveNetwork(@NonNull android.net.NetworkRequest, @NonNull android.os.Handler, @NonNull android.net.ConnectivityManager.NetworkCallback);
     method @Deprecated public void setNetworkPreference(int);
     method @Deprecated public static boolean setProcessDefaultNetwork(@Nullable android.net.Network);
     method public void unregisterNetworkCallback(@NonNull android.net.ConnectivityManager.NetworkCallback);
