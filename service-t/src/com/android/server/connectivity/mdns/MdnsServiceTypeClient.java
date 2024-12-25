@@ -730,7 +730,7 @@ public class MdnsServiceTypeClient {
                                 serviceType,
                                 subtypes,
                                 taskArgs.config.expectUnicastResponse,
-                                taskArgs.config.transactionId,
+                                taskArgs.config.getTransactionId(),
                                 socketKey,
                                 onlyUseIpv6OnIpv6OnlyNetworks,
                                 sendDiscoveryQueries,
