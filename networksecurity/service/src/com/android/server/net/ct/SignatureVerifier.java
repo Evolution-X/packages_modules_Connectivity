@@ -27,7 +27,6 @@ import androidx.annotation.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -74,9 +73,10 @@ public class SignatureVerifier {
         mPublicKey = Optional.of(publicKey);
     }
 
-    boolean verify(Uri file, Uri signature) throws GeneralSecurityException, IOException {
+    boolean verify(Uri file, Uri signature)
+            throws GeneralSecurityException, IOException, MissingPublicKeyException {
         if (!mPublicKey.isPresent()) {
-            throw new InvalidKeyException("Missing public key for signature verification");
+            throw new MissingPublicKeyException("Missing public key for signature verification");
         }
         Signature verifier = Signature.getInstance("SHA256withRSA");
         verifier.initVerify(mPublicKey.get());
