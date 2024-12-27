@@ -37,6 +37,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private final DataStore mDataStore;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
     private final AlarmManager mAlarmManager;
+    private final PendingIntent mPendingIntent;
 
     private boolean mDependenciesReady = false;
 
@@ -49,9 +50,15 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
         mDataStore = dataStore;
         mCertificateTransparencyDownloader = certificateTransparencyDownloader;
         mAlarmManager = context.getSystemService(AlarmManager.class);
+        mPendingIntent =
+                PendingIntent.getBroadcast(
+                        mContext,
+                        /* requestCode= */ 0,
+                        new Intent(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
+                        PendingIntent.FLAG_IMMUTABLE);
     }
 
-    void initialize() {
+    void schedule() {
         mContext.registerReceiver(
                 this,
                 new IntentFilter(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
@@ -60,14 +67,21 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
                 AlarmManager.ELAPSED_REALTIME,
                 SystemClock.elapsedRealtime(), // schedule first job at earliest convenient time.
                 AlarmManager.INTERVAL_DAY,
-                PendingIntent.getBroadcast(
-                        mContext,
-                        0,
-                        new Intent(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
-                        PendingIntent.FLAG_IMMUTABLE));
+                mPendingIntent);
 
         if (Config.DEBUG) {
-            Log.d(TAG, "CertificateTransparencyJob scheduled successfully.");
+            Log.d(TAG, "CertificateTransparencyJob scheduled.");
+        }
+    }
+
+    void cancel() {
+        mContext.unregisterReceiver(this);
+        mAlarmManager.cancel(mPendingIntent);
+        mCertificateTransparencyDownloader.stop();
+        mDependenciesReady = false;
+
+        if (Config.DEBUG) {
+            Log.d(TAG, "CertificateTransparencyJob canceled.");
         }
     }
 
@@ -82,7 +96,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
         }
         if (!mDependenciesReady) {
             mDataStore.load();
-            mCertificateTransparencyDownloader.initialize();
+            mCertificateTransparencyDownloader.start();
             mDependenciesReady = true;
         }
 
