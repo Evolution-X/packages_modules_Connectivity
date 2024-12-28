@@ -22,33 +22,34 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
+import android.os.SystemClock
 import androidx.test.filters.SmallTest
-import com.android.net.module.util.TimerFileDescriptor.ITask
-import com.android.net.module.util.TimerFileDescriptor.MessageTask
-import com.android.net.module.util.TimerFileDescriptor.RunnableTask
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.tryTest
 import com.android.testutils.visibleOnHandlerThread
+import com.google.common.collect.Range
+import com.google.common.truth.Truth.assertThat
+import kotlin.test.assertEquals
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.Duration
-import java.time.Instant
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-
-private const val MSG_TEST = 1
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
 class TimerFileDescriptorTest {
+
+    private val TIMEOUT_MS = 1000L
+    private val TOLERANCE_MS = 50L
     private class TestHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
-            val cv = msg.obj as ConditionVariable
+            val pair = msg.obj as Pair<ConditionVariable, MutableList<Long>>
+            val cv = pair.first
             cv.open()
+            val executionTimes = pair.second
+            executionTimes.add(SystemClock.elapsedRealtime())
         }
     }
     private val thread = HandlerThread(TimerFileDescriptorTest::class.simpleName).apply { start() }
@@ -60,55 +61,80 @@ class TimerFileDescriptorTest {
         thread.join()
     }
 
-    private fun assertDelayedTaskPost(
-            timerFd: TimerFileDescriptor,
-            task: ITask,
-            cv: ConditionVariable
-    ) {
-        val delayTime = 10L
-        val startTime1 = Instant.now()
-        handler.post { timerFd.setDelayedTask(task, delayTime) }
-        assertTrue(cv.block(100L /* timeoutMs*/))
-        assertTrue(Duration.between(startTime1, Instant.now()).toMillis() >= delayTime)
-    }
-
     @Test
-    fun testSetDelayedTask() {
-        val timerFd = TimerFileDescriptor(handler)
+    fun testMultiplePostDelayedTasks() {
+        val scheduler = TimerFileDescriptor(handler)
         tryTest {
-            // Verify the delayed task is executed with the self-implemented ITask
-            val cv1 = ConditionVariable()
-            assertDelayedTaskPost(timerFd, { cv1.open() }, cv1)
-
-            // Verify the delayed task is executed with the RunnableTask
-            val cv2 = ConditionVariable()
-            assertDelayedTaskPost(timerFd, RunnableTask{ cv2.open() }, cv2)
-
-            // Verify the delayed task is executed with the MessageTask
-            val cv3 = ConditionVariable()
-            assertDelayedTaskPost(timerFd, MessageTask(handler.obtainMessage(MSG_TEST, cv3)), cv3)
+            val initialTimeMs = SystemClock.elapsedRealtime()
+            val executionTimes = mutableListOf<Long>()
+            val cv = ConditionVariable()
+            handler.post {
+                scheduler.postDelayed(
+                    { executionTimes.add(SystemClock.elapsedRealtime() - initialTimeMs) }, 0)
+                scheduler.postDelayed(
+                    { executionTimes.add(SystemClock.elapsedRealtime() - initialTimeMs) }, 200)
+                val toBeRemoved = Runnable {
+                    executionTimes.add(SystemClock.elapsedRealtime() - initialTimeMs)
+                }
+                scheduler.postDelayed(toBeRemoved, 250)
+                scheduler.removeDelayedRunnable(toBeRemoved)
+                scheduler.postDelayed(
+                    { executionTimes.add(SystemClock.elapsedRealtime() - initialTimeMs) }, 100)
+                scheduler.postDelayed({
+                    executionTimes.add(SystemClock.elapsedRealtime() - initialTimeMs)
+                    cv.open() }, 300)
+            }
+            cv.block(TIMEOUT_MS)
+            assertEquals(4, executionTimes.size)
+            assertThat(executionTimes[0]).isIn(Range.closed(0L, TOLERANCE_MS))
+            assertThat(executionTimes[1]).isIn(Range.closed(100L, 100 + TOLERANCE_MS))
+            assertThat(executionTimes[2]).isIn(Range.closed(200L, 200 + TOLERANCE_MS))
+            assertThat(executionTimes[3]).isIn(Range.closed(300L, 300 + TOLERANCE_MS))
         } cleanup {
-            visibleOnHandlerThread(handler) { timerFd.close() }
+            visibleOnHandlerThread(handler) { scheduler.close() }
         }
     }
 
     @Test
-    fun testCancelTask() {
-        // The task is posted and canceled within the same handler loop, so the short delay used
-        // here won't cause flakes.
-        val delayTime = 10L
-        val timerFd = TimerFileDescriptor(handler)
-        val cv = ConditionVariable()
+    fun testMultipleSendDelayedMessages() {
+        val scheduler = TimerFileDescriptor(handler)
         tryTest {
+            val MSG_ID_0 = 0
+            val MSG_ID_1 = 1
+            val MSG_ID_2 = 2
+            val MSG_ID_3 = 3
+            val MSG_ID_4 = 4
+            val initialTimeMs = SystemClock.elapsedRealtime()
+            val executionTimes = mutableListOf<Long>()
+            val cv = ConditionVariable()
             handler.post {
-                timerFd.setDelayedTask({ cv.open() }, delayTime)
-                assertTrue(timerFd.hasDelayedTask())
-                timerFd.cancelTask()
-                assertFalse(timerFd.hasDelayedTask())
+                scheduler.sendDelayedMessage(
+                    Message.obtain(handler, MSG_ID_0, Pair(ConditionVariable(), executionTimes)), 0)
+                scheduler.sendDelayedMessage(
+                    Message.obtain(handler, MSG_ID_1, Pair(ConditionVariable(), executionTimes)),
+                    200)
+                scheduler.sendDelayedMessage(
+                    Message.obtain(handler, MSG_ID_4, Pair(ConditionVariable(), executionTimes)),
+                    250)
+                scheduler.removeDelayedMessage(MSG_ID_4)
+                scheduler.sendDelayedMessage(
+                    Message.obtain(handler, MSG_ID_2, Pair(ConditionVariable(), executionTimes)),
+                    100)
+                scheduler.sendDelayedMessage(
+                    Message.obtain(handler, MSG_ID_3, Pair(cv, executionTimes)),
+                    300)
             }
-            assertFalse(cv.block(20L /* timeoutMs*/))
+            cv.block(TIMEOUT_MS)
+            assertEquals(4, executionTimes.size)
+            assertThat(executionTimes[0] - initialTimeMs).isIn(Range.closed(0L, TOLERANCE_MS))
+            assertThat(executionTimes[1] - initialTimeMs)
+                .isIn(Range.closed(100L, 100 + TOLERANCE_MS))
+            assertThat(executionTimes[2] - initialTimeMs)
+                .isIn(Range.closed(200L, 200 + TOLERANCE_MS))
+            assertThat(executionTimes[3] - initialTimeMs)
+                .isIn(Range.closed(300L, 300 + TOLERANCE_MS))
         } cleanup {
-            visibleOnHandlerThread(handler) { timerFd.close() }
+            visibleOnHandlerThread(handler) { scheduler.close() }
         }
     }
 }
