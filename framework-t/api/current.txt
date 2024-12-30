@@ -210,6 +210,23 @@ package android.net {
 
 package android.net.nsd {
 
+  @FlaggedApi("com.android.net.flags.ipv6_over_ble") public final class AdvertisingRequest implements android.os.Parcelable {
+    method public int describeContents();
+    method public long getFlags();
+    method public int getProtocolType();
+    method @NonNull public android.net.nsd.NsdServiceInfo getServiceInfo();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.nsd.AdvertisingRequest> CREATOR;
+    field public static final long FLAG_SKIP_PROBING = 2L; // 0x2L
+  }
+
+  @FlaggedApi("com.android.net.flags.ipv6_over_ble") public static final class AdvertisingRequest.Builder {
+    ctor public AdvertisingRequest.Builder(@NonNull android.net.nsd.NsdServiceInfo);
+    method @NonNull public android.net.nsd.AdvertisingRequest build();
+    method @NonNull public android.net.nsd.AdvertisingRequest.Builder setFlags(long);
+    method @NonNull public android.net.nsd.AdvertisingRequest.Builder setProtocolType(int);
+  }
+
   @FlaggedApi("com.android.net.flags.nsd_subtypes_support_enabled") public final class DiscoveryRequest implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public android.net.Network getNetwork();

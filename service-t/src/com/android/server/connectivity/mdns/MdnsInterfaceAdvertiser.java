@@ -122,28 +122,32 @@ public class MdnsInterfaceAdvertiser implements MulticastPacketReader.PacketHand
         }
         @Override
         public void onFinished(MdnsProber.ProbingInfo info) {
-            final MdnsAnnouncer.AnnouncementInfo announcementInfo;
-            mSharedLog.i("Probing finished for service " + info.getServiceId());
-            mCbHandler.post(() -> mCb.onServiceProbingSucceeded(
-                    MdnsInterfaceAdvertiser.this, info.getServiceId()));
-            try {
-                announcementInfo = mRecordRepository.onProbingSucceeded(info);
-            } catch (IOException e) {
-                mSharedLog.e("Error building announcements", e);
-                return;
-            }
+            handleProbingFinished(info);
+        }
+    }
 
-            mAnnouncer.startSending(info.getServiceId(), announcementInfo,
-                    0L /* initialDelayMs */);
+    private void handleProbingFinished(MdnsProber.ProbingInfo info) {
+        final MdnsAnnouncer.AnnouncementInfo announcementInfo;
+        mSharedLog.i("Probing finished for service " + info.getServiceId());
+        mCbHandler.post(() -> mCb.onServiceProbingSucceeded(
+                MdnsInterfaceAdvertiser.this, info.getServiceId()));
+        try {
+            announcementInfo = mRecordRepository.onProbingSucceeded(info);
+        } catch (IOException e) {
+            mSharedLog.e("Error building announcements", e);
+            return;
+        }
 
-            // Re-announce the services which have the same custom hostname.
-            final String hostname = mRecordRepository.getHostnameForServiceId(info.getServiceId());
-            if (hostname != null) {
-                final List<MdnsAnnouncer.AnnouncementInfo> announcementInfos =
-                        new ArrayList<>(mRecordRepository.restartAnnouncingForHostname(hostname));
-                announcementInfos.removeIf((i) -> i.getServiceId() == info.getServiceId());
-                reannounceServices(announcementInfos);
-            }
+        mAnnouncer.startSending(info.getServiceId(), announcementInfo,
+                0L /* initialDelayMs */);
+
+        // Re-announce the services which have the same custom hostname.
+        final String hostname = mRecordRepository.getHostnameForServiceId(info.getServiceId());
+        if (hostname != null) {
+            final List<MdnsAnnouncer.AnnouncementInfo> announcementInfos =
+                    new ArrayList<>(mRecordRepository.restartAnnouncingForHostname(hostname));
+            announcementInfos.removeIf((i) -> i.getServiceId() == info.getServiceId());
+            reannounceServices(announcementInfos);
         }
     }
 
@@ -280,7 +284,12 @@ public class MdnsInterfaceAdvertiser implements MulticastPacketReader.PacketHand
                     + " getting re-added, cancelling exit announcements");
             mAnnouncer.stop(replacedExitingService);
         }
-        mProber.startProbing(mRecordRepository.setServiceProbing(id));
+        final MdnsProber.ProbingInfo probingInfo = mRecordRepository.setServiceProbing(id);
+        if (advertisingOptions.skipProbing()) {
+            handleProbingFinished(probingInfo);
+        } else {
+            mProber.startProbing(probingInfo);
+        }
     }
 
     /**
