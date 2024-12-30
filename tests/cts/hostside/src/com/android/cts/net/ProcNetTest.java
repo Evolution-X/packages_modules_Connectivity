@@ -91,8 +91,8 @@ public class ProcNetTest extends BaseHostJUnit4Test implements IBuildReceiver, I
     }
 
     private String[] getSysctlDirs() throws Exception {
-        String interfaceDirs[] = mDevice.executeAdbCommand("shell", "ls", "-1",
-                IPV6_SYSCTL_DIR).split("\n");
+        String[] interfaceDirs = mDevice.executeShellCommand("ls -1 " + IPV6_SYSCTL_DIR)
+                .split("\n");
         List<String> interfaceDirsList = new ArrayList<String>(Arrays.asList(interfaceDirs));
         interfaceDirsList.remove("all");
         interfaceDirsList.remove("lo");
@@ -109,13 +109,13 @@ public class ProcNetTest extends BaseHostJUnit4Test implements IBuildReceiver, I
     }
 
     public int readIntFromPath(String path) throws Exception {
-        String mode = mDevice.executeAdbCommand("shell", "stat", "-c", "%a", path).trim();
-        String user = mDevice.executeAdbCommand("shell", "stat", "-c", "%u", path).trim();
-        String group = mDevice.executeAdbCommand("shell", "stat", "-c", "%g", path).trim();
+        String mode = mDevice.executeShellCommand("stat -c %a " + path).trim();
+        String user = mDevice.executeShellCommand("stat -c %u " + path).trim();
+        String group = mDevice.executeShellCommand("stat -c %g " + path).trim();
         assertEquals(mode, "644");
         assertEquals(user, "0");
         assertEquals(group, "0");
-        return Integer.parseInt(mDevice.executeAdbCommand("shell", "cat", path).trim());
+        return Integer.parseInt(mDevice.executeShellCommand("cat " + path).trim());
     }
 
     /**
@@ -191,7 +191,7 @@ public class ProcNetTest extends BaseHostJUnit4Test implements IBuildReceiver, I
         assumeTrue(new DeviceSdkLevel(mDevice).isDeviceAtLeastV());
 
         String path = "/proc/sys/net/ipv4/tcp_congestion_control";
-        String value = mDevice.executeAdbCommand("shell", "cat", path).trim();
+        String value = mDevice.executeShellCommand("cat " + path).trim();
         assertEquals("cubic", value);
     }
 }
