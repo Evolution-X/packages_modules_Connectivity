@@ -150,7 +150,7 @@ class CSDeclaredMethodsForCallbacksTest : CSTest() {
         // EXPIRE_LEGACY_REQUEST (=8) is only used in ConnectivityManager and not included.
         // CALLBACK_TRANSITIVE_CALLS_ONLY (=0) is not a callback so not included either.
         assertEquals(
-            "PRECHK|AVAIL|LOSING|LOST|UNAVAIL|NC|LP|SUSP|RESUME|BLK|LOCALINF|0x7fffe101",
+            "PRECHK|AVAIL|LOSING|LOST|UNAVAIL|NC|LP|SUSP|RESUME|BLK|LOCALINF|RES|0x7fffc101",
             ConnectivityService.declaredMethodsFlagsToString(0x7fff_ffff)
         )
         // The toString method and the assertion above need to be updated if constants are added
@@ -158,7 +158,7 @@ class CSDeclaredMethodsForCallbacksTest : CSTest() {
             Modifier.isStatic(it.modifiers) && Modifier.isFinal(it.modifiers) &&
                     it.name.startsWith("CALLBACK_")
         }
-        assertEquals(12, constants.size)
+        assertEquals(13, constants.size)
     }
 }
 

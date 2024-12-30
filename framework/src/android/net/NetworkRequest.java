@@ -32,6 +32,7 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_PARTIAL_CONNECTIVIT
 import static android.net.NetworkCapabilities.NET_CAPABILITY_TEMPORARILY_NOT_METERED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED;
+import static android.net.NetworkCapabilities.RES_ID_UNSET;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 
 import android.annotation.FlaggedApi;
@@ -255,6 +256,9 @@ public class NetworkRequest implements Parcelable {
     public NetworkRequest(NetworkCapabilities nc, int legacyType, int rId, Type type) {
         if (nc == null) {
             throw new NullPointerException();
+        }
+        if (nc.getReservationId() != RES_ID_UNSET) {
+            throw new IllegalArgumentException("ReservationId must only be set by the system");
         }
         requestId = rId;
         networkCapabilities = nc;
