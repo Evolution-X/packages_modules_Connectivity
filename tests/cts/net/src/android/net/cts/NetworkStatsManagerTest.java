@@ -757,11 +757,12 @@ public class NetworkStatsManagerTest {
         }
     }
 
-    private long getTotalForTagState(int i, int tag, int state, boolean assertNotEmpty) {
+    private long getTotalForTagState(int i, int tag, int state, boolean assertNotEmpty,
+            long startTime, long endTime) {
         final NetworkStats stats = mNsm.queryDetailsForUidTagState(
                 mNetworkInterfacesToTest[i].getNetworkType(), getSubscriberId(i),
-                mStartTime, mEndTime, Process.myUid(), tag, state);
-        final long total = getTotal(stats, tag, state, assertNotEmpty);
+                startTime, endTime, Process.myUid(), tag, state);
+        final long total = getTotal(stats, tag, state, assertNotEmpty, startTime, endTime);
         stats.close();
         return total;
     }
@@ -789,8 +790,6 @@ public class NetworkStatsManagerTest {
             if (!shouldTestThisNetworkType(i)) {
                 continue;
             }
-            // Relatively large tolerance to accommodate for history bucket size.
-            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
             setAppOpsMode(AppOpsManager.OPSTR_GET_USAGE_STATS, "allow");
 
             int currentState = isInForeground() ? STATE_FOREGROUND : STATE_DEFAULT;
@@ -808,14 +807,42 @@ public class NetworkStatsManagerTest {
             allTags.addAll(tagsWithTraffic);
             allTags.addAll(tagsWithNoTraffic);
 
-            QueryResults results = new QueryResults();
+            // Relatively large tolerance to accommodate for history bucket size,
+            // and covering the entire test duration.
+            final long now = System.currentTimeMillis();
+            final long startTime = now - LONG_TOLERANCE;
+            final long endTime = now + LONG_TOLERANCE;
 
+            // Collect a baseline before generating network traffic.
+            QueryResults baseline = new QueryResults();
+            final ArrayList<String> logNonEmptyBaseline = new ArrayList<>();
+            for (int tag : allTags) {
+                for (int state : allStates) {
+                    final long total = getTotalForTagState(i, tag, state, false,
+                            startTime, endTime);
+                    baseline.put(tag, state, total);
+                    if (total > 0) {
+                        logNonEmptyBaseline.add(
+                                new QueryResults.QueryKey(tag, state) + "=" + total);
+                    }
+                }
+            }
+            // TODO: Remove debug log for b/368624224.
+            if (logNonEmptyBaseline.size() > 0) {
+                Log.v(LOG_TAG, "Baseline=" + logNonEmptyBaseline);
+            }
+
+            // Generate some traffic and release the network.
+            requestNetworkAndGenerateTraffic(i, LONG_TOLERANCE);
+
+            QueryResults results = new QueryResults();
             // Collect results for all combinations of tags and states.
             for (int tag : allTags) {
                 for (int state : allStates) {
                     final boolean assertNotEmpty = tagsWithTraffic.contains(tag)
                             && statesWithTraffic.contains(state);
-                    final long total = getTotalForTagState(i, tag, state, assertNotEmpty);
+                    final long total = getTotalForTagState(i, tag, state, assertNotEmpty,
+                            startTime, endTime) - baseline.get(tag, state);
                     results.put(tag, state, total);
                 }
             }
@@ -941,7 +968,7 @@ public class NetworkStatsManagerTest {
     }
 
     private long getTotal(NetworkStats result, Integer expectedTag,
-            Integer expectedState, boolean assertNotEmpty) {
+            Integer expectedState, boolean assertNotEmpty, long startTime, long endTime) {
         assertTrue(result != null);
         NetworkStats.Bucket bucket = new NetworkStats.Bucket();
         long totalTxPackets = 0;
@@ -950,7 +977,7 @@ public class NetworkStatsManagerTest {
         long totalRxBytes = 0;
         while (result.hasNextBucket()) {
             assertTrue(result.getNextBucket(bucket));
-            assertTimestamps(bucket);
+            assertTimestamps(bucket, startTime, endTime);
             if (expectedTag != null) assertEquals(bucket.getTag(), (int) expectedTag);
             if (expectedState != null) assertEquals(bucket.getState(), (int) expectedState);
             assertEquals(bucket.getMetered(), METERED_ALL);
@@ -977,14 +1004,18 @@ public class NetworkStatsManagerTest {
     }
 
     private long getTotalAndAssertNotEmpty(NetworkStats result) {
-        return getTotal(result, null, STATE_ALL, true /*assertEmpty*/);
+        return getTotal(result, null, STATE_ALL, true /*assertEmpty*/, mStartTime, mEndTime);
     }
 
     private void assertTimestamps(final NetworkStats.Bucket bucket) {
+        assertTimestamps(bucket, mStartTime, mEndTime);
+    }
+
+    private void assertTimestamps(final NetworkStats.Bucket bucket, long startTime, long endTime) {
         assertTrue("Start timestamp " + bucket.getStartTimeStamp() + " is less than "
-                + mStartTime, bucket.getStartTimeStamp() >= mStartTime);
+                + startTime, bucket.getStartTimeStamp() >= startTime);
         assertTrue("End timestamp " + bucket.getEndTimeStamp() + " is greater than "
-                + mEndTime, bucket.getEndTimeStamp() <= mEndTime);
+                + endTime, bucket.getEndTimeStamp() <= endTime);
     }
 
     private static class TestUsageCallback extends NetworkStatsManager.UsageCallback {
