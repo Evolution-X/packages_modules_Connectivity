@@ -20,8 +20,10 @@ import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFIC
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DOWNLOAD_CANNOT_RESUME;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_TOO_MANY_REDIRECTS;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__PENDING_WAITING_FOR_WIFI;
 
@@ -47,6 +49,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 
 /** Helper class to download certificate transparency log files. */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -202,15 +205,42 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         }
 
         boolean success = false;
+        boolean failureLogged = false;
+
         try {
             success = mSignatureVerifier.verify(contentUri, metadataUri);
+        } catch (MissingPublicKeyException e) {
+            if (updateFailureCount()) {
+                failureLogged = true;
+                mLogger.logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND,
+                        mDataStore.getPropertyInt(
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0)
+                );
+            }
+        } catch (InvalidKeyException e) {
+            if (updateFailureCount()) {
+                failureLogged = true;
+                mLogger.logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
+                        mDataStore.getPropertyInt(
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0)
+                );
+            }
         } catch (IOException | GeneralSecurityException e) {
             Log.e(TAG, "Could not verify new log list", e);
         }
+
         if (!success) {
             Log.w(TAG, "Log list did not pass verification");
 
-            // TODO(b/384931263): add logging for failed signature verification
+            // Avoid logging failure twice
+            if (!failureLogged && updateFailureCount()) {
+                mLogger.logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
+                        mDataStore.getPropertyInt(
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+            }
             return;
         }
 
