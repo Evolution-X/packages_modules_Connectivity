@@ -20,6 +20,7 @@ import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThr
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.AGGRESSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsServiceCache.ServiceExpiredCallback;
 import static com.android.server.connectivity.mdns.MdnsServiceCache.findMatchedResponse;
+import static com.android.server.connectivity.mdns.MdnsQueryScheduler.ScheduledQueryTaskArgs;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.Clock;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.buildMdnsServiceInfoFromResponse;
 
@@ -36,6 +37,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DnsUtils;
+import com.android.net.module.util.RealtimeScheduler;
 import com.android.net.module.util.SharedLog;
 import com.android.server.connectivity.mdns.util.MdnsUtils;
 
@@ -94,6 +96,9 @@ public class MdnsServiceTypeClient {
     private final boolean removeServiceAfterTtlExpires =
             MdnsConfigs.removeServiceAfterTtlExpires();
     private final Clock clock;
+    // Use RealtimeScheduler for query scheduling, which allows for more accurate sending of
+    // queries.
+    @Nullable private final RealtimeScheduler realtimeScheduler;
 
     @Nullable private MdnsSearchOptions searchOptions;
 
@@ -139,8 +144,7 @@ public class MdnsServiceTypeClient {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case EVENT_START_QUERYTASK: {
-                    final MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs =
-                            (MdnsQueryScheduler.ScheduledQueryTaskArgs) msg.obj;
+                    final ScheduledQueryTaskArgs taskArgs = (ScheduledQueryTaskArgs) msg.obj;
                     // QueryTask should be run immediately after being created (not be scheduled in
                     // advance). Because the result of "makeResponsesForResolve" depends on answers
                     // that were received before it is called, so to take into account all answers
@@ -174,7 +178,7 @@ public class MdnsServiceTypeClient {
                     final long now = clock.elapsedRealtime();
                     lastSentTime = now;
                     final long minRemainingTtl = getMinRemainingTtl(now);
-                    MdnsQueryScheduler.ScheduledQueryTaskArgs args =
+                    final ScheduledQueryTaskArgs args =
                             mdnsQueryScheduler.scheduleNextRun(
                                     sentResult.taskArgs.config,
                                     minRemainingTtl,
@@ -189,10 +193,14 @@ public class MdnsServiceTypeClient {
                     sharedLog.log(String.format("Query sent with transactionId: %d. "
                                     + "Next run: sessionId: %d, in %d ms",
                             sentResult.transactionId, args.sessionId, timeToNextTaskMs));
-                    dependencies.sendMessageDelayed(
-                            handler,
-                            handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                            timeToNextTaskMs);
+                    if (realtimeScheduler != null) {
+                        setDelayedTask(args, timeToNextTaskMs);
+                    } else {
+                        dependencies.sendMessageDelayed(
+                                handler,
+                                handler.obtainMessage(EVENT_START_QUERYTASK, args),
+                                timeToNextTaskMs);
+                    }
                     break;
                 }
                 default:
@@ -254,6 +262,14 @@ public class MdnsServiceTypeClient {
                 return List.of(new DatagramPacket(queryBuffer, 0, queryBuffer.length, address));
             }
         }
+
+        /**
+         * @see RealtimeScheduler
+         */
+        @Nullable
+        public RealtimeScheduler createRealtimeScheduler(@NonNull Handler handler) {
+            return new RealtimeScheduler(handler);
+        }
     }
 
     /**
@@ -301,6 +317,8 @@ public class MdnsServiceTypeClient {
         this.mdnsQueryScheduler = new MdnsQueryScheduler();
         this.cacheKey = new MdnsServiceCache.CacheKey(serviceType, socketKey);
         this.featureFlags = featureFlags;
+        this.realtimeScheduler = featureFlags.isAccurateDelayCallbackEnabled()
+                ? dependencies.createRealtimeScheduler(handler) : null;
     }
 
     /**
@@ -310,11 +328,20 @@ public class MdnsServiceTypeClient {
         removeScheduledTask();
         mdnsQueryScheduler.cancelScheduledRun();
         serviceCache.unregisterServiceExpiredCallback(cacheKey);
+        if (realtimeScheduler != null) {
+            realtimeScheduler.close();
+        }
     }
 
     private List<MdnsResponse> getExistingServices() {
         return featureFlags.isQueryWithKnownAnswerEnabled()
                 ? serviceCache.getCachedServices(cacheKey) : Collections.emptyList();
+    }
+
+    private void setDelayedTask(ScheduledQueryTaskArgs args, long timeToNextTaskMs) {
+        realtimeScheduler.removeDelayedMessage(EVENT_START_QUERYTASK);
+        realtimeScheduler.sendDelayedMessage(
+                handler.obtainMessage(EVENT_START_QUERYTASK, args), timeToNextTaskMs);
     }
 
     /**
@@ -363,7 +390,7 @@ public class MdnsServiceTypeClient {
         }
         final long minRemainingTtl = getMinRemainingTtl(now);
         if (hadReply) {
-            MdnsQueryScheduler.ScheduledQueryTaskArgs args =
+            final ScheduledQueryTaskArgs args =
                     mdnsQueryScheduler.scheduleNextRun(
                             taskConfig,
                             minRemainingTtl,
@@ -377,10 +404,14 @@ public class MdnsServiceTypeClient {
             final long timeToNextTaskMs = calculateTimeToNextTask(args, now);
             sharedLog.log(String.format("Schedule a query. Next run: sessionId: %d, in %d ms",
                     args.sessionId, timeToNextTaskMs));
-            dependencies.sendMessageDelayed(
-                    handler,
-                    handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                    timeToNextTaskMs);
+            if (realtimeScheduler != null) {
+                setDelayedTask(args, timeToNextTaskMs);
+            } else {
+                dependencies.sendMessageDelayed(
+                        handler,
+                        handler.obtainMessage(EVENT_START_QUERYTASK, args),
+                        timeToNextTaskMs);
+            }
         } else {
             final List<MdnsResponse> servicesToResolve = makeResponsesForResolve(socketKey);
             final QueryTask queryTask = new QueryTask(
@@ -420,7 +451,11 @@ public class MdnsServiceTypeClient {
     }
 
     private void removeScheduledTask() {
-        dependencies.removeMessages(handler, EVENT_START_QUERYTASK);
+        if (realtimeScheduler != null) {
+            realtimeScheduler.removeDelayedMessage(EVENT_START_QUERYTASK);
+        } else {
+            dependencies.removeMessages(handler, EVENT_START_QUERYTASK);
+        }
         sharedLog.log("Remove EVENT_START_QUERYTASK"
                 + ", current session: " + currentSessionId);
         ++currentSessionId;
@@ -506,10 +541,13 @@ public class MdnsServiceTypeClient {
                 }
             }
         }
-        if (dependencies.hasMessages(handler, EVENT_START_QUERYTASK)) {
+        final boolean hasScheduledTask = realtimeScheduler != null
+                ? realtimeScheduler.hasDelayedMessage(EVENT_START_QUERYTASK)
+                : dependencies.hasMessages(handler, EVENT_START_QUERYTASK);
+        if (hasScheduledTask) {
             final long now = clock.elapsedRealtime();
             final long minRemainingTtl = getMinRemainingTtl(now);
-            MdnsQueryScheduler.ScheduledQueryTaskArgs args =
+            final ScheduledQueryTaskArgs args =
                     mdnsQueryScheduler.maybeRescheduleCurrentRun(now, minRemainingTtl,
                             lastSentTime, currentSessionId + 1,
                             searchOptions.numOfQueriesBeforeBackoff());
@@ -518,10 +556,14 @@ public class MdnsServiceTypeClient {
                 final long timeToNextTaskMs = calculateTimeToNextTask(args, now);
                 sharedLog.log(String.format("Reschedule a query. Next run: sessionId: %d, in %d ms",
                         args.sessionId, timeToNextTaskMs));
-                dependencies.sendMessageDelayed(
-                        handler,
-                        handler.obtainMessage(EVENT_START_QUERYTASK, args),
-                        timeToNextTaskMs);
+                if (realtimeScheduler != null) {
+                    setDelayedTask(args, timeToNextTaskMs);
+                } else {
+                    dependencies.sendMessageDelayed(
+                            handler,
+                            handler.obtainMessage(EVENT_START_QUERYTASK, args),
+                            timeToNextTaskMs);
+                }
             }
         }
     }
@@ -686,10 +728,10 @@ public class MdnsServiceTypeClient {
     private static class QuerySentArguments {
         private final int transactionId;
         private final List<String> subTypes = new ArrayList<>();
-        private final MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs;
+        private final ScheduledQueryTaskArgs taskArgs;
 
         QuerySentArguments(int transactionId, @NonNull List<String> subTypes,
-                @NonNull MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs) {
+                @NonNull ScheduledQueryTaskArgs taskArgs) {
             this.transactionId = transactionId;
             this.subTypes.addAll(subTypes);
             this.taskArgs = taskArgs;
@@ -698,14 +740,14 @@ public class MdnsServiceTypeClient {
 
     // A FutureTask that enqueues a single query, and schedule a new FutureTask for the next task.
     private class QueryTask implements Runnable {
-        private final MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs;
+        private final ScheduledQueryTaskArgs taskArgs;
         private final List<MdnsResponse> servicesToResolve = new ArrayList<>();
         private final List<String> subtypes = new ArrayList<>();
         private final boolean sendDiscoveryQueries;
         private final List<MdnsResponse> existingServices = new ArrayList<>();
         private final boolean onlyUseIpv6OnIpv6OnlyNetworks;
         private final SocketKey socketKey;
-        QueryTask(@NonNull MdnsQueryScheduler.ScheduledQueryTaskArgs taskArgs,
+        QueryTask(@NonNull ScheduledQueryTaskArgs taskArgs,
                 @NonNull Collection<MdnsResponse> servicesToResolve,
                 @NonNull Collection<String> subtypes, boolean sendDiscoveryQueries,
                 @NonNull Collection<MdnsResponse> existingServices,
@@ -771,7 +813,7 @@ public class MdnsServiceTypeClient {
         return minRemainingTtl == Long.MAX_VALUE ? 0 : minRemainingTtl;
     }
 
-    private static long calculateTimeToNextTask(MdnsQueryScheduler.ScheduledQueryTaskArgs args,
+    private static long calculateTimeToNextTask(ScheduledQueryTaskArgs args,
             long now) {
         return Math.max(args.timeToRun - now, 0);
     }

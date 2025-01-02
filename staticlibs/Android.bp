@@ -438,7 +438,11 @@ java_library {
     srcs: [
         "device/com/android/net/module/util/FdEventsReader.java",
         "device/com/android/net/module/util/HandlerUtils.java",
+        "device/com/android/net/module/util/JniUtil.java",
+        "device/com/android/net/module/util/RealtimeScheduler.java",
         "device/com/android/net/module/util/SharedLog.java",
+        "device/com/android/net/module/util/ServiceConnectivityJni.java",
+        "device/com/android/net/module/util/TimerFdUtils.java",
         "framework/com/android/net/module/util/ByteUtils.java",
         "framework/com/android/net/module/util/CollectionUtils.java",
         "framework/com/android/net/module/util/DnsUtils.java",
