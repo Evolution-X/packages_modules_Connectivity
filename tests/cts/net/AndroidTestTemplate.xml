@@ -41,6 +41,7 @@
     </target_preparer>
     <test class="com.android.tradefed.testtype.AndroidJUnitTest" >
         <option name="package" value="{PACKAGE}" />
+        <option name="shell-timeout" value="1500s"/>
         <option name="runtime-hint" value="9m4s" />
         <option name="hidden-api-checks" value="false" />
         <option name="isolated-storage" value="false" />
