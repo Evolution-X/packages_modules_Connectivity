@@ -1,3 +1,6 @@
+# Keep JNI registered methods
+-keepclasseswithmembers,includedescriptorclasses class * { native <methods>; }
+
 # Keep class's integer static field for MessageUtils to parsing their name.
 -keepclassmembers class com.android.server.**,android.net.**,com.android.networkstack.** {
     static final % POLICY_*;
@@ -5,18 +8,6 @@
     static final % TRANSPORT_*;
     static final % CMD_*;
     static final % EVENT_*;
-}
-
--keep class com.android.networkstack.tethering.util.BpfMap {
-    native <methods>;
-}
-
--keep class com.android.networkstack.tethering.util.TcUtils {
-    native <methods>;
-}
-
--keep class com.android.networkstack.tethering.util.TetheringUtils {
-    native <methods>;
 }
 
 # Ensure runtime-visible field annotations are kept when using R8 full mode.
