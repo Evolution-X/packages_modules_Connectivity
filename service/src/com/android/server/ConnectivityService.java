@@ -7683,16 +7683,22 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     }
 
-    private void ensureAllNetworkRequestsHaveType(List<NetworkRequest> requests) {
+    private void ensureAllNetworkRequestsHaveSupportedType(List<NetworkRequest> requests) {
+        final boolean isMultilayerRequest = requests.size() > 1;
         for (int i = 0; i < requests.size(); i++) {
-            ensureNetworkRequestHasType(requests.get(i));
+            ensureNetworkRequestHasSupportedType(requests.get(i), isMultilayerRequest);
         }
     }
 
-    private void ensureNetworkRequestHasType(NetworkRequest request) {
+    private void ensureNetworkRequestHasSupportedType(NetworkRequest request,
+            boolean isMultilayerRequest) {
         if (request.type == NetworkRequest.Type.NONE) {
             throw new IllegalArgumentException(
                     "All NetworkRequests in ConnectivityService must have a type");
+        }
+        if (isMultilayerRequest && request.type == NetworkRequest.Type.RESERVATION) {
+            throw new IllegalArgumentException(
+                    "Reservation requests are not supported in multilayer request");
         }
     }
 
@@ -7845,7 +7851,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
                 @NonNull final NetworkRequest requestForCallback, @Nullable final PendingIntent pi,
                 @Nullable String callingAttributionTag, final int preferenceOrder) {
-            ensureAllNetworkRequestsHaveType(r);
+            ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = requestForCallback;
             mPendingIntent = pi;
@@ -7879,7 +7885,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 @NetworkCallback.Flag int callbackFlags,
                 @Nullable String callingAttributionTag, int declaredMethodsFlags) {
             super();
-            ensureAllNetworkRequestsHaveType(r);
+            ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = requestForCallback;
             mMessenger = m;
@@ -7899,7 +7905,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         NetworkRequestInfo(@NonNull final NetworkRequestInfo nri,
                 @NonNull final List<NetworkRequest> r) {
             super();
-            ensureAllNetworkRequestsHaveType(r);
+            ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = nri.getNetworkRequestForCallback();
             final NetworkAgentInfo satisfier = nri.getSatisfier();
@@ -8888,7 +8894,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     @Override
     public void releaseNetworkRequest(NetworkRequest networkRequest) {
-        ensureNetworkRequestHasType(networkRequest);
+        ensureNetworkRequestHasSupportedType(networkRequest, false /* isMultilayerRequest */);
         mHandler.sendMessage(mHandler.obtainMessage(
                 EVENT_RELEASE_NETWORK_REQUEST, mDeps.getCallingUid(), 0, networkRequest));
     }
