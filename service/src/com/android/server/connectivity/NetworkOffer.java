@@ -42,6 +42,7 @@ import java.util.Set;
  * @hide
  */
 public class NetworkOffer implements NetworkRanker.Scoreable {
+    private static final String TAG = NetworkOffer.class.getSimpleName();
     @NonNull public final FullScore score;
     @NonNull public final NetworkCapabilities caps;
     @NonNull public final INetworkOfferCallback callback;
@@ -123,6 +124,23 @@ public class NetworkOffer implements NetworkRanker.Scoreable {
      */
     public boolean neededFor(@NonNull final NetworkRequest request) {
         return mCurrentlyNeeded.contains(request);
+    }
+
+    /**
+     * Sends onNetworkUnneeded for any remaining NetworkRequests.
+     *
+     * Used after a NetworkOffer migration failed to let the provider know that its networks should
+     * be torn down (as the offer is no longer registered).
+     */
+    public void notifyUnneeded() {
+        try {
+            for (NetworkRequest request : mCurrentlyNeeded) {
+                callback.onNetworkUnneeded(request);
+            }
+        } catch (RemoteException e) {
+            // The remote is dead; nothing to do.
+        }
+        mCurrentlyNeeded.clear();
     }
 
     /**
