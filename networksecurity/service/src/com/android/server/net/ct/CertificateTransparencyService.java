@@ -18,18 +18,18 @@ package com.android.server.net.ct;
 
 import static android.security.Flags.certificateTransparencyConfiguration;
 
-import static com.android.net.ct.flags.Flags.certificateTransparencyJob;
 import static com.android.net.ct.flags.Flags.certificateTransparencyService;
 
 import android.annotation.RequiresApi;
 import android.content.Context;
 import android.net.ct.ICertificateTransparencyManager;
 import android.os.Build;
-import android.util.Log;
 import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
+import android.util.Log;
 
 import com.android.server.SystemService;
+
 import java.util.concurrent.Executors;
 
 /** Implementation of the Certificate Transparency service. */
@@ -62,7 +62,7 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
                         downloadHelper,
                         signatureVerifier,
                         new CertificateTransparencyInstaller(),
-                        new CertificateTransparencyLogger());
+                        new CertificateTransparencyLoggerImpl());
         mCertificateTransparencyJob =
                 new CertificateTransparencyJob(context, dataStore, downloader);
     }
