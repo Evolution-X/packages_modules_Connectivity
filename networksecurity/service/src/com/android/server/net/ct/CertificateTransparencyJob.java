@@ -22,6 +22,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.ConfigUpdate;
 import android.os.SystemClock;
@@ -32,6 +33,7 @@ import android.util.Log;
 public class CertificateTransparencyJob extends BroadcastReceiver {
 
     private static final String TAG = "CertificateTransparencyJob";
+    private static final String UPDATE_CONFIG_PERMISSION = "android.permission.UPDATE_CONFIG";
 
     private final Context mContext;
     private final DataStore mDataStore;
@@ -89,6 +91,11 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (!ConfigUpdate.ACTION_UPDATE_CT_LOGS.equals(intent.getAction())) {
             Log.w(TAG, "Received unexpected broadcast with action " + intent);
+            return;
+        }
+        if (context.checkCallingOrSelfPermission(UPDATE_CONFIG_PERMISSION)
+                != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Caller does not have UPDATE_CONFIG permission.");
             return;
         }
         if (Config.DEBUG) {
