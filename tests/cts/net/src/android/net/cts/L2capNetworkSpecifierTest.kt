@@ -18,13 +18,16 @@ package android.net.cts
 
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
+import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_NONE
 import android.net.L2capNetworkSpecifier.ROLE_CLIENT
+import android.net.L2capNetworkSpecifier.ROLE_SERVER
 import android.net.MacAddress
 import android.os.Build
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.assertParcelingIsLossless
+import kotlin.test.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -42,5 +45,20 @@ class L2capNetworkSpecifierTest {
                 .setRemoteAddress(remoteMac)
                 .build()
         assertParcelingIsLossless(specifier)
+    }
+
+    @Test
+    fun testGetters() {
+        val remoteMac = MacAddress.fromString("11:22:33:44:55:66")
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setPsm(123)
+                .setRemoteAddress(remoteMac)
+                .build()
+        assertEquals(ROLE_SERVER, specifier.getRole())
+        assertEquals(HEADER_COMPRESSION_NONE, specifier.getHeaderCompression())
+        assertEquals(123, specifier.getPsm())
+        assertEquals(remoteMac, specifier.getRemoteAddress())
     }
 }
