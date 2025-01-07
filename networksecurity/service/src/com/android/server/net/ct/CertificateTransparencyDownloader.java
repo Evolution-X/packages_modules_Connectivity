@@ -313,7 +313,6 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
                         status.reason());
             } else {
                 // TODO(b/384935059): handle blocked domain logging
-                // TODO(b/384936292): add additionalchecks for pending wifi status
                 mLogger.logCTLogListUpdateFailedEvent(
                         downloadStatusToFailureReason(status.reason()), failureCount);
             }
