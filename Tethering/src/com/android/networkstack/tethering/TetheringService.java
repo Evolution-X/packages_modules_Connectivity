@@ -38,7 +38,6 @@ import android.net.INetworkStackConnector;
 import android.net.ITetheringConnector;
 import android.net.ITetheringEventCallback;
 import android.net.NetworkStack;
-import android.net.TetheringManager.TetheringRequest;
 import android.net.TetheringRequestParcel;
 import android.net.dhcp.DhcpServerCallbacks;
 import android.net.dhcp.DhcpServingParamsParcel;
@@ -138,8 +137,8 @@ public class TetheringService extends Service {
                     listener)) {
                 return;
             }
-            // TODO(b/216524590): Add UID/packageName of caller to TetheringRequest here
-            mTethering.startTethering(new TetheringRequest(request), callerPkg, listener);
+
+            mTethering.startTethering(request, callerPkg, listener);
         }
 
         @Override

@@ -45,7 +45,6 @@ import android.net.IIntResultListener;
 import android.net.ITetheringConnector;
 import android.net.ITetheringEventCallback;
 import android.net.TetheringManager;
-import android.net.TetheringManager.TetheringRequest;
 import android.net.TetheringRequestParcel;
 import android.net.ip.IpServer;
 import android.os.Bundle;
@@ -312,8 +311,7 @@ public final class TetheringServiceTest {
                 result);
         verify(mTethering).isTetheringSupported();
         verify(mTethering).isTetheringAllowed();
-        verify(mTethering).startTethering(
-                eq(new TetheringRequest(request)), eq(TEST_CALLER_PKG), eq(result));
+        verify(mTethering).startTethering(eq(request), eq(TEST_CALLER_PKG), eq(result));
     }
 
     @Test
