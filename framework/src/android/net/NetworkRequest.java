@@ -282,6 +282,13 @@ public class NetworkRequest implements Parcelable {
         this.type = that.type;
     }
 
+    private NetworkRequest(Parcel in) {
+        networkCapabilities = NetworkCapabilities.CREATOR.createFromParcel(in);
+        legacyType = in.readInt();
+        requestId = in.readInt();
+        type = Type.valueOf(in.readString());  // IllegalArgumentException if invalid.
+    }
+
     /**
      * Builder used to create {@link NetworkRequest} objects.  Specify the Network features
      * needed in terms of {@link NetworkCapabilities} features
@@ -678,12 +685,7 @@ public class NetworkRequest implements Parcelable {
     public static final @android.annotation.NonNull Creator<NetworkRequest> CREATOR =
         new Creator<NetworkRequest>() {
             public NetworkRequest createFromParcel(Parcel in) {
-                NetworkCapabilities nc = NetworkCapabilities.CREATOR.createFromParcel(in);
-                int legacyType = in.readInt();
-                int requestId = in.readInt();
-                Type type = Type.valueOf(in.readString());  // IllegalArgumentException if invalid.
-                NetworkRequest result = new NetworkRequest(nc, legacyType, requestId, type);
-                return result;
+                return new NetworkRequest(in);
             }
             public NetworkRequest[] newArray(int size) {
                 return new NetworkRequest[size];
