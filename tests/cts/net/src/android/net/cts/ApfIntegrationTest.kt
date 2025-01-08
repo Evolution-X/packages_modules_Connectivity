@@ -363,7 +363,8 @@ class ApfIntegrationTest {
     @Test
     fun testApfCapabilities() {
         // APF became mandatory in Android 14 VSR.
-        assume().that(getVsrApiLevel()).isAtLeast(34)
+        val vsrApiLevel = getVsrApiLevel()
+        assume().that(vsrApiLevel).isAtLeast(34)
 
         // ApfFilter does not support anything but ARPHRD_ETHER.
         assertThat(caps.apfPacketFormat).isEqualTo(OsConstants.ARPHRD_ETHER)
@@ -386,8 +387,18 @@ class ApfIntegrationTest {
         // ro.board.first_api_level or ro.board.api_level to 202404 or higher:
         // - [GMS-VSR-5.3.12-009] MUST indicate at least 2048 bytes of usable memory from calls to
         //   the getApfPacketFilterCapabilities HAL method.
-        if (getVsrApiLevel() >= 202404) {
+        if (vsrApiLevel >= 202404) {
             assertThat(caps.maximumApfProgramSize).isAtLeast(2048)
+        }
+
+        // CHIPSETs (or DEVICES with CHIPSETs) that set ro.board.first_api_level or
+        // ro.board.api_level to 202504 or higher:
+        // - [VSR-5.3.12-018] MUST implement version 6 of the Android Packet Filtering (APF)
+        //   interpreter in the Wi-Fi firmware.
+        // - [VSR-5.3.12-019] MUST provide at least 4000 bytes of APF RAM.
+        if (vsrApiLevel >= 202504) {
+            assertThat(caps.apfVersionSupported).isEqualTo(6000)
+            assertThat(caps.maximumApfProgramSize).isAtLeast(4000)
         }
     }
 
