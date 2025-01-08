@@ -255,7 +255,7 @@ package android.net {
     method @NonNull public android.net.L2capNetworkSpecifier build();
     method @NonNull public android.net.L2capNetworkSpecifier.Builder setHeaderCompression(int);
     method @NonNull public android.net.L2capNetworkSpecifier.Builder setPsm(int);
-    method @NonNull public android.net.L2capNetworkSpecifier.Builder setRemoteAddress(@NonNull android.net.MacAddress);
+    method @NonNull public android.net.L2capNetworkSpecifier.Builder setRemoteAddress(@Nullable android.net.MacAddress);
     method @NonNull public android.net.L2capNetworkSpecifier.Builder setRole(int);
   }
 

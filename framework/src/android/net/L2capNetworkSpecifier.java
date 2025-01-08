@@ -178,11 +178,10 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
          *
          * Only valid for client networks. A null MacAddress matches *any* MacAddress.
          *
-         * @param remoteAddress the MAC address to connect to.
+         * @param remoteAddress the MAC address to connect to, or null to match any MAC address.
          */
         @NonNull
-        public Builder setRemoteAddress(@NonNull MacAddress remoteAddress) {
-            Objects.requireNonNull(remoteAddress);
+        public Builder setRemoteAddress(@Nullable MacAddress remoteAddress) {
             mRemoteAddress = remoteAddress;
             return this;
         }
