@@ -18,6 +18,7 @@ package android.net;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.os.Build;
@@ -31,7 +32,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.Objects;
 
 /**
- * A {@link NetworkSpecifier} used to identify an L2CAP network.
+ * A {@link NetworkSpecifier} used to identify an L2CAP network over BLE.
  *
  * An L2CAP network is not symmetrical, meaning there exists both a server (Bluetooth peripheral)
  * and a client (Bluetooth central) node. This specifier contains the information required to
@@ -119,7 +120,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
      * This PSM value is only meaningful in {@link NetworkRequest}s. Specifiers for actual L2CAP
      * networks never have this value set.
      */
-    public static final int PSM_ANY = -1;
+    public static final int PSM_ANY = 0;
 
     /** The Bluetooth L2CAP Protocol/Service Multiplexer (PSM). */
     private final int mPsm;
@@ -228,7 +229,10 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
          * @param psm the Protocol/Service Multiplexer (PSM) to connect to.
          */
         @NonNull
-        public Builder setPsm(int psm) {
+        public Builder setPsm(@IntRange(from = 0, to = 255) int psm) {
+            if (psm < 0 /* PSM_ANY */ || psm > 0xFF) {
+                throw new IllegalArgumentException("PSM must be PSM_ANY or within range [1, 255]");
+            }
             mPsm = psm;
             return this;
         }
