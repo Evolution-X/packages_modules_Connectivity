@@ -16,16 +16,10 @@
 
 package com.android.server.net.ct;
 
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DEVICE_OFFLINE;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DOWNLOAD_CANNOT_RESUME;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_TOO_MANY_REDIRECTS;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__PENDING_WAITING_FOR_WIFI;
 
 import android.annotation.RequiresApi;
 import android.app.DownloadManager;
@@ -303,39 +297,16 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
                     mDataStore.getPropertyInt(
                             Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
 
-            // HTTP Error
-            if (400 <= status.reason() && status.reason() <= 600) {
+            if (status.isHttpError()) {
                 mLogger.logCTLogListUpdateFailedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR,
                         failureCount,
                         status.reason());
             } else {
                 // TODO(b/384935059): handle blocked domain logging
-                mLogger.logCTLogListUpdateFailedEvent(
-                        downloadStatusToFailureReason(status.reason()), failureCount);
+                mLogger.logCTLogListUpdateFailedEventWithDownloadStatus(
+                        status.reason(), failureCount);
             }
-        }
-    }
-
-    /** Converts DownloadStatus reason into failure reason to log. */
-    private int downloadStatusToFailureReason(int downloadStatusReason) {
-        switch (downloadStatusReason) {
-            case DownloadManager.PAUSED_WAITING_TO_RETRY:
-            case DownloadManager.PAUSED_WAITING_FOR_NETWORK:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DEVICE_OFFLINE;
-            case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
-            case DownloadManager.ERROR_HTTP_DATA_ERROR:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR;
-            case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_TOO_MANY_REDIRECTS;
-            case DownloadManager.ERROR_CANNOT_RESUME:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DOWNLOAD_CANNOT_RESUME;
-            case DownloadManager.ERROR_INSUFFICIENT_SPACE:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
-            case DownloadManager.PAUSED_QUEUED_FOR_WIFI:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__PENDING_WAITING_FOR_WIFI;
-            default:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
         }
     }
 
