@@ -16,7 +16,6 @@
 
 package com.android.server.net.ct;
 
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS;
@@ -215,8 +214,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
@@ -235,6 +234,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
+        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
+                anyInt(), anyInt());
     }
 
     @Test
@@ -284,8 +285,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
@@ -306,6 +307,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
+        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
+                anyInt(), anyInt());
     }
 
     @Test
@@ -359,8 +362,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
@@ -381,6 +384,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
+        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
+                anyInt(), anyInt());
     }
 
     @Test
@@ -594,6 +599,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
+        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
+                anyInt(), anyInt());
     }
 
     @Test
