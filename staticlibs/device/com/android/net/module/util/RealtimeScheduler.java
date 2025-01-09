@@ -34,7 +34,7 @@ import java.io.IOException;
 import java.util.PriorityQueue;
 
 /**
- * Represents a Timer file descriptor object used for scheduling tasks with precise delays.
+ * Represents a realtime scheduler object used for scheduling tasks with precise delays.
  * Compared to {@link Handler#postDelayed}, this class offers enhanced accuracy for delayed
  * callbacks by accounting for periods when the device is in deep sleep.
  *
@@ -42,24 +42,24 @@ import java.util.PriorityQueue;
  *
  * **Usage Examples:**
  *
- * ** Scheduling recurring tasks with the same TimerFileDescriptor **
+ * ** Scheduling recurring tasks with the same RealtimeScheduler **
  *
  * ```java
- * // Create a TimerFileDescriptor
- * final TimerFileDescriptor timerFd = new TimerFileDescriptor(handler);
+ * // Create a RealtimeScheduler
+ * final RealtimeScheduler scheduler = new RealtimeScheduler(handler);
  *
  * // Schedule a new task with a delay.
- * timerFd.postDelayed(() -> taskToExecute(), delayTime);
+ * scheduler.postDelayed(() -> taskToExecute(), delayTime);
  *
  * // Once the delay has elapsed, and the task is running, schedule another task.
- * timerFd.postDelayed(() -> anotherTaskToExecute(), anotherDelayTime);
+ * scheduler.postDelayed(() -> anotherTaskToExecute(), anotherDelayTime);
  *
- * // Remember to close the TimerFileDescriptor after all tasks have finished running.
- * timerFd.close();
+ * // Remember to close the RealtimeScheduler after all tasks have finished running.
+ * scheduler.close();
  * ```
  */
-public class TimerFileDescriptor {
-    private static final String TAG = TimerFileDescriptor.class.getSimpleName();
+public class RealtimeScheduler {
+    private static final String TAG = RealtimeScheduler.class.getSimpleName();
     // EVENT_ERROR may be generated even if not specified, as per its javadoc.
     private static final int FD_EVENTS = EVENT_INPUT | EVENT_ERROR;
     private final CloseGuard mGuard = new CloseGuard();
@@ -155,12 +155,12 @@ public class TimerFileDescriptor {
     }
 
     /**
-     * The TimerFileDescriptor constructor
+     * The RealtimeScheduler constructor
      *
      * Note: The constructor is currently safe to call on another thread because it only sets final
      * members and registers the event to be called on the handler.
      */
-    public TimerFileDescriptor(@NonNull Handler handler) {
+    public RealtimeScheduler(@NonNull Handler handler) {
         mFdInt = TimerFdUtils.createTimerFileDescriptor();
         mParcelFileDescriptor = ParcelFileDescriptor.adoptFd(mFdInt);
         mHandler = handler;
@@ -237,7 +237,7 @@ public class TimerFileDescriptor {
     }
 
     /**
-     * Close the TimerFileDescriptor. This implementation closes the underlying
+     * Close the RealtimeScheduler. This implementation closes the underlying
      * OS resources allocated to represent this stream.
      */
     public void close() {

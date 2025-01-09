@@ -39,7 +39,7 @@ import org.junit.runner.RunWith
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
-class TimerFileDescriptorTest {
+class RealtimeSchedulerTest {
 
     private val TIMEOUT_MS = 1000L
     private val TOLERANCE_MS = 50L
@@ -52,7 +52,7 @@ class TimerFileDescriptorTest {
             executionTimes.add(SystemClock.elapsedRealtime())
         }
     }
-    private val thread = HandlerThread(TimerFileDescriptorTest::class.simpleName).apply { start() }
+    private val thread = HandlerThread(RealtimeSchedulerTest::class.simpleName).apply { start() }
     private val handler by lazy { TestHandler(thread.looper) }
 
     @After
@@ -63,7 +63,7 @@ class TimerFileDescriptorTest {
 
     @Test
     fun testMultiplePostDelayedTasks() {
-        val scheduler = TimerFileDescriptor(handler)
+        val scheduler = RealtimeScheduler(handler)
         tryTest {
             val initialTimeMs = SystemClock.elapsedRealtime()
             val executionTimes = mutableListOf<Long>()
@@ -97,7 +97,7 @@ class TimerFileDescriptorTest {
 
     @Test
     fun testMultipleSendDelayedMessages() {
-        val scheduler = TimerFileDescriptor(handler)
+        val scheduler = RealtimeScheduler(handler)
         tryTest {
             val MSG_ID_0 = 0
             val MSG_ID_1 = 1
