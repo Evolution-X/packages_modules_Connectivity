@@ -282,7 +282,7 @@ public final class OffloadServiceInfo implements Parcelable {
         }
 
         /**
-         * Get the service type. (e.g. "_http._tcp.local" )
+         * Get the service type. (e.g. "_http._tcp" )
          */
         @NonNull
         public String getServiceType() {
