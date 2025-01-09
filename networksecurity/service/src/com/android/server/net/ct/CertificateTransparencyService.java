@@ -61,10 +61,8 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
                         dataStore,
                         downloadHelper,
                         signatureVerifier,
-                        new CertificateTransparencyInstaller(),
                         new CertificateTransparencyLoggerImpl());
-        mCertificateTransparencyJob =
-                new CertificateTransparencyJob(context, dataStore, downloader);
+        mCertificateTransparencyJob = new CertificateTransparencyJob(context, downloader);
     }
 
     /**
