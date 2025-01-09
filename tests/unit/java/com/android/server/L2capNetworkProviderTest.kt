@@ -33,6 +33,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
+import org.mockito.Mockito.any
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -71,6 +72,7 @@ class L2capNetworkProviderTest {
     fun testNetworkProvider_registeredWhenSupported() {
         L2capNetworkProvider(deps, context, handler)
         verify(cm).registerNetworkProvider(eq(provider))
+        verify(provider).registerNetworkOffer(any(), any(), any(), any())
     }
 
     @Test
