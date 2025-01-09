@@ -57,6 +57,11 @@ class DataStore extends Properties {
         }
     }
 
+    boolean delete() {
+        clear();
+        return mPropertyFile.delete();
+    }
+
     long getPropertyLong(String key, long defaultValue) {
         return Optional.ofNullable(getProperty(key)).map(Long::parseLong).orElse(defaultValue);
     }
