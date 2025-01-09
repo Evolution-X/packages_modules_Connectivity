@@ -36,7 +36,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private static final String UPDATE_CONFIG_PERMISSION = "android.permission.UPDATE_CONFIG";
 
     private final Context mContext;
-    private final DataStore mDataStore;
+    private final CompatibilityVersion mCompatVersion;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
     private final AlarmManager mAlarmManager;
     private final PendingIntent mPendingIntent;
@@ -45,12 +45,16 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
 
     /** Creates a new {@link CertificateTransparencyJob} object. */
     public CertificateTransparencyJob(
-            Context context,
-            DataStore dataStore,
-            CertificateTransparencyDownloader certificateTransparencyDownloader) {
+            Context context, CertificateTransparencyDownloader certificateTransparencyDownloader) {
         mContext = context;
-        mDataStore = dataStore;
+        mCompatVersion =
+                new CompatibilityVersion(
+                        Config.COMPATIBILITY_VERSION,
+                        Config.URL_SIGNATURE,
+                        Config.URL_LOG_LIST,
+                        Config.CT_ROOT_DIRECTORY_PATH);
         mCertificateTransparencyDownloader = certificateTransparencyDownloader;
+        mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
         mAlarmManager = context.getSystemService(AlarmManager.class);
         mPendingIntent =
                 PendingIntent.getBroadcast(
@@ -80,6 +84,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
         mContext.unregisterReceiver(this);
         mAlarmManager.cancel(mPendingIntent);
         mCertificateTransparencyDownloader.stop();
+        mCompatVersion.delete();
         mDependenciesReady = false;
 
         if (Config.DEBUG) {
@@ -102,15 +107,9 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Log.d(TAG, "Starting CT daily job.");
         }
         if (!mDependenciesReady) {
-            mDataStore.load();
             mCertificateTransparencyDownloader.start();
             mDependenciesReady = true;
         }
-
-        mDataStore.setProperty(Config.CONTENT_URL, Config.URL_LOG_LIST);
-        mDataStore.setProperty(Config.METADATA_URL, Config.URL_SIGNATURE);
-        mDataStore.setProperty(Config.PUBLIC_KEY_URL, Config.URL_PUBLIC_KEY);
-        mDataStore.store();
 
         if (mCertificateTransparencyDownloader.startPublicKeyDownload() == -1) {
             Log.e(TAG, "Public key download not started.");

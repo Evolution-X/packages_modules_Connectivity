@@ -48,11 +48,8 @@ final class Config {
 
     // properties
     static final String VERSION = "version";
-    static final String CONTENT_URL = "content_url";
     static final String CONTENT_DOWNLOAD_ID = "content_download_id";
-    static final String METADATA_URL = "metadata_url";
     static final String METADATA_DOWNLOAD_ID = "metadata_download_id";
-    static final String PUBLIC_KEY_URL = "public_key_url";
     static final String PUBLIC_KEY_DOWNLOAD_ID = "public_key_download_id";
     static final String LOG_LIST_UPDATE_FAILURE_COUNT = "log_list_update_failure_count";
 

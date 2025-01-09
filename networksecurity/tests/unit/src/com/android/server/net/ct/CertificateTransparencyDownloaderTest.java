@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.server.net.ct;
 
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
@@ -24,7 +25,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -73,15 +73,14 @@ import java.util.Base64;
 public class CertificateTransparencyDownloaderTest {
 
     @Mock private DownloadManager mDownloadManager;
-    @Mock private CertificateTransparencyInstaller mCertificateTransparencyInstaller;
     @Mock private CertificateTransparencyLogger mLogger;
 
     private PrivateKey mPrivateKey;
     private PublicKey mPublicKey;
     private Context mContext;
-    private File mTempFile;
     private DataStore mDataStore;
     private SignatureVerifier mSignatureVerifier;
+    private CompatibilityVersion mCompatVersion;
     private CertificateTransparencyDownloader mCertificateTransparencyDownloader;
 
     private long mNextDownloadId = 666;
@@ -95,8 +94,7 @@ public class CertificateTransparencyDownloaderTest {
         mPublicKey = keyPair.getPublic();
 
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
-        mTempFile = File.createTempFile("datastore-test", ".properties");
-        mDataStore = new DataStore(mTempFile);
+        mDataStore = new DataStore(File.createTempFile("datastore-test", ".properties"));
         mSignatureVerifier = new SignatureVerifier(mContext);
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
@@ -104,56 +102,64 @@ public class CertificateTransparencyDownloaderTest {
                         mDataStore,
                         new DownloadHelper(mDownloadManager),
                         mSignatureVerifier,
-                        mCertificateTransparencyInstaller,
                         mLogger);
+        mCompatVersion =
+                new CompatibilityVersion(
+                        /* compatVersion= */ "v666",
+                        Config.URL_SIGNATURE,
+                        Config.URL_LOG_LIST,
+                        mContext.getFilesDir());
 
-        prepareDataStore();
         prepareDownloadManager();
+        mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
+        mCertificateTransparencyDownloader.start();
     }
 
     @After
     public void tearDown() {
-        mTempFile.delete();
         mSignatureVerifier.resetPublicKey();
+        mCertificateTransparencyDownloader.stop();
+        mCompatVersion.delete();
     }
 
     @Test
     public void testDownloader_startPublicKeyDownload() {
         assertThat(mCertificateTransparencyDownloader.hasPublicKeyDownloadId()).isFalse();
+
         long downloadId = mCertificateTransparencyDownloader.startPublicKeyDownload();
 
         assertThat(mCertificateTransparencyDownloader.hasPublicKeyDownloadId()).isTrue();
-        assertThat(mCertificateTransparencyDownloader.isPublicKeyDownloadId(downloadId)).isTrue();
+        assertThat(mCertificateTransparencyDownloader.getPublicKeyDownloadId())
+                .isEqualTo(downloadId);
     }
 
     @Test
     public void testDownloader_startMetadataDownload() {
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
-        long downloadId = mCertificateTransparencyDownloader.startMetadataDownload();
+
+        mCertificateTransparencyDownloader.startMetadataDownload();
 
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isTrue();
-        assertThat(mCertificateTransparencyDownloader.isMetadataDownloadId(downloadId)).isTrue();
     }
 
     @Test
     public void testDownloader_startContentDownload() {
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isFalse();
-        long downloadId = mCertificateTransparencyDownloader.startContentDownload();
+
+        mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isTrue();
-        assertThat(mCertificateTransparencyDownloader.isContentDownloadId(downloadId)).isTrue();
     }
 
     @Test
     public void testDownloader_publicKeyDownloadSuccess_updatePublicKey_startMetadataDownload()
             throws Exception {
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
-        setSuccessfulDownload(publicKeyId, writePublicKeyToFile(mPublicKey));
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
 
         assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(publicKeyId));
+                mContext, makePublicKeyDownloadCompleteIntent(writePublicKeyToFile(mPublicKey)));
 
         assertThat(mSignatureVerifier.getPublicKey()).hasValue(mPublicKey);
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isTrue();
@@ -163,14 +169,14 @@ public class CertificateTransparencyDownloaderTest {
     public void
             testDownloader_publicKeyDownloadSuccess_updatePublicKeyFail_doNotStartMetadataDownload()
                     throws Exception {
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
-        setSuccessfulDownload(
-                publicKeyId, writeToFile("i_am_not_a_base64_encoded_public_key".getBytes()));
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
 
         assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(publicKeyId));
+                mContext,
+                makePublicKeyDownloadCompleteIntent(
+                        writeToFile("i_am_not_a_base64_encoded_public_key".getBytes())));
 
         assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
@@ -178,17 +184,15 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void testDownloader_publicKeyDownloadFail_doNotUpdatePublicKey() throws Exception {
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
-        setFailedDownload(
-                publicKeyId, // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
 
         assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makePublicKeyDownloadFailedIntent(DownloadManager.ERROR_INSUFFICIENT_SPACE));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makePublicKeyDownloadFailedIntent(DownloadManager.ERROR_HTTP_DATA_ERROR));
 
         assertThat(mSignatureVerifier.getPublicKey()).isEmpty();
         assertThat(mCertificateTransparencyDownloader.hasMetadataDownloadId()).isFalse();
@@ -196,225 +200,202 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void testDownloader_publicKeyDownloadFail_failureThresholdExceeded_logsFailure()
-                throws Exception {
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-        setFailedDownload(
-                publicKeyId, // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makePublicKeyDownloadFailedIntent(DownloadManager.ERROR_INSUFFICIENT_SPACE));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
     public void testDownloader_publicKeyDownloadFail_failureThresholdNotMet_doesNotLog()
-                throws Exception {
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
         // Set the failure count to well below the threshold
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-        setFailedDownload(
-                publicKeyId, // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(publicKeyId);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makePublicKeyDownloadFailedIntent(DownloadManager.ERROR_HTTP_DATA_ERROR));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(1);
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
     public void testDownloader_metadataDownloadSuccess_startContentDownload() {
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, new File("log_list.sig"));
+        mCertificateTransparencyDownloader.startMetadataDownload();
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isFalse();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(metadataId));
+                mContext,
+                makeMetadataDownloadCompleteIntent(mCompatVersion, new File("log_list.sig")));
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isTrue();
     }
 
     @Test
     public void testDownloader_metadataDownloadFail_doNotStartContentDownload() {
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setFailedDownload(
-                metadataId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
+        mCertificateTransparencyDownloader.startMetadataDownload();
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isFalse();
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeMetadataDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeMetadataDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_HTTP_DATA_ERROR));
 
         assertThat(mCertificateTransparencyDownloader.hasContentDownloadId()).isFalse();
     }
 
     @Test
     public void testDownloader_metadataDownloadFail_failureThresholdExceeded_logsFailure()
-                throws Exception {
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startMetadataDownload();
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-        setFailedDownload(
-                metadataId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeMetadataDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
     public void testDownloader_metadataDownloadFail_failureThresholdNotMet_doesNotLog()
-                throws Exception {
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startMetadataDownload();
         // Set the failure count to well below the threshold
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-        setFailedDownload(
-                metadataId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(metadataId);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeMetadataDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(1);
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
-    public void testDownloader_contentDownloadSuccess_installSuccess_updateDataStore()
-            throws Exception {
+    public void testDownloader_contentDownloadSuccess_installSuccess() throws Exception {
         String newVersion = "456";
         File logListFile = makeLogListFile(newVersion);
         File metadataFile = sign(logListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
-        when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
-                .thenReturn(true);
+        mCertificateTransparencyDownloader.startMetadataDownload();
 
         assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
         assertInstallSuccessful(newVersion);
     }
 
     @Test
     public void testDownloader_contentDownloadFail_doNotInstall() throws Exception {
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setFailedDownload(
-                contentId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
+        mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeContentDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeContentDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_HTTP_DATA_ERROR));
 
-        verify(mCertificateTransparencyInstaller, never()).install(any(), any(), any());
         assertNoVersionIsInstalled();
     }
 
     @Test
     public void testDownloader_contentDownloadFail_failureThresholdExceeded_logsFailure()
-                throws Exception {
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-        setFailedDownload(
-                contentId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeContentDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
     public void testDownloader_contentDownloadFail_failureThresholdNotMet_doesNotLog()
-                throws Exception {
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
+            throws Exception {
+        mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
         // Set the failure count to well below the threshold
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-        setFailedDownload(
-                contentId,
-                // Failure cases where we give up on the download.
-                DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                DownloadManager.ERROR_HTTP_DATA_ERROR);
-        Intent downloadCompleteIntent = makeDownloadCompleteIntent(contentId);
 
-        mCertificateTransparencyDownloader.onReceive(mContext, downloadCompleteIntent);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makeContentDownloadFailedIntent(
+                        mCompatVersion, DownloadManager.ERROR_HTTP_DATA_ERROR));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(1);
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
     @Test
-    public void testDownloader_contentDownloadSuccess_installFail_doNotUpdateDataStore()
+    public void testDownloader_contentDownloadSuccess_invalidLogList_installFails()
             throws Exception {
-        File logListFile = makeLogListFile("456");
-        File metadataFile = sign(logListFile);
+        File invalidLogListFile = writeToFile("not_a_json_log_list".getBytes());
+        File metadataFile = sign(invalidLogListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
-        when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
-                .thenReturn(false);
+        mCertificateTransparencyDownloader.startMetadataDownload();
 
         assertNoVersionIsInstalled();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, invalidLogListFile));
 
         assertNoVersionIsInstalled();
     }
@@ -426,30 +407,31 @@ public class CertificateTransparencyDownloaderTest {
         File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
+        mCertificateTransparencyDownloader.startMetadataDownload();
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         // Set the public key to be missing
         mSignatureVerifier.resetPublicKey();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(
-                eq(CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION),
-                anyInt()
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION),
+                        anyInt());
     }
 
     @Test
@@ -464,31 +446,31 @@ public class CertificateTransparencyDownloaderTest {
         KeyPairGenerator instance = KeyPairGenerator.getInstance("EC");
         mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
 
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
-
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         // Act
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
         // Assert
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(
-                eq(CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
-                anyInt()
-        );
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
+                        anyInt());
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
@@ -503,31 +485,31 @@ public class CertificateTransparencyDownloaderTest {
         KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
         mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
 
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
-
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         // Act
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
         // Assert
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(
-                eq(CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
-                anyInt()
-        );
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
+                        anyInt());
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
@@ -536,84 +518,81 @@ public class CertificateTransparencyDownloaderTest {
                     throws Exception {
         File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
-        // Set the public key wrong, so signature verification fails
-        mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
+        // Set the key to be deliberately wrong by using diff key pair
+        KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
+        mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
         // Set the failure count to well below the threshold
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
 
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(1);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(
-                eq(CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
-                anyInt()
-        );
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(
-                eq(CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION),
-                anyInt()
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(1);
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION),
+                        anyInt());
     }
 
     @Test
     public void
             testDownloader_contentDownloadSuccess_installFail_failureThresholdExceeded_logsFailure()
                     throws Exception {
-        File logListFile = makeLogListFile("456");
-        File metadataFile = sign(logListFile);
+        File invalidLogListFile = writeToFile("not_a_json_log_list".getBytes());
+        File metadataFile = sign(invalidLogListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
         // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-        when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
-                .thenReturn(false);
+        mDataStore.setPropertyInt(
+                Config.LOG_LIST_UPDATE_FAILURE_COUNT, Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, invalidLogListFile));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1)).logCTLogListUpdateFailedEvent(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS,
-                Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD
-        );
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+        verify(mLogger, times(1))
+                .logCTLogListUpdateFailedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_VERSION_ALREADY_EXISTS,
+                        Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD);
     }
 
     @Test
     public void
             testDownloader_contentDownloadSuccess_installFail_failureThresholdNotMet_doesNotLog()
                     throws Exception {
-        File logListFile = makeLogListFile("456");
-        File metadataFile = sign(logListFile);
+        File invalidLogListFile = writeToFile("not_a_json_log_list".getBytes());
+        File metadataFile = sign(invalidLogListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
         // Set the failure count to well below the threshold
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-        when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
-                .thenReturn(false);
 
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, invalidLogListFile));
 
-        assertThat(mDataStore.getPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                        .isEqualTo(1);
+        assertThat(
+                        mDataStore.getPropertyInt(
+                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
+                .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
     }
 
@@ -623,17 +602,14 @@ public class CertificateTransparencyDownloaderTest {
         File logListFile = makeLogListFile("456");
         File metadataFile = File.createTempFile("log_list-wrong_metadata", "sig");
         mSignatureVerifier.setPublicKey(mPublicKey);
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
 
         assertNoVersionIsInstalled();
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
-        verify(mCertificateTransparencyInstaller, never())
-                .install(eq(Config.COMPATIBILITY_VERSION), any(), anyString());
         assertNoVersionIsInstalled();
     }
 
@@ -643,17 +619,14 @@ public class CertificateTransparencyDownloaderTest {
         File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
         mSignatureVerifier.resetPublicKey();
-        long metadataId = mCertificateTransparencyDownloader.startMetadataDownload();
-        setSuccessfulDownload(metadataId, metadataFile);
-        long contentId = mCertificateTransparencyDownloader.startContentDownload();
-        setSuccessfulDownload(contentId, logListFile);
 
         assertNoVersionIsInstalled();
+        mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
-        verify(mCertificateTransparencyInstaller, never())
-                .install(eq(Config.COMPATIBILITY_VERSION), any(), anyString());
         assertNoVersionIsInstalled();
     }
 
@@ -667,57 +640,68 @@ public class CertificateTransparencyDownloaderTest {
         assertNoVersionIsInstalled();
 
         // 1. Start download of public key.
-        long publicKeyId = mCertificateTransparencyDownloader.startPublicKeyDownload();
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
 
-        // 2. On successful public key download, set the key and start the metatadata download.
-        setSuccessfulDownload(publicKeyId, publicKeyFile);
-
+        // 2. On successful public key download, set the key and start the metatadata
+        // download.
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(publicKeyId));
+                mContext, makePublicKeyDownloadCompleteIntent(publicKeyFile));
 
         // 3. On successful metadata download, start the content download.
-        long metadataId = mCertificateTransparencyDownloader.getMetadataDownloadId();
-        setSuccessfulDownload(metadataId, metadataFile);
-
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(metadataId));
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
 
-        // 4. On successful content download, verify the signature and install the new version.
-        long contentId = mCertificateTransparencyDownloader.getContentDownloadId();
-        setSuccessfulDownload(contentId, logListFile);
-        when(mCertificateTransparencyInstaller.install(
-                        eq(Config.COMPATIBILITY_VERSION), any(), anyString()))
-                .thenReturn(true);
-
+        // 4. On successful content download, verify the signature and install the new
+        // version.
         mCertificateTransparencyDownloader.onReceive(
-                mContext, makeDownloadCompleteIntent(contentId));
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
 
         assertInstallSuccessful(newVersion);
     }
 
     private void assertNoVersionIsInstalled() {
-        assertThat(mDataStore.getProperty(Config.VERSION)).isNull();
+        assertThat(mCompatVersion.getVersionDir().exists()).isFalse();
     }
 
     private void assertInstallSuccessful(String version) {
-        assertThat(mDataStore.getProperty(Config.VERSION)).isEqualTo(version);
-    }
-
-    private Intent makeDownloadCompleteIntent(long downloadId) {
-        return new Intent(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-                .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
-    }
-
-    private void prepareDataStore() {
-        mDataStore.load();
-        mDataStore.setProperty(Config.CONTENT_URL, Config.URL_LOG_LIST);
-        mDataStore.setProperty(Config.METADATA_URL, Config.URL_SIGNATURE);
-        mDataStore.setProperty(Config.PUBLIC_KEY_URL, Config.URL_PUBLIC_KEY);
+        File logsDir =
+                new File(
+                        mCompatVersion.getVersionDir(),
+                        CompatibilityVersion.LOGS_DIR_PREFIX + version);
+        assertThat(logsDir.exists()).isTrue();
+        File logsFile = new File(logsDir, CompatibilityVersion.LOGS_LIST_FILE_NAME);
+        assertThat(logsFile.exists()).isTrue();
     }
 
     private void prepareDownloadManager() {
         when(mDownloadManager.enqueue(any(Request.class)))
                 .thenAnswer(invocation -> mNextDownloadId++);
+    }
+
+    private Intent makePublicKeyDownloadCompleteIntent(File publicKeyfile) {
+        return makeDownloadCompleteIntent(
+                mCertificateTransparencyDownloader.getPublicKeyDownloadId(), publicKeyfile);
+    }
+
+    private Intent makeMetadataDownloadCompleteIntent(
+            CompatibilityVersion compatVersion, File signatureFile) {
+        return makeDownloadCompleteIntent(
+                mCertificateTransparencyDownloader.getMetadataDownloadId(compatVersion),
+                signatureFile);
+    }
+
+    private Intent makeContentDownloadCompleteIntent(
+            CompatibilityVersion compatVersion, File logListFile) {
+        return makeDownloadCompleteIntent(
+                mCertificateTransparencyDownloader.getContentDownloadId(compatVersion),
+                logListFile);
+    }
+
+    private Intent makeDownloadCompleteIntent(long downloadId, File file) {
+        when(mDownloadManager.query(any(Query.class))).thenReturn(makeSuccessfulDownloadCursor());
+        when(mDownloadManager.getUriForDownloadedFile(downloadId)).thenReturn(Uri.fromFile(file));
+        return new Intent(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+                .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
     }
 
     private Cursor makeSuccessfulDownloadCursor() {
@@ -730,9 +714,26 @@ public class CertificateTransparencyDownloaderTest {
         return cursor;
     }
 
-    private void setSuccessfulDownload(long downloadId, File file) {
-        when(mDownloadManager.query(any(Query.class))).thenReturn(makeSuccessfulDownloadCursor());
-        when(mDownloadManager.getUriForDownloadedFile(downloadId)).thenReturn(Uri.fromFile(file));
+    private Intent makePublicKeyDownloadFailedIntent(int error) {
+        return makeDownloadFailedIntent(
+                mCertificateTransparencyDownloader.getPublicKeyDownloadId(), error);
+    }
+
+    private Intent makeMetadataDownloadFailedIntent(CompatibilityVersion compatVersion, int error) {
+        return makeDownloadFailedIntent(
+                mCertificateTransparencyDownloader.getMetadataDownloadId(compatVersion), error);
+    }
+
+    private Intent makeContentDownloadFailedIntent(CompatibilityVersion compatVersion, int error) {
+        return makeDownloadFailedIntent(
+                mCertificateTransparencyDownloader.getContentDownloadId(compatVersion), error);
+    }
+
+    private Intent makeDownloadFailedIntent(long downloadId, int error) {
+        when(mDownloadManager.query(any(Query.class))).thenReturn(makeFailedDownloadCursor(error));
+        when(mDownloadManager.getUriForDownloadedFile(downloadId)).thenReturn(null);
+        return new Intent(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+                .putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
     }
 
     private Cursor makeFailedDownloadCursor(int error) {
@@ -743,16 +744,6 @@ public class CertificateTransparencyDownloaderTest {
                         });
         cursor.addRow(new Object[] {DownloadManager.STATUS_FAILED, error});
         return cursor;
-    }
-
-    private void setFailedDownload(long downloadId, int... downloadManagerErrors) {
-        Cursor first = makeFailedDownloadCursor(downloadManagerErrors[0]);
-        Cursor[] others = new Cursor[downloadManagerErrors.length - 1];
-        for (int i = 1; i < downloadManagerErrors.length; i++) {
-            others[i - 1] = makeFailedDownloadCursor(downloadManagerErrors[i]);
-        }
-        when(mDownloadManager.query(any())).thenReturn(first, others);
-        when(mDownloadManager.getUriForDownloadedFile(downloadId)).thenReturn(null);
     }
 
     private File writePublicKeyToFile(PublicKey publicKey)
