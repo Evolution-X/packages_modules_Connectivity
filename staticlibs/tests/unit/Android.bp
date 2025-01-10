@@ -28,6 +28,7 @@ android_library {
         "net-utils-device-common-struct-base",
         "net-utils-device-common-wear",
         "net-utils-service-connectivity",
+        "truth",
     ],
     libs: [
         "android.test.runner.stubs",
