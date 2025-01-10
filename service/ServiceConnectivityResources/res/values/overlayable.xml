@@ -53,6 +53,7 @@
             <item type="string" name="config_thread_model_name" />
             <item type="array" name="config_thread_mdns_vendor_specific_txts" />
             <item type="bool" name="config_thread_srp_server_wait_for_border_routing_enabled" />
+            <item type="bool" name="config_thread_border_router_auto_join_enabled" />
         </policy>
     </overlayable>
 </resources>

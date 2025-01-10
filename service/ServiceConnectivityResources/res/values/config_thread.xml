@@ -79,4 +79,10 @@
     to the devices, or reaching to Thread end devices doesn't require border routing to work.
     -->
     <bool name="config_thread_srp_server_wait_for_border_routing_enabled">true</bool>
+
+    <!-- Whether this border router will automatically join the previous connected network after
+    device reboots. Setting this value to false can allow the user to control the lifecycle of
+    the Thread border router state on this device.
+    -->
+    <bool name="config_thread_border_router_auto_join_enabled">true</bool>
 </resources>
