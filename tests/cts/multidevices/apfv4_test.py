@@ -53,7 +53,7 @@ class ApfV4Test(apf_test_base.ApfTestBase, parameterized.TestCase):
   )  # Declare inputs for state_str and expected_result.
   def test_apf_drop_ethertype_not_allowed(self, blocked_ether_type):
     # Ethernet header (14 bytes).
-    packet = ETHER_BROADCAST_ADDR  # Destination MAC (broadcast)
+    packet = self.client_mac_address.replace(":", "")  # Destination MAC
     packet += self.server_mac_address.replace(":", "")  # Source MAC
     packet += blocked_ether_type
 
