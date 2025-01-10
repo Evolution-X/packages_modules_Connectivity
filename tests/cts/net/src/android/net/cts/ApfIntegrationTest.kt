@@ -22,6 +22,7 @@ package android.net.cts
 import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
+import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
 import android.net.Network
@@ -103,6 +104,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import org.junit.After
 import org.junit.AfterClass
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -298,9 +300,22 @@ class ApfIntegrationTest {
         return ApfCapabilities(version, maxLen, packetFormat)
     }
 
+    private fun isTvDeviceSupportFullNetworkingUnder2w(): Boolean {
+        return (pm.hasSystemFeature(FEATURE_LEANBACK) &&
+            pm.hasSystemFeature("com.google.android.tv.full_networking_under_2w"))
+    }
+
     @Before
     fun setUp() {
         assume().that(pm.hasSystemFeature(FEATURE_WIFI)).isTrue()
+
+        // Based on GTVS-16, Android Packet Filtering (APF) is OPTIONAL for devices that fully
+        // process all network packets on CPU at all times, even in standby, while meeting
+        // the <= 2W standby power demand requirement.
+        assumeFalse(
+            "Skipping test: TV device process full networking on CPU under 2W",
+            isTvDeviceSupportFullNetworkingUnder2w()
+        )
 
         networkCallback = TestableNetworkCallback()
         cm.requestNetwork(
