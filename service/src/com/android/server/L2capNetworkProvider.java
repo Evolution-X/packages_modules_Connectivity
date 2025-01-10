@@ -16,6 +16,7 @@
 
 package com.android.server;
 
+import static android.net.L2capNetworkSpecifier.ROLE_SERVER;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING;
@@ -28,6 +29,7 @@ import static android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
+import android.net.L2capNetworkSpecifier;
 import android.net.NetworkCapabilities;
 import android.net.NetworkProvider;
 import android.net.NetworkProvider.NetworkOfferCallback;
@@ -61,6 +63,9 @@ public class L2capNetworkProvider {
         // Note the missing NET_CAPABILITY_NOT_RESTRICTED marking the network as restricted.
         public static final NetworkCapabilities CAPABILITIES;
         static {
+            final L2capNetworkSpecifier l2capNetworkSpecifier = new L2capNetworkSpecifier.Builder()
+                    .setRole(ROLE_SERVER)
+                    .build();
             NetworkCapabilities caps = NetworkCapabilities.Builder.withoutDefaultCapabilities()
                     .addTransportType(TRANSPORT_BLUETOOTH)
                     .addCapability(NET_CAPABILITY_NOT_CONGESTED)
@@ -69,6 +74,7 @@ public class L2capNetworkProvider {
                     .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
                     .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
                     .addCapability(NET_CAPABILITY_NOT_VPN)
+                    .setNetworkSpecifier(l2capNetworkSpecifier)
                     .build();
             caps.setReservationId(RES_ID_MATCH_ALL_RESERVATIONS);
             CAPABILITIES = caps;
