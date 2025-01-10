@@ -21,7 +21,6 @@ package android.net.cts
 
 import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
 import android.Manifest.permission.WRITE_DEVICE_CONFIG
-import android.content.pm.PackageManager
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
@@ -170,8 +169,8 @@ class ApfIntegrationTest {
         private fun isAutomotiveWithVisibleBackgroundUser(): Boolean {
             val packageManager = context.getPackageManager()
             val userManager = context.getSystemService(UserManager::class.java)!!
-            return (packageManager.hasSystemFeature(FEATURE_AUTOMOTIVE)
-                    && userManager.isVisibleBackgroundUsersSupported)
+            return (packageManager.hasSystemFeature(FEATURE_AUTOMOTIVE) &&
+                    userManager.isVisibleBackgroundUsersSupported)
         }
 
         @BeforeClass
