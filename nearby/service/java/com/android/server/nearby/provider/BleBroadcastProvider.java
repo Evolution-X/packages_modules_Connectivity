@@ -89,6 +89,9 @@ public class BleBroadcastProvider extends AdvertiseCallback {
                             break;
                         case BroadcastRequest.PRESENCE_VERSION_V1:
                             if (adapter.isLeExtendedAdvertisingSupported()) {
+                                if (mAdvertisingSetCallback == null) {
+                                    mAdvertisingSetCallback = getAdvertisingSetCallback();
+                                }
                                 bluetoothLeAdvertiser.startAdvertisingSet(
                                         getAdvertisingSetParameters(),
                                         advertiseData,
@@ -133,6 +136,11 @@ public class BleBroadcastProvider extends AdvertiseCallback {
             }
             mBroadcastListener = null;
             mIsAdvertising = false;
+            // If called startAdvertisingSet() but onAdvertisingSetStopped() is not invoked yet,
+            // using the same mAdvertisingSetCallback will cause new advertising cann't be stopped.
+            // Therefore, release the old mAdvertisingSetCallback and
+            // create a new mAdvertisingSetCallback when calling startAdvertisingSet.
+            mAdvertisingSetCallback = null;
         }
     }
 
