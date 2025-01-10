@@ -16,15 +16,22 @@
 
 package android.net.cts
 
+import android.Manifest.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS
 import android.Manifest.permission.MANAGE_TEST_NETWORKS
 import android.Manifest.permission.NETWORK_SETTINGS
 import android.net.ConnectivityManager
+import android.net.L2capNetworkSpecifier
+import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
+import android.net.L2capNetworkSpecifier.PSM_ANY
+import android.net.L2capNetworkSpecifier.ROLE_SERVER
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED
+import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS
+import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_TEST
 import android.net.NetworkProvider
@@ -44,6 +51,9 @@ import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
 import com.android.testutils.runAsShell
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -136,5 +146,30 @@ class NetworkReservationTest {
         // reserved offer goes away
         provider.unregisterNetworkOffer(reservedOffer)
         cb.expect<Unavailable>()
+    }
+
+    @Test
+    fun testReserveL2capNetwork() {
+        val l2capReservationSpecifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        val l2capRequest = NetworkRequest.Builder()
+                .addTransportType(TRANSPORT_BLUETOOTH)
+                .removeCapability(NET_CAPABILITY_TRUSTED)
+                .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
+                .setNetworkSpecifier(l2capReservationSpecifier)
+                .build()
+        val cb = TestableNetworkCallback()
+        runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) {
+            cm.reserveNetwork(l2capRequest, handler, cb)
+        }
+
+        val caps = cb.expect<Reserved>().caps
+        val reservedSpec = caps.networkSpecifier
+        assertTrue(reservedSpec is L2capNetworkSpecifier)
+        assertNotEquals(PSM_ANY, reservedSpec.psm)
+        assertEquals(HEADER_COMPRESSION_6LOWPAN, reservedSpec.headerCompression)
+        assertNull(reservedSpec.remoteAddress)
     }
 }

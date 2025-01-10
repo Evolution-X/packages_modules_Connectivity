@@ -412,6 +412,7 @@ import com.android.server.ConnectivityService.ConnectivityDiagnosticsCallbackInf
 import com.android.server.ConnectivityService.NetworkRequestInfo;
 import com.android.server.ConnectivityServiceTest.ConnectivityServiceDependencies.DestroySocketsWrapper;
 import com.android.server.ConnectivityServiceTest.ConnectivityServiceDependencies.ReportedInterfaces;
+import com.android.server.L2capNetworkProvider;
 import com.android.server.connectivity.ApplicationSelfCertifiedNetworkCapabilities;
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker;
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator;
@@ -2380,6 +2381,11 @@ public class ConnectivityServiceTest {
         public int getDefaultWifiDataInactivityTimeout() {
             // Needed to mock out the dependency on DeviceConfig
             return 15;
+        }
+
+        @Override
+        public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
+            return null;
         }
     }
 
