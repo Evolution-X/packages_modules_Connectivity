@@ -231,25 +231,17 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         }
 
         boolean success = false;
-        boolean failureLogged = false;
+        int failureReason = -1;
 
         try {
             success = mSignatureVerifier.verify(contentUri, metadataUri);
         } catch (MissingPublicKeyException e) {
             if (updateFailureCount()) {
-                failureLogged = true;
-                mLogger.logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND,
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+                failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_NOT_FOUND;
             }
         } catch (InvalidKeyException e) {
             if (updateFailureCount()) {
-                failureLogged = true;
-                mLogger.logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+                failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION;
             }
         } catch (IOException | GeneralSecurityException e) {
             Log.e(TAG, "Could not verify new log list", e);
@@ -259,9 +251,13 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             Log.w(TAG, "Log list did not pass verification");
 
             // Avoid logging failure twice
-            if (!failureLogged && updateFailureCount()) {
+            if (failureReason == -1 && updateFailureCount()) {
+                failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION;
+            }
+
+            if (failureReason != -1) {
                 mLogger.logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_SIGNATURE_VERIFICATION,
+                        failureReason,
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
             }
