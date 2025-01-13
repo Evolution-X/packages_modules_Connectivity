@@ -234,6 +234,8 @@ public final class ThreadNetworkControllerServiceTest {
         when(mResources.getBoolean(
                         eq(R.bool.config_thread_srp_server_wait_for_border_routing_enabled)))
                 .thenReturn(true);
+        when(mResources.getBoolean(eq(R.bool.config_thread_border_router_auto_join_enabled)))
+                .thenReturn(true);
         when(mResources.getString(eq(R.string.config_thread_vendor_name)))
                 .thenReturn(TEST_VENDOR_NAME);
         when(mResources.getString(eq(R.string.config_thread_vendor_oui)))
@@ -291,6 +293,8 @@ public final class ThreadNetworkControllerServiceTest {
         when(mResources.getBoolean(
                         eq(R.bool.config_thread_srp_server_wait_for_border_routing_enabled)))
                 .thenReturn(false);
+        when(mResources.getBoolean(eq(R.bool.config_thread_border_router_auto_join_enabled)))
+                .thenReturn(false);
         when(mResources.getString(eq(R.string.config_thread_vendor_name)))
                 .thenReturn(TEST_VENDOR_NAME);
         when(mResources.getString(eq(R.string.config_thread_vendor_oui)))
@@ -304,6 +308,7 @@ public final class ThreadNetworkControllerServiceTest {
         mTestLooper.dispatchAll();
 
         assertThat(mFakeOtDaemon.getConfiguration().srpServerWaitForBorderRoutingEnabled).isFalse();
+        assertThat(mFakeOtDaemon.getConfiguration().borderRouterAutoJoinEnabled).isFalse();
         MeshcopTxtAttributes meshcopTxts = mFakeOtDaemon.getOverriddenMeshcopTxtAttributes();
         assertThat(meshcopTxts.vendorName).isEqualTo(TEST_VENDOR_NAME);
         assertThat(meshcopTxts.vendorOui).isEqualTo(TEST_VENDOR_OUI_BYTES);
