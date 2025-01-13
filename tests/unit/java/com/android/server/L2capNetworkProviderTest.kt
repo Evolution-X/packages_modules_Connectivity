@@ -39,6 +39,7 @@ import android.os.HandlerThread
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.waitForIdle
+import java.util.concurrent.CountDownLatch
 import kotlin.test.assertTrue
 import org.junit.After
 import org.junit.Before
@@ -50,6 +51,7 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
 import org.mockito.Mockito.any
 import org.mockito.Mockito.clearInvocations
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.never
 import org.mockito.Mockito.times
@@ -82,8 +84,11 @@ class L2capNetworkProviderTest {
     @Mock private lateinit var adapter: BluetoothAdapter
     @Mock private lateinit var serverSocket: BluetoothServerSocket
 
+    private val acceptCountdownLatch = CountDownLatch(1);
     private val handlerThread = HandlerThread("$TAG handler thread").apply { start() }
     private val handler = Handler(handlerThread.looper)
+
+
 
     @Before
     fun setUp() {
@@ -98,6 +103,13 @@ class L2capNetworkProviderTest {
         doReturn(adapter).`when`(bm).getAdapter()
         doReturn(serverSocket).`when`(adapter).listenUsingInsecureL2capChannel()
         doReturn(0x80).`when`(serverSocket).getPsm()
+        // accept() currently only awaits close()
+        doAnswer({
+            acceptCountdownLatch.await()
+        }).`when`(serverSocket).accept()
+        doAnswer({
+            acceptCountdownLatch.countDown()
+        }).`when`(serverSocket).close()
     }
 
     @After

@@ -269,16 +269,117 @@ public class L2capNetworkProvider {
         return new L2capNetwork(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
     }
 
-
     private class ReservedServerOffer implements NetworkOfferCallback {
         private final NetworkCapabilities mReservedCapabilities;
-        private final BluetoothServerSocket mServerSocket;
+        private final AcceptThread mAcceptThread;
+        // This set should almost always contain at most one network. This is because all L2CAP
+        // server networks created by the same reserved offer are indistinguishable from each other,
+        // so that ConnectivityService will tear down all but the first. However, temporarily, there
+        // can be more than one network.
+        private final Set<L2capNetwork> mL2capNetworks = new ArraySet<>();
+
+        private class AcceptThread extends Thread {
+            private static final int TIMEOUT_MS = 500;
+            private final BluetoothServerSocket mServerSocket;
+            private volatile boolean mIsRunning = true;
+
+            public AcceptThread(BluetoothServerSocket serverSocket) {
+                mServerSocket = serverSocket;
+            }
+
+            private void postDestroyAndUnregisterReservedOffer() {
+                mHandler.post(() -> {
+                    destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
+                });
+            }
+
+            private static void closeBluetoothSocket(BluetoothSocket socket) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    Log.w(TAG, "Failed to close BluetoothSocket", e);
+                }
+            }
+
+            private void postCreateServerNetwork(BluetoothSocket connectedSocket) {
+                mHandler.post(() -> {
+                    final boolean success = createServerNetwork(connectedSocket);
+                    if (!success) closeBluetoothSocket(connectedSocket);
+                });
+            }
+
+            public void run() {
+                while (mIsRunning) {
+                    final BluetoothSocket connectedSocket;
+                    try {
+                        connectedSocket = mServerSocket.accept();
+                    } catch (IOException e) {
+                        // BluetoothServerSocket was closed().
+                        if (!mIsRunning) return;
+
+                        // Else, BluetoothServerSocket encountered exception.
+                        Log.e(TAG, "BluetoothServerSocket#accept failed", e);
+                        postDestroyAndUnregisterReservedOffer();
+                        return; // stop running immediately on error
+                    }
+                    postCreateServerNetwork(connectedSocket);
+                }
+            }
+
+            public void tearDown() {
+                mIsRunning = false;
+                try {
+                    // BluetoothServerSocket.close() is thread-safe.
+                    mServerSocket.close();
+                } catch (IOException e) {
+                    Log.w(TAG, "Failed to close BluetoothServerSocket", e);
+                }
+                try {
+                    join();
+                } catch (InterruptedException e) {
+                    // join() interrupted during tearDown(). Do nothing.
+                }
+            }
+        }
+
+        private boolean createServerNetwork(BluetoothSocket socket) {
+            // It is possible the offer went away.
+            if (!mReservedServerOffers.contains(this)) return false;
+
+            if (!socket.isConnected()) {
+                Log.wtf(TAG, "BluetoothSocket must be connected");
+                return false;
+            }
+
+            final L2capNetwork network = createL2capNetwork(socket, mReservedCapabilities,
+                    new L2capNetwork.ICallback() {
+                @Override
+                public void onError(L2capNetwork network) {
+                    destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
+                }
+                @Override
+                public void onNetworkUnwanted(L2capNetwork network) {
+                    // Leave reservation in place.
+                    final boolean networkExists = mL2capNetworks.remove(network);
+                    if (!networkExists) return; // already torn down.
+                    network.tearDown();
+                }
+            });
+
+            if (network == null) {
+                Log.e(TAG, "Failed to create L2capNetwork");
+                return false;
+            }
+
+            mL2capNetworks.add(network);
+            return true;
+        }
 
         public ReservedServerOffer(NetworkCapabilities reservedCapabilities,
                 BluetoothServerSocket serverSocket) {
             mReservedCapabilities = reservedCapabilities;
-            // TODO: ServerSocket will be managed by an AcceptThread.
-            mServerSocket = serverSocket;
+            mAcceptThread = new AcceptThread(serverSocket);
+            mAcceptThread.start();
         }
 
         public NetworkCapabilities getReservedCapabilities() {
@@ -287,24 +388,19 @@ public class L2capNetworkProvider {
 
         @Override
         public void onNetworkNeeded(NetworkRequest request) {
-            // TODO: implement
+            // UNUSED: the lifetime of the reserved network is controlled by the blanket offer.
         }
 
         @Override
         public void onNetworkUnneeded(NetworkRequest request) {
-            // TODO: implement
+            // UNUSED: the lifetime of the reserved network is controlled by the blanket offer.
         }
 
-        /**
-         * Called when the reservation goes away and the reserved offer must be torn down.
-         *
-         * This method can be called multiple times.
-         */
+        /** Called when the reservation goes away and the reserved offer must be torn down. */
         public void tearDown() {
-            try {
-                mServerSocket.close();
-            } catch (IOException e) {
-                Log.w(TAG, "Failed to close BluetoothServerSocket", e);
+            mAcceptThread.tearDown();
+            for (L2capNetwork network : mL2capNetworks) {
+                network.tearDown();
             }
         }
     }
