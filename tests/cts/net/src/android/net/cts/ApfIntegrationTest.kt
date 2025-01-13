@@ -38,7 +38,7 @@ import android.net.apf.ApfConstants.IPV6_HEADER_LEN
 import android.net.apf.ApfConstants.IPV6_NEXT_HEADER_OFFSET
 import android.net.apf.ApfConstants.IPV6_SRC_ADDR_OFFSET
 import android.net.apf.ApfCounterTracker
-import android.net.apf.ApfCounterTracker.Counter.DROPPED_IPV6_MULTICAST_PING
+import android.net.apf.ApfCounterTracker.Counter.DROPPED_IPV6_NS_REPLIED_NON_DAD
 import android.net.apf.ApfCounterTracker.Counter.FILTER_AGE_16384THS
 import android.net.apf.ApfCounterTracker.Counter.PASSED_IPV6_ICMP
 import android.net.apf.ApfV4Generator
@@ -716,7 +716,7 @@ class ApfIntegrationTest {
         //     pass
         //   else
         //     transmit a ICMPv6 echo request packet with the first byte of the payload in the reply
-        //     increase DROPPED_IPV6_MULTICAST_PING counter
+        //     increase DROPPED_IPV6_NS_REPLIED_NON_DAD counter
         //     drop
         val program = gen
                 .addLoad16(R0, ETH_ETHERTYPE_OFFSET)
@@ -758,8 +758,8 @@ class ApfIntegrationTest {
                         IPPROTO_ICMPV6, // partial_sum
                         false // udp
                 )
-                // Warning: the program abuse DROPPED_IPV6_MULTICAST_PING for debugging purpose
-                .addCountAndDrop(DROPPED_IPV6_MULTICAST_PING)
+                // Warning: the program abuse DROPPED_IPV6_NS_REPLIED_NON_DAD for debugging purpose
+                .addCountAndDrop(DROPPED_IPV6_NS_REPLIED_NON_DAD)
                 .defineLabel(skipPacketLabel)
                 .addPass()
                 .generate()
