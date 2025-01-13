@@ -22,7 +22,6 @@ import android.Manifest.permission.NETWORK_SETTINGS
 import android.net.ConnectivityManager
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
-import android.net.L2capNetworkSpecifier.PSM_ANY
 import android.net.L2capNetworkSpecifier.ROLE_SERVER
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
@@ -50,8 +49,8 @@ import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
 import com.android.testutils.runAsShell
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.After
@@ -93,6 +92,8 @@ class NetworkReservationTest {
     private val handler = Handler(handlerThread.looper)
     private val provider = NetworkProvider(context, handlerThread.looper, TAG)
 
+    private val registeredCallbacks = ArrayList<TestableNetworkCallback>()
+
     @Before
     fun setUp() {
         runAsShell(NETWORK_SETTINGS) {
@@ -102,6 +103,7 @@ class NetworkReservationTest {
 
     @After
     fun tearDown() {
+        registeredCallbacks.forEach { cm.unregisterNetworkCallback(it) }
         runAsShell(NETWORK_SETTINGS) {
             // unregisterNetworkProvider unregisters all associated NetworkOffers.
             cm.unregisterNetworkProvider(provider)
@@ -114,6 +116,13 @@ class NetworkReservationTest {
         it.reservationId = resId
     }
 
+    fun reserveNetwork(nr: NetworkRequest): TestableNetworkCallback {
+        return TestableNetworkCallback().also {
+            cm.reserveNetwork(nr, handler, it)
+            registeredCallbacks.add(it)
+        }
+    }
+
     @Test
     fun testReserveNetwork() {
         // register blanket offer
@@ -122,8 +131,7 @@ class NetworkReservationTest {
             provider.registerNetworkOffer(NETWORK_SCORE, BLANKET_CAPS, handler::post, blanketOffer)
         }
 
-        val cb = TestableNetworkCallback()
-        cm.reserveNetwork(ETHERNET_REQUEST, handler, cb)
+        val cb = reserveNetwork(ETHERNET_REQUEST)
 
         // validate the reservation matches the blanket offer.
         val reservationReq = blanketOffer.expectOnNetworkNeeded(BLANKET_CAPS).request
@@ -160,15 +168,14 @@ class NetworkReservationTest {
                 .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
                 .setNetworkSpecifier(l2capReservationSpecifier)
                 .build()
-        val cb = TestableNetworkCallback()
-        runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) {
-            cm.reserveNetwork(l2capRequest, handler, cb)
+        val cb = runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) {
+            reserveNetwork(l2capRequest)
         }
 
         val caps = cb.expect<Reserved>().caps
         val reservedSpec = caps.networkSpecifier
         assertTrue(reservedSpec is L2capNetworkSpecifier)
-        assertNotEquals(PSM_ANY, reservedSpec.psm)
+        assertContains(0x80..0xFF, reservedSpec.psm, "PSM is outside of dynamic range")
         assertEquals(HEADER_COMPRESSION_6LOWPAN, reservedSpec.headerCompression)
         assertNull(reservedSpec.remoteAddress)
     }
