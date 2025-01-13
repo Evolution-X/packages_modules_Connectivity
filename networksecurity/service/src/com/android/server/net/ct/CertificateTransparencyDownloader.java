@@ -29,6 +29,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.DeviceConfig;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -320,7 +321,12 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
         mDataStore.store();
 
-        boolean shouldReport = new_failure_count >= Config.LOG_LIST_UPDATE_FAILURE_THRESHOLD;
+        int threshold = DeviceConfig.getInt(
+                Config.NAMESPACE_NETWORK_SECURITY,
+                Config.FLAG_LOG_FAILURE_THRESHOLD,
+                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+
+        boolean shouldReport = new_failure_count >= threshold;
         if (shouldReport) {
             Log.d(TAG, "Log list update failure count exceeds threshold: " + new_failure_count);
         }

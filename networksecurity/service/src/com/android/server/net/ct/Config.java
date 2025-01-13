@@ -45,6 +45,7 @@ final class Config {
     static final String FLAG_METADATA_URL = FLAGS_PREFIX + "metadata_url";
     static final String FLAG_VERSION = FLAGS_PREFIX + "version";
     static final String FLAG_PUBLIC_KEY = FLAGS_PREFIX + "public_key";
+    static final String FLAG_LOG_FAILURE_THRESHOLD = FLAGS_PREFIX + "log_list_failure_threshold";
 
     // properties
     static final String VERSION = "version";
@@ -60,5 +61,5 @@ final class Config {
     static final String URL_PUBLIC_KEY = URL_PREFIX + "log_list.pub";
 
     // Threshold amounts
-    static final int LOG_LIST_UPDATE_FAILURE_THRESHOLD = 10;
+    static final int DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD = 10;
 }
