@@ -244,7 +244,7 @@ package android.net {
     field public static final int HEADER_COMPRESSION_6LOWPAN = 2; // 0x2
     field public static final int HEADER_COMPRESSION_ANY = 0; // 0x0
     field public static final int HEADER_COMPRESSION_NONE = 1; // 0x1
-    field public static final int PSM_ANY = -1; // 0xffffffff
+    field public static final int PSM_ANY = 0; // 0x0
     field public static final int ROLE_ANY = 0; // 0x0
     field public static final int ROLE_CLIENT = 1; // 0x1
     field public static final int ROLE_SERVER = 2; // 0x2
@@ -254,8 +254,8 @@ package android.net {
     ctor public L2capNetworkSpecifier.Builder();
     method @NonNull public android.net.L2capNetworkSpecifier build();
     method @NonNull public android.net.L2capNetworkSpecifier.Builder setHeaderCompression(int);
-    method @NonNull public android.net.L2capNetworkSpecifier.Builder setPsm(int);
-    method @NonNull public android.net.L2capNetworkSpecifier.Builder setRemoteAddress(@NonNull android.net.MacAddress);
+    method @NonNull public android.net.L2capNetworkSpecifier.Builder setPsm(@IntRange(from=0, to=255) int);
+    method @NonNull public android.net.L2capNetworkSpecifier.Builder setRemoteAddress(@Nullable android.net.MacAddress);
     method @NonNull public android.net.L2capNetworkSpecifier.Builder setRole(int);
   }
 
