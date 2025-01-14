@@ -26,6 +26,7 @@ import android.net.RouteInfo
 import android.os.CancellationSignal
 import android.os.HandlerThread
 import android.os.SystemClock
+import android.platform.test.annotations.AppModeFull
 import android.provider.DeviceConfig
 import android.provider.DeviceConfig.NAMESPACE_NETD_NATIVE
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -58,6 +59,7 @@ private val TEST_DNSSERVER_MAC = MacAddress.fromString("00:11:22:33:44:55")
 private val TAG = DnsResolverTapTest::class.java.simpleName
 private const val TEST_TIMEOUT_MS = 10_000L
 
+@AppModeFull(reason = "Test networks cannot be created in instant app mode")
 @DnsResolverModuleTest
 @RunWith(AndroidJUnit4::class)
 class DnsResolverTapTest {
