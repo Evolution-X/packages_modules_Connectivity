@@ -108,6 +108,7 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -600,12 +601,39 @@ public class Tethering {
     // This method needs to exist because TETHERING_BLUETOOTH before Android T and TETHERING_WIGIG
     // can't use enableIpServing.
     private void processInterfaceStateChange(final String iface, boolean enabled) {
+        final int type = ifaceNameToType(iface);
         // Do not listen to USB interface state changes or USB interface add/removes. USB tethering
         // is driven only by USB_ACTION broadcasts.
-        final int type = ifaceNameToType(iface);
         if (type == TETHERING_USB || type == TETHERING_NCM) return;
 
+        // On T+, BLUETOOTH uses enableIpServing.
         if (type == TETHERING_BLUETOOTH && SdkLevel.isAtLeastT()) return;
+
+        // Cannot happen: on S+, tetherableWigigRegexps is always empty.
+        if (type == TETHERING_WIGIG && SdkLevel.isAtLeastS()) return;
+
+        // After V, disallow this legacy codepath from starting tethering of any type:
+        // everything must call ensureIpServerStarted directly.
+        //
+        // Don't touch the teardown path for now. It's more complicated because:
+        // - ensureIpServerStarted and ensureIpServerStopped act on different
+        //   tethering types.
+        // - Depending on the type, ensureIpServerStopped is either called twice (once
+        //   on interface down and once on interface removed) or just once (on
+        //   interface removed).
+        //
+        // Note that this only affects WIFI and WIFI_P2P. The other types are either
+        // ignored above, or ignored by ensureIpServerStarted. Note that even for WIFI
+        // and WIFI_P2P, this code should not ever run in normal use, because the
+        // hotspot and p2p code do not call tether(). It's possible that this could
+        // happen in the field due to unforeseen OEM modifications. If it does happen,
+        // a terrible error is logged in tether().
+        // TODO: fix the teardown path to stop depending on interface state notifications.
+        // These are not necessary since most/all link layers have their own teardown
+        // notifications, and can race with those notifications.
+        if (enabled && Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return;
+        }
 
         if (enabled) {
             ensureIpServerStarted(iface);
@@ -999,7 +1027,27 @@ public class Tethering {
         return TETHER_ERROR_NO_ERROR;
     }
 
+    /**
+     * Legacy tether API that starts tethering with CONNECTIVITY_SCOPE_GLOBAL on the given iface.
+     *
+     * This API relies on the IpServer having been started for the interface by
+     * processInterfaceStateChanged beforehand, which is only possible for
+     *     - WIGIG Pre-S
+     *     - BLUETOOTH Pre-T
+     *     - WIFI
+     *     - WIFI_P2P.
+     * Note that WIFI and WIFI_P2P already start tethering on their respective ifaces via
+     * WIFI_(AP/P2P_STATE_CHANGED broadcasts, which makes this API redundant for those types unless
+     * those broadcasts are disabled by OEM.
+     */
     void tether(String iface, int requestedState, final IIntResultListener listener) {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // After V, the TetheringManager and ConnectivityManager tether and untether methods
+            // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
+            // that this code cannot run even if callers use raw binder calls or other
+            // unsupported methods.
+            return;
+        }
         mHandler.post(() -> {
             switch (ifaceNameToType(iface)) {
                 case TETHERING_WIFI:
@@ -1051,6 +1099,13 @@ public class Tethering {
     }
 
     void untether(String iface, final IIntResultListener listener) {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // After V, the TetheringManager and ConnectivityManager tether and untether methods
+            // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
+            // that this code cannot run even if callers use raw binder calls or other
+            // unsupported methods.
+            return;
+        }
         mHandler.post(() -> {
             try {
                 listener.onResult(untether(iface));
