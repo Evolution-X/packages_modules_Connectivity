@@ -3065,7 +3065,8 @@ public class ConnectivityManager {
      * <p>WARNING: New clients should not use this function. The only usages should be in PanService
      * and WifiStateMachine which need direct access. All other clients should use
      * {@link #startTethering} and {@link #stopTethering} which encapsulate proper provisioning
-     * logic.</p>
+     * logic. On SDK versions after {@link Build.VERSION_CODES.VANILLA_ICE_CREAM}, this will throw
+     * an UnsupportedOperationException.</p>
      *
      * @param iface the interface name to tether.
      * @return error a {@code TETHER_ERROR} value indicating success or failure type
@@ -3090,7 +3091,8 @@ public class ConnectivityManager {
      * <p>WARNING: New clients should not use this function. The only usages should be in PanService
      * and WifiStateMachine which need direct access. All other clients should use
      * {@link #startTethering} and {@link #stopTethering} which encapsulate proper provisioning
-     * logic.</p>
+     * logic. On SDK versions after {@link Build.VERSION_CODES.VANILLA_ICE_CREAM}, this will throw
+     * an UnsupportedOperationException.</p>
      *
      * @param iface the interface name to untether.
      * @return error a {@code TETHER_ERROR} value indicating success or failure type
