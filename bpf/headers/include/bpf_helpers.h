@@ -62,8 +62,8 @@
 // Android Mainline BpfLoader when running on Android V (sdk=35)
 #define BPFLOADER_MAINLINE_V_VERSION (BPFLOADER_MAINLINE_U_QPR3_VERSION + 1u)
 
-// Android Mainline BpfLoader when running on Android W (sdk=36)
-#define BPFLOADER_MAINLINE_W_VERSION (BPFLOADER_MAINLINE_V_VERSION + 1u)
+// Android Mainline BpfLoader when running on Android 25Q2 (sdk=36)
+#define BPFLOADER_MAINLINE_25Q2_VERSION (BPFLOADER_MAINLINE_V_VERSION + 1u)
 
 /* For mainline module use, you can #define BPFLOADER_{MIN/MAX}_VER
  * before #include "bpf_helpers.h" to change which bpfloaders will

@@ -1417,7 +1417,7 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool isAtLeastT = (effective_api_level >= __ANDROID_API_T__);
     const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
     const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
-    const bool isAtLeastW = (effective_api_level >  __ANDROID_API_V__);  // TODO: switch to W
+    const bool isAtLeast25Q2 = (effective_api_level > __ANDROID_API_V__);  // TODO: fix >
 
     const int first_api_level = GetIntProperty("ro.board.first_api_level", effective_api_level);
 
@@ -1432,7 +1432,7 @@ static int doLoad(char** argv, char * const envp[]) {
     if (isAtLeastU) ++bpfloader_ver;     // [44] BPFLOADER_MAINLINE_U_VERSION
     if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
     if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
-    if (isAtLeastW) ++bpfloader_ver;     // [47] BPFLOADER_MAINLINE_W_VERSION
+    if (isAtLeast25Q2) ++bpfloader_ver;  // [47] BPFLOADER_MAINLINE_25Q2_VERSION
 
     ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
           bpfloader_ver, argv[0], android_get_device_api_level(), effective_api_level,
@@ -1477,8 +1477,8 @@ static int doLoad(char** argv, char * const envp[]) {
 
     // W bumps the kernel requirement up to 5.4
     // see also: //system/netd/tests/kernel_test.cpp TestKernel54
-    if (isAtLeastW && !isAtLeastKernelVersion(5, 4, 0)) {
-        ALOGE("Android W requires kernel 5.4.");
+    if (isAtLeast25Q2 && !isAtLeastKernelVersion(5, 4, 0)) {
+        ALOGE("Android 25Q2 requires kernel 5.4.");
         return 1;
     }
 
