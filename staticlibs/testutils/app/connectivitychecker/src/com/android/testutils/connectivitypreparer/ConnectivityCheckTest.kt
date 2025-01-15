@@ -19,7 +19,7 @@ package com.android.testutils.connectivitypreparer
 import android.Manifest.permission.NETWORK_SETTINGS
 import android.content.pm.PackageManager.FEATURE_TELEPHONY
 import android.content.pm.PackageManager.FEATURE_WIFI
-import android.net.LinkAddress
+import android.net.InetAddresses.parseNumericAddress
 import android.net.Network
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
@@ -66,7 +66,8 @@ class ConnectivityCheckTest {
     // Skip IPv6 checks on virtual devices which do not support it. Tests that require IPv6 will
     // still fail even if the preparer does not.
     private fun ipv6Unsupported(wifiSsid: String?) = ConnectUtil.VIRTUAL_SSIDS.contains(
-        WifiInfo.sanitizeSsid(wifiSsid))
+        WifiInfo.sanitizeSsid(wifiSsid)
+    )
 
     @Test
     fun testCheckWifiSetup() {
@@ -89,13 +90,25 @@ class ConnectivityCheckTest {
                 pos = 0,
                 timeoutMs = 30_000L
             ) {
-                it is LinkPropertiesChanged &&
-                it.network == network &&
-                it.lp.allLinkAddresses.any(LinkAddress::isIpv4) &&
-                        (ipv6Unsupported(ssid) || it.lp.hasGlobalIpv6Address())
+                if (it !is LinkPropertiesChanged || it.network != network) {
+                    false
+                } else {
+                    // Same check as used by DnsResolver for AI_ADDRCONFIG (have_ipv4)
+                    val ipv4Reachable = it.lp.isReachable(parseNumericAddress("8.8.8.8"))
+                    // Same check as used by DnsResolver for AI_ADDRCONFIG (have_ipv6)
+                    val ipv6Reachable = it.lp.isReachable(parseNumericAddress("2000::"))
+                    ipv4Reachable && (ipv6Unsupported(ssid) || ipv6Reachable)
+                }
             }
-            assertNotNull(lpChange, "Wifi network $network needs an IPv4 address" +
-                    if (ipv6Unsupported(ssid)) "" else " and a global IPv6 address")
+            assertNotNull(
+                lpChange,
+                "Wifi network $network needs an IPv4 address and default route" +
+                        if (ipv6Unsupported(ssid)) {
+                            ""
+                        } else {
+                            " and a global IPv6 address and default route"
+                        }
+            )
 
             Pair(network, ssid)
         }

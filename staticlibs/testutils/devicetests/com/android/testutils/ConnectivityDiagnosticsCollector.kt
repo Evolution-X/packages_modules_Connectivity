@@ -419,15 +419,29 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
      * @param exceptionContext An exception to write a stacktrace to the dump for context.
      */
     fun collectDumpsysConnectivity(exceptionContext: Throwable? = null) {
-        Log.i(TAG, "Collecting dumpsys connectivity for test artifacts")
+        collectDumpsys("connectivity --dump-priority HIGH", exceptionContext)
+    }
+
+    /**
+     * Add a dumpsys to the test data dump.
+     *
+     * <p>The dump will be collected immediately, and exported to a test artifact file when the
+     * test ends.
+     * @param dumpsysCmd The dumpsys command to run (for example "connectivity").
+     * @param exceptionContext An exception to write a stacktrace to the dump for context.
+     */
+    fun collectDumpsys(dumpsysCmd: String, exceptionContext: Throwable? = null) {
+        Log.i(TAG, "Collecting dumpsys $dumpsysCmd for test artifacts")
         PrintWriter(buffer).let {
-            it.println("--- Dumpsys connectivity at ${ZonedDateTime.now()} ---")
+            it.println("--- Dumpsys $dumpsysCmd at ${ZonedDateTime.now()} ---")
             maybeWriteExceptionContext(it, exceptionContext)
             it.flush()
         }
         ParcelFileDescriptor.AutoCloseInputStream(
             InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
-                "dumpsys connectivity --dump-priority HIGH")).use {
+                "dumpsys $dumpsysCmd"
+            )
+        ).use {
             it.copyTo(buffer)
         }
     }

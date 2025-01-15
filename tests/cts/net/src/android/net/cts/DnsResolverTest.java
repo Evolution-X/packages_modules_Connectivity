@@ -58,6 +58,7 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.net.module.util.DnsPacket;
+import com.android.testutils.ConnectivityDiagnosticsCollector;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DeviceConfigRule;
@@ -394,7 +395,22 @@ public class DnsResolverTest {
     @Test
     @DnsResolverModuleTest
     public void testRawQueryNXDomainWithPrivateDns() throws Exception {
-        doTestRawQueryNXDomainWithPrivateDns(mExecutor);
+        try {
+            doTestRawQueryNXDomainWithPrivateDns(mExecutor);
+        } catch (Throwable e) {
+            final ConnectivityDiagnosticsCollector collector =
+                    ConnectivityDiagnosticsCollector.getInstance();
+            if (collector != null) {
+                // IWLAN on U QPR3 release may cause failures in this test, see
+                // CarrierConfigSetupTest which is supposed to avoid the issue. Collect IWLAN
+                // related dumpsys if the test still fails.
+                collector.collectDumpsys("carrier_config", e);
+                collector.collectDumpsys("telecom", e);
+                collector.collectDumpsys("telephony_ims", e);
+                collector.collectDumpsys("telephony.registry", e);
+            }
+            throw e;
+        }
     }
 
     @Test
