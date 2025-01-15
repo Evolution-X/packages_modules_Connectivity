@@ -1409,17 +1409,15 @@ static int doLoad(char** argv, char * const envp[]) {
     //
     // Also note that 'android_get_device_api_level()' is what the
     //   //system/core/init/apex_init_util.cpp
-    // apex init .XXrc parsing code uses for XX filtering.
-    //
-    // That code has a hack to bump <35 to 35 (to force aosp/main to parse .35rc),
-    // but could (should?) perhaps be adjusted to match this.
-    const int effective_api_level = android_get_device_api_level() + (int)unreleased;
-    const bool isAtLeastT = (effective_api_level >= __ANDROID_API_T__);
-    const bool isAtLeastU = (effective_api_level >= __ANDROID_API_U__);
-    const bool isAtLeastV = (effective_api_level >= __ANDROID_API_V__);
-    const bool isAtLeast25Q2 = (effective_api_level > __ANDROID_API_V__);  // TODO: fix >
+    // apex init .XXrc parsing code uses for XX filtering, and that code
+    // (now) similarly uses __ANDROID_API_FUTURE__ for non 'REL' codenames.
+    const int api_level = unreleased ? __ANDROID_API_FUTURE__ : android_get_device_api_level();
+    const bool isAtLeastT = (api_level >= __ANDROID_API_T__);
+    const bool isAtLeastU = (api_level >= __ANDROID_API_U__);
+    const bool isAtLeastV = (api_level >= __ANDROID_API_V__);
+    const bool isAtLeast25Q2 = (api_level > __ANDROID_API_V__);  // TODO: fix >
 
-    const int first_api_level = GetIntProperty("ro.board.first_api_level", effective_api_level);
+    const int first_api_level = GetIntProperty("ro.board.first_api_level", api_level);
 
     // last in U QPR2 beta1
     const bool has_platform_bpfloader_rc = exists("/system/etc/init/bpfloader.rc");
@@ -1435,7 +1433,7 @@ static int doLoad(char** argv, char * const envp[]) {
     if (isAtLeast25Q2) ++bpfloader_ver;  // [47] BPFLOADER_MAINLINE_25Q2_VERSION
 
     ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
-          bpfloader_ver, argv[0], android_get_device_api_level(), effective_api_level,
+          bpfloader_ver, argv[0], android_get_device_api_level(), api_level,
           kernelVersion(), describeArch(), getuid(),
           has_platform_bpfloader_rc, has_platform_netbpfload_rc);
 
@@ -1475,7 +1473,7 @@ static int doLoad(char** argv, char * const envp[]) {
         return 1;
     }
 
-    // W bumps the kernel requirement up to 5.4
+    // 25Q2 bumps the kernel requirement up to 5.4
     // see also: //system/netd/tests/kernel_test.cpp TestKernel54
     if (isAtLeast25Q2 && !isAtLeastKernelVersion(5, 4, 0)) {
         ALOGE("Android 25Q2 requires kernel 5.4.");
