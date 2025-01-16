@@ -20,6 +20,7 @@ import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN;
 import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_ANY;
 import static android.net.L2capNetworkSpecifier.PSM_ANY;
 import static android.net.L2capNetworkSpecifier.ROLE_SERVER;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING;
@@ -78,6 +79,8 @@ public class L2capNetworkProvider {
                     .build();
             NetworkCapabilities caps = NetworkCapabilities.Builder.withoutDefaultCapabilities()
                     .addTransportType(TRANSPORT_BLUETOOTH)
+                    // TODO: consider removing NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED.
+                    .addCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
                     .addCapability(NET_CAPABILITY_NOT_CONGESTED)
                     .addCapability(NET_CAPABILITY_NOT_METERED)
                     .addCapability(NET_CAPABILITY_NOT_ROAMING)
