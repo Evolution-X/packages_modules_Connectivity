@@ -25,7 +25,7 @@ import java.io.IOException;
 class DirectoryUtils {
 
     static void makeDir(File dir) throws IOException {
-        dir.mkdirs();
+        dir.mkdir();
         if (!dir.isDirectory()) {
             throw new IOException("Unable to make directory " + dir.getCanonicalPath());
         }

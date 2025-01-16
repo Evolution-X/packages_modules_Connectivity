@@ -1,5 +1,14 @@
 {
-  "postsubmit": [
+  "presubmit": [
+    {
+      "name": "CtsNetSecConfigCertificateTransparencyTestCases"
+    },
+    {
+      "name": "CtsNetSecConfigCertificateTransparencyDefaultTestCases"
+    },
+    {
+      "name": "NetSecConfigCertificateTransparencySctLogListTestCases"
+    },
     {
       "name": "NetworkSecurityUnitTests"
     }
