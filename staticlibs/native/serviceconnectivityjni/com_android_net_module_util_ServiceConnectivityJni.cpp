@@ -53,7 +53,10 @@ namespace android {
 
 static jint createTimerFd(JNIEnv *env, jclass clazz) {
   int tfd;
-  tfd = timerfd_create(CLOCK_BOOTTIME, 0);
+  // For safety, the file descriptor should have O_NONBLOCK(TFD_NONBLOCK) set
+  // using fcntl during creation. This ensures that, in the worst-case scenario,
+  // an EAGAIN error is returned when reading.
+  tfd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK);
   if (tfd == -1) {
     jniThrowErrnoException(env, "createTimerFd", tfd);
   }
