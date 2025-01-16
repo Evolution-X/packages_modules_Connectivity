@@ -135,7 +135,7 @@ class TestNetworkService extends ITestNetworkManager.Stub {
             // flags atomically.
             final boolean setIffMulticast = bringUp;
             ParcelFileDescriptor tunIntf = ParcelFileDescriptor.adoptFd(
-                    ServiceConnectivityJni.nativeCreateTunTap(
+                    ServiceConnectivityJni.createTunTap(
                             isTun, hasCarrier, setIffMulticast, interfaceName));
 
             // Disable DAD and remove router_solicitation_delay before assigning link addresses.
@@ -153,7 +153,7 @@ class TestNetworkService extends ITestNetworkManager.Stub {
             }
 
             if (bringUp) {
-                ServiceConnectivityJni.nativeBringUpInterface(interfaceName);
+                ServiceConnectivityJni.bringUpInterface(interfaceName);
             }
 
             return new TestNetworkInterface(tunIntf, interfaceName);
@@ -396,11 +396,11 @@ class TestNetworkService extends ITestNetworkManager.Stub {
     @Override
     public void setCarrierEnabled(@NonNull TestNetworkInterface iface, boolean enabled) {
         enforceTestNetworkPermissions(mContext);
-        ServiceConnectivityJni.nativeSetTunTapCarrierEnabled(iface.getInterfaceName(),
+        ServiceConnectivityJni.setTunTapCarrierEnabled(iface.getInterfaceName(),
                 iface.getFileDescriptor().getFd(), enabled);
         // Explicitly close fd after use to prevent StrictMode from complaining.
         // Also, explicitly referencing iface guarantees that the object is not garbage collected
-        // before nativeSetTunTapCarrierEnabled() executes.
+        // before setTunTapCarrierEnabled() executes.
         try {
             iface.getFileDescriptor().close();
         } catch (IOException e) {

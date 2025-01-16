@@ -51,9 +51,7 @@
 
 namespace android {
 
-static jint
-com_android_net_module_util_ServiceConnectivityJni_createTimerFd(JNIEnv *env,
-                                                       jclass clazz) {
+static jint createTimerFd(JNIEnv *env, jclass clazz) {
   int tfd;
   tfd = timerfd_create(CLOCK_BOOTTIME, 0);
   if (tfd == -1) {
@@ -62,9 +60,7 @@ com_android_net_module_util_ServiceConnectivityJni_createTimerFd(JNIEnv *env,
   return tfd;
 }
 
-static void
-com_android_net_module_util_ServiceConnectivityJni_setTime(JNIEnv *env, jclass clazz,
-                                                 jint tfd, jlong milliseconds) {
+static void setTimerFdTime(JNIEnv *env, jclass clazz, jint tfd, jlong milliseconds) {
   struct itimerspec new_value;
   new_value.it_value.tv_sec = milliseconds / MSEC_PER_SEC;
   new_value.it_value.tv_nsec = (milliseconds % MSEC_PER_SEC) * NSEC_PER_MSEC;
@@ -75,7 +71,7 @@ com_android_net_module_util_ServiceConnectivityJni_setTime(JNIEnv *env, jclass c
 
   int ret = timerfd_settime(tfd, 0, &new_value, NULL);
   if (ret == -1) {
-    jniThrowErrnoException(env, "setTime", ret);
+    jniThrowErrnoException(env, "setTimerFdTime", ret);
   }
 }
 
@@ -185,13 +181,11 @@ static void bringUpInterface(JNIEnv* env, jclass /* clazz */, jstring jIface) {
  */
 static const JNINativeMethod gMethods[] = {
     /* name, signature, funcPtr */
-    {"createTimerFd", "()I",
-     (void *)com_android_net_module_util_ServiceConnectivityJni_createTimerFd},
-    {"setTime", "(IJ)V",
-     (void *)com_android_net_module_util_ServiceConnectivityJni_setTime},
-    {"nativeSetTunTapCarrierEnabled", "(Ljava/lang/String;IZ)V", (void*)setTunTapCarrierEnabled},
-    {"nativeCreateTunTap", "(ZZZLjava/lang/String;)I", (void*)createTunTap},
-    {"nativeBringUpInterface", "(Ljava/lang/String;)V", (void*)bringUpInterface},
+    {"createTimerFd", "()I", (void *)createTimerFd},
+    {"setTimerFdTime", "(IJ)V", (void *)setTimerFdTime},
+    {"setTunTapCarrierEnabled", "(Ljava/lang/String;IZ)V", (void*)setTunTapCarrierEnabled},
+    {"createTunTap", "(ZZZLjava/lang/String;)I", (void*)createTunTap},
+    {"bringUpInterface", "(Ljava/lang/String;)V", (void*)bringUpInterface},
 };
 
 int register_com_android_net_module_util_ServiceConnectivityJni(JNIEnv *env,
