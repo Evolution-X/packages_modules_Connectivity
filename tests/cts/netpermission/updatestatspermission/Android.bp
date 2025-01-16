@@ -33,6 +33,7 @@ android_test {
 
     // Tag this module as a cts test artifact
     test_suites: [
+        "automotive-general-tests",
         "cts",
         "general-tests",
     ],
