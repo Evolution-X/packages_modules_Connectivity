@@ -308,6 +308,41 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
                 && mPsm == rhs.mPsm;
     }
 
+    /** @hide */
+    @Override
+    public String toString() {
+        final String role;
+        switch (mRole) {
+            case ROLE_CLIENT:
+                role = "ROLE_CLIENT";
+                break;
+            case ROLE_SERVER:
+                role = "ROLE_SERVER";
+                break;
+            default:
+                role = "ROLE_ANY";
+                break;
+        }
+
+        final String headerCompression;
+        switch (mHeaderCompression) {
+            case HEADER_COMPRESSION_NONE:
+                headerCompression = "HEADER_COMPRESSION_NONE";
+                break;
+            case HEADER_COMPRESSION_6LOWPAN:
+                headerCompression = "HEADER_COMPRESSION_6LOWPAN";
+                break;
+            default:
+                headerCompression = "HEADER_COMPRESSION_ANY";
+                break;
+        }
+
+        final String psm = (mPsm == PSM_ANY) ? "PSM_ANY" : String.valueOf(mPsm);
+
+        return String.format("L2capNetworkSpecifier(%s, %s, RemoteAddress=%s, PSM=%s)",
+                role, headerCompression, Objects.toString(mRemoteAddress), psm);
+    }
+
     @Override
     public int describeContents() {
         return 0;
