@@ -81,6 +81,7 @@ class L2capNetworkProviderTest {
     fun setUp() {
         MockitoAnnotations.initMocks(this)
         doReturn(provider).`when`(deps).getNetworkProvider(any(), any())
+        doReturn(handlerThread).`when`(deps).getHandlerThread()
         doReturn(cm).`when`(context).getSystemService(eq(ConnectivityManager::class.java))
         doReturn(pm).`when`(context).getPackageManager()
         doReturn(true).`when`(pm).hasSystemFeature(FEATURE_BLUETOOTH_LE)
@@ -94,7 +95,7 @@ class L2capNetworkProviderTest {
 
     @Test
     fun testNetworkProvider_registeredWhenSupported() {
-        L2capNetworkProvider(deps, context, handler)
+        L2capNetworkProvider(deps, context).start()
         verify(cm).registerNetworkProvider(eq(provider))
         verify(provider).registerNetworkOffer(any(), any(), any(), any())
     }
@@ -102,13 +103,13 @@ class L2capNetworkProviderTest {
     @Test
     fun testNetworkProvider_notRegisteredWhenNotSupported() {
         doReturn(false).`when`(pm).hasSystemFeature(FEATURE_BLUETOOTH_LE)
-        L2capNetworkProvider(deps, context, handler)
+        L2capNetworkProvider(deps, context).start()
         verify(cm, never()).registerNetworkProvider(eq(provider))
     }
 
     fun doTestBlanketOfferIgnoresRequest(request: NetworkRequest) {
         clearInvocations(provider)
-        L2capNetworkProvider(deps, context, handler)
+        L2capNetworkProvider(deps, context).start()
 
         val blanketOfferCaptor = ArgumentCaptor.forClass(NetworkOfferCallback::class.java)
         verify(provider).registerNetworkOffer(any(), any(), any(), blanketOfferCaptor.capture())
@@ -122,7 +123,7 @@ class L2capNetworkProviderTest {
             reservation: NetworkCapabilities
     ) {
         clearInvocations(provider)
-        L2capNetworkProvider(deps, context, handler)
+        L2capNetworkProvider(deps, context).start()
 
         val blanketOfferCaptor = ArgumentCaptor.forClass(NetworkOfferCallback::class.java)
         verify(provider).registerNetworkOffer(any(), any(), any(), blanketOfferCaptor.capture())
