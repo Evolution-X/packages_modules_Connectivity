@@ -30,7 +30,7 @@ cc_library_shared {
         "com_android_net_moduletests_util/onload.cpp",
     ],
     static_libs: [
-        "libnet_utils_device_common_timerfdjni",
+        "libserviceconnectivityjni",
     ],
     shared_libs: [
         "liblog",

@@ -113,7 +113,6 @@ cc_library_shared {
         ":services.connectivity-netstats-jni-sources",
         "jni/com_android_server_connectivity_ClatCoordinator.cpp",
         "jni/com_android_server_ServiceManagerWrapper.cpp",
-        "jni/com_android_server_TestNetworkService.cpp",
         "jni/onload.cpp",
     ],
     header_libs: [
@@ -125,7 +124,7 @@ cc_library_shared {
         "libmodules-utils-build",
         "libnetjniutils",
         "libnet_utils_device_common_bpfjni",
-        "libnet_utils_device_common_timerfdjni",
+        "libserviceconnectivityjni",
         "netd_aidl_interface-lateststable-ndk",
     ],
     shared_libs: [

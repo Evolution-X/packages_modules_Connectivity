@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,33 +14,36 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
-
-#define LOG_TAG "TestNetworkServiceJni"
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <jni.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <linux/ipv6_route.h>
 #include <linux/route.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/timerfd.h>
 #include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
-#include <log/log.h>
-
-#include "jni.h"
-#include <android-base/stringprintf.h>
 #include <android-base/unique_fd.h>
 #include <bpf/KernelUtils.h>
 #include <nativehelper/JNIHelp.h>
-#include <nativehelper/ScopedUtfChars.h>
+#include <nativehelper/scoped_utf_chars.h>
+
+#define MSEC_PER_SEC 1000
+#define NSEC_PER_MSEC 1000000
 
 #ifndef IFF_NO_CARRIER
 #define IFF_NO_CARRIER 0x0040
@@ -48,7 +51,33 @@
 
 namespace android {
 
-//------------------------------------------------------------------------------
+static jint
+com_android_net_module_util_ServiceConnectivityJni_createTimerFd(JNIEnv *env,
+                                                       jclass clazz) {
+  int tfd;
+  tfd = timerfd_create(CLOCK_BOOTTIME, 0);
+  if (tfd == -1) {
+    jniThrowErrnoException(env, "createTimerFd", tfd);
+  }
+  return tfd;
+}
+
+static void
+com_android_net_module_util_ServiceConnectivityJni_setTime(JNIEnv *env, jclass clazz,
+                                                 jint tfd, jlong milliseconds) {
+  struct itimerspec new_value;
+  new_value.it_value.tv_sec = milliseconds / MSEC_PER_SEC;
+  new_value.it_value.tv_nsec = (milliseconds % MSEC_PER_SEC) * NSEC_PER_MSEC;
+  // Set the interval time to 0 because it's designed for repeated timer expirations after the
+  // initial expiration, which doesn't fit the current usage.
+  new_value.it_interval.tv_sec = 0;
+  new_value.it_interval.tv_nsec = 0;
+
+  int ret = timerfd_settime(tfd, 0, &new_value, NULL);
+  if (ret == -1) {
+    jniThrowErrnoException(env, "setTime", ret);
+  }
+}
 
 static void throwException(JNIEnv* env, int error, const char* action, const char* iface) {
     const std::string& msg = "Error: " + std::string(action) + " " + std::string(iface) +  ": "
@@ -119,8 +148,6 @@ static void bringUpInterfaceImpl(JNIEnv* env, const char* iface) {
 
 //------------------------------------------------------------------------------
 
-
-
 static void setTunTapCarrierEnabled(JNIEnv* env, jclass /* clazz */, jstring
                                     jIface, jint tunFd, jboolean enabled) {
     ScopedUtfChars iface(env, jIface);
@@ -153,16 +180,23 @@ static void bringUpInterface(JNIEnv* env, jclass /* clazz */, jstring jIface) {
 
 //------------------------------------------------------------------------------
 
+/*
+ * JNI registration.
+ */
 static const JNINativeMethod gMethods[] = {
+    /* name, signature, funcPtr */
+    {"createTimerFd", "()I",
+     (void *)com_android_net_module_util_ServiceConnectivityJni_createTimerFd},
+    {"setTime", "(IJ)V",
+     (void *)com_android_net_module_util_ServiceConnectivityJni_setTime},
     {"nativeSetTunTapCarrierEnabled", "(Ljava/lang/String;IZ)V", (void*)setTunTapCarrierEnabled},
     {"nativeCreateTunTap", "(ZZZLjava/lang/String;)I", (void*)createTunTap},
     {"nativeBringUpInterface", "(Ljava/lang/String;)V", (void*)bringUpInterface},
 };
 
-int register_com_android_server_TestNetworkService(JNIEnv* env) {
-    return jniRegisterNativeMethods(env,
-            "android/net/connectivity/com/android/server/TestNetworkService", gMethods,
-            NELEM(gMethods));
+int register_com_android_net_module_util_ServiceConnectivityJni(JNIEnv *env,
+                                                      char const *class_name) {
+  return jniRegisterNativeMethods(env, class_name, gMethods, NELEM(gMethods));
 }
 
 }; // namespace android

@@ -18,17 +18,20 @@ package {
 }
 
 cc_library_static {
-    name: "libnet_utils_device_common_timerfdjni",
+    name: "libserviceconnectivityjni",
     srcs: [
         "com_android_net_module_util_ServiceConnectivityJni.cpp",
     ],
     header_libs: [
+        "bpf_headers",
         "jni_headers",
+        "libbase_headers",
     ],
     shared_libs: [
         "liblog",
         "libnativehelper_compat_libc++",
     ],
+    stl: "libc++_static",
     cflags: [
         "-Wall",
         "-Werror",
