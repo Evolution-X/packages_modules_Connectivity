@@ -33,6 +33,7 @@ import android.net.NetworkScore
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.platform.test.annotations.AppModeFull
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
@@ -71,6 +72,7 @@ private const val TIMEOUT_MS = 5_000L
 private const val NO_CB_TIMEOUT_MS = 200L
 
 // TODO: integrate with CSNetworkReservationTest and move to common tests.
+@AppModeFull(reason = "CHANGE_NETWORK_STATE, MANAGE_TEST_NETWORKS not grantable to instant apps")
 @ConnectivityModuleTest
 @RunWith(DevSdkIgnoreRunner::class)
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
