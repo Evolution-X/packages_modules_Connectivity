@@ -22,7 +22,7 @@
 
 namespace android {
 
-int register_com_android_net_module_util_TimerFdUtils(JNIEnv *env,
+int register_com_android_net_module_util_ServiceConnectivityJni(JNIEnv *env,
                                                       char const *class_name);
 
 extern "C" jint JNI_OnLoad(JavaVM *vm, void *) {
@@ -32,8 +32,8 @@ extern "C" jint JNI_OnLoad(JavaVM *vm, void *) {
     return JNI_ERR;
   }
 
-  if (register_com_android_net_module_util_TimerFdUtils(
-          env, "com/android/net/moduletests/util/TimerFdUtils") < 0)
+  if (register_com_android_net_module_util_ServiceConnectivityJni(
+          env, "com/android/net/moduletests/util/ServiceConnectivityJni") < 0)
     return JNI_ERR;
 
   return JNI_VERSION_1_6;
