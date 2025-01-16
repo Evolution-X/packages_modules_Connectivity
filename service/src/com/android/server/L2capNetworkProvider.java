@@ -33,6 +33,7 @@ import static android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE;
 
 import android.annotation.Nullable;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.L2capNetworkSpecifier;
 import android.net.NetworkCapabilities;
@@ -42,6 +43,7 @@ import android.net.NetworkRequest;
 import android.net.NetworkScore;
 import android.net.NetworkSpecifier;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -54,6 +56,8 @@ import java.util.Map;
 public class L2capNetworkProvider {
     private static final String TAG = L2capNetworkProvider.class.getSimpleName();
     private final Dependencies mDeps;
+    private final Context mContext;
+    private final HandlerThread mHandlerThread;
     private final Handler mHandler;
     private final NetworkProvider mProvider;
     private final BlanketReservationOffer mBlanketOffer;
@@ -201,26 +205,40 @@ public class L2capNetworkProvider {
         public NetworkProvider getNetworkProvider(Context context, Looper looper) {
             return new NetworkProvider(context, looper, TAG);
         }
+
+        /** Get the HandlerThread for L2capNetworkProvider to run on */
+        public HandlerThread getHandlerThread() {
+            final HandlerThread thread = new HandlerThread("L2capNetworkProviderThread");
+            thread.start();
+            return thread;
+        }
     }
 
-    public L2capNetworkProvider(Context context, Handler handler) {
-        this(new Dependencies(), context, handler);
+    public L2capNetworkProvider(Context context) {
+        this(new Dependencies(), context);
     }
 
     @VisibleForTesting
-    public L2capNetworkProvider(Dependencies deps, Context context, Handler handler) {
+    public L2capNetworkProvider(Dependencies deps, Context context) {
         mDeps = deps;
-        mHandler = handler;
-        mProvider = mDeps.getNetworkProvider(context, handler.getLooper());
+        mContext = context;
+        mHandlerThread = mDeps.getHandlerThread();
+        mHandler = new Handler(mHandlerThread.getLooper());
+        mProvider = mDeps.getNetworkProvider(context, mHandlerThread.getLooper());
         mBlanketOffer = new BlanketReservationOffer();
+    }
 
-        final boolean isBleSupported =
-                context.getPackageManager().hasSystemFeature(FEATURE_BLUETOOTH_LE);
-        if (isBleSupported) {
-            context.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
+    /**
+     * Start L2capNetworkProvider.
+     *
+     * Called on CS Handler thread.
+     */
+    public void start() {
+        final PackageManager pm = mContext.getPackageManager();
+        if (pm.hasSystemFeature(FEATURE_BLUETOOTH_LE)) {
+            mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
             mProvider.registerNetworkOffer(BlanketReservationOffer.SCORE,
                     BlanketReservationOffer.CAPABILITIES, mHandler::post, mBlanketOffer);
         }
     }
 }
-
