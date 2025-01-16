@@ -255,6 +255,10 @@ public class RealtimeScheduler {
                     if (!isRunning()) {
                         return 0;
                     }
+                    if ((events & EVENT_ERROR) != 0) {
+                        Log.wtf(TAG, "Got EVENT_ERROR from FileDescriptorEventListener.");
+                        return 0;
+                    }
                     if ((events & EVENT_INPUT) != 0) {
                         handleExpiration();
                     }
