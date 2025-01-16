@@ -16,6 +16,8 @@
 
 package com.android.net.module.util;
 
+import android.annotation.NonNull;
+
 import java.io.IOException;
 
 /**
@@ -47,4 +49,15 @@ public class ServiceConnectivityJni {
      * @throws IOException if setting expiration time is failed.
      */
     public static native void setTime(int fd, long timeMs) throws IOException;
+
+    /** Create tun/tap interface */
+    public static native int nativeCreateTunTap(boolean isTun, boolean hasCarrier,
+            boolean setIffMulticast, @NonNull String iface);
+
+    /** Enable carrier on tun/tap interface */
+    public static native void nativeSetTunTapCarrierEnabled(@NonNull String iface, int tunFd,
+            boolean enabled);
+
+    /** Bring up tun/tap interface */
+    public static native void nativeBringUpInterface(String iface);
 }
