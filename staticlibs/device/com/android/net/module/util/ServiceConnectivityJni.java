@@ -48,7 +48,7 @@ public class ServiceConnectivityJni {
      * @param timeMs target time
      * @throws IOException if setting expiration time is failed.
      */
-    public static native void setTime(int fd, long timeMs) throws IOException;
+    public static native void setTimerFdTime(int fd, long timeMs) throws IOException;
 
     /** Create tun/tap interface */
     public static native int createTunTap(boolean isTun, boolean hasCarrier,
