@@ -189,9 +189,9 @@ static const JNINativeMethod gMethods[] = {
      (void *)com_android_net_module_util_ServiceConnectivityJni_createTimerFd},
     {"setTime", "(IJ)V",
      (void *)com_android_net_module_util_ServiceConnectivityJni_setTime},
-    {"nativeSetTunTapCarrierEnabled", "(Ljava/lang/String;IZ)V", (void*)setTunTapCarrierEnabled},
-    {"nativeCreateTunTap", "(ZZZLjava/lang/String;)I", (void*)createTunTap},
-    {"nativeBringUpInterface", "(Ljava/lang/String;)V", (void*)bringUpInterface},
+    {"setTunTapCarrierEnabled", "(Ljava/lang/String;IZ)V", (void*)setTunTapCarrierEnabled},
+    {"createTunTap", "(ZZZLjava/lang/String;)I", (void*)createTunTap},
+    {"bringUpInterface", "(Ljava/lang/String;)V", (void*)bringUpInterface},
 };
 
 int register_com_android_net_module_util_ServiceConnectivityJni(JNIEnv *env,
