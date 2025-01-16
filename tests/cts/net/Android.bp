@@ -95,6 +95,7 @@ android_test {
         "NetworkStackApiCurrentShims",
     ],
     test_suites: [
+        "automotive-general-tests",
         "cts",
         "mts-tethering",
         "mcts-tethering",
