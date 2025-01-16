@@ -140,6 +140,7 @@ impl JavaPlatform {
 }
 
 impl Platform for JavaPlatform {
+    #[allow(clippy::unit_arg)]
     fn send_request(
         &mut self,
         connection_id: i32,
