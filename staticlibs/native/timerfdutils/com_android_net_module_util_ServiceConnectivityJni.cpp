@@ -33,7 +33,7 @@
 namespace android {
 
 static jint
-com_android_net_module_util_TimerFdUtils_createTimerFd(JNIEnv *env,
+com_android_net_module_util_ServiceConnectivityJni_createTimerFd(JNIEnv *env,
                                                        jclass clazz) {
   int tfd;
   tfd = timerfd_create(CLOCK_BOOTTIME, 0);
@@ -44,7 +44,7 @@ com_android_net_module_util_TimerFdUtils_createTimerFd(JNIEnv *env,
 }
 
 static void
-com_android_net_module_util_TimerFdUtils_setTime(JNIEnv *env, jclass clazz,
+com_android_net_module_util_ServiceConnectivityJni_setTime(JNIEnv *env, jclass clazz,
                                                  jint tfd, jlong milliseconds) {
   struct itimerspec new_value;
   new_value.it_value.tv_sec = milliseconds / MSEC_PER_SEC;
@@ -66,12 +66,12 @@ com_android_net_module_util_TimerFdUtils_setTime(JNIEnv *env, jclass clazz,
 static const JNINativeMethod gMethods[] = {
     /* name, signature, funcPtr */
     {"createTimerFd", "()I",
-     (void *)com_android_net_module_util_TimerFdUtils_createTimerFd},
+     (void *)com_android_net_module_util_ServiceConnectivityJni_createTimerFd},
     {"setTime", "(IJ)V",
-     (void *)com_android_net_module_util_TimerFdUtils_setTime},
+     (void *)com_android_net_module_util_ServiceConnectivityJni_setTime},
 };
 
-int register_com_android_net_module_util_TimerFdUtils(JNIEnv *env,
+int register_com_android_net_module_util_ServiceConnectivityJni(JNIEnv *env,
                                                       char const *class_name) {
   return jniRegisterNativeMethods(env, class_name, gMethods, NELEM(gMethods));
 }

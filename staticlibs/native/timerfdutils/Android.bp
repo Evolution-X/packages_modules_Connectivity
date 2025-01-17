@@ -20,7 +20,7 @@ package {
 cc_library_static {
     name: "libnet_utils_device_common_timerfdjni",
     srcs: [
-        "com_android_net_module_util_TimerFdUtils.cpp",
+        "com_android_net_module_util_ServiceConnectivityJni.cpp",
     ],
     header_libs: [
         "jni_headers",
