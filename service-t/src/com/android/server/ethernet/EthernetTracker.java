@@ -51,7 +51,6 @@ import com.android.internal.util.IndentingPrintWriter;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.NetdUtils;
-import com.android.net.module.util.PermissionUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.NetlinkConstants;
@@ -624,7 +623,7 @@ public class EthernetTracker {
             nc = mNetworkCapabilities.get(hwAddress);
             if (nc == null) {
                 final boolean isTestIface = iface.matches(TEST_IFACE_REGEXP);
-                nc = createDefaultNetworkCapabilities(isTestIface);
+                nc = createDefaultNetworkCapabilities(isTestIface, /* overrideTransport */ null);
             }
         }
 
@@ -739,9 +738,13 @@ public class EthernetTracker {
      */
     private void parseEthernetConfig(String configString) {
         final EthernetTrackerConfig config = createEthernetTrackerConfig(configString);
-        NetworkCapabilities nc = createNetworkCapabilities(
-                !TextUtils.isEmpty(config.mCapabilities)  /* clear default capabilities */,
-                config.mCapabilities, config.mTransport).build();
+        NetworkCapabilities nc;
+        if (TextUtils.isEmpty(config.mCapabilities)) {
+            boolean isTestIface = config.mIface.matches(TEST_IFACE_REGEXP);
+            nc = createDefaultNetworkCapabilities(isTestIface, config.mTransport);
+        } else {
+            nc = createNetworkCapabilities(config.mCapabilities, config.mTransport).build();
+        }
         mNetworkCapabilities.put(config.mIface, nc);
 
         if (null != config.mIpConfig) {
@@ -756,15 +759,16 @@ public class EthernetTracker {
         return new EthernetTrackerConfig(configString.split(";", /* limit of tokens */ 4));
     }
 
-    private static NetworkCapabilities createDefaultNetworkCapabilities(boolean isTestIface) {
-        NetworkCapabilities.Builder builder = createNetworkCapabilities(
-                false /* clear default capabilities */, null, null)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED);
+    private static NetworkCapabilities createDefaultNetworkCapabilities(
+            boolean isTestIface, @Nullable String overrideTransport) {
+        NetworkCapabilities.Builder builder =
+                createNetworkCapabilities(/* commaSeparatedCapabilities */ null, overrideTransport)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED);
 
         if (isTestIface) {
             builder.addTransportType(NetworkCapabilities.TRANSPORT_TEST);
@@ -778,7 +782,6 @@ public class EthernetTracker {
     /**
      * Parses a static list of network capabilities
      *
-     * @param clearDefaultCapabilities Indicates whether or not to clear any default capabilities
      * @param commaSeparatedCapabilities A comma separated string list of integer encoded
      *                                   NetworkCapability.NET_CAPABILITY_* values
      * @param overrideTransport A string representing a single integer encoded override transport
@@ -788,12 +791,12 @@ public class EthernetTracker {
      */
     @VisibleForTesting
     static NetworkCapabilities.Builder createNetworkCapabilities(
-            boolean clearDefaultCapabilities, @Nullable String commaSeparatedCapabilities,
-            @Nullable String overrideTransport) {
+            @Nullable String commaSeparatedCapabilities, @Nullable String overrideTransport) {
 
-        final NetworkCapabilities.Builder builder = clearDefaultCapabilities
-                ? NetworkCapabilities.Builder.withoutDefaultCapabilities()
-                : new NetworkCapabilities.Builder();
+        final NetworkCapabilities.Builder builder =
+                TextUtils.isEmpty(commaSeparatedCapabilities)
+                        ? new NetworkCapabilities.Builder()
+                        : NetworkCapabilities.Builder.withoutDefaultCapabilities();
 
         // Determine the transport type. If someone has tried to define an override transport then
         // attempt to add it. Since we can only have one override, all errors with it will
