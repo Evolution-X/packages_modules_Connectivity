@@ -25,6 +25,8 @@ import android.os.Message;
 import android.os.MessageQueue;
 import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
+import android.system.ErrnoException;
+import android.system.Os;
 import android.util.CloseGuard;
 import android.util.Log;
 
@@ -265,6 +267,26 @@ public class RealtimeScheduler {
     }
 
     private void handleExpiration() {
+        // The data from the FileDescriptor must be read after the timer expires. Otherwise,
+        // expiration callbacks will continue to be sent, notifying of unread data. The content(the
+        // number of expirations) can be ignored, as the callback is the only item of interest.
+        // Refer to https://man7.org/linux/man-pages/man2/timerfd_create.2.html
+        // read(2)
+        //         If the timer has already expired one or more times since
+        //         its settings were last modified using timerfd_settime(),
+        //         or since the last successful read(2), then the buffer
+        //         given to read(2) returns an unsigned 8-byte integer
+        //         (uint64_t) containing the number of expirations that have
+        //         occurred.  (The returned value is in host byte order—that
+        //         is, the native byte order for integers on the host
+        //         machine.)
+        final byte[] readBuffer = new byte[8];
+        try {
+            Os.read(mParcelFileDescriptor.getFileDescriptor(), readBuffer, 0, readBuffer.length);
+        } catch (IOException | ErrnoException exception) {
+            Log.wtf(TAG, "Read FileDescriptor failed. ", exception);
+        }
+
         long currentTimeMs = SystemClock.elapsedRealtime();
         while (!mTaskQueue.isEmpty()) {
             final Task task = mTaskQueue.peek();
@@ -276,7 +298,6 @@ public class RealtimeScheduler {
             mTaskQueue.poll();
         }
 
-
         if (!mTaskQueue.isEmpty()) {
             // Using currentTimeMs ensures that the calculated expiration time
             // is always positive.
@@ -286,10 +307,6 @@ public class RealtimeScheduler {
                 Log.wtf(TAG, "Failed to set expiration time");
                 mTaskQueue.clear();
             }
-        } else {
-            // We have to clean up the timer if no tasks are left. Otherwise, the timer will keep
-            // being triggered.
-            TimerFdUtils.setExpirationTime(mFdInt, 0);
         }
     }
 
