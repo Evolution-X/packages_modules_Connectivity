@@ -124,7 +124,7 @@ cc_library_shared {
         "libmodules-utils-build",
         "libnetjniutils",
         "libnet_utils_device_common_bpfjni",
-        "libnet_utils_device_common_timerfdjni",
+        "libserviceconnectivityjni",
         "netd_aidl_interface-lateststable-ndk",
     ],
     shared_libs: [
