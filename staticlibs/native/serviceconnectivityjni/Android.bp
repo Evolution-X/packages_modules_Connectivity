@@ -18,7 +18,7 @@ package {
 }
 
 cc_library_static {
-    name: "libnet_utils_device_common_timerfdjni",
+    name: "libserviceconnectivityjni",
     srcs: [
         "com_android_net_module_util_ServiceConnectivityJni.cpp",
     ],
