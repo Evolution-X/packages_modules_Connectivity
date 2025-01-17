@@ -44,7 +44,7 @@ public class TimerFdUtils {
      */
     static boolean setExpirationTime(int fd, long expirationTimeMs) {
         try {
-            ServiceConnectivityJni.setTime(fd, expirationTimeMs);
+            ServiceConnectivityJni.setTimerFdTime(fd, expirationTimeMs);
         } catch (IOException e) {
             Log.e(TAG, "setExpirationTime failed", e);
             return false;
