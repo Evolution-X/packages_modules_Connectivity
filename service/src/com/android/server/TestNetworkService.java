@@ -48,6 +48,7 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.NetworkStackConstants;
+import com.android.net.module.util.ServiceConnectivityJni;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -74,15 +75,6 @@ class TestNetworkService extends ITestNetworkManager.Stub {
 
     @NonNull private final ConnectivityManager mCm;
     @NonNull private final NetworkProvider mNetworkProvider;
-
-    // Native method stubs
-    private static native int nativeCreateTunTap(boolean isTun, boolean hasCarrier,
-            boolean setIffMulticast, @NonNull String iface);
-
-    private static native void nativeSetTunTapCarrierEnabled(@NonNull String iface, int tunFd,
-            boolean enabled);
-
-    private static native void nativeBringUpInterface(String iface);
 
     @VisibleForTesting
     protected TestNetworkService(@NonNull Context context) {
@@ -143,7 +135,8 @@ class TestNetworkService extends ITestNetworkManager.Stub {
             // flags atomically.
             final boolean setIffMulticast = bringUp;
             ParcelFileDescriptor tunIntf = ParcelFileDescriptor.adoptFd(
-                    nativeCreateTunTap(isTun, hasCarrier, setIffMulticast, interfaceName));
+                    ServiceConnectivityJni.nativeCreateTunTap(
+                            isTun, hasCarrier, setIffMulticast, interfaceName));
 
             // Disable DAD and remove router_solicitation_delay before assigning link addresses.
             if (disableIpv6ProvisioningDelay) {
@@ -160,7 +153,7 @@ class TestNetworkService extends ITestNetworkManager.Stub {
             }
 
             if (bringUp) {
-                nativeBringUpInterface(interfaceName);
+                ServiceConnectivityJni.nativeBringUpInterface(interfaceName);
             }
 
             return new TestNetworkInterface(tunIntf, interfaceName);
@@ -403,8 +396,8 @@ class TestNetworkService extends ITestNetworkManager.Stub {
     @Override
     public void setCarrierEnabled(@NonNull TestNetworkInterface iface, boolean enabled) {
         enforceTestNetworkPermissions(mContext);
-        nativeSetTunTapCarrierEnabled(iface.getInterfaceName(), iface.getFileDescriptor().getFd(),
-                enabled);
+        ServiceConnectivityJni.nativeSetTunTapCarrierEnabled(iface.getInterfaceName(),
+                iface.getFileDescriptor().getFd(), enabled);
         // Explicitly close fd after use to prevent StrictMode from complaining.
         // Also, explicitly referencing iface guarantees that the object is not garbage collected
         // before nativeSetTunTapCarrierEnabled() executes.
