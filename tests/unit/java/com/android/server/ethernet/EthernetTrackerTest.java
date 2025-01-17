@@ -166,9 +166,10 @@ public class EthernetTrackerTest {
                 EthernetTracker.parseStaticIpConfiguration(configAsString));
     }
 
-    private NetworkCapabilities.Builder makeEthernetCapabilitiesBuilder(boolean clearAll) {
+    private NetworkCapabilities.Builder makeEthernetCapabilitiesBuilder(boolean clearDefaults) {
         final NetworkCapabilities.Builder builder =
-                clearAll ? NetworkCapabilities.Builder.withoutDefaultCapabilities()
+                clearDefaults
+                        ? NetworkCapabilities.Builder.withoutDefaultCapabilities()
                         : new NetworkCapabilities.Builder();
         return builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
@@ -176,21 +177,20 @@ public class EthernetTrackerTest {
     }
 
     /**
-     * Test: Attempt to create a capabilties with various valid sets of capabilities/transports
+     * Test: Attempt to create a capabilities with various valid sets of capabilities/transports
      */
     @Test
     public void createNetworkCapabilities() {
-
         // Particularly common expected results
-        NetworkCapabilities defaultEthernetCleared =
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+        NetworkCapabilities defaultCapabilities =
+                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
                         .build();
 
         NetworkCapabilities ethernetClearedWithCommonCaps =
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(true /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
@@ -200,89 +200,71 @@ public class EthernetTrackerTest {
                         .addCapability(15)
                         .build();
 
-        // Empty capabilities and transports lists with a "please clear defaults" should
-        // yield an empty capabilities set with TRANPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultEthernetCleared, true, "", "");
+        // Empty capabilities and transports should return the default capabilities set
+        // with TRANSPORT_ETHERNET
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "");
 
-        // Empty capabilities and transports without the clear defaults flag should return the
-        // default capabilities set with TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearAll */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-                        .build(),
-                false, "", "");
-
-        // A list of capabilities without the clear defaults flag should return the default
-        // capabilities, mixed with the desired capabilities, and TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearAll */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-                        .addCapability(11)
-                        .addCapability(12)
-                        .build(),
-                false, "11,12", "");
-
-        // Adding a list of capabilities with a clear defaults will leave exactly those capabilities
-        // with a default TRANSPORT_ETHERNET since no overrides are specified
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, true, "12,13,14,15", "");
+        // Adding a list of capabilities will leave exactly those capabilities with a default
+        // TRANSPORT_ETHERNET since no overrides are specified
+        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15", "");
 
         // Adding any invalid capabilities to the list will cause them to be ignored
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, true, "12,13,14,15,65,73", "");
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, true, "12,13,14,15,abcdefg", "");
+        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15,65,73", "");
+        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15,abcdefg", "");
 
         // Adding a valid override transport will remove the default TRANSPORT_ETHERNET transport
-        // and apply only the override to the capabiltities object
+        // and apply only the override to the capabilities object
         assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(0)
                         .build(),
-                true, "", "0");
+                "",
+                "0");
         assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(1)
                         .build(),
-                true, "", "1");
+                "",
+                "1");
         assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(2)
                         .build(),
-                true, "", "2");
+                "",
+                "2");
         assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addTransportType(3)
                         .build(),
-                true, "", "3");
+                "",
+                "3");
 
-        // "4" is TRANSPORT_VPN, which is unsupported. Should default back to TRANPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultEthernetCleared, true, "", "4");
+        // "4" is TRANSPORT_VPN, which is unsupported. Should default back to TRANSPORT_ETHERNET
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "4");
 
         // "5" is TRANSPORT_WIFI_AWARE, which is currently supported due to no legacy TYPE_NONE
         // conversion. When that becomes available, this test must be updated
-        assertParsedNetworkCapabilities(defaultEthernetCleared, true, "", "5");
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "5");
 
         // "6" is TRANSPORT_LOWPAN, which is currently supported due to no legacy TYPE_NONE
         // conversion. When that becomes available, this test must be updated
-        assertParsedNetworkCapabilities(defaultEthernetCleared, true, "", "6");
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "6");
 
         // Adding an invalid override transport will leave the transport as TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultEthernetCleared,true, "", "100");
-        assertParsedNetworkCapabilities(defaultEthernetCleared, true, "", "abcdefg");
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "100");
+        assertParsedNetworkCapabilities(defaultCapabilities, "", "abcdefg");
 
         // Ensure the adding of both capabilities and transports work
         assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearAll */)
+                makeEthernetCapabilitiesBuilder(true /* clearDefaults */)
                         .setLinkUpstreamBandwidthKbps(100000)
                         .setLinkDownstreamBandwidthKbps(100000)
                         .addCapability(12)
@@ -291,17 +273,21 @@ public class EthernetTrackerTest {
                         .addCapability(15)
                         .addTransportType(3)
                         .build(),
-                true, "12,13,14,15", "3");
+                "12,13,14,15",
+                "3");
 
         // Ensure order does not matter for capability list
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, true, "13,12,15,14", "");
+        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "13,12,15,14", "");
     }
 
-    private void assertParsedNetworkCapabilities(NetworkCapabilities expectedNetworkCapabilities,
-            boolean clearCapabilties, String configCapabiltiies,String configTransports) {
-        assertEquals(expectedNetworkCapabilities,
-                EthernetTracker.createNetworkCapabilities(clearCapabilties, configCapabiltiies,
-                        configTransports).build());
+    private void assertParsedNetworkCapabilities(
+            NetworkCapabilities expectedNetworkCapabilities,
+            String configCapabiltiies,
+            String configTransports) {
+        assertEquals(
+                expectedNetworkCapabilities,
+                EthernetTracker.createNetworkCapabilities(configCapabiltiies, configTransports)
+                        .build());
     }
 
     @Test
