@@ -93,6 +93,7 @@ java_test_host {
     libs: ["tradefed"],
     test_suites: [
         "ats",
+        "automotive-general-tests",
         "device-tests",
         "general-tests",
         "cts",
