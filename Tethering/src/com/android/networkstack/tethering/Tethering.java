@@ -70,6 +70,8 @@ import static com.android.networkstack.tethering.UpstreamNetworkMonitor.isCellul
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_MAIN_SM;
 
 import android.app.usage.NetworkStatsManager;
@@ -144,6 +146,7 @@ import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
+import com.android.net.module.util.TerribleErrorLog;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceCallbackShim;
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceRequestShim;
@@ -1049,25 +1052,38 @@ public class Tethering {
             return;
         }
         mHandler.post(() -> {
+            int result = tether(iface, requestedState);
             switch (ifaceNameToType(iface)) {
                 case TETHERING_WIFI:
-                    TetheringStatsLog.write(
+                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                            "Legacy tether API called on Wifi iface " + iface,
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI
-                    );
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI);
+                    if (result == TETHER_ERROR_NO_ERROR) {
+                        TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                                "Legacy tether API succeeded on Wifi iface " + iface,
+                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS);
+                    }
                     break;
                 case TETHERING_WIFI_P2P:
-                    TetheringStatsLog.write(
+                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                            "Legacy tether API called on Wifi P2P iface " + iface,
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P
-                    );
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P);
+                    if (result == TETHER_ERROR_NO_ERROR) {
+                        TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                                "Legacy tether API succeeded on Wifi P2P iface " + iface,
+                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS);
+                    }
                     break;
                 default:
                     // Do nothing
                     break;
             }
             try {
-                listener.onResult(tether(iface, requestedState));
+                listener.onResult(result);
             } catch (RemoteException e) { }
         });
     }
