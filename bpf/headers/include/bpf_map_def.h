@@ -94,6 +94,10 @@ _Static_assert(__alignof__(enum bpf_map_type) == 4, "__alignof__ enum bpf_map_ty
 _Static_assert(_Alignof(enum bpf_map_type) == 4, "_Alignof enum bpf_map_type != 4");
 
 // Linux kernel requires sizeof(int) == 4, sizeof(void*) == sizeof(long), sizeof(long long) == 8
+_Static_assert(sizeof(int) == 4, "sizeof int != 4");
+_Static_assert(__alignof__(int) == 4, "__alignof__ int != 4");
+_Static_assert(_Alignof(int) == 4, "_Alignof int != 4");
+
 _Static_assert(sizeof(unsigned int) == 4, "sizeof unsigned int != 4");
 _Static_assert(__alignof__(unsigned int) == 4, "__alignof__ unsigned int != 4");
 _Static_assert(_Alignof(unsigned int) == 4, "_Alignof unsigned int != 4");
@@ -155,7 +159,7 @@ struct bpf_map_def {
     enum bpf_map_type type;
     unsigned int key_size;
     unsigned int value_size;
-    unsigned int max_entries;
+    int max_entries;  // negative means BPF_F_NO_PREALLOC, but *might* not work with S
     unsigned int map_flags;
 
     // The following are not supported by the Android bpfloader:
