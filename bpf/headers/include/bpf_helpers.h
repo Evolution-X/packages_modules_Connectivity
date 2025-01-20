@@ -234,13 +234,13 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 #define DEFINE_BPF_MAP_BASE(the_map, TYPE, keysize, valuesize, num_entries, \
                             usr, grp, md, selinux, pindir, share, minkver,  \
                             maxkver, minloader, maxloader, ignore_eng,      \
-                            ignore_user, ignore_userdebug)                  \
+                            ignore_user, ignore_userdebug, mapflags)        \
     const struct bpf_map_def SECTION("maps") the_map = {                    \
         .type = BPF_MAP_TYPE_##TYPE,                                        \
         .key_size = (keysize),                                              \
         .value_size = (valuesize),                                          \
         .max_entries = (num_entries),                                       \
-        .map_flags = 0,                                                     \
+        .map_flags = (mapflags),                                            \
         .uid = (usr),                                                       \
         .gid = (grp),                                                       \
         .mode = (md),                                                       \
@@ -269,7 +269,7 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
     DEFINE_BPF_MAP_BASE(the_map, RINGBUF, 0, 0, size_bytes, usr, grp, md,      \
                         selinux, pindir, share, KVER_5_8, KVER_INF,            \
                         min_loader, max_loader, ignore_eng, ignore_user,       \
-                        ignore_userdebug);                                     \
+                        ignore_userdebug, 0);                                  \
                                                                                \
     _Static_assert((size_bytes) >= 4096, "min 4 kiB ringbuffer size");         \
     _Static_assert((size_bytes) <= 0x10000000, "max 256 MiB ringbuffer size"); \
@@ -317,11 +317,11 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 /* type safe macro to declare a map and related accessor functions */
 #define DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md,         \
                            selinux, pindir, share, min_loader, max_loader, ignore_eng,           \
-                           ignore_user, ignore_userdebug)                                        \
+                           ignore_user, ignore_userdebug, mapFlags)                              \
   DEFINE_BPF_MAP_BASE(the_map, TYPE, sizeof(KeyType), sizeof(ValueType),                         \
                       num_entries, usr, grp, md, selinux, pindir, share,                         \
                       KVER_NONE, KVER_INF, min_loader, max_loader,                               \
-                      ignore_eng, ignore_user, ignore_userdebug);                                \
+                      ignore_eng, ignore_user, ignore_userdebug, mapFlags);                      \
     BPF_MAP_ASSERT_OK(BPF_MAP_TYPE_##TYPE, (num_entries), (md));                                 \
     _Static_assert(sizeof(KeyType) < 1024, "aosp/2370288 requires < 1024 byte keys");            \
     _Static_assert(sizeof(ValueType) < 65536, "aosp/2370288 requires < 65536 byte values");      \
@@ -359,13 +359,13 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 #define DEFINE_BPF_MAP_KERNEL_INTERNAL(the_map, TYPE, KeyType, ValueType, num_entries)           \
     DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, AID_ROOT, AID_ROOT,       \
                        0000, "fs_bpf_loader", "", PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, \
-                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 #define DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md) \
     DEFINE_BPF_MAP_EXT(the_map, TYPE, KeyType, ValueType, num_entries, usr, grp, md,     \
                        DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR,      \
                        PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,                    \
-                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 #define DEFINE_BPF_MAP(the_map, TYPE, KeyType, ValueType, num_entries) \
     DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, \
