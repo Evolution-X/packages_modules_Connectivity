@@ -807,6 +807,46 @@ public class TetheringManager {
      */
     @SuppressLint("UnflaggedApi")
     public static final class TetheringRequest implements Parcelable {
+        /**
+         * Tethering started by an explicit call to startTethering.
+         * @hide
+         */
+        public static final int REQUEST_TYPE_EXPLICIT = 0;
+
+        /**
+         * Tethering implicitly started by broadcasts (LOHS and P2P). Can never be pending.
+         * @hide
+         */
+        public static final int REQUEST_TYPE_IMPLICIT = 1;
+
+        /**
+         * Tethering started by the legacy tether() call. Can only happen on V-.
+         * @hide
+         */
+        public static final int REQUEST_TYPE_LEGACY = 2;
+
+        /**
+         * Tethering started but there was no pending request found. This may happen if Tethering is
+         * started and immediately stopped before the link layer goes up, or if we get a link layer
+         * event without a prior call to startTethering (e.g. adb shell cmd wifi start-softap).
+         * @hide
+         */
+        public static final int REQUEST_TYPE_PLACEHOLDER = 3;
+
+        /**
+         * Type of request, used to keep track of whether the request was explicitly sent by
+         * startTethering, implicitly created by broadcasts, or via legacy tether().
+         * @hide
+         */
+        @Retention(RetentionPolicy.SOURCE)
+        @IntDef(prefix = "TYPE_", value = {
+                REQUEST_TYPE_EXPLICIT,
+                REQUEST_TYPE_IMPLICIT,
+                REQUEST_TYPE_LEGACY,
+                REQUEST_TYPE_PLACEHOLDER,
+        })
+        public @interface RequestType {}
+
         /** A configuration set for TetheringRequest. */
         private final TetheringRequestParcel mRequestParcel;
 
@@ -866,6 +906,7 @@ public class TetheringManager {
                 mBuilderParcel.uid = Process.INVALID_UID;
                 mBuilderParcel.softApConfig = null;
                 mBuilderParcel.interfaceName = null;
+                mBuilderParcel.requestType = REQUEST_TYPE_EXPLICIT;
             }
 
             /**
@@ -1161,6 +1202,14 @@ public class TetheringManager {
         }
 
         /**
+         * Get the type of the request.
+         * @hide
+         */
+        public @RequestType int getRequestType() {
+            return mRequestParcel.requestType;
+        }
+
+        /**
          * String of TetheringRequest detail.
          * @hide
          */
@@ -1168,6 +1217,13 @@ public class TetheringManager {
         public String toString() {
             StringJoiner sj = new StringJoiner(", ", "TetheringRequest[ ", " ]");
             sj.add(typeToString(mRequestParcel.tetheringType));
+            if (mRequestParcel.requestType == REQUEST_TYPE_IMPLICIT) {
+                sj.add("IMPLICIT");
+            } else if (mRequestParcel.requestType == REQUEST_TYPE_LEGACY) {
+                sj.add("LEGACY");
+            } else if (mRequestParcel.requestType == REQUEST_TYPE_PLACEHOLDER) {
+                sj.add("PLACEHOLDER");
+            }
             if (mRequestParcel.localIPv4Address != null) {
                 sj.add("localIpv4Address=" + mRequestParcel.localIPv4Address);
             }
@@ -1217,7 +1273,8 @@ public class TetheringManager {
         public boolean equalsIgnoreUidPackage(TetheringRequest otherRequest) {
             TetheringRequestParcel parcel = getParcel();
             TetheringRequestParcel otherParcel = otherRequest.getParcel();
-            return parcel.tetheringType == otherParcel.tetheringType
+            return parcel.requestType == otherParcel.requestType
+                    && parcel.tetheringType == otherParcel.tetheringType
                     && Objects.equals(parcel.localIPv4Address, otherParcel.localIPv4Address)
                     && Objects.equals(parcel.staticClientAddress, otherParcel.staticClientAddress)
                     && parcel.exemptFromEntitlementCheck == otherParcel.exemptFromEntitlementCheck
