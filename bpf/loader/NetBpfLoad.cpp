@@ -604,9 +604,6 @@ static bool mapMatchesExpectations(const unique_fd& fd, const string& mapName,
     if (type == BPF_MAP_TYPE_DEVMAP || type == BPF_MAP_TYPE_DEVMAP_HASH)
         desired_map_flags |= BPF_F_RDONLY_PROG;
 
-    if (type == BPF_MAP_TYPE_LPM_TRIE)
-        desired_map_flags |= BPF_F_NO_PREALLOC;
-
     // The .h file enforces that this is a power of two, and page size will
     // also always be a power of two, so this logic is actually enough to
     // force it to be a multiple of the page size, as required by the kernel.
@@ -782,7 +779,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
               .key_size = md[i].key_size,
               .value_size = md[i].value_size,
               .max_entries = max_entries,
-              .map_flags = md[i].map_flags | (type == BPF_MAP_TYPE_LPM_TRIE ? BPF_F_NO_PREALLOC : 0),
+              .map_flags = md[i].map_flags,
             };
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
