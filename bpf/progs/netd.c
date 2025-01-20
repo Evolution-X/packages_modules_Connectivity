@@ -46,14 +46,14 @@ static const bool TRACE_OFF = false;
     DEFINE_BPF_MAP_EXT(the_map, TYPE, TypeOfKey, TypeOfValue, num_entries,         \
                        AID_ROOT, AID_NET_BW_ACCT, 0060, "fs_bpf_net_shared", "",   \
                        PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,              \
-                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 // For maps netd only needs read only access to
 #define DEFINE_BPF_MAP_RO_NETD(the_map, TYPE, TypeOfKey, TypeOfValue, num_entries)  \
     DEFINE_BPF_MAP_EXT(the_map, TYPE, TypeOfKey, TypeOfValue, num_entries,          \
                        AID_ROOT, AID_NET_BW_ACCT, 0460, "fs_bpf_netd_readonly", "", \
                        PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,               \
-                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+                       LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 // For maps netd needs to be able to read and write
 #define DEFINE_BPF_MAP_RW_NETD(the_map, TYPE, TypeOfKey, TypeOfValue, num_entries) \
@@ -92,7 +92,7 @@ DEFINE_BPF_MAP_NO_NETD(iface_index_name_map, HASH, uint32_t, IfaceValue, IFACE_I
 DEFINE_BPF_MAP_EXT(packet_trace_enabled_map, ARRAY, uint32_t, bool, 1,
                    AID_ROOT, AID_SYSTEM, 0060, "fs_bpf_net_shared", "", PRIVATE,
                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, LOAD_ON_ENG,
-                   LOAD_ON_USER, LOAD_ON_USERDEBUG)
+                   LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 // A ring buffer on which packet information is pushed.
 DEFINE_BPF_RINGBUF_EXT(packet_trace_ringbuf, PacketTrace, PACKET_TRACE_BUF_SIZE,
