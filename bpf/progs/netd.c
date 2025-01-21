@@ -514,14 +514,14 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
     return match;
 }
 
-// Tracing on Android U+ 5.8+
+// Tracing on Android U+ 5.10+
 DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
-                    bpf_cgroup_ingress_trace, KVER_5_8, KVER_INF,
+                    bpf_cgroup_ingress_trace, KVER_5_10, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_8, SDK_LEVEL_U);
+    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19", AID_ROOT, AID_SYSTEM,
@@ -536,14 +536,14 @@ DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_SY
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
 }
 
-// Tracing on Android U+ 5.8+
+// Tracing on Android U+ 5.10+
 DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
-                    bpf_cgroup_egress_trace, KVER_5_8, KVER_INF,
+                    bpf_cgroup_egress_trace, KVER_5_10, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_8, SDK_LEVEL_U);
+    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19", AID_ROOT, AID_SYSTEM,

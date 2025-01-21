@@ -291,14 +291,15 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 // Type safe macro to declare a ring buffer and related output functions.
 // Compatibility:
 // * BPF ring buffers are only available kernels 5.8 and above. Any program
-//   accessing the ring buffer should set a program level min_kver >= 5.8.
-// * The definition below sets a map min_kver of 5.8 which requires targeting
+//   accessing the ring buffer should set a program level min_kver >= 5.10,
+//   since 5.10 is the next LTS version.
+// * The definition below sets a map min_kver of 5.10 which requires targeting
 //   a BPFLOADER_MIN_VER >= BPFLOADER_S_VERSION.
 #define DEFINE_BPF_RINGBUF_EXT(the_map, ValueType, size_bytes, usr, grp, md,   \
                                selinux, pindir, share, min_loader, max_loader, \
                                ignore_eng, ignore_user, ignore_userdebug)      \
     DEFINE_BPF_MAP_BASE(the_map, RINGBUF, 0, 0, size_bytes, usr, grp, md,      \
-                        selinux, pindir, share, KVER_5_8, KVER_INF,            \
+                        selinux, pindir, share, KVER_5_10, KVER_INF,           \
                         min_loader, max_loader, ignore_eng, ignore_user,       \
                         ignore_userdebug, 0);                                  \
                                                                                \
