@@ -127,8 +127,8 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
 #define DEFINE_NETD_BPF_PROG(SECTION_NAME, prog_uid, prog_gid, the_prog) \
     DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, KVER_NONE)
 
-#define DEFINE_NETD_V_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, minKV)            \
-    DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, minKV,                        \
+#define DEFINE_NETD_V_BPF_PROG_KVER(SECTION_NAME, the_prog, minKV)                                \
+    DEFINE_BPF_PROG_EXT(SECTION_NAME, AID_ROOT, AID_ROOT, the_prog, minKV,                        \
                         KVER_INF, BPFLOADER_MAINLINE_V_VERSION, BPFLOADER_MAX_VER, MANDATORY,     \
                         "fs_bpf_netd_readonly", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
@@ -714,37 +714,37 @@ DEFINE_NETD_BPF_PROG_KVER("bind6/inet6_bind", AID_ROOT, AID_ROOT, inet6_bind, KV
     return block_port(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("connect4/inet4_connect", AID_ROOT, AID_ROOT, inet4_connect, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("connect4/inet4_connect", inet4_connect, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("connect6/inet6_connect", AID_ROOT, AID_ROOT, inet6_connect, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("connect6/inet6_connect", inet6_connect, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("recvmsg4/udp4_recvmsg", AID_ROOT, AID_ROOT, udp4_recvmsg, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("recvmsg4/udp4_recvmsg", udp4_recvmsg, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("recvmsg6/udp6_recvmsg", AID_ROOT, AID_ROOT, udp6_recvmsg, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("recvmsg6/udp6_recvmsg", udp6_recvmsg, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("sendmsg4/udp4_sendmsg", AID_ROOT, AID_ROOT, udp4_sendmsg, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("sendmsg4/udp4_sendmsg", udp4_sendmsg, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("sendmsg6/udp6_sendmsg", AID_ROOT, AID_ROOT, udp6_sendmsg, KVER_4_19)
+DEFINE_NETD_V_BPF_PROG_KVER("sendmsg6/udp6_sendmsg", udp6_sendmsg, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return check_localhost(ctx);
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("getsockopt/prog", AID_ROOT, AID_ROOT, getsockopt_prog, KVER_5_4)
+DEFINE_NETD_V_BPF_PROG_KVER("getsockopt/prog", getsockopt_prog, KVER_5_4)
 (struct bpf_sockopt *ctx) {
     // Tell kernel to return 'original' kernel reply (instead of the bpf modified buffer)
     // This is important if the answer is larger than PAGE_SIZE (max size this bpf hook can provide)
@@ -752,7 +752,7 @@ DEFINE_NETD_V_BPF_PROG_KVER("getsockopt/prog", AID_ROOT, AID_ROOT, getsockopt_pr
     return BPF_ALLOW;
 }
 
-DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", AID_ROOT, AID_ROOT, setsockopt_prog, KVER_5_4)
+DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", setsockopt_prog, KVER_5_4)
 (struct bpf_sockopt *ctx) {
     // Tell kernel to use/process original buffer provided by userspace.
     // This is important if it is larger than PAGE_SIZE (max size this bpf hook can handle).
