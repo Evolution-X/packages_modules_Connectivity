@@ -122,10 +122,7 @@
  */
 #define CRITICAL(REASON) char _critical[] SECTION("critical") = (REASON)
 
-/*
- * Helper functions called from eBPF programs written in C. These are
- * implemented in the kernel sources.
- */
+// Helpers for writing kernel version specific bpf programs
 
 struct kver_uint { unsigned int kver; };
 #define KVER_(v) ((struct kver_uint){ .kver = (v) })
@@ -166,6 +163,11 @@ struct kver_uint { unsigned int kver; };
  *      for use by iptables xt_bpf extensions.
  *
  * See cs/p:aosp-master%20-file:prebuilts/%20file:genfs_contexts%20"genfscon%20bpf"
+ */
+
+/*
+ * Helper functions called from eBPF programs written in C. These are
+ * implemented in the kernel sources.
  */
 
 /* generic functions */
