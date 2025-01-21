@@ -133,8 +133,8 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
                         "fs_bpf_netd_readonly", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
 // programs that only need to be usable by the system server
-#define DEFINE_SYS_BPF_PROG(SECTION_NAME, prog_uid, prog_gid, the_prog) \
-    DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog, KVER_NONE, KVER_INF,  \
+#define DEFINE_SYS_BPF_PROG(SECTION_NAME, the_prog) \
+    DEFINE_BPF_PROG_EXT(SECTION_NAME, AID_ROOT, AID_NET_ADMIN, the_prog, KVER_NONE, KVER_INF,  \
                         BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, MANDATORY, \
                         "fs_bpf_net_shared", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
@@ -590,7 +590,7 @@ DEFINE_XTBPF_PROG("skfilter/ingress/xtbpf", xt_bpf_ingress_prog)
     return XTBPF_MATCH;
 }
 
-DEFINE_SYS_BPF_PROG("schedact/ingress/account", AID_ROOT, AID_NET_ADMIN,
+DEFINE_SYS_BPF_PROG("schedact/ingress/account",
                     tc_bpf_ingress_account_prog)
 (struct __sk_buff* skb) {
     if (is_received_skb(skb)) {
