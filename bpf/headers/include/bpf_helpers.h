@@ -141,6 +141,27 @@ struct kver_uint { unsigned int kver; };
 
 #define KVER_IS_AT_LEAST(kver, a, b, c) ((kver).kver >= KVER(a, b, c).kver)
 
+// Helpers for writing sdk level specific bpf programs
+//
+// Note: we choose to follow sdk api level values, but there is no real need for this:
+// These just need to be monotonically increasing.  We could also use values ten or even
+// a hundred times larger to leave room for quarters or months.  We may also just use
+// dates or something (2502 or 202506 for 25Q2) or even the mainline bpfloader version...
+// For now this easily suffices for our use case.
+
+struct sdk_level_uint { unsigned int sdk_level; };
+#define SDK_LEVEL_(v) ((struct sdk_level_uint){ .sdk_level = (v) })
+#define SDK_LEVEL_NONE SDK_LEVEL_(0)
+#define SDK_LEVEL_S    SDK_LEVEL_(31) // Android 12
+#define SDK_LEVEL_Sv2  SDK_LEVEL_(32) // Android 12L
+#define SDK_LEVEL_T    SDK_LEVEL_(33) // Android 13
+#define SDK_LEVEL_U    SDK_LEVEL_(34) // Android 14
+#define SDK_LEVEL_V    SDK_LEVEL_(35) // Android 15
+#define SDK_LEVEL_24Q3 SDK_LEVEL_V
+#define SDK_LEVEL_25Q2 SDK_LEVEL_(36) // Android 16
+
+#define SDK_LEVEL_IS_AT_LEAST(lvl, v) ((lvl).sdk_level >= (SDK_LEVEL_##v).sdk_level)
+
 /*
  * BPFFS (ie. /sys/fs/bpf) labelling is as follows:
  *   subdirectory   selinux context      mainline  usecase / usable by
