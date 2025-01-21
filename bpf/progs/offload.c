@@ -805,7 +805,7 @@ static inline __always_inline int do_xdp_forward_rawip(struct xdp_md *ctx,
 }
 
 #define DEFINE_XDP_PROG(str, func) \
-    DEFINE_BPF_PROG_KVER(str, AID_ROOT, AID_NETWORK_STACK, func, KVER_5_9)(struct xdp_md *ctx)
+    DEFINE_BPF_PROG_KVER(str, AID_ROOT, AID_NETWORK_STACK, func, KVER_5_10)(struct xdp_md *ctx)
 
 DEFINE_XDP_PROG("xdp/tether_downstream_ether",
                  xdp_tether_downstream_ether) {
