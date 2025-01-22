@@ -185,6 +185,7 @@ ASSERT_STRING_EQUAL(XT_BPF_DENYLIST_PROG_PATH,  BPF_NETD_PATH "prog_netd_skfilte
 #define PACKET_TRACE_RINGBUF_PATH BPF_NETD_PATH "map_netd_packet_trace_ringbuf"
 #define PACKET_TRACE_ENABLED_MAP_PATH BPF_NETD_PATH "map_netd_packet_trace_enabled_map"
 #define DATA_SAVER_ENABLED_MAP_PATH BPF_NETD_PATH "map_netd_data_saver_enabled_map"
+#define LOCAL_NET_ACCESS_MAP_PATH BPF_NETD_PATH "map_netd_local_net_access_map"
 
 #endif // __cplusplus
 
@@ -244,6 +245,18 @@ typedef struct {
     uint32_t iif[2];
 } IngressDiscardValue;
 STRUCT_SIZE(IngressDiscardValue, 2 * 4);  // 8
+
+typedef struct {
+  // Longest prefix match length in bits (value from 0 to 192).
+  uint32_t lpm_bitlen;
+  uint32_t if_index;
+  // IPv4 uses IPv4-mapped IPv6 address format.
+  struct in6_addr remote_ip6;
+  // u16 instead of u8 to avoid padding due to alignment requirement.
+  uint16_t protocol;
+  __be16 remote_port;
+} LocalNetAccessKey;
+STRUCT_SIZE(LocalNetAccessKey, 4 + 4 + 16 + 2 + 2);  // 28
 
 // Entry in the configuration map that stores which UID rules are enabled.
 #define UID_RULES_CONFIGURATION_KEY 0
