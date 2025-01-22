@@ -116,16 +116,16 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
 // programs that need to be usable by netd, but not by netutils_wrappers
 // (this is because these are currently attached by the mainline provided libnetd_updatable .so
 // which is loaded into netd and thus runs as netd uid/gid/selinux context)
-#define DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, prog_uid, prog_gid, the_prog, minKV, maxKV) \
-    DEFINE_BPF_PROG_EXT(SECTION_NAME, prog_uid, prog_gid, the_prog,                               \
+#define DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, the_prog, minKV, maxKV) \
+    DEFINE_BPF_PROG_EXT(SECTION_NAME, AID_ROOT, AID_ROOT, the_prog,                               \
                         minKV, maxKV, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, MANDATORY,            \
                         "fs_bpf_netd_readonly", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 
-#define DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv) \
-    DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, prog_uid, prog_gid, the_prog, min_kv, KVER_INF)
+#define DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, the_prog, min_kv) \
+    DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, the_prog, min_kv, KVER_INF)
 
-#define DEFINE_NETD_BPF_PROG(SECTION_NAME, prog_uid, prog_gid, the_prog) \
-    DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, prog_uid, prog_gid, the_prog, KVER_NONE)
+#define DEFINE_NETD_BPF_PROG(SECTION_NAME, the_prog) \
+    DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, the_prog, KVER_NONE)
 
 #define DEFINE_NETD_V_BPF_PROG_KVER(SECTION_NAME, the_prog, minKV)                                \
     DEFINE_BPF_PROG_EXT(SECTION_NAME, AID_ROOT, AID_ROOT, the_prog, minKV,                        \
@@ -524,13 +524,13 @@ DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_ROOT,
     return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19", AID_ROOT, AID_ROOT,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19",
                                 bpf_cgroup_ingress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_ROOT,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14",
                                 bpf_cgroup_ingress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
@@ -546,13 +546,13 @@ DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_ROOT,
     return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19", AID_ROOT, AID_ROOT,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19",
                                 bpf_cgroup_egress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14", AID_ROOT, AID_ROOT,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14",
                                 bpf_cgroup_egress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
@@ -644,14 +644,12 @@ static __always_inline inline uint8_t get_app_permissions() {
     return permissions ? *permissions : BPF_PERMISSION_INTERNET;
 }
 
-DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", AID_ROOT, AID_ROOT, inet_socket_create,
-                          KVER_4_14)
+DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", inet_socket_create, KVER_4_14)
 (__unused struct bpf_sock* sk) {
     return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? BPF_ALLOW : BPF_DISALLOW;
 }
 
-DEFINE_NETD_BPF_PROG_KVER("cgroupsockrelease/inet_release", AID_ROOT, AID_ROOT,
-                          inet_socket_release, KVER_5_10)
+DEFINE_NETD_BPF_PROG_KVER("cgroupsockrelease/inet_release", inet_socket_release, KVER_5_10)
 (struct bpf_sock* sk) {
     uint64_t cookie = bpf_get_sk_cookie(sk);
     if (cookie) bpf_cookie_tag_map_delete_elem(&cookie);
@@ -704,12 +702,12 @@ static inline __always_inline int block_port(struct bpf_sock_addr *ctx) {
     return BPF_ALLOW;
 }
 
-DEFINE_NETD_BPF_PROG_KVER("bind4/inet4_bind", AID_ROOT, AID_ROOT, inet4_bind, KVER_4_19)
+DEFINE_NETD_BPF_PROG_KVER("bind4/inet4_bind", inet4_bind, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return block_port(ctx);
 }
 
-DEFINE_NETD_BPF_PROG_KVER("bind6/inet6_bind", AID_ROOT, AID_ROOT, inet6_bind, KVER_4_19)
+DEFINE_NETD_BPF_PROG_KVER("bind6/inet6_bind", inet6_bind, KVER_4_19)
 (struct bpf_sock_addr *ctx) {
     return block_port(ctx);
 }
