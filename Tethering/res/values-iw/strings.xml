@@ -17,7 +17,7 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="tethered_notification_title" msgid="5350162111436634622">"שיתוף האינטרנט או הנקודה לשיתוף אינטרנט פעילים"</string>
-    <string name="tethered_notification_message" msgid="2338023450330652098">"יש להקיש כדי להגדיר."</string>
+    <string name="tethered_notification_message" msgid="2338023450330652098">"יש ללחוץ כדי להגדיר."</string>
     <string name="disable_tether_notification_title" msgid="3183576627492925522">"שיתוף האינטרנט בין מכשירים מושבת"</string>
     <string name="disable_tether_notification_message" msgid="6655882039707534929">"לפרטים, יש לפנות לאדמין"</string>
     <string name="notification_channel_tethering_status" msgid="7030733422705019001">"סטטוס של נקודה לשיתוף אינטרנט ושיתוף אינטרנט בין מכשירים"</string>
