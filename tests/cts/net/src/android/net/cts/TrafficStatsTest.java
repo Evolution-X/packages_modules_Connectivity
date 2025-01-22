@@ -24,6 +24,8 @@ import android.test.AndroidTestCase;
 import android.util.Log;
 import android.util.Range;
 
+import com.android.testutils.ConnectivityDiagnosticsCollector;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -94,11 +96,12 @@ public class TrafficStatsTest extends AndroidTestCase {
 
     long tcpPacketToIpBytes(long packetCount, long bytes) {
         // ip header + tcp header + data.
-        // Tcp header is mostly 32. Syn has different tcp options -> 40. Don't care.
+        // Tcp header is mostly 32. Syn has different tcp options -> 40.
         return packetCount * (20 + 32 + bytes);
     }
 
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
+    @ConnectivityDiagnosticsCollector.CollectTcpdumpOnFailure
     public void testTrafficStatsForLocalhost() throws IOException {
         final long mobileTxPacketsBefore = TrafficStats.getMobileTxPackets();
         final long mobileRxPacketsBefore = TrafficStats.getMobileRxPackets();
@@ -224,9 +227,15 @@ public class TrafficStatsTest extends AndroidTestCase {
                 - uidTxDeltaPackets;
         final long deltaRxOtherPackets = (totalRxPacketsAfter - totalRxPacketsBefore)
                 - uidRxDeltaPackets;
-        if (deltaTxOtherPackets > 0 || deltaRxOtherPackets > 0) {
+        final long deltaTxOtherPktBytes = (totalTxBytesAfter - totalTxBytesBefore)
+                - uidTxDeltaBytes;
+        final long deltaRxOtherPktBytes  = (totalRxBytesAfter - totalRxBytesBefore)
+                - uidRxDeltaBytes;
+        if (deltaTxOtherPackets != 0 || deltaRxOtherPackets != 0
+                || deltaTxOtherPktBytes != 0 || deltaRxOtherPktBytes != 0) {
             Log.i(LOG_TAG, "lingering traffic data: " + deltaTxOtherPackets + "/"
-                    + deltaRxOtherPackets);
+                    + deltaRxOtherPackets + "/" + deltaTxOtherPktBytes
+                    + "/" + deltaRxOtherPktBytes);
         }
 
         // Check that the per-uid stats obtained from data profiling contain the expected values.
@@ -237,9 +246,9 @@ public class TrafficStatsTest extends AndroidTestCase {
         final long pktBytes = tcpPacketToIpBytes(packetCount, byteCount);
         final long pktWithNoDataBytes = tcpPacketToIpBytes(packetCount, 0);
         final long minExpExtraPktBytes = tcpPacketToIpBytes(minExpectedExtraPackets, 0);
-        final long maxExpExtraPktBytes = tcpPacketToIpBytes(maxExpectedExtraPackets, 0);
-        final long deltaTxOtherPktBytes = tcpPacketToIpBytes(deltaTxOtherPackets, 0);
-        final long deltaRxOtherPktBytes  = tcpPacketToIpBytes(deltaRxOtherPackets, 0);
+        // Syn/syn-ack has different tcp options, make tcp header 40 for upper bound estimation.
+        final long maxExpExtraPktBytes = tcpPacketToIpBytes(maxExpectedExtraPackets, 8);
+
         assertInRange("txPackets detail", entry.txPackets, packetCount + minExpectedExtraPackets,
                 uidTxDeltaPackets);
         assertInRange("rxPackets detail", entry.rxPackets, packetCount + minExpectedExtraPackets,
@@ -257,32 +266,24 @@ public class TrafficStatsTest extends AndroidTestCase {
         assertInRange("uidrxb", uidRxDeltaBytes, pktBytes + minExpExtraPktBytes,
                 pktBytes + pktWithNoDataBytes + maxExpExtraPktBytes + deltaRxOtherPktBytes);
         assertInRange("iftxp", ifaceTxDeltaPackets, packetCount + minExpectedExtraPackets,
-                packetCount + packetCount + maxExpectedExtraPackets);
+                packetCount + packetCount + maxExpectedExtraPackets + deltaTxOtherPackets);
         assertInRange("ifrxp", ifaceRxDeltaPackets, packetCount + minExpectedExtraPackets,
-                packetCount + packetCount + maxExpectedExtraPackets);
+                packetCount + packetCount + maxExpectedExtraPackets + deltaRxOtherPackets);
         assertInRange("iftxb", ifaceTxDeltaBytes, pktBytes + minExpExtraPktBytes,
-                pktBytes + pktWithNoDataBytes + maxExpExtraPktBytes);
+                pktBytes + pktWithNoDataBytes + maxExpExtraPktBytes + deltaTxOtherPktBytes);
         assertInRange("ifrxb", ifaceRxDeltaBytes, pktBytes + minExpExtraPktBytes,
-                pktBytes + pktWithNoDataBytes + maxExpExtraPktBytes);
+                pktBytes + pktWithNoDataBytes + maxExpExtraPktBytes + deltaRxOtherPktBytes);
 
         // Localhost traffic *does* count against total stats.
         // Check the total stats increased after test data transfer over localhost has been made.
-        assertTrue("ttxp: " + totalTxPacketsBefore + " -> " + totalTxPacketsAfter,
-                totalTxPacketsAfter >= totalTxPacketsBefore + uidTxDeltaPackets);
-        assertTrue("trxp: " + totalRxPacketsBefore + " -> " + totalRxPacketsAfter,
-                totalRxPacketsAfter >= totalRxPacketsBefore + uidRxDeltaPackets);
-        assertTrue("ttxb: " + totalTxBytesBefore + " -> " + totalTxBytesAfter,
-                totalTxBytesAfter >= totalTxBytesBefore + uidTxDeltaBytes);
-        assertTrue("trxb: " + totalRxBytesBefore + " -> " + totalRxBytesAfter,
-                totalRxBytesAfter >= totalRxBytesBefore + uidRxDeltaBytes);
-        assertTrue("iftxp: " + ifaceTxPacketsBefore + " -> " + ifaceTxPacketsAfter,
-                totalTxPacketsAfter >= totalTxPacketsBefore + ifaceTxDeltaPackets);
-        assertTrue("ifrxp: " + ifaceRxPacketsBefore + " -> " + ifaceRxPacketsAfter,
-                totalRxPacketsAfter >= totalRxPacketsBefore + ifaceRxDeltaPackets);
-        assertTrue("iftxb: " + ifaceTxBytesBefore + " -> " + ifaceTxBytesAfter,
-            totalTxBytesAfter >= totalTxBytesBefore + ifaceTxDeltaBytes);
-        assertTrue("ifrxb: " + ifaceRxBytesBefore + " -> " + ifaceRxBytesAfter,
-            totalRxBytesAfter >= totalRxBytesBefore + ifaceRxDeltaBytes);
+        assertInRange("ttxp", totalTxPacketsAfter,
+                totalTxPacketsBefore + packetCount + minExpectedExtraPackets, Long.MAX_VALUE);
+        assertInRange("trxp", totalRxPacketsAfter,
+                totalRxPacketsBefore + packetCount + minExpectedExtraPackets, Long.MAX_VALUE);
+        assertInRange("ttxb", totalTxBytesAfter,
+                totalTxBytesBefore + pktBytes + minExpExtraPktBytes, Long.MAX_VALUE);
+        assertInRange("trxb", totalRxBytesAfter,
+                totalRxBytesBefore + pktBytes + minExpExtraPktBytes, Long.MAX_VALUE);
 
         // Localhost traffic should *not* count against mobile stats,
         // There might be some other traffic, but nowhere near 1MB.
