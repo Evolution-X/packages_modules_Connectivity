@@ -391,7 +391,8 @@ static __always_inline inline bool ingress_should_discard(struct __sk_buff* skb,
 
 static __always_inline inline int bpf_owner_match(struct __sk_buff* skb, uint32_t uid,
                                                   const struct egress_bool egress,
-                                                  const struct kver_uint kver) {
+                                                  const struct kver_uint kver,
+                                                  const struct sdk_level_uint lvl) {
     if (is_system_uid(uid)) return PASS;
 
     if (skip_owner_match(skb, egress, kver)) return PASS;
@@ -421,6 +422,11 @@ static __always_inline inline int bpf_owner_match(struct __sk_buff* skb, uint32_
             return DROP_UNLESS_DNS;
         }
     }
+
+    if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && skb->ifindex == 1) {
+        // TODO: sdksandbox localhost restrictions
+    }
+
     return PASS;
 }
 
@@ -468,7 +474,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
     // CLAT daemon receives via an untagged AF_PACKET socket.
     if (egress.egress && uid == AID_CLAT) return PASS;
 
-    int match = bpf_owner_match(skb, sock_uid, egress, kver);
+    int match = bpf_owner_match(skb, sock_uid, egress, kver, lvl);
 
 // Workaround for secureVPN with VpnIsolation enabled, refer to b/159994981 for details.
 // Keep TAG_SYSTEM_DNS in sync with DnsResolver/include/netd_resolv/resolv.h
