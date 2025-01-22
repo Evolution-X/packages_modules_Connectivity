@@ -441,7 +441,8 @@ static __always_inline inline void update_stats_with_config(const uint32_t selec
 static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
                                                       const struct egress_bool egress,
                                                       const bool enable_tracing,
-                                                      const struct kver_uint kver) {
+                                                      const struct kver_uint kver,
+                                                      const struct sdk_level_uint lvl) {
     // sock_uid will be 'overflowuid' if !sk_fullsock(sk_to_full_sk(skb->sk))
     uint32_t sock_uid = bpf_get_socket_uid(skb);
 
@@ -483,6 +484,10 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
         if (match == DROP_UNLESS_DNS) match = DROP;
     }
 
+    if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && (match != DROP)) {
+        // TODO: implement local network blocking
+    }
+
     // If an outbound packet is going to be dropped, we do not count that traffic.
     if (egress.egress && (match == DROP)) return DROP;
 
@@ -516,19 +521,19 @@ DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_8);
+    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_8, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19", AID_ROOT, AID_SYSTEM,
                                 bpf_cgroup_ingress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_4_19);
+    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_SYSTEM,
                                 bpf_cgroup_ingress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE);
+    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
 }
 
 // Tracing on Android U+ 5.8+
@@ -538,19 +543,19 @@ DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
                     "fs_bpf_netd_readonly", "",
                     LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_8);
+    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_8, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19", AID_ROOT, AID_SYSTEM,
                                 bpf_cgroup_egress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_4_19);
+    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14", AID_ROOT, AID_SYSTEM,
                                 bpf_cgroup_egress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_NONE);
+    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
 }
 
 // WARNING: Android T's non-updatable netd depends on the name of this program.
