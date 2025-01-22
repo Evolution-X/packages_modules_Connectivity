@@ -515,7 +515,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
 }
 
 // Tracing on Android U+ 5.10+
-DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
+DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_ROOT,
                     bpf_cgroup_ingress_trace, KVER_5_10, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
@@ -524,20 +524,20 @@ DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_SYSTEM,
     return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19", AID_ROOT, AID_SYSTEM,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19", AID_ROOT, AID_ROOT,
                                 bpf_cgroup_ingress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_SYSTEM,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14", AID_ROOT, AID_ROOT,
                                 bpf_cgroup_ingress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
 }
 
 // Tracing on Android U+ 5.10+
-DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
+DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_ROOT,
                     bpf_cgroup_egress_trace, KVER_5_10, KVER_INF,
                     BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
                     "fs_bpf_netd_readonly", "",
@@ -546,13 +546,13 @@ DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_SYSTEM,
     return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19", AID_ROOT, AID_SYSTEM,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19", AID_ROOT, AID_ROOT,
                                 bpf_cgroup_egress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
 }
 
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14", AID_ROOT, AID_SYSTEM,
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14", AID_ROOT, AID_ROOT,
                                 bpf_cgroup_egress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
