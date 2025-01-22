@@ -235,8 +235,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
-                anyInt(), anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
     }
 
     @Test
@@ -309,8 +309,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
-                anyInt(), anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
     }
 
     @Test
@@ -387,8 +387,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
-                anyInt(), anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
     }
 
     @Test
@@ -606,8 +606,8 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never()).logCTLogListUpdateFailedEventWithDownloadStatus(
-                anyInt(), anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
     }
 
     @Test
@@ -793,7 +793,7 @@ public class CertificateTransparencyDownloaderTest {
         try (InputStream fileStream = new FileInputStream(file);
                 OutputStream outputStream = new FileOutputStream(signatureFile)) {
             signer.update(fileStream.readAllBytes());
-            outputStream.write(signer.sign());
+            outputStream.write(Base64.getEncoder().encode(signer.sign()));
         }
 
         return signatureFile;
