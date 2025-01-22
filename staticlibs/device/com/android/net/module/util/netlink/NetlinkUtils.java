@@ -83,7 +83,7 @@ public class NetlinkUtils {
     public static final int INET_DIAG_INFO = 2;
     public static final int INET_DIAG_MARK = 15;
 
-    public static final long IO_TIMEOUT_MS = 300L;
+    public static final long IO_TIMEOUT_MS = 3000L;
 
     public static final int DEFAULT_RECV_BUFSIZE = 8 * 1024;
     public static final int SOCKET_RECV_BUFSIZE = 64 * 1024;
