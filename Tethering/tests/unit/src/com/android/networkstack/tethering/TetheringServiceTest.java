@@ -219,7 +219,7 @@ public final class TetheringServiceTest {
         mTetheringConnector.tether(TEST_IFACE_NAME, TEST_CALLER_PKG, TEST_ATTRIBUTION_TAG, result);
         verify(mTethering).isTetheringSupported();
         verify(mTethering).isTetheringAllowed();
-        verify(mTethering).tether(TEST_IFACE_NAME, IpServer.STATE_TETHERED, result);
+        verify(mTethering).legacyTether(TEST_IFACE_NAME, IpServer.STATE_TETHERED, result);
     }
 
     @Test
@@ -267,7 +267,7 @@ public final class TetheringServiceTest {
                 result);
         verify(mTethering).isTetheringSupported();
         verify(mTethering).isTetheringAllowed();
-        verify(mTethering).untether(eq(TEST_IFACE_NAME), eq(result));
+        verify(mTethering).legacyUntether(eq(TEST_IFACE_NAME), eq(result));
     }
 
     @Test
@@ -661,7 +661,7 @@ public final class TetheringServiceTest {
         mTetheringConnector.stopAllTethering(TEST_CALLER_PKG, TEST_ATTRIBUTION_TAG, result);
         verify(mTethering).isTetheringSupported();
         verify(mTethering).isTetheringAllowed();
-        verify(mTethering).untetherAll();
+        verify(mTethering).stopAllTethering();
         result.assertResult(TETHER_ERROR_NO_ERROR);
     }
 
