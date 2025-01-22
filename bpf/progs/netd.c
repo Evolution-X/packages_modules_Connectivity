@@ -116,10 +116,13 @@ DEFINE_BPF_MAP_RO_NETD(data_saver_enabled_map, ARRAY, uint32_t, bool,
 // programs that need to be usable by netd, but not by netutils_wrappers
 // (this is because these are currently attached by the mainline provided libnetd_updatable .so
 // which is loaded into netd and thus runs as netd uid/gid/selinux context)
-#define DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, the_prog, minKV, maxKV) \
+#define DEFINE_NETD_BPF_PROG_RANGES(SECTION_NAME, the_prog, minKV, maxKV, min_loader, max_loader) \
     DEFINE_BPF_PROG_EXT(SECTION_NAME, AID_ROOT, AID_ROOT, the_prog,                               \
-                        minKV, maxKV, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER, MANDATORY,            \
+                        minKV, maxKV, min_loader, max_loader, MANDATORY,                          \
                         "fs_bpf_netd_readonly", "", LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+
+#define DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, the_prog, minKV, maxKV) \
+    DEFINE_NETD_BPF_PROG_RANGES(SECTION_NAME, the_prog, minKV, maxKV, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER)
 
 #define DEFINE_NETD_BPF_PROG_KVER(SECTION_NAME, the_prog, min_kv) \
     DEFINE_NETD_BPF_PROG_KVER_RANGE(SECTION_NAME, the_prog, min_kv, KVER_INF)
@@ -515,11 +518,9 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
 }
 
 // Tracing on Android U+ 5.10+
-DEFINE_BPF_PROG_EXT("cgroupskb/ingress/stats$trace", AID_ROOT, AID_ROOT,
-                    bpf_cgroup_ingress_trace, KVER_5_10, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
-                    "fs_bpf_netd_readonly", "",
-                    LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/ingress/stats$trace",
+                            bpf_cgroup_ingress_trace, KVER_5_10, KVER_INF,
+                            BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
@@ -537,11 +538,9 @@ DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14",
 }
 
 // Tracing on Android U+ 5.10+
-DEFINE_BPF_PROG_EXT("cgroupskb/egress/stats$trace", AID_ROOT, AID_ROOT,
-                    bpf_cgroup_egress_trace, KVER_5_10, KVER_INF,
-                    BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER, MANDATORY,
-                    "fs_bpf_netd_readonly", "",
-                    LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/egress/stats$trace",
+                            bpf_cgroup_egress_trace, KVER_5_10, KVER_INF,
+                            BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER)
 (struct __sk_buff* skb) {
     return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
 }
