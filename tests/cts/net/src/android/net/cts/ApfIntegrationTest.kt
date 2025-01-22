@@ -53,6 +53,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
 import android.os.UserManager
+import android.os.SystemProperties
 import android.platform.test.annotations.AppModeFull
 import android.provider.DeviceConfig
 import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
@@ -423,6 +424,10 @@ class ApfIntegrationTest {
         assume().that(caps.apfVersionSupported).isAtLeast(version)
     }
 
+    fun assumeNotCuttlefish() {
+        assume().that(SystemProperties.get("ro.product.board", "")).isNotEqualTo("cutf")
+    }
+
     fun installProgram(bytes: ByteArray) {
         val prog = bytes.toHexString()
         val result = runShellCommandOrThrow("cmd network_stack apf $ifname install $prog").trim()
@@ -506,6 +511,7 @@ class ApfIntegrationTest {
         // should be turned on.
         assume().that(getVsrApiLevel()).isAtLeast(34)
         assumeApfVersionSupportAtLeast(4)
+        assumeNotCuttlefish()
 
         // clear any active APF filter
         clearApfMemory()
@@ -558,6 +564,7 @@ class ApfIntegrationTest {
         assume().that(getVsrApiLevel()).isAtLeast(34)
         // Test v4 memory slots on both v4 and v6 interpreters.
         assumeApfVersionSupportAtLeast(4)
+        assumeNotCuttlefish()
         clearApfMemory()
         val gen = ApfV4Generator(
                 caps.apfVersionSupported,
@@ -616,6 +623,7 @@ class ApfIntegrationTest {
         // should be turned on.
         assume().that(getVsrApiLevel()).isAtLeast(34)
         assumeApfVersionSupportAtLeast(4)
+        assumeNotCuttlefish()
         clearApfMemory()
         val gen = ApfV4Generator(
                 caps.apfVersionSupported,
@@ -658,6 +666,7 @@ class ApfIntegrationTest {
     @Test
     fun testFilterAge16384thsIncreasesBetweenPackets() {
         assumeApfVersionSupportAtLeast(6000)
+        assumeNotCuttlefish()
         clearApfMemory()
         val gen = ApfV6Generator(
                 caps.apfVersionSupported,
@@ -707,6 +716,7 @@ class ApfIntegrationTest {
     @Test
     fun testReplyPing() {
         assumeApfVersionSupportAtLeast(6000)
+        assumeNotCuttlefish()
         installProgram(ByteArray(caps.maximumApfProgramSize) { 0 }) // Clear previous program
         readProgram() // Ensure installation is complete
 
