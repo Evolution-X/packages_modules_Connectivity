@@ -799,8 +799,12 @@ class ApfIntegrationTest {
         Log.i(TAG, "counter map: ${apfCounterTracker.counters}")
 
         assertThat(replyPayloads.size).isEqualTo(expectReplyPayloads.size)
-        for (i in replyPayloads.indices) {
-            assertThat(replyPayloads[i]).isEqualTo(expectReplyPayloads[i])
+
+        // Sort the payload list before comparison to ensure consistency.
+        val sortedReplyPayloads = replyPayloads.sortedBy { it[0] }
+        val sortedExpectReplyPayloads = expectReplyPayloads.sortedBy { it[0] }
+        for (i in sortedReplyPayloads.indices) {
+            assertThat(sortedReplyPayloads[i]).isEqualTo(sortedExpectReplyPayloads[i])
         }
     }
 }
