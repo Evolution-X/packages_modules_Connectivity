@@ -25,10 +25,6 @@ static const int DROP = 0;
 static const int PASS = 1;
 static const int DROP_UNLESS_DNS = 2;  // internal to our program
 
-// Used for 'bool enable_tracing'
-static const bool TRACE_ON = true;
-static const bool TRACE_OFF = false;
-
 // offsetof(struct iphdr, ihl) -- but that's a bitfield
 #define IPPROTO_IHL_OFF 0
 
@@ -236,9 +232,8 @@ static __always_inline inline int bpf_skb_load_bytes_net(const struct __sk_buff*
 
 static __always_inline inline void do_packet_tracing(
         const struct __sk_buff* const skb, const struct egress_bool egress, const uint32_t uid,
-        const uint32_t tag, const bool enable_tracing, const struct kver_uint kver) {
-    if (!enable_tracing) return;
-    if (!KVER_IS_AT_LEAST(kver, 5, 8, 0)) return;
+        const uint32_t tag, const struct kver_uint kver) {
+    if (!KVER_IS_AT_LEAST(kver, 5, 10, 0)) return;
 
     uint32_t mapKey = 0;
     bool* traceConfig = bpf_packet_trace_enabled_map_lookup_elem(&mapKey);
@@ -443,7 +438,6 @@ static __always_inline inline void update_stats_with_config(const uint32_t selec
 
 static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
                                                       const struct egress_bool egress,
-                                                      const bool enable_tracing,
                                                       const struct kver_uint kver,
                                                       const struct sdk_level_uint lvl) {
     // sock_uid will be 'overflowuid' if !sk_fullsock(sk_to_full_sk(skb->sk))
@@ -504,7 +498,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
 
     if (!selectedMap) return PASS;  // cannot happen, needed to keep bpf verifier happy
 
-    do_packet_tracing(skb, egress, uid, tag, enable_tracing, kver);
+    do_packet_tracing(skb, egress, uid, tag, kver);
     update_stats_with_config(*selectedMap, skb, &key, egress, kver);
     update_app_uid_stats_map(skb, &uid, egress, kver);
 
@@ -522,19 +516,19 @@ DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/ingress/stats$trace",
                             bpf_cgroup_ingress_trace, KVER_5_10, KVER_INF,
                             BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
+    return bpf_traffic_account(skb, INGRESS, KVER_5_10, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19",
                                 bpf_cgroup_ingress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
+    return bpf_traffic_account(skb, INGRESS, KVER_4_19, SDK_LEVEL_NONE);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_14",
                                 bpf_cgroup_ingress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
+    return bpf_traffic_account(skb, INGRESS, KVER_NONE, SDK_LEVEL_NONE);
 }
 
 // Tracing on Android U+ 5.10+
@@ -542,19 +536,19 @@ DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/egress/stats$trace",
                             bpf_cgroup_egress_trace, KVER_5_10, KVER_INF,
                             BPFLOADER_MAINLINE_U_VERSION, BPFLOADER_MAX_VER)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_ON, KVER_5_10, SDK_LEVEL_U);
+    return bpf_traffic_account(skb, EGRESS, KVER_5_10, SDK_LEVEL_U);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19",
                                 bpf_cgroup_egress_4_19, KVER_4_19, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_4_19, SDK_LEVEL_NONE);
+    return bpf_traffic_account(skb, EGRESS, KVER_4_19, SDK_LEVEL_NONE);
 }
 
 DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_14",
                                 bpf_cgroup_egress_4_14, KVER_NONE, KVER_4_19)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, TRACE_OFF, KVER_NONE, SDK_LEVEL_NONE);
+    return bpf_traffic_account(skb, EGRESS, KVER_NONE, SDK_LEVEL_NONE);
 }
 
 // WARNING: Android T's non-updatable netd depends on the name of this program.
