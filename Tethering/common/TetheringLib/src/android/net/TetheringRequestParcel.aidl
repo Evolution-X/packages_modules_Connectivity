@@ -24,6 +24,7 @@ import android.net.wifi.SoftApConfiguration;
  * @hide
  */
 parcelable TetheringRequestParcel {
+    int requestType;
     int tetheringType;
     LinkAddress localIPv4Address;
     LinkAddress staticClientAddress;

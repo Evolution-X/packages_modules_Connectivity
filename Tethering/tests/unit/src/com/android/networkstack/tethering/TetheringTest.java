@@ -2098,7 +2098,7 @@ public class TetheringTest {
 
         verify(mNotificationUpdater, times(expectedInteractionsWithShowNotification))
                 .notifyTetheringDisabledByRestriction();
-        verify(mockTethering, times(expectedInteractionsWithShowNotification)).untetherAll();
+        verify(mockTethering, times(expectedInteractionsWithShowNotification)).stopAllTethering();
     }
 
     @Test
@@ -3426,7 +3426,7 @@ public class TetheringTest {
         mTethering.interfaceStatusChanged(TEST_BT_IFNAME, false);
         mTethering.interfaceStatusChanged(TEST_BT_IFNAME, true);
         final ResultListener tetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
-        mTethering.tether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
+        mTethering.legacyTether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
         mLooper.dispatchAll();
         tetherResult.assertHasResult();
 
@@ -3446,7 +3446,7 @@ public class TetheringTest {
         mTethering.stopTethering(TETHERING_BLUETOOTH);
         mLooper.dispatchAll();
         final ResultListener untetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
-        mTethering.untether(TEST_BT_IFNAME, untetherResult);
+        mTethering.legacyUntether(TEST_BT_IFNAME, untetherResult);
         mLooper.dispatchAll();
         untetherResult.assertHasResult();
         verifySetBluetoothTethering(false /* enable */, false /* bindToPanService */);
@@ -3476,7 +3476,7 @@ public class TetheringTest {
             mTethering.interfaceStatusChanged(TEST_BT_IFNAME, false);
             mTethering.interfaceStatusChanged(TEST_BT_IFNAME, true);
             final ResultListener tetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
-            mTethering.tether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
+            mTethering.legacyTether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
             mLooper.dispatchAll();
             tetherResult.assertHasResult();
         }
