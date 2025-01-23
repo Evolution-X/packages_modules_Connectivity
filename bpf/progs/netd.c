@@ -252,6 +252,42 @@ static inline __always_inline __unused bool is_local_net_access_allowed(const ui
     return v ? *v : true;
 }
 
+static __always_inline inline bool should_block_local_network_packets(struct __sk_buff *skb,
+                                   const struct kver_uint kver) {
+    struct in6_addr remote_ip6;
+    uint8_t ip_proto;
+    uint8_t L4_off;
+    if (skb->protocol == htons(ETH_P_IP)) {
+        remote_ip6.s6_addr32[0] = 0;
+        remote_ip6.s6_addr32[1] = 0;
+        remote_ip6.s6_addr32[2] = htonl(0xFFFF);
+        (void)bpf_skb_load_bytes_net(skb, IP4_OFFSET(daddr), &remote_ip6.s6_addr32[3], 4, kver);
+        (void)bpf_skb_load_bytes_net(skb, IP4_OFFSET(protocol), &ip_proto, sizeof(ip_proto), kver);
+        uint8_t ihl;
+        (void)bpf_skb_load_bytes_net(skb, IPPROTO_IHL_OFF, &ihl, sizeof(ihl), kver);
+        L4_off = (ihl & 0x0F) * 4;  // IHL calculation.
+    } else if (skb->protocol == htons(ETH_P_IPV6)) {
+        (void)bpf_skb_load_bytes_net(skb, IP6_OFFSET(daddr), &remote_ip6, sizeof(remote_ip6), kver);
+        (void)bpf_skb_load_bytes_net(skb, IP6_OFFSET(nexthdr), &ip_proto, sizeof(ip_proto), kver);
+        L4_off = sizeof(struct ipv6hdr);
+    } else {
+        return false;
+    }
+
+    __be16 port = 0;
+    switch (ip_proto) {
+      case IPPROTO_TCP:
+      case IPPROTO_DCCP:
+      case IPPROTO_UDP:
+      case IPPROTO_UDPLITE:
+      case IPPROTO_SCTP:
+        (void)bpf_skb_load_bytes_net(skb, L4_off + 2, &port, sizeof(port), kver);
+        break;
+    }
+
+    return !is_local_net_access_allowed(skb->ifindex, &remote_ip6, ip_proto, port);
+}
+
 static __always_inline inline void do_packet_tracing(
         const struct __sk_buff* const skb, const struct egress_bool egress, const uint32_t uid,
         const uint32_t tag, const struct kver_uint kver) {
@@ -510,7 +546,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
     }
 
     if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && (match != DROP)) {
-        // TODO: implement local network blocking
+        if (egress.egress && should_block_local_network_packets(skb, kver)) match = DROP;
     }
 
     // If an outbound packet is going to be dropped, we do not count that traffic.
