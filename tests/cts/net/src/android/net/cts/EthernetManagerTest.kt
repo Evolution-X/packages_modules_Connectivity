@@ -1069,6 +1069,9 @@ class EthernetManagerTest {
 
     @Test
     fun testSetTetheringInterfaceMode_disableEnableEthernet() {
+        // do not run this test if an interface that can be used for tethering already exists.
+        assumeNoInterfaceForTetheringAvailable()
+
         val listener = EthernetStateListener()
         addInterfaceStateListener(listener)
 
