@@ -186,6 +186,7 @@ ASSERT_STRING_EQUAL(XT_BPF_DENYLIST_PROG_PATH,  BPF_NETD_PATH "prog_netd_skfilte
 #define PACKET_TRACE_ENABLED_MAP_PATH BPF_NETD_PATH "map_netd_packet_trace_enabled_map"
 #define DATA_SAVER_ENABLED_MAP_PATH BPF_NETD_PATH "map_netd_data_saver_enabled_map"
 #define LOCAL_NET_ACCESS_MAP_PATH BPF_NETD_PATH "map_netd_local_net_access_map"
+#define LOCAL_NET_BLOCKED_UID_MAP_PATH BPF_NETD_PATH "map_netd_local_net_blocked_uid_map"
 
 #endif // __cplusplus
 
