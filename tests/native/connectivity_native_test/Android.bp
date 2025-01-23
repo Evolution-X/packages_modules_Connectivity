@@ -24,7 +24,6 @@ cc_test {
         "libcom.android.tethering.connectivity_native",
         "liblog",
         "libnetutils",
-        "libprocessgroup",
     ],
     static_libs: [
         "connectivity_native_aidl_interface-lateststable-ndk",
