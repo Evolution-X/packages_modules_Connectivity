@@ -16,14 +16,14 @@
 
 package com.android.server.net.ct;
 
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DEVICE_OFFLINE;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DOWNLOAD_CANNOT_RESUME;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_TOO_MANY_REDIRECTS;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__PENDING_WAITING_FOR_WIFI;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_DEVICE_OFFLINE;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_DOWNLOAD_CANNOT_RESUME;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_NO_DISK_SPACE;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_TOO_MANY_REDIRECTS;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_UNKNOWN;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__PENDING_WAITING_FOR_WIFI;
 
 import android.app.DownloadManager;
 
@@ -45,11 +45,12 @@ class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger
     public void logCTLogListUpdateFailedEvent(
             int failureReason, int failureCount, int httpErrorStatusCode) {
         CertificateTransparencyStatsLog.write(
-                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED,
+                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED,
                 failureReason,
                 failureCount,
-                httpErrorStatusCode
-        );
+                httpErrorStatusCode,
+                /* signature= */ "",
+                /* logListTimestampMs= */ 0);
     }
 
     /** Converts DownloadStatus reason into failure reason to log. */
@@ -57,21 +58,20 @@ class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger
         switch (downloadStatusReason) {
             case DownloadManager.PAUSED_WAITING_TO_RETRY:
             case DownloadManager.PAUSED_WAITING_FOR_NETWORK:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DEVICE_OFFLINE;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_DEVICE_OFFLINE;
             case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
             case DownloadManager.ERROR_HTTP_DATA_ERROR:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_HTTP_ERROR;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR;
             case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_TOO_MANY_REDIRECTS;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_TOO_MANY_REDIRECTS;
             case DownloadManager.ERROR_CANNOT_RESUME:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_DOWNLOAD_CANNOT_RESUME;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_DOWNLOAD_CANNOT_RESUME;
             case DownloadManager.ERROR_INSUFFICIENT_SPACE:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_NO_DISK_SPACE;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_NO_DISK_SPACE;
             case DownloadManager.PAUSED_QUEUED_FOR_WIFI:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__PENDING_WAITING_FOR_WIFI;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__PENDING_WAITING_FOR_WIFI;
             default:
-                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_FAILED__FAILURE_REASON__FAILURE_UNKNOWN;
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_UNKNOWN;
         }
     }
-
 }
