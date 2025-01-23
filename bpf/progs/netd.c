@@ -235,10 +235,8 @@ static __always_inline inline int bpf_skb_load_bytes_net(const struct __sk_buff*
         : bpf_skb_load_bytes(skb, L3_off, to, len);
 }
 
-/*
- * False iff arguments are found with longest prefix match lookup and disallowed.
- */
-static inline __always_inline __unused bool is_local_net_access_allowed(const uint32_t if_index,
+// False iff arguments are found with longest prefix match lookup and disallowed.
+static inline __always_inline bool is_local_net_access_allowed(const uint32_t if_index,
         const struct in6_addr* remote_ip6, const uint16_t protocol, const __be16 remote_port) {
     LocalNetAccessKey query_key = {
         .lpm_bitlen = 8 * (sizeof(if_index) + sizeof(*remote_ip6) + sizeof(protocol)
@@ -252,40 +250,44 @@ static inline __always_inline __unused bool is_local_net_access_allowed(const ui
     return v ? *v : true;
 }
 
-static __always_inline inline bool should_block_local_network_packets(struct __sk_buff *skb,
-                                   const struct kver_uint kver) {
+static __always_inline inline
+bool should_block_local_network_packets(struct __sk_buff *skb,
+                                        const struct egress_bool egress,
+                                        const struct kver_uint kver) {
     struct in6_addr remote_ip6;
     uint8_t ip_proto;
     uint8_t L4_off;
     if (skb->protocol == htons(ETH_P_IP)) {
+        int remote_ip_ofs = egress.egress ? IP4_OFFSET(daddr) : IP4_OFFSET(saddr);
         remote_ip6.s6_addr32[0] = 0;
         remote_ip6.s6_addr32[1] = 0;
         remote_ip6.s6_addr32[2] = htonl(0xFFFF);
-        (void)bpf_skb_load_bytes_net(skb, IP4_OFFSET(daddr), &remote_ip6.s6_addr32[3], 4, kver);
+        (void)bpf_skb_load_bytes_net(skb, remote_ip_ofs, &remote_ip6.s6_addr32[3], 4, kver);
         (void)bpf_skb_load_bytes_net(skb, IP4_OFFSET(protocol), &ip_proto, sizeof(ip_proto), kver);
         uint8_t ihl;
         (void)bpf_skb_load_bytes_net(skb, IPPROTO_IHL_OFF, &ihl, sizeof(ihl), kver);
         L4_off = (ihl & 0x0F) * 4;  // IHL calculation.
     } else if (skb->protocol == htons(ETH_P_IPV6)) {
-        (void)bpf_skb_load_bytes_net(skb, IP6_OFFSET(daddr), &remote_ip6, sizeof(remote_ip6), kver);
+        int remote_ip_ofs = egress.egress ? IP6_OFFSET(daddr) : IP6_OFFSET(saddr);
+        (void)bpf_skb_load_bytes_net(skb, remote_ip_ofs, &remote_ip6, sizeof(remote_ip6), kver);
         (void)bpf_skb_load_bytes_net(skb, IP6_OFFSET(nexthdr), &ip_proto, sizeof(ip_proto), kver);
         L4_off = sizeof(struct ipv6hdr);
     } else {
         return false;
     }
 
-    __be16 port = 0;
+    __be16 remote_port = 0;
     switch (ip_proto) {
       case IPPROTO_TCP:
       case IPPROTO_DCCP:
       case IPPROTO_UDP:
       case IPPROTO_UDPLITE:
       case IPPROTO_SCTP:
-        (void)bpf_skb_load_bytes_net(skb, L4_off + 2, &port, sizeof(port), kver);
+        (void)bpf_skb_load_bytes_net(skb, L4_off + (egress.egress ? 2 : 0), &remote_port, sizeof(remote_port), kver);
         break;
     }
 
-    return !is_local_net_access_allowed(skb->ifindex, &remote_ip6, ip_proto, port);
+    return !is_local_net_access_allowed(skb->ifindex, &remote_ip6, ip_proto, remote_port);
 }
 
 static __always_inline inline void do_packet_tracing(
@@ -546,7 +548,7 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
     }
 
     if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && (match != DROP)) {
-        if (egress.egress && should_block_local_network_packets(skb, kver)) match = DROP;
+        if (should_block_local_network_packets(skb, egress, kver)) match = DROP;
     }
 
     // If an outbound packet is going to be dropped, we do not count that traffic.
