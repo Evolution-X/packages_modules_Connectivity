@@ -20,7 +20,9 @@
 #include <set>
 #include <string>
 
+#include <android-base/properties.h>
 #include <android-modules-utils/sdk_level.h>
+#include <android/api-level.h>
 #include <bpf/BpfUtils.h>
 
 #include <gtest/gtest.h>
@@ -45,6 +47,11 @@ using android::modules::sdklevel::IsAtLeastV;
 
 class BpfExistenceTest : public ::testing::Test {
 };
+
+//ToDo: replace isAtLeast25Q2 with IsAtLeastB once sdk_level have been upgraded to 36 on aosp/main
+const bool unreleased = (android::base::GetProperty("ro.build.version.codename", "REL") != "REL");
+const int api_level = unreleased ? __ANDROID_API_FUTURE__ : android_get_device_api_level();
+const bool isAtLeast25Q2 = (api_level > __ANDROID_API_V__);
 
 // Part of Android R platform (for 4.9+), but mainlined in S
 static const set<string> PLATFORM_ONLY_IN_R = {
@@ -159,6 +166,11 @@ static const set<string> MAINLINE_FOR_V_5_4_PLUS = {
     NETD "prog_netd_setsockopt_prog",
 };
 
+// Provided by *current* mainline module for 25Q2+ devices
+static const set<string> MAINLINE_FOR_25Q2_PLUS = {
+    NETD "map_netd_local_net_access_map",
+};
+
 static void addAll(set<string>& a, const set<string>& b) {
     a.insert(b.begin(), b.end());
 }
@@ -208,6 +220,9 @@ TEST_F(BpfExistenceTest, TestPrograms) {
     if (IsAtLeastV()) ASSERT_TRUE(isAtLeastKernelVersion(4, 19, 0));
     DO_EXPECT(IsAtLeastV(), MAINLINE_FOR_V_PLUS);
     DO_EXPECT(IsAtLeastV() && isAtLeastKernelVersion(5, 4, 0), MAINLINE_FOR_V_5_4_PLUS);
+
+    if (isAtLeast25Q2) ASSERT_TRUE(isAtLeastKernelVersion(5, 4, 0));
+    DO_EXPECT(isAtLeast25Q2, MAINLINE_FOR_25Q2_PLUS);
 
     for (const auto& file : mustExist) {
         EXPECT_EQ(0, access(file.c_str(), R_OK)) << file << " does not exist";
