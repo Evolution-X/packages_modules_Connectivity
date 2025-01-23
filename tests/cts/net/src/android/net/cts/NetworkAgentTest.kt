@@ -140,7 +140,6 @@ import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnUnregisterQosC
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnValidationStatus
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertThrows
-import com.android.testutils.com.android.testutils.CarrierConfigRule
 import com.android.testutils.runAsShell
 import com.android.testutils.tryTest
 import com.android.testutils.waitForIdle
@@ -168,7 +167,6 @@ import kotlin.test.fail
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
@@ -227,9 +225,6 @@ private const val SHOULD_CREATE_NETWORKS_IMMEDIATELY = false
 @IgnoreUpTo(Build.VERSION_CODES.R)
 @RunWith(DevSdkIgnoreRunner::class)
 class NetworkAgentTest {
-    @get:Rule
-    val carrierConfigRule = CarrierConfigRule()
-
     private val LOCAL_IPV4_ADDRESS = InetAddresses.parseNumericAddress("192.0.2.1")
     private val REMOTE_IPV4_ADDRESS = InetAddresses.parseNumericAddress("192.0.2.2")
 
@@ -719,6 +714,7 @@ class NetworkAgentTest {
         }
 
         val tm = realContext.getSystemService(TelephonyManager::class.java)!!
+        val ccm = realContext.getSystemService(CarrierConfigManager::class.java)!!
 
         val cv = ConditionVariable()
         val cpb = PrivilegeWaiterCallback(cv)
@@ -738,13 +734,16 @@ class NetworkAgentTest {
                 return@tryTest
             }
             cv.close()
-            if (hold) {
-                carrierConfigRule.addConfigOverrides(subId, PersistableBundle().also {
-                    it.putStringArray(CarrierConfigManager.KEY_CARRIER_CERTIFICATE_STRING_ARRAY,
-                        arrayOf(getCertHash()))
-                })
-            } else {
-                carrierConfigRule.cleanUpNow()
+            runAsShell(MODIFY_PHONE_STATE) {
+                val carrierConfigs = if (hold) {
+                    PersistableBundle().also {
+                        it.putStringArray(CarrierConfigManager.KEY_CARRIER_CERTIFICATE_STRING_ARRAY,
+                                arrayOf(getCertHash()))
+                    }
+                } else {
+                    null
+                }
+                ccm.overrideConfig(subId, carrierConfigs)
             }
             assertTrue(cv.block(DEFAULT_TIMEOUT_MS), "Can't change carrier privilege")
         } cleanup {

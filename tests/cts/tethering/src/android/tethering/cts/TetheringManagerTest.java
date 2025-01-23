@@ -84,11 +84,9 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.modules.utils.build.SdkLevel;
 import com.android.testutils.ParcelUtils;
-import com.android.testutils.com.android.testutils.CarrierConfigRule;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -104,8 +102,6 @@ import java.util.function.Consumer;
 
 @RunWith(AndroidJUnit4.class)
 public class TetheringManagerTest {
-    @Rule
-    public final CarrierConfigRule mCarrierConfigRule = new CarrierConfigRule();
 
     private Context mContext;
 
@@ -531,13 +527,22 @@ public class TetheringManagerTest {
         // Override carrier config to ignore entitlement check.
         final PersistableBundle bundle = new PersistableBundle();
         bundle.putBoolean(CarrierConfigManager.KEY_REQUIRE_ENTITLEMENT_CHECKS_BOOL, false);
-        mCarrierConfigRule.addConfigOverrides(
-                SubscriptionManager.getDefaultSubscriptionId(), bundle);
+        overrideCarrierConfig(bundle);
 
         // Verify that requestLatestTetheringEntitlementResult() can get entitlement
         // result TETHER_ERROR_NO_ERROR due to provisioning bypassed.
         assertEntitlementResult(listener -> mTM.requestLatestTetheringEntitlementResult(
                 TETHERING_WIFI, false, c -> c.run(), listener), TETHER_ERROR_NO_ERROR);
+
+        // Reset carrier config.
+        overrideCarrierConfig(null);
+    }
+
+    private void overrideCarrierConfig(PersistableBundle bundle) {
+        final CarrierConfigManager configManager = (CarrierConfigManager) mContext
+                .getSystemService(Context.CARRIER_CONFIG_SERVICE);
+        final int subId = SubscriptionManager.getDefaultSubscriptionId();
+        runAsShell(MODIFY_PHONE_STATE, () -> configManager.overrideConfig(subId, bundle));
     }
 
     private boolean isTetheringApnRequired() {
