@@ -15,6 +15,11 @@
  */
 package com.android.server.net.ct;
 
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_INVALID;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_NOT_FOUND;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED;
+
 import android.annotation.NonNull;
 import android.annotation.RequiresApi;
 import android.content.ContentResolver;
@@ -27,7 +32,9 @@ import androidx.annotation.VisibleForTesting;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -40,6 +47,7 @@ import java.util.Optional;
 public class SignatureVerifier {
 
     private final Context mContext;
+    private static final String TAG = "SignatureVerifier";
 
     @NonNull private Optional<PublicKey> mPublicKey = Optional.empty();
 
@@ -79,30 +87,54 @@ public class SignatureVerifier {
         mPublicKey = Optional.of(publicKey);
     }
 
-    boolean verify(Uri file, Uri signature)
-            throws GeneralSecurityException, IOException, MissingPublicKeyException {
+    LogListUpdateStatus verify(Uri file, Uri signature) {
+        LogListUpdateStatus.Builder statusBuilder = LogListUpdateStatus.builder();
+
         if (!mPublicKey.isPresent()) {
-            throw new MissingPublicKeyException("Missing public key for signature verification");
+            statusBuilder.setState(PUBLIC_KEY_NOT_FOUND);
+            Log.e(TAG, "No public key found for log list verification");
+            return statusBuilder.build();
         }
-        Signature verifier = Signature.getInstance("SHA256withRSA");
-        verifier.initVerify(mPublicKey.get());
+
         ContentResolver contentResolver = mContext.getContentResolver();
 
-        boolean success = false;
         try (InputStream fileStream = contentResolver.openInputStream(file);
                 InputStream signatureStream = contentResolver.openInputStream(signature)) {
+            Signature verifier = Signature.getInstance("SHA256withRSA");
+            verifier.initVerify(mPublicKey.get());
             verifier.update(fileStream.readAllBytes());
 
             byte[] signatureBytes = signatureStream.readAllBytes();
             try {
-                success = verifier.verify(Base64.getDecoder().decode(signatureBytes));
+                byte[] decodedSigBytes = Base64.getDecoder().decode(signatureBytes);
+                statusBuilder.setSignature(new String(decodedSigBytes, StandardCharsets.UTF_8));
+
+                if (!verifier.verify(decodedSigBytes)) {
+                    // Leave the UpdateState as UNKNOWN_STATE if successful as there are other
+                    // potential failures past the signature verification step
+                    statusBuilder.setState(SIGNATURE_VERIFICATION_FAILED);
+                }
             } catch (IllegalArgumentException e) {
-                Log.w("CertificateTransparencyDownloader", "Invalid signature base64 encoding", e);
-                // TODO: remove the fallback once the signature base64 is published
-                Log.i("CertificateTransparencyDownloader", "Signature verification as raw bytes");
-                success = verifier.verify(signatureBytes);
+                Log.w(TAG, "Invalid signature base64 encoding", e);
+                statusBuilder.setSignature(new String(signatureBytes, StandardCharsets.UTF_8));
+                statusBuilder.setState(SIGNATURE_INVALID);
+                return statusBuilder.build();
             }
+        } catch (InvalidKeyException e) {
+            Log.e(TAG, "Signature invalid for log list verification", e);
+            statusBuilder.setState(SIGNATURE_INVALID);
+            return statusBuilder.build();
+        } catch (IOException | GeneralSecurityException e) {
+            Log.e(TAG, "Could not verify new log list", e);
+            statusBuilder.setState(SIGNATURE_VERIFICATION_FAILED);
+            return statusBuilder.build();
         }
-        return success;
+
+        // Double check if the signature is empty that we set the state correctly
+        if (!statusBuilder.build().hasSignature()) {
+            statusBuilder.setState(SIGNATURE_NOT_FOUND);
+        }
+
+        return statusBuilder.build();
     }
 }

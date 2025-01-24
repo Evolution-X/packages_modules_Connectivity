@@ -16,10 +16,12 @@
 
 package com.android.server.net.ct;
 
+import static com.google.common.io.Files.toByteArray;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -57,6 +59,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -335,7 +338,7 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void
-            testDownloader_contentDownloadSuccess_noSignatureFound_logsSingleFailure()
+            testDownloader_contentDownloadSuccess_noPublicKeyFound_logsSingleFailure()
                     throws Exception {
         File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
@@ -356,19 +359,23 @@ public class CertificateTransparencyDownloaderTest {
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
                         CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND,
-                        /* failureCount= */ 1);
+                        /* failureCount= */ 1,
+                        "");
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_INVALID),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED),
-                        anyInt());
+                        anyInt(),
+                        anyString());
     }
 
     @Test
@@ -398,19 +405,23 @@ public class CertificateTransparencyDownloaderTest {
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
                         CTLogListUpdateState.SIGNATURE_INVALID,
-                        /* failureCount= */ 1);
+                        /* failureCount= */ 1,
+                        ""); // Should be empty b/c invalid key exception thrown
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
-                        anyInt());
+                        anyInt(),
+                        anyString());
     }
 
     @Test
@@ -440,19 +451,24 @@ public class CertificateTransparencyDownloaderTest {
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.SIGNATURE_INVALID),
-                        anyInt());
+                        anyInt(),
+                        anyString());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
                         eq(CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND),
-                        anyInt());
+                        anyInt(),
+                        anyString());
+        byte[] signatureBytes = Base64.getDecoder().decode(toByteArray(metadataFile));
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
                         CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED,
-                        /* failureCount= */ 1);
+                        /* failureCount= */ 1,
+                        new String(signatureBytes, StandardCharsets.UTF_8));
     }
 
     @Test
@@ -473,10 +489,12 @@ public class CertificateTransparencyDownloaderTest {
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
+        byte[] signatureBytes = Base64.getDecoder().decode(toByteArray(metadataFile));
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
                         CTLogListUpdateState.VERSION_ALREADY_EXISTS,
-                        /* failureCount= */ 1);
+                        /* failureCount= */ 1,
+                        new String(signatureBytes, StandardCharsets.UTF_8));
     }
 
     @Test
