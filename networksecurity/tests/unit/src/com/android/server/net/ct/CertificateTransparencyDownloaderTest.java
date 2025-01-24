@@ -16,6 +16,7 @@
 
 package com.android.server.net.ct;
 
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS;
@@ -198,13 +199,9 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_publicKeyDownloadFail_failureThresholdExceeded_logsFailure()
+    public void testDownloader_publicKeyDownloadFail_logsFailure()
             throws Exception {
         mCertificateTransparencyDownloader.startPublicKeyDownload();
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         mCertificateTransparencyDownloader.onReceive(
                 mContext,
@@ -213,30 +210,11 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
-                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-    }
-
-    @Test
-    public void testDownloader_publicKeyDownloadFail_failureThresholdNotMet_doesNotLog()
-            throws Exception {
-        mCertificateTransparencyDownloader.startPublicKeyDownload();
-        // Set the failure count to well below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makePublicKeyDownloadFailedIntent(DownloadManager.ERROR_HTTP_DATA_ERROR));
-
-        assertThat(
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        /* failureCount= */ 1);
     }
 
     @Test
@@ -269,35 +247,9 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_metadataDownloadFail_failureThresholdExceeded_logsFailure()
+    public void testDownloader_metadataDownloadFail_logsFailure()
             throws Exception {
         mCertificateTransparencyDownloader.startMetadataDownload();
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-
-        mCertificateTransparencyDownloader.onReceive(
-                mContext,
-                makeMetadataDownloadFailedIntent(
-                        mCompatVersion, DownloadManager.ERROR_INSUFFICIENT_SPACE));
-
-        assertThat(
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
-                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-    }
-
-    @Test
-    public void testDownloader_metadataDownloadFail_failureThresholdNotMet_doesNotLog()
-            throws Exception {
-        mCertificateTransparencyDownloader.startMetadataDownload();
-        // Set the failure count to well below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
 
         mCertificateTransparencyDownloader.onReceive(
                 mContext,
@@ -308,9 +260,10 @@ public class CertificateTransparencyDownloaderTest {
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        /* failureCount= */ 1);
     }
 
     @Test
@@ -347,13 +300,9 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_contentDownloadFail_failureThresholdExceeded_logsFailure()
+    public void testDownloader_contentDownloadFail_logsFailure()
             throws Exception {
         mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         mCertificateTransparencyDownloader.onReceive(
                 mContext,
@@ -363,32 +312,11 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-        verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
-                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-    }
-
-    @Test
-    public void testDownloader_contentDownloadFail_failureThresholdNotMet_doesNotLog()
-            throws Exception {
-        mCertificateTransparencyDownloader.startContentDownload(mCompatVersion);
-        // Set the failure count to well below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-
-        mCertificateTransparencyDownloader.onReceive(
-                mContext,
-                makeContentDownloadFailedIntent(
-                        mCompatVersion, DownloadManager.ERROR_HTTP_DATA_ERROR));
-
-        assertThat(
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE,
+                        /* failureCount= */ 1);
     }
 
     @Test
@@ -410,16 +338,12 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void
-            testDownloader_contentDownloadSuccess_noSignatureFound_failureThresholdExceeded_logsSingleFailure()
+            testDownloader_contentDownloadSuccess_noSignatureFound_logsSingleFailure()
                     throws Exception {
         File logListFile = makeLogListFile("456");
         File metadataFile = sign(logListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
         mCertificateTransparencyDownloader.startMetadataDownload();
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         // Set the public key to be missing
         mSignatureVerifier.resetPublicKey();
@@ -431,13 +355,18 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                .logCTLogListUpdateStateChangedEvent(
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND,
+                        /* failureCount= */ 1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION),
                         anyInt());
@@ -445,7 +374,7 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void
-            testDownloader_contentDownloadSuccess_wrongSignatureAlgo_failureThresholdExceeded_logsSingleFailure()
+            testDownloader_contentDownloadSuccess_wrongSignatureAlgo_logsSingleFailure()
                     throws Exception {
         // Arrange
         File logListFile = makeLogListFile("456");
@@ -455,11 +384,6 @@ public class CertificateTransparencyDownloaderTest {
         KeyPairGenerator instance = KeyPairGenerator.getInstance("EC");
         mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
 
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-
         // Act
         mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
@@ -471,21 +395,21 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                .isEqualTo(1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                        /* failureCount= */ 1);
     }
 
     @Test
     public void
-            testDownloader_contentDownloadSuccess_signatureNotVerified_failureThresholdExceeded_logsSingleFailure()
+            testDownloader_contentDownloadSuccess_signatureNotVerified_logsSingleFailure()
                     throws Exception {
         // Arrange
         File logListFile = makeLogListFile("456");
@@ -495,11 +419,6 @@ public class CertificateTransparencyDownloaderTest {
         KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
         mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
 
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
-
         // Act
         mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
@@ -511,63 +430,30 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                .isEqualTo(1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
                         anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(
+                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND),
+                        anyInt());
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                        /* failureCount= */ 1);
     }
 
     @Test
     public void
-            testDownloader_contentDownloadSuccess_wrongSignature_failureThresholdNotMet_doesNotLog()
-                    throws Exception {
-        File logListFile = makeLogListFile("456");
-        File metadataFile = sign(logListFile);
-        // Set the key to be deliberately wrong by using diff key pair
-        KeyPairGenerator instance = KeyPairGenerator.getInstance("RSA");
-        mSignatureVerifier.setPublicKey(instance.generateKeyPair().getPublic());
-        // Set the failure count to well below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-
-        mCertificateTransparencyDownloader.startMetadataDownload();
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
-
-        assertThat(
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(1);
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
-                        anyInt());
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION),
-                        anyInt());
-    }
-
-    @Test
-    public void
-            testDownloader_contentDownloadSuccess_installFail_failureThresholdExceeded_logsFailure()
+            testDownloader_contentDownloadSuccess_installFail_logsFailure()
                     throws Exception {
         File invalidLogListFile = writeToFile("not_a_json_log_list".getBytes());
         File metadataFile = sign(invalidLogListFile);
         mSignatureVerifier.setPublicKey(mPublicKey);
-        // Set the failure count to just below the threshold
-        mDataStore.setPropertyInt(
-                Config.LOG_LIST_UPDATE_FAILURE_COUNT,
-                Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD - 1);
 
         mCertificateTransparencyDownloader.startMetadataDownload();
         mCertificateTransparencyDownloader.onReceive(
@@ -578,36 +464,11 @@ public class CertificateTransparencyDownloaderTest {
         assertThat(
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
+                .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS,
-                        Config.DEFAULT_LOG_LIST_UPDATE_FAILURE_THRESHOLD);
-    }
-
-    @Test
-    public void
-            testDownloader_contentDownloadSuccess_installFail_failureThresholdNotMet_doesNotLog()
-                    throws Exception {
-        File invalidLogListFile = writeToFile("not_a_json_log_list".getBytes());
-        File metadataFile = sign(invalidLogListFile);
-        mSignatureVerifier.setPublicKey(mPublicKey);
-        // Set the failure count to well below the threshold
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, 0);
-
-        mCertificateTransparencyDownloader.startMetadataDownload();
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
-        mCertificateTransparencyDownloader.onReceive(
-                mContext, makeContentDownloadCompleteIntent(mCompatVersion, invalidLogListFile));
-
-        assertThat(
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
-                .isEqualTo(1);
-        verify(mLogger, never()).logCTLogListUpdateFailedEvent(anyInt(), anyInt());
-        verify(mLogger, never())
-                .logCTLogListUpdateFailedEventWithDownloadStatus(anyInt(), anyInt());
+                        /* failureCount= */ 1);
     }
 
     @Test
