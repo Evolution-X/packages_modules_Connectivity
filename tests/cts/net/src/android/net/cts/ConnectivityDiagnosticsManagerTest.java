@@ -88,11 +88,9 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.ArrayTrackRecord;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DevSdkIgnoreRunner;
-import com.android.testutils.com.android.testutils.CarrierConfigRule;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -111,9 +109,6 @@ import java.util.concurrent.TimeUnit;
 @AppModeFull(reason = "CHANGE_NETWORK_STATE, MANAGE_TEST_NETWORKS not grantable to instant apps")
 public class ConnectivityDiagnosticsManagerTest {
     private static final String TAG = ConnectivityDiagnosticsManagerTest.class.getSimpleName();
-
-    @Rule
-    public final CarrierConfigRule mCarrierConfigRule = new CarrierConfigRule();
 
     private static final int CALLBACK_TIMEOUT_MILLIS = 5000;
     private static final int NO_CALLBACK_INVOKED_TIMEOUT = 500;
@@ -269,6 +264,9 @@ public class ConnectivityDiagnosticsManagerTest {
             doBroadcastCarrierConfigsAndVerifyOnConnectivityReportAvailable(
                     subId, carrierConfigReceiver, testNetworkCallback);
         }, () -> {
+                runWithShellPermissionIdentity(
+                    () -> mCarrierConfigManager.overrideConfig(subId, null),
+                    android.Manifest.permission.MODIFY_PHONE_STATE);
             mConnectivityManager.unregisterNetworkCallback(testNetworkCallback);
             mContext.unregisterReceiver(carrierConfigReceiver);
             });
@@ -293,9 +291,9 @@ public class ConnectivityDiagnosticsManagerTest {
                 CarrierConfigManager.KEY_CARRIER_CERTIFICATE_STRING_ARRAY,
                 new String[] {getCertHashForThisPackage()});
 
-        mCarrierConfigRule.addConfigOverrides(subId, carrierConfigs);
         runWithShellPermissionIdentity(
                 () -> {
+                    mCarrierConfigManager.overrideConfig(subId, carrierConfigs);
                     mCarrierConfigManager.notifyConfigChangedForSubId(subId);
                 },
                 android.Manifest.permission.MODIFY_PHONE_STATE);
