@@ -26,7 +26,6 @@ import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -56,8 +55,6 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
 
     private final List<CompatibilityVersion> mCompatVersions = new ArrayList<>();
 
-    private boolean started = false;
-
     CertificateTransparencyDownloader(
             Context context,
             DataStore dataStore,
@@ -75,33 +72,8 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         mCompatVersions.add(compatVersion);
     }
 
-    void start() {
-        if (started) {
-            return;
-        }
-        mContext.registerReceiver(
-                this,
-                new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                Context.RECEIVER_EXPORTED);
-        mDataStore.load();
-        started = true;
-
-        if (Config.DEBUG) {
-            Log.d(TAG, "CertificateTransparencyDownloader started.");
-        }
-    }
-
-    void stop() {
-        if (!started) {
-            return;
-        }
-        mContext.unregisterReceiver(this);
-        mDataStore.delete();
-        started = false;
-
-        if (Config.DEBUG) {
-            Log.d(TAG, "CertificateTransparencyDownloader stopped.");
-        }
+    void clearCompatibilityVersions() {
+        mCompatVersions.clear();
     }
 
     long startPublicKeyDownload() {

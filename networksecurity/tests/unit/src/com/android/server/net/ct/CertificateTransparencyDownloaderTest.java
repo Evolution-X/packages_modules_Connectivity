@@ -111,15 +111,15 @@ public class CertificateTransparencyDownloaderTest {
                         mContext.getFilesDir());
 
         prepareDownloadManager();
+        mDataStore.load();
         mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
-        mCertificateTransparencyDownloader.start();
     }
 
     @After
     public void tearDown() {
         mSignatureVerifier.resetPublicKey();
-        mCertificateTransparencyDownloader.stop();
         mCompatVersion.delete();
+        mDataStore.delete();
     }
 
     @Test
