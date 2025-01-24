@@ -212,7 +212,7 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
                         DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         /* failureCount= */ 1);
     }
@@ -261,7 +261,7 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
                         DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         /* failureCount= */ 1);
     }
@@ -314,7 +314,7 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEventWithDownloadStatus(
+                .logCTLogListUpdateStateChangedEventWithDownloadStatus(
                         DownloadManager.ERROR_INSUFFICIENT_SPACE,
                         /* failureCount= */ 1);
     }
@@ -357,16 +357,16 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND,
                         /* failureCount= */ 1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION),
                         anyInt());
@@ -397,12 +397,12 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
                         /* failureCount= */ 1);
     }
@@ -432,17 +432,17 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, never())
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         eq(
                                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND),
                         anyInt());
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
                         /* failureCount= */ 1);
     }
@@ -466,7 +466,7 @@ public class CertificateTransparencyDownloaderTest {
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
         verify(mLogger, times(1))
-                .logCTLogListUpdateFailedEvent(
+                .logCTLogListUpdateStateChangedEvent(
                         CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS,
                         /* failureCount= */ 1);
     }

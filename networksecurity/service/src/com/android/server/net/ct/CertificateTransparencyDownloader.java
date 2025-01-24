@@ -237,11 +237,13 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             success = mSignatureVerifier.verify(contentUri, metadataUri);
         } catch (MissingPublicKeyException e) {
             updateFailureCount();
-            failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
+            failureReason =
+                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
             Log.e(TAG, "No public key found for log list verification", e);
         } catch (InvalidKeyException e) {
             updateFailureCount();
-            failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
+            failureReason =
+                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
             Log.e(TAG, "Signature invalid for log list verification", e);
         } catch (IOException | GeneralSecurityException e) {
             Log.e(TAG, "Could not verify new log list", e);
@@ -253,11 +255,12 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             // Avoid logging failure twice
             if (failureReason == -1) {
                 updateFailureCount();
-                failureReason = CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
+                failureReason =
+                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
             }
 
             if (failureReason != -1) {
-                mLogger.logCTLogListUpdateFailedEvent(
+                mLogger.logCTLogListUpdateStateChangedEvent(
                         failureReason,
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
@@ -278,7 +281,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             mDataStore.store();
         } else {
             updateFailureCount();
-            mLogger.logCTLogListUpdateFailedEvent(
+            mLogger.logCTLogListUpdateStateChangedEvent(
                     CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS,
                     mDataStore.getPropertyInt(
                             Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
@@ -294,13 +297,13 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
                         Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
 
         if (status.isHttpError()) {
-            mLogger.logCTLogListUpdateFailedEvent(
+            mLogger.logCTLogListUpdateStateChangedEvent(
                     CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR,
                     failureCount,
                     status.reason());
         } else {
             // TODO(b/384935059): handle blocked domain logging
-            mLogger.logCTLogListUpdateFailedEventWithDownloadStatus(
+            mLogger.logCTLogListUpdateStateChangedEventWithDownloadStatus(
                     status.reason(), failureCount);
         }
     }
