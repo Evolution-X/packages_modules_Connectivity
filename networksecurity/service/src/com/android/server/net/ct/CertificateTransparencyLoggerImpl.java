@@ -31,18 +31,20 @@ import android.app.DownloadManager;
 class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger {
 
     @Override
-    public void logCTLogListUpdateFailedEventWithDownloadStatus(
+    public void logCTLogListUpdateStateChangedEventWithDownloadStatus(
             int downloadStatus, int failureCount) {
-        logCTLogListUpdateFailedEvent(downloadStatusToFailureReason(downloadStatus), failureCount);
+        logCTLogListUpdateStateChangedEvent(
+                downloadStatusToFailureReason(downloadStatus), failureCount);
     }
 
     @Override
-    public void logCTLogListUpdateFailedEvent(int failureReason, int failureCount) {
-        logCTLogListUpdateFailedEvent(failureReason, failureCount, /* httpErrorStatusCode= */ 0);
+    public void logCTLogListUpdateStateChangedEvent(int failureReason, int failureCount) {
+        logCTLogListUpdateStateChangedEvent(
+                failureReason, failureCount, /* httpErrorStatusCode= */ 0);
     }
 
     @Override
-    public void logCTLogListUpdateFailedEvent(
+    public void logCTLogListUpdateStateChangedEvent(
             int failureReason, int failureCount, int httpErrorStatusCode) {
         CertificateTransparencyStatsLog.write(
                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED,

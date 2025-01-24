@@ -20,29 +20,30 @@ package com.android.server.net.ct;
 public interface CertificateTransparencyLogger {
 
     /**
-     * Logs a CTLogListUpdateFailed event to statsd, when failure is provided by DownloadManager.
+     * Logs a CTLogListUpdateStateChanged event to statsd, when failure is from DownloadManager.
      *
      * @param downloadStatus DownloadManager failure status why the log list wasn't updated
      * @param failureCount number of consecutive log list update failures
      */
-    void logCTLogListUpdateFailedEventWithDownloadStatus(int downloadStatus, int failureCount);
+    void logCTLogListUpdateStateChangedEventWithDownloadStatus(
+            int downloadStatus, int failureCount);
 
     /**
-     * Logs a CTLogListUpdateFailed event to statsd, when no HTTP error status code is present.
+     * Logs a CTLogListUpdateStateChanged event to statsd without a HTTP error status code.
      *
      * @param failureReason reason why the log list wasn't updated
      * @param failureCount number of consecutive log list update failures
      */
-    void logCTLogListUpdateFailedEvent(int failureReason, int failureCount);
+    void logCTLogListUpdateStateChangedEvent(int failureReason, int failureCount);
 
     /**
-     * Logs a CTLogListUpdateFailed event to statsd, when an HTTP error status code is provided.
+     * Logs a CTLogListUpdateStateChanged event to statsd with an HTTP error status code.
      *
      * @param failureReason reason why the log list wasn't updated (e.g. DownloadManager failures)
      * @param failureCount number of consecutive log list update failures
      * @param httpErrorStatusCode if relevant, the HTTP error status code from DownloadManager
      */
-    void logCTLogListUpdateFailedEvent(
+    void logCTLogListUpdateStateChangedEvent(
             int failureReason, int failureCount, int httpErrorStatusCode);
 
 }
