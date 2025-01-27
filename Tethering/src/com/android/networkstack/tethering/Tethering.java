@@ -640,7 +640,7 @@ public class Tethering {
         }
 
         if (enabled) {
-            ensureIpServerStarted(iface);
+            ensureIpServerStartedForInterface(iface);
         } else {
             ensureIpServerStopped(iface);
         }
@@ -1631,7 +1631,7 @@ public class Tethering {
     // TODO: make the request @NonNull and move the tetheringType and ipServingMode into it.
     private void enableIpServing(@Nullable TetheringRequest request, int tetheringType,
             String ifname, int ipServingMode, boolean isNcm) {
-        ensureIpServerStarted(ifname, tetheringType, isNcm);
+        ensureIpServerStartedForType(ifname, tetheringType, isNcm);
         if (tetherInternal(request, ifname, ipServingMode) != TETHER_ERROR_NO_ERROR) {
             Log.e(TAG, "unable start tethering on iface " + ifname);
         }
@@ -3005,7 +3005,7 @@ public class Tethering {
         return type != TETHERING_INVALID;
     }
 
-    private void ensureIpServerStarted(final String iface) {
+    private void ensureIpServerStartedForInterface(final String iface) {
         // If we don't care about this type of interface, ignore.
         final int interfaceType = ifaceNameToType(iface);
         if (!checkTetherableType(interfaceType)) {
@@ -3014,10 +3014,11 @@ public class Tethering {
             return;
         }
 
-        ensureIpServerStarted(iface, interfaceType, false /* isNcm */);
+        ensureIpServerStartedForType(iface, interfaceType, false /* isNcm */);
     }
 
-    private void ensureIpServerStarted(final String iface, int interfaceType, boolean isNcm) {
+    private void ensureIpServerStartedForType(final String iface, int interfaceType,
+            boolean isNcm) {
         // If we have already started a TISM for this interface, skip.
         if (mTetherStates.containsKey(iface)) {
             mLog.log("active iface (" + iface + ") reported as added, ignoring");
