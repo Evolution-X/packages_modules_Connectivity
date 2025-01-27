@@ -101,7 +101,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -458,14 +457,9 @@ public class TetheringManagerTest {
 
     @Test
     public void testStopTetheringRequest() throws Exception {
+        assumeTrue(isTetheringWithSoftApConfigEnabled());
         TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
-        Executor executor = Runnable::run;
-        TetheringManager.StopTetheringCallback callback =
-                new TetheringManager.StopTetheringCallback() {};
-        try {
-            mTM.stopTethering(request, executor, callback);
-            fail("stopTethering should throw UnsupportedOperationException");
-        } catch (UnsupportedOperationException expect) { }
+        mCtsTetheringUtils.stopTethering(request);
     }
 
     private boolean isTetheringWithSoftApConfigEnabled() {
