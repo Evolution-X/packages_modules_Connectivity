@@ -308,7 +308,7 @@ public class RtNetlinkLinkMessageTest {
     @Test
     public void testCreateSetInterfaceFlagsMessage() {
         final String expectedHexBytes =
-                "20000000100001006824000000000000"    // struct nlmsghdr
+                "20000000100005006824000000000000"    // struct nlmsghdr
                         + "00000000080000000100000001000100"; // struct ifinfomsg
         final String interfaceName = "wlan0";
         final int interfaceIndex = 8;
