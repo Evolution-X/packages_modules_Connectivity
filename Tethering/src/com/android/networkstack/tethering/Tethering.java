@@ -1074,6 +1074,50 @@ public class Tethering {
         return placeholder;
     }
 
+    private void handleLegacyTether(String iface, int requestedState,
+            final IIntResultListener listener) {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // After V, the TetheringManager and ConnectivityManager tether and untether methods
+            // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
+            // that this code cannot run even if callers use raw binder calls or other
+            // unsupported methods.
+            return;
+        }
+        int result = tetherInternal(iface, requestedState);
+        switch (ifaceNameToType(iface)) {
+            case TETHERING_WIFI:
+                TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                        "Legacy tether API called on Wifi iface " + iface,
+                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI);
+                if (result == TETHER_ERROR_NO_ERROR) {
+                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                            "Legacy tether API succeeded on Wifi iface " + iface,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS);
+                }
+                break;
+            case TETHERING_WIFI_P2P:
+                TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                        "Legacy tether API called on Wifi P2P iface " + iface,
+                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P);
+                if (result == TETHER_ERROR_NO_ERROR) {
+                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                            "Legacy tether API succeeded on Wifi P2P iface " + iface,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS);
+                }
+                break;
+            default:
+                // Do nothing
+                break;
+        }
+        try {
+            listener.onResult(result);
+        } catch (RemoteException e) { }
+    }
+
     /**
      * Legacy tether API that starts tethering with CONNECTIVITY_SCOPE_GLOBAL on the given iface.
      *
@@ -1088,48 +1132,7 @@ public class Tethering {
      * those broadcasts are disabled by OEM.
      */
     void legacyTether(String iface, int requestedState, final IIntResultListener listener) {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            // After V, the TetheringManager and ConnectivityManager tether and untether methods
-            // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
-            // that this code cannot run even if callers use raw binder calls or other
-            // unsupported methods.
-            return;
-        }
-        mHandler.post(() -> {
-            int result = tetherInternal(iface, requestedState);
-            switch (ifaceNameToType(iface)) {
-                case TETHERING_WIFI:
-                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                            "Legacy tether API called on Wifi iface " + iface,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI);
-                    if (result == TETHER_ERROR_NO_ERROR) {
-                        TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                                "Legacy tether API succeeded on Wifi iface " + iface,
-                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS);
-                    }
-                    break;
-                case TETHERING_WIFI_P2P:
-                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                            "Legacy tether API called on Wifi P2P iface " + iface,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P);
-                    if (result == TETHER_ERROR_NO_ERROR) {
-                        TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                                "Legacy tether API succeeded on Wifi P2P iface " + iface,
-                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                                CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS);
-                    }
-                    break;
-                default:
-                    // Do nothing
-                    break;
-            }
-            try {
-                listener.onResult(result);
-            } catch (RemoteException e) { }
-        });
+        mHandler.post(() -> handleLegacyTether(iface, requestedState, listener));
     }
 
     private int tetherInternal(String iface, int requestedState) {
