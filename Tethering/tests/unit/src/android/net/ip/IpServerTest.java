@@ -48,7 +48,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.clearInvocations;
@@ -74,6 +73,7 @@ import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.MacAddress;
 import android.net.RouteInfo;
+import android.net.TetheringManager.TetheringRequest;
 import android.net.dhcp.DhcpServerCallbacks;
 import android.net.dhcp.DhcpServingParamsParcel;
 import android.net.dhcp.IDhcpEventCallbacks;
@@ -240,7 +240,8 @@ public class IpServerTest {
             Set<LinkAddress> upstreamAddresses, boolean usingLegacyDhcp, boolean usingBpfOffload)
             throws Exception {
         initStateMachine(interfaceType, usingLegacyDhcp, usingBpfOffload);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
+                mock(TetheringRequest.class));
         verify(mBpfCoordinator).addIpServer(mIpServer);
         if (upstreamIface != null) {
             InterfaceParams interfaceParams = mDependencies.getInterfaceParams(upstreamIface);
@@ -345,7 +346,8 @@ public class IpServerTest {
     public void canBeTetheredAsBluetooth() throws Exception {
         initStateMachine(TETHERING_BLUETOOTH);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
+                mock(TetheringRequest.class));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         if (isAtLeastT()) {
             inOrder.verify(mRoutingCoordinatorManager)
@@ -400,7 +402,8 @@ public class IpServerTest {
     public void canBeTetheredAsUsb() throws Exception {
         initStateMachine(TETHERING_USB);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
+                mock(TetheringRequest.class));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
                 eq(CONNECTIVITY_SCOPE_GLOBAL), any());
@@ -423,7 +426,8 @@ public class IpServerTest {
     public void canBeTetheredAsWifiP2p_NotUsingDedicatedIp() throws Exception {
         initStateMachine(TETHERING_WIFI_P2P);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
+                mock(TetheringRequest.class));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
                 eq(CONNECTIVITY_SCOPE_LOCAL), any());
@@ -447,7 +451,8 @@ public class IpServerTest {
         initStateMachine(TETHERING_WIFI_P2P, false /* usingLegacyDhcp */, DEFAULT_USING_BPF_OFFLOAD,
                 true /* shouldEnableWifiP2pDedicatedIp */);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
+                mock(TetheringRequest.class));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         // When using WiFi P2p dedicated IP, the IpServer just picks the IP address without
         // requesting for it at RoutingCoordinatorManager.
@@ -627,7 +632,8 @@ public class IpServerTest {
         initStateMachine(TETHERING_USB);
 
         doThrow(RemoteException.class).when(mNetd).tetherInterfaceAdd(IFACE_NAME);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
+                mock(TetheringRequest.class));
         InOrder usbTeardownOrder = inOrder(mNetd, mCallback);
         usbTeardownOrder.verify(mNetd).interfaceSetCfg(
                 argThat(cfg -> IFACE_NAME.equals(cfg.ifName)));
@@ -713,7 +719,8 @@ public class IpServerTest {
     @Test
     public void startsDhcpServerOnNcm() throws Exception {
         initStateMachine(TETHERING_NCM);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
+                mock(TetheringRequest.class));
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
 
         assertDhcpStarted(new IpPrefix("192.168.42.0/24"));
@@ -722,7 +729,8 @@ public class IpServerTest {
     @Test
     public void testOnNewPrefixRequest() throws Exception {
         initStateMachine(TETHERING_NCM);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
+                mock(TetheringRequest.class));
 
         final IDhcpEventCallbacks eventCallbacks;
         final ArgumentCaptor<IDhcpEventCallbacks> dhcpEventCbsCaptor =
@@ -911,7 +919,8 @@ public class IpServerTest {
         doNothing().when(mDependencies).makeDhcpServer(any(), mDhcpParamsCaptor.capture(),
                 cbCaptor.capture());
         initStateMachine(TETHERING_WIFI);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED);
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
+                mock(TetheringRequest.class));
         verify(mDhcpServer, never()).startWithCallbacks(any(), any());
 
         // No stop dhcp server because dhcp server is not created yet.
@@ -961,10 +970,12 @@ public class IpServerTest {
      * Send a command to the state machine under test, and run the event loop to idle.
      *
      * @param command One of the IpServer.CMD_* constants.
-     * @param arg1 An additional argument to pass.
+     * @param arg1    An additional argument to pass.
+     * @param arg2    An additional argument to pass.
+     * @param obj     An additional object to pass.
      */
-    private void dispatchCommand(int command, int arg1) {
-        mIpServer.sendMessage(command, arg1);
+    private void dispatchCommand(int command, int arg1, int arg2, Object obj) {
+        mIpServer.sendMessage(command, arg1, arg2, obj);
         mLooper.dispatchAll();
     }
 

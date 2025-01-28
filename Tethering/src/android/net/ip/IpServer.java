@@ -430,7 +430,7 @@ public class IpServer extends StateMachineShim {
     }
 
     /** Enable this IpServer. IpServer state machine will be tethered or localHotspot state. */
-    public void enable(final int requestedState, final TetheringRequest request) {
+    public void enable(final int requestedState, @NonNull final TetheringRequest request) {
         sendMessage(CMD_TETHER_REQUESTED, requestedState, 0, request);
     }
 
@@ -1026,11 +1026,11 @@ public class IpServer extends StateMachineShim {
         mLinkProperties.setInterfaceName(mIfaceName);
     }
 
-    private void maybeConfigureStaticIp(final TetheringRequest request) {
+    private void maybeConfigureStaticIp(@NonNull final TetheringRequest request) {
         // Ignore static address configuration if they are invalid or null. In theory, static
         // addresses should not be invalid here because TetheringManager do not allow caller to
         // specify invalid static address configuration.
-        if (request == null || request.getLocalIpv4Address() == null
+        if (request.getLocalIpv4Address() == null
                 || request.getClientStaticIpv4Address() == null || !checkStaticAddressConfiguration(
                 request.getLocalIpv4Address(), request.getClientStaticIpv4Address())) {
             return;
