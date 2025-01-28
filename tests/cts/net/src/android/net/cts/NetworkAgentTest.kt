@@ -722,9 +722,15 @@ class NetworkAgentTest {
 
         val cv = ConditionVariable()
         val cpb = PrivilegeWaiterCallback(cv)
-        tryTest {
+        // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
+        // T. This means the lambda will compile as a private method of this class taking a
+        // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
+        // including private methods, this would fail with a link error when running on S-.
+        // To solve this, make the lambda serializable, which causes the compiler to emit a
+        // synthetic class instead of a synthetic method.
+        tryTest @JvmSerializableLambda {
             val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
             }
             // Wait for the callback to be registered
@@ -747,8 +753,8 @@ class NetworkAgentTest {
                 carrierConfigRule.cleanUpNow()
             }
             assertTrue(cv.block(DEFAULT_TIMEOUT_MS), "Can't change carrier privilege")
-        } cleanup {
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
+        } cleanup @JvmSerializableLambda {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.unregisterCarrierPrivilegesCallback(cpb)
             }
         }
@@ -762,9 +768,15 @@ class NetworkAgentTest {
 
         val cv = ConditionVariable()
         val cpb = CarrierServiceChangedWaiterCallback(cv)
-        tryTest {
+        // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
+        // T. This means the lambda will compile as a private method of this class taking a
+        // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
+        // including private methods, this would fail with a link error when running on S-.
+        // To solve this, make the lambda serializable, which causes the compiler to emit a
+        // synthetic class instead of a synthetic method.
+        tryTest @JvmSerializableLambda {
             val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
             }
             // Wait for the callback to be registered
@@ -786,8 +798,8 @@ class NetworkAgentTest {
                 }
             }
             assertTrue(cv.block(DEFAULT_TIMEOUT_MS), "Can't modify carrier service package")
-        } cleanup {
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
+        } cleanup @JvmSerializableLambda {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.unregisterCarrierPrivilegesCallback(cpb)
             }
         }
