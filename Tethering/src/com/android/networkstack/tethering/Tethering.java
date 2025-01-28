@@ -944,7 +944,9 @@ public class Tethering {
         public void onAvailable(String iface) {
             if (this != mBluetoothCallback) return;
 
-            enableIpServing(TETHERING_BLUETOOTH, iface, getRequestedState(TETHERING_BLUETOOTH));
+            final TetheringRequest request = getActiveTetheringRequest(TETHERING_BLUETOOTH);
+            enableIpServing(request, TETHERING_BLUETOOTH, iface,
+                    getRequestedState(TETHERING_BLUETOOTH));
             mConfiguredBluetoothIface = iface;
         }
 
@@ -999,7 +1001,10 @@ public class Tethering {
                 // Ethernet callback arrived after Ethernet tethering stopped. Ignore.
                 return;
             }
-            enableIpServing(TETHERING_ETHERNET, iface, getRequestedState(TETHERING_ETHERNET));
+
+            final TetheringRequest request = getActiveTetheringRequest(TETHERING_ETHERNET);
+            enableIpServing(request, TETHERING_ETHERNET, iface,
+                    getRequestedState(TETHERING_ETHERNET));
             mConfiguredEthernetIface = iface;
         }
 
@@ -1020,7 +1025,9 @@ public class Tethering {
             } else {
                 mConfiguredVirtualIface = iface;
             }
+            final TetheringRequest request = getActiveTetheringRequest(TETHERING_VIRTUAL);
             enableIpServing(
+                    request,
                     TETHERING_VIRTUAL,
                     mConfiguredVirtualIface,
                     getRequestedState(TETHERING_VIRTUAL));
@@ -1083,8 +1090,17 @@ public class Tethering {
             // unsupported methods.
             return;
         }
-        int result = tetherInternal(iface, requestedState);
-        switch (ifaceNameToType(iface)) {
+
+        final int type = ifaceNameToType(iface);
+        if (type == TETHERING_INVALID) {
+            Log.e(TAG, "Ignoring call to legacy tether for unknown iface " + iface);
+            try {
+                listener.onResult(TETHER_ERROR_UNKNOWN_IFACE);
+            } catch (RemoteException e) { }
+        }
+
+        int result = tetherInternal(null, iface, requestedState);
+        switch (type) {
             case TETHERING_WIFI:
                 TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
                         "Legacy tether API called on Wifi iface " + iface,
@@ -1135,7 +1151,11 @@ public class Tethering {
         mHandler.post(() -> handleLegacyTether(iface, requestedState, listener));
     }
 
-    private int tetherInternal(String iface, int requestedState) {
+    // TODO: is it possible to make the request @NonNull here?
+    // Because the IpServer doesn't actually look at (almost anything in) the request, we can just
+    // make callers synthesize a reasonable-looking request and make this @NonNull.
+    private int tetherInternal(@Nullable TetheringRequest request, String iface,
+            int requestedState) {
         if (DBG) Log.d(TAG, "Tethering " + iface);
         TetherState tetherState = mTetherStates.get(iface);
         if (tetherState == null) {
@@ -1148,15 +1168,19 @@ public class Tethering {
             Log.e(TAG, "Tried to Tether an unavailable iface: " + iface + ", ignoring");
             return TETHER_ERROR_UNAVAIL_IFACE;
         }
-        // NOTE: If a CMD_TETHER_REQUESTED message is already in the TISM's queue but not yet
+        // NOTE: If a CMD_TETHER_REQUESTED message is already in the IpServer's queue but not yet
         // processed, this will be a no-op and it will not return an error.
         //
         // This code cannot race with untether() because they both run on the handler thread.
+        //
+        // TODO: once the request is @NonNull, it will be correct to fetch the type from it, because
+        // the type used to fetch (or synthesize) the request is the same as the type passed in at
+        // IpServer creation time.
+        // BUG: the connectivity scope in the request is ignored. This matches current behaviour.
+        // TODO: see if the connectivity scope can be made (or is already) correct, and fetch the
+        // requested state from there.
         final int type = tetherState.ipServer.interfaceType();
-        final TetheringRequest request = mActiveTetheringRequests.get(type, null);
-        if (request != null) {
-            mActiveTetheringRequests.delete(type);
-        }
+        mActiveTetheringRequests.remove(type);
         tetherState.ipServer.enable(requestedState, request);
         return TETHER_ERROR_NO_ERROR;
     }
@@ -1216,6 +1240,7 @@ public class Tethering {
         return mEntitlementMgr.isTetherProvisioningRequired(cfg);
     }
 
+    // TODO: make this take a TetheringRequest instead.
     private int getRequestedState(int type) {
         final TetheringRequest request = mActiveTetheringRequests.get(type);
 
@@ -1593,14 +1618,21 @@ public class Tethering {
         }
     }
 
-    private void enableIpServing(int tetheringType, String ifname, int ipServingMode) {
-        enableIpServing(tetheringType, ifname, ipServingMode, false /* isNcm */);
+    final TetheringRequest getActiveTetheringRequest(int type) {
+        return mActiveTetheringRequests.get(type, null);
     }
 
-    private void enableIpServing(int tetheringType, String ifname, int ipServingMode,
-            boolean isNcm) {
+    // TODO: make the request @NonNull and move the tetheringType and ipServingMode into it.
+    private void enableIpServing(@Nullable TetheringRequest request, int tetheringType,
+            String ifname, int ipServingMode) {
+        enableIpServing(request, tetheringType, ifname, ipServingMode, false /* isNcm */);
+    }
+
+    // TODO: make the request @NonNull and move the tetheringType and ipServingMode into it.
+    private void enableIpServing(@Nullable TetheringRequest request, int tetheringType,
+            String ifname, int ipServingMode, boolean isNcm) {
         ensureIpServerStarted(ifname, tetheringType, isNcm);
-        if (tetherInternal(ifname, ipServingMode) != TETHER_ERROR_NO_ERROR) {
+        if (tetherInternal(request, ifname, ipServingMode) != TETHER_ERROR_NO_ERROR) {
             Log.e(TAG, "unable start tethering on iface " + ifname);
         }
     }
@@ -1652,7 +1684,9 @@ public class Tethering {
             mLog.e(ifname + " is not a tetherable iface, ignoring");
             return;
         }
-        enableIpServing(type, ifname, IpServer.STATE_LOCAL_ONLY);
+        // No need to look for active requests. There can never be explicit requests for
+        // TETHERING_WIFI_P2P because enableTetheringInternal ignores that type.
+        enableIpServing(null, type, ifname, IpServer.STATE_LOCAL_ONLY);
     }
 
     private void disableWifiP2pIpServingIfNeeded(String ifname) {
@@ -1662,17 +1696,35 @@ public class Tethering {
         disableWifiIpServingCommon(TETHERING_WIFI_P2P, ifname);
     }
 
+    // TODO: fold this in to enableWifiIpServing.  We cannot do this at the moment because there
+    // are tests that send wifi AP broadcasts with a null interface. But if this can't happen on
+    // real devices, we should fix those tests to always pass in an interface.
+    private int maybeInferWifiTetheringType(String ifname) {
+        return SdkLevel.isAtLeastT() ? TETHERING_WIFI : ifaceNameToType(ifname);
+    }
+
     private void enableWifiIpServing(String ifname, int wifiIpMode) {
         mLog.log("request WiFi tethering - interface=" + ifname + " state=" + wifiIpMode);
 
         // Map wifiIpMode values to IpServer.Callback serving states.
+        TetheringRequest request;
         final int ipServingMode;
+        final int type;
         switch (wifiIpMode) {
             case IFACE_IP_MODE_TETHERED:
                 ipServingMode = IpServer.STATE_TETHERED;
+                type = maybeInferWifiTetheringType(ifname);
+                request = getActiveTetheringRequest(type);
                 break;
             case IFACE_IP_MODE_LOCAL_ONLY:
                 ipServingMode = IpServer.STATE_LOCAL_ONLY;
+                type = maybeInferWifiTetheringType(ifname);
+                // BUG: this request is incorrect - instead of LOHS, it will reflect whatever
+                // request (if any) is being processed for TETHERING_WIFI. However, this is the
+                // historical behaviour. It mostly works because a) most of the time there is no
+                // such request b) tetherinternal doesn't look at the connectivity scope of the
+                // request, it takes the scope from requestedState.
+                request = getActiveTetheringRequest(type);
                 break;
             default:
                 mLog.e("Cannot enable IP serving in unknown WiFi mode: " + wifiIpMode);
@@ -1681,14 +1733,13 @@ public class Tethering {
 
         // After T, tethering always trust the iface pass by state change intent. This allow
         // tethering to deprecate tetherable wifi regexs after T.
-        final int type = SdkLevel.isAtLeastT() ? TETHERING_WIFI : ifaceNameToType(ifname);
         if (!checkTetherableType(type)) {
             mLog.e(ifname + " is not a tetherable iface, ignoring");
             return;
         }
 
         if (!TextUtils.isEmpty(ifname)) {
-            enableIpServing(type, ifname, ipServingMode);
+            enableIpServing(request, type, ifname, ipServingMode);
         } else {
             mLog.e("Cannot enable IP serving on missing interface name");
         }
@@ -1718,10 +1769,11 @@ public class Tethering {
             return;
         }
 
+        final TetheringRequest request = getActiveTetheringRequest(tetheringType);
         if (ifaces != null) {
             for (String iface : ifaces) {
                 if (ifaceNameToType(iface) == tetheringType) {
-                    enableIpServing(tetheringType, iface, requestedState, forNcmFunction);
+                    enableIpServing(request, tetheringType, iface, requestedState, forNcmFunction);
                     return;
                 }
             }
