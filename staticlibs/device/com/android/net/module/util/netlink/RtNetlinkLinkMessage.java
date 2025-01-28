@@ -357,7 +357,8 @@ public class RtNetlinkLinkMessage extends NetlinkMessage {
         // interface, including change in administrative state. While RTM_SETLINK is used to
         // modify an existing link rather than creating a new one.
         return RtNetlinkLinkMessage.build(
-                new StructNlMsgHdr(/*payloadLen*/ 0, RTM_NEWLINK, NLM_F_REQUEST, sequenceNumber),
+                new StructNlMsgHdr(
+                        /*payloadLen*/ 0, RTM_NEWLINK, NLM_F_REQUEST_ACK, sequenceNumber),
                 new StructIfinfoMsg((short) AF_UNSPEC, /*type*/ 0, interfaceIndex,
                         flagsBits, changeBits),
                 DEFAULT_MTU, /*hardwareAddress*/ null, /*interfaceName*/ null);
