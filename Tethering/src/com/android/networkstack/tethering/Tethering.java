@@ -74,6 +74,7 @@ import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS;
+import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WITH_PLACEHOLDER_REQUEST;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_MAIN_SM;
 
 import android.app.usage.NetworkStatsManager;
@@ -1169,6 +1170,12 @@ public class Tethering {
         final int requestedState = request.getConnectivityScope() == CONNECTIVITY_SCOPE_GLOBAL
                 ? IpServer.STATE_TETHERED : IpServer.STATE_LOCAL_ONLY;
         tetherState.ipServer.enable(requestedState, request);
+        if (request.getRequestType() == REQUEST_TYPE_PLACEHOLDER) {
+            TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
+                    "Started tethering with placeholder request: " + request,
+                    CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                    CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WITH_PLACEHOLDER_REQUEST);
+        }
         return TETHER_ERROR_NO_ERROR;
     }
 
