@@ -397,6 +397,16 @@ public class EthernetTracker {
         return mFactory.hasInterface(iface);
     }
 
+    private List<String> getAllInterfaces() {
+        final ArrayList<String> interfaces = new ArrayList<>(
+                List.of(mFactory.getAvailableInterfaces(/* includeRestricted */ true)));
+
+        if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
+            interfaces.add(mTetheringInterface);
+        }
+        return interfaces;
+    }
+
     String[] getClientModeInterfaces(boolean includeRestricted) {
         return mFactory.getAvailableInterfaces(includeRestricted);
     }
@@ -459,10 +469,16 @@ public class EthernetTracker {
     public void setIncludeTestInterfaces(boolean include) {
         mHandler.post(() -> {
             mIncludeTestInterfaces = include;
-            if (!include) {
+            if (include) {
+                trackAvailableInterfaces();
+            } else {
                 removeTestData();
+                // remove all test interfaces
+                for (String iface : getAllInterfaces()) {
+                    if (isValidEthernetInterface(iface)) continue;
+                    stopTrackingInterface(iface);
+                }
             }
-            trackAvailableInterfaces();
         });
     }
 
@@ -952,17 +968,7 @@ public class EthernetTracker {
             if (mIsEthernetEnabled == enabled) return;
 
             mIsEthernetEnabled = enabled;
-
-            // Interface in server mode should also be included.
-            ArrayList<String> interfaces =
-                    new ArrayList<>(
-                    List.of(mFactory.getAvailableInterfaces(/* includeRestricted */ true)));
-
-            if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
-                interfaces.add(mTetheringInterface);
-            }
-
-            for (String iface : interfaces) {
+            for (String iface : getAllInterfaces()) {
                 setInterfaceUpState(iface, enabled);
             }
             broadcastEthernetStateChange(mIsEthernetEnabled);

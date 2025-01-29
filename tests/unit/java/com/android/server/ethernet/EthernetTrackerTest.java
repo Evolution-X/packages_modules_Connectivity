@@ -79,6 +79,7 @@ public class EthernetTrackerTest {
         initMockResources();
         doReturn(false).when(mFactory).updateInterfaceLinkState(anyString(), anyBoolean());
         doReturn(new String[0]).when(mNetd).interfaceGetList();
+        doReturn(new String[0]).when(mFactory).getAvailableInterfaces(anyBoolean());
         mHandlerThread = new HandlerThread(THREAD_NAME);
         mHandlerThread.start();
         tracker = new EthernetTracker(mContext, mHandlerThread.getThreadHandler(), mFactory, mNetd,
