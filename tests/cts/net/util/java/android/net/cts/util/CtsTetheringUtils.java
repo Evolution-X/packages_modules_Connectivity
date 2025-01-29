@@ -126,6 +126,67 @@ public final class CtsTetheringUtils {
         }
     }
 
+    public static class StopTetheringCallback implements TetheringManager.StopTetheringCallback {
+        private static final int TIMEOUT_MS = 30_000;
+        public static class CallbackValue {
+            public final int error;
+
+            private CallbackValue(final int e) {
+                error = e;
+            }
+
+            public static class OnStopTetheringSucceeded extends CallbackValue {
+                OnStopTetheringSucceeded() {
+                    super(TETHER_ERROR_NO_ERROR);
+                }
+            }
+
+            public static class OnStopTetheringFailed extends CallbackValue {
+                OnStopTetheringFailed(final int error) {
+                    super(error);
+                }
+            }
+
+            @Override
+            public String toString() {
+                return String.format("%s(%d)", getClass().getSimpleName(), error);
+            }
+        }
+
+        private final ArrayTrackRecord<CallbackValue>.ReadHead mHistory =
+                new ArrayTrackRecord<CallbackValue>().newReadHead();
+
+        @Override
+        public void onStopTetheringSucceeded() {
+            mHistory.add(new CallbackValue.OnStopTetheringSucceeded());
+        }
+
+        @Override
+        public void onStopTetheringFailed(final int error) {
+            mHistory.add(new CallbackValue.OnStopTetheringFailed(error));
+        }
+
+        /**
+         *  Verifies that {@link #onStopTetheringSucceeded()} was called
+         */
+        public void verifyStopTetheringSucceeded() {
+            final CallbackValue cv = mHistory.poll(TIMEOUT_MS, c -> true);
+            assertNotNull("No onStopTetheringSucceeded after " + TIMEOUT_MS + " ms", cv);
+            assertTrue("Fail stop tethering:" + cv,
+                    cv instanceof CallbackValue.OnStopTetheringSucceeded);
+        }
+
+        /**
+         *  Verifies that {@link #onStopTetheringFailed(int)} was called
+         */
+        public void expectStopTetheringFailed(final int expected) {
+            final CallbackValue cv = mHistory.poll(TIMEOUT_MS, c -> true);
+            assertNotNull("No onStopTetheringFailed after " + TIMEOUT_MS + " ms", cv);
+            assertTrue("Expect fail with error code " + expected + ", but received: " + cv,
+                    (cv instanceof CallbackValue.OnStopTetheringFailed) && (cv.error == expected));
+        }
+    }
+
     private static boolean isRegexMatch(final String[] ifaceRegexs, String iface) {
         if (ifaceRegexs == null) fail("ifaceRegexs should not be null");
 
@@ -572,6 +633,23 @@ public final class CtsTetheringUtils {
             callback.expectOneOfOffloadStatusChanged(TETHER_HARDWARE_OFFLOAD_STOPPED);
         });
         expectSoftApDisabled();
+    }
+
+    /**
+     * Calls {@link TetheringManager#stopTethering(TetheringRequest, Executor,
+     * TetheringManager.StopTetheringCallback)} and verifies it throws an
+     * UnsupportedOperationException.
+     */
+    public void stopTethering(final TetheringRequest request) {
+        final StopTetheringCallback callback = new StopTetheringCallback();
+        runAsShell(TETHER_PRIVILEGED, () -> {
+            try {
+                mTm.stopTethering(request, Runnable::run /* Executor */, callback);
+                fail("stopTethering should throw UnsupportedOperationException");
+            } catch (UnsupportedOperationException expected) {
+                // Success.
+            }
+        });
     }
 
     public void stopAllTethering() {
