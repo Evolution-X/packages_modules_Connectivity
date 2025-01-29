@@ -3426,7 +3426,7 @@ public class TetheringTest {
         mTethering.interfaceStatusChanged(TEST_BT_IFNAME, false);
         mTethering.interfaceStatusChanged(TEST_BT_IFNAME, true);
         final ResultListener tetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
-        mTethering.legacyTether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
+        mTethering.legacyTether(TEST_BT_IFNAME, tetherResult);
         mLooper.dispatchAll();
         tetherResult.assertHasResult();
 
@@ -3476,7 +3476,7 @@ public class TetheringTest {
             mTethering.interfaceStatusChanged(TEST_BT_IFNAME, false);
             mTethering.interfaceStatusChanged(TEST_BT_IFNAME, true);
             final ResultListener tetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
-            mTethering.legacyTether(TEST_BT_IFNAME, IpServer.STATE_TETHERED, tetherResult);
+            mTethering.legacyTether(TEST_BT_IFNAME, tetherResult);
             mLooper.dispatchAll();
             tetherResult.assertHasResult();
         }
