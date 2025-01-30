@@ -594,9 +594,13 @@ static __always_inline inline int bpf_traffic_account(struct __sk_buff* skb,
 //
 //      | 4.9 | 4.14 | 4.19 | 5.4 | 5.10 | 5.15 | 6.1 | 6.6 | 6.12 |
 // 25Q2 |     |      |      |  x  |  x   |  x   |  x  |  x  |  x   |
-//    V |     |      |  x   |  x  |  x   |  x   |  x  |  x  |      |
+//    V |     |      |  x   |  x  |  x   |  x   |  x  |  x  |      | (netbpfload)
 //    U |     |  x   |  x   |  x  |  x   |  x   |  x  |     |      |
-//    T |  x  |  x   |  x   |  x  |  x   |  x   |     |     |      |
+//    T |  x  |  x   |  x   |  x  |  x   |  x   |     |     |      | (magic netbpfload)
+//    S |  x  |  x   |  x   |  x  |  x   |      |     |     |      | (platform loads offload)
+//    R |  x  |  x   |  x   |  x  |      |      |     |     |      | (no mainline ebpf)
+//
+// Not relevant for eBPF, but R can also run on 4.4
 
 // ----- cgroupskb/ingress/stats -----
 
