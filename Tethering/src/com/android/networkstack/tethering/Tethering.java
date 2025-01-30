@@ -47,6 +47,7 @@ import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_SERVICE_UNAVAIL;
 import static android.net.TetheringManager.TETHER_ERROR_UNAVAIL_IFACE;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_IFACE;
+import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_TYPE;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_FAILED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STARTED;
@@ -727,6 +728,37 @@ public class Tethering {
             stopTetheringInternal(type);
         });
     }
+
+    private boolean isTetheringTypePendingOrServing(final int type) {
+        for (int i = 0; i < mPendingTetheringRequests.size(); i++) {
+            if (mPendingTetheringRequests.valueAt(i).getTetheringType() == type) return true;
+        }
+        for (TetherState state : mTetherStates.values()) {
+            if (state.isCurrentlyServing() && state.ipServer.interfaceType() == type) return true;
+        }
+        return false;
+    }
+
+    void stopTetheringRequest(@NonNull final TetheringRequest request,
+            @NonNull final IIntResultListener listener) {
+        if (!isTetheringWithSoftApConfigEnabled()) return;
+        mHandler.post(() -> {
+            final int type = request.getTetheringType();
+            if (isTetheringTypePendingOrServing(type)) {
+                stopTetheringInternal(type);
+                try {
+                    listener.onResult(TETHER_ERROR_NO_ERROR);
+                } catch (RemoteException ignored) { }
+                return;
+            }
+
+            // Request doesn't match any active requests, ignore.
+            try {
+                listener.onResult(TETHER_ERROR_UNKNOWN_REQUEST);
+            } catch (RemoteException ignored) { }
+        });
+    }
+
     void stopTetheringInternal(int type) {
         mPendingTetheringRequests.remove(type);
 
