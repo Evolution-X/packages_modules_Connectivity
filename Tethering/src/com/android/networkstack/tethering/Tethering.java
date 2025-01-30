@@ -1081,8 +1081,7 @@ public class Tethering {
         return placeholder;
     }
 
-    private void handleLegacyTether(String iface, int requestedState,
-            final IIntResultListener listener) {
+    private void handleLegacyTether(String iface, final IIntResultListener listener) {
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             // After V, the TetheringManager and ConnectivityManager tether and untether methods
             // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
@@ -1099,7 +1098,7 @@ public class Tethering {
             } catch (RemoteException e) { }
         }
 
-        int result = tetherInternal(null, iface, requestedState);
+        int result = tetherInternal(null, iface, IpServer.STATE_TETHERED);
         switch (type) {
             case TETHERING_WIFI:
                 TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
@@ -1147,8 +1146,8 @@ public class Tethering {
      * WIFI_(AP/P2P_STATE_CHANGED broadcasts, which makes this API redundant for those types unless
      * those broadcasts are disabled by OEM.
      */
-    void legacyTether(String iface, int requestedState, final IIntResultListener listener) {
-        mHandler.post(() -> handleLegacyTether(iface, requestedState, listener));
+    void legacyTether(String iface, final IIntResultListener listener) {
+        mHandler.post(() -> handleLegacyTether(iface, listener));
     }
 
     // TODO: is it possible to make the request @NonNull here?
