@@ -127,6 +127,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import android.annotation.NonNull;
@@ -922,6 +923,7 @@ public class ConnectivityManagerTest {
     public void testOpenConnection() throws Exception {
         assumeTrue(mPackageManager.hasSystemFeature(FEATURE_WIFI));
         assumeTrue(mPackageManager.hasSystemFeature(FEATURE_TELEPHONY));
+        assumeFalse(Build.MODEL.contains("Cuttlefish"));
 
         Network wifiNetwork = mCtsNetUtils.ensureWifiConnected();
         Network cellNetwork = networkCallbackRule.requestCell();
