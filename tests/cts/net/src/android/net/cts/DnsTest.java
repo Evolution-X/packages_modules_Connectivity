@@ -18,6 +18,7 @@ package android.net.cts;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -26,6 +27,7 @@ import android.net.ConnectivityManager.NetworkCallback;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -299,6 +301,8 @@ public class DnsTest {
     }
 
     private void ensureIpv6Connectivity() throws InterruptedException {
+        assumeFalse(Build.MODEL.contains("Cuttlefish"));
+
         CountDownLatch latch = new CountDownLatch(1);
         final int TIMEOUT_MS = 5_000;
 
