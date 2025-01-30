@@ -2331,8 +2331,10 @@ public class ConnectivityManagerTest {
 
             // Verify that turning airplane mode off takes effect as expected.
             // connectToCell only registers a request, it cannot / does not need to be called twice
-            mCtsNetUtils.ensureWifiConnected();
-            if (verifyWifi) waitForAvailable(wifiCb);
+            if (verifyWifi) {
+                mCtsNetUtils.ensureWifiConnected();
+                waitForAvailable(wifiCb);
+            }
             if (supportTelephony) {
                 telephonyCb.eventuallyExpect(
                         CallbackEntry.AVAILABLE, CELL_DATA_AVAILABLE_TIMEOUT_MS);
