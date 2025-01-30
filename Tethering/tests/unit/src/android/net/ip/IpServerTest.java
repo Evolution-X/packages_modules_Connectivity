@@ -240,8 +240,8 @@ public class IpServerTest {
             Set<LinkAddress> upstreamAddresses, boolean usingLegacyDhcp, boolean usingBpfOffload)
             throws Exception {
         initStateMachine(interfaceType, usingLegacyDhcp, usingBpfOffload);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_GLOBAL));
         verify(mBpfCoordinator).addIpServer(mIpServer);
         if (upstreamIface != null) {
             InterfaceParams interfaceParams = mDependencies.getInterfaceParams(upstreamIface);
@@ -346,8 +346,8 @@ public class IpServerTest {
     public void canBeTetheredAsBluetooth() throws Exception {
         initStateMachine(TETHERING_BLUETOOTH);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_GLOBAL));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         if (isAtLeastT()) {
             inOrder.verify(mRoutingCoordinatorManager)
@@ -402,8 +402,8 @@ public class IpServerTest {
     public void canBeTetheredAsUsb() throws Exception {
         initStateMachine(TETHERING_USB);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_GLOBAL));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
                 eq(CONNECTIVITY_SCOPE_GLOBAL), any());
@@ -426,8 +426,8 @@ public class IpServerTest {
     public void canBeTetheredAsWifiP2p_NotUsingDedicatedIp() throws Exception {
         initStateMachine(TETHERING_WIFI_P2P);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_LOCAL));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         inOrder.verify(mRoutingCoordinatorManager).requestStickyDownstreamAddress(anyInt(),
                 eq(CONNECTIVITY_SCOPE_LOCAL), any());
@@ -451,8 +451,8 @@ public class IpServerTest {
         initStateMachine(TETHERING_WIFI_P2P, false /* usingLegacyDhcp */, DEFAULT_USING_BPF_OFFLOAD,
                 true /* shouldEnableWifiP2pDedicatedIp */);
 
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_LOCAL));
         InOrder inOrder = inOrder(mCallback, mNetd, mRoutingCoordinatorManager);
         // When using WiFi P2p dedicated IP, the IpServer just picks the IP address without
         // requesting for it at RoutingCoordinatorManager.
@@ -632,8 +632,8 @@ public class IpServerTest {
         initStateMachine(TETHERING_USB);
 
         doThrow(RemoteException.class).when(mNetd).tetherInterfaceAdd(IFACE_NAME);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_GLOBAL));
         InOrder usbTeardownOrder = inOrder(mNetd, mCallback);
         usbTeardownOrder.verify(mNetd).interfaceSetCfg(
                 argThat(cfg -> IFACE_NAME.equals(cfg.ifName)));
@@ -719,8 +719,8 @@ public class IpServerTest {
     @Test
     public void startsDhcpServerOnNcm() throws Exception {
         initStateMachine(TETHERING_NCM);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_LOCAL));
         dispatchTetherConnectionChanged(UPSTREAM_IFACE);
 
         assertDhcpStarted(new IpPrefix("192.168.42.0/24"));
@@ -729,8 +729,8 @@ public class IpServerTest {
     @Test
     public void testOnNewPrefixRequest() throws Exception {
         initStateMachine(TETHERING_NCM);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_LOCAL_ONLY, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_LOCAL));
 
         final IDhcpEventCallbacks eventCallbacks;
         final ArgumentCaptor<IDhcpEventCallbacks> dhcpEventCbsCaptor =
@@ -919,8 +919,8 @@ public class IpServerTest {
         doNothing().when(mDependencies).makeDhcpServer(any(), mDhcpParamsCaptor.capture(),
                 cbCaptor.capture());
         initStateMachine(TETHERING_WIFI);
-        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, STATE_TETHERED, 0,
-                mock(TetheringRequest.class));
+        dispatchCommand(IpServer.CMD_TETHER_REQUESTED, 0, 0,
+                createMockTetheringRequest(CONNECTIVITY_SCOPE_GLOBAL));
         verify(mDhcpServer, never()).startWithCallbacks(any(), any());
 
         // No stop dhcp server because dhcp server is not created yet.
@@ -964,6 +964,12 @@ public class IpServerTest {
         verify(mDhcpServer, timeout(MAKE_DHCPSERVER_TIMEOUT_MS).times(1)).startWithCallbacks(
                 any(), any());
         assertDhcpServingParams(mDhcpParamsCaptor.getValue(), expectedPrefix);
+    }
+
+    private TetheringRequest createMockTetheringRequest(int connectivityScope) {
+        TetheringRequest request = mock(TetheringRequest.class);
+        when(request.getConnectivityScope()).thenReturn(connectivityScope);
+        return request;
     }
 
     /**

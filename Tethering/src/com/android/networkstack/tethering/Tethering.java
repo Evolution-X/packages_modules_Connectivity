@@ -1167,9 +1167,7 @@ public class Tethering {
         //
         // This code cannot race with untether() because they both run on the handler thread.
         mPendingTetheringRequests.remove(request.getTetheringType());
-        final int requestedState = request.getConnectivityScope() == CONNECTIVITY_SCOPE_GLOBAL
-                ? IpServer.STATE_TETHERED : IpServer.STATE_LOCAL_ONLY;
-        tetherState.ipServer.enable(requestedState, request);
+        tetherState.ipServer.enable(request);
         if (request.getRequestType() == REQUEST_TYPE_PLACEHOLDER) {
             TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
                     "Started tethering with placeholder request: " + request,

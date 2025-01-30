@@ -429,9 +429,11 @@ public class IpServer extends StateMachineShim {
         return Collections.unmodifiableList(mDhcpLeases);
     }
 
-    /** Enable this IpServer. IpServer state machine will be tethered or localHotspot state. */
-    public void enable(final int requestedState, @NonNull final TetheringRequest request) {
-        sendMessage(CMD_TETHER_REQUESTED, requestedState, 0, request);
+    /**
+     * Enable this IpServer. IpServer state machine will be tethered or localHotspot state based on
+     * the connectivity scope of the TetheringRequest. */
+    public void enable(@NonNull final TetheringRequest request) {
+        sendMessage(CMD_TETHER_REQUESTED, 0, 0, request);
     }
 
     /** Stop this IpServer. After this is called this IpServer should not be used any more. */
@@ -1053,13 +1055,13 @@ public class IpServer extends StateMachineShim {
                 case CMD_TETHER_REQUESTED:
                     mLastError = TETHER_ERROR_NO_ERROR;
                     mTetheringRequest = (TetheringRequest) message.obj;
-                    switch (message.arg1) {
-                        case STATE_LOCAL_ONLY:
-                            maybeConfigureStaticIp((TetheringRequest) message.obj);
+                    switch (mTetheringRequest.getConnectivityScope()) {
+                        case CONNECTIVITY_SCOPE_LOCAL:
+                            maybeConfigureStaticIp(mTetheringRequest);
                             transitionTo(mLocalHotspotState);
                             break;
-                        case STATE_TETHERED:
-                            maybeConfigureStaticIp((TetheringRequest) message.obj);
+                        case CONNECTIVITY_SCOPE_GLOBAL:
+                            maybeConfigureStaticIp(mTetheringRequest);
                             transitionTo(mTetheredState);
                             break;
                         default:
