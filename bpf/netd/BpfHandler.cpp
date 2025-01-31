@@ -109,11 +109,7 @@ static Status initPrograms(const char* cg2_path) {
     }
 
     unique_fd cg_fd(open(cg2_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC));
-    if (!cg_fd.ok()) {
-        const int err = errno;
-        ALOGE("Failed to open the cgroup directory: %s", strerror(err));
-        return statusFromErrno(err, "Open the cgroup directory failed");
-    }
+    if (!cg_fd.ok()) return statusFromErrno(errno, "Opening cgroup dir failed");
 
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_ALLOWLIST_PROG_PATH));
     RETURN_IF_NOT_OK(checkProgramAccessible(XT_BPF_DENYLIST_PROG_PATH));
@@ -364,7 +360,7 @@ int BpfHandler::tagSocket(int sockFd, uint32_t tag, uid_t chargeUid, uid_t realU
         return -errno;
     }
     if (socketFamily != AF_INET && socketFamily != AF_INET6) {
-        ALOGE("Unsupported family: %d", socketFamily);
+        ALOGV("Unsupported family: %d", socketFamily);
         return -EAFNOSUPPORT;
     }
 
@@ -375,7 +371,7 @@ int BpfHandler::tagSocket(int sockFd, uint32_t tag, uid_t chargeUid, uid_t realU
         return -errno;
     }
     if (socketProto != IPPROTO_UDP && socketProto != IPPROTO_TCP) {
-        ALOGE("Unsupported protocol: %d", socketProto);
+        ALOGV("Unsupported protocol: %d", socketProto);
         return -EPROTONOSUPPORT;
     }
 
@@ -437,8 +433,8 @@ int BpfHandler::tagSocket(int sockFd, uint32_t tag, uid_t chargeUid, uid_t realU
         ALOGE("Failed to tag the socket: %s", strerror(res.error().code()));
         return -res.error().code();
     }
-    ALOGD("Socket with cookie %" PRIu64 " tagged successfully with tag %" PRIu32 " uid %u "
-              "and real uid %u", sock_cookie, tag, chargeUid, realUid);
+    ALOGV("Socket with cookie %" PRIu64 " tagged successfully with tag %" PRIu32 " uid %u "
+          "and real uid %u", sock_cookie, tag, chargeUid, realUid);
     return 0;
 }
 
@@ -449,10 +445,11 @@ int BpfHandler::untagSocket(int sockFd) {
     if (!mCookieTagMap.isValid()) return -EPERM;
     base::Result<void> res = mCookieTagMap.deleteValue(sock_cookie);
     if (!res.ok()) {
-        ALOGE("Failed to untag socket: %s", strerror(res.error().code()));
-        return -res.error().code();
+        const int err = res.error().code();
+        if (err != ENOENT) ALOGE("Failed to untag socket: %s", strerror(err));
+        return -err;
     }
-    ALOGD("Socket with cookie %" PRIu64 " untagged successfully.", sock_cookie);
+    ALOGV("Socket with cookie %" PRIu64 " untagged successfully.", sock_cookie);
     return 0;
 }
 
