@@ -465,13 +465,13 @@ public class TetheringManagerTest {
 
             // stopTethering without any tethering active should fail.
             TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
-            mCtsTetheringUtils.stopTethering(request, false /* succeeded */);
+            mCtsTetheringUtils.stopTethering(request, false /* expectSuccess */);
 
             // Start wifi tethering
             mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
 
             // stopTethering should succeed now that there's a request.
-            mCtsTetheringUtils.stopTethering(request, true /* succeeded */);
+            mCtsTetheringUtils.stopTethering(request, true /* expectSuccess */);
             tetherEventCallback.expectNoTetheringActive();
         } finally {
             mCtsTetheringUtils.stopAllTethering();
