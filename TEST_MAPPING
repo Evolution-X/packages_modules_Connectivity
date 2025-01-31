@@ -257,6 +257,9 @@
     // TODO: Move to presumit after meet SLO requirement.
     {
       "name": "NetworkStaticLibHostPythonTests"
+    },
+    {
+      "name": "CtsTetheringTestLatestSdk"
     }
   ],
   "mainline-presubmit": [
