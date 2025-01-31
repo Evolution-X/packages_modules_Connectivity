@@ -274,6 +274,16 @@ Status BpfHandler::init(const char* cg2_path) {
     RETURN_IF_NOT_OK(initPrograms(cg2_path));
     RETURN_IF_NOT_OK(initMaps());
 
+    if (android_get_device_api_level() > __ANDROID_API_V__) {
+        // make sure netd can create & write maps.  sepolicy is V+, but enough to enforce on 25Q2+
+        int key = 1;
+        int value = 123;
+        unique_fd map(bpf::createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
+        if (!map.ok()) return statusFromErrno(errno, fmt::format("map create failed"));
+        int rv = bpf::writeToMapEntry(map, &key, &value, BPF_ANY);
+        if (rv) return statusFromErrno(errno, fmt::format("map write failed (rv={})", rv));
+    }
+
     return netdutils::status::ok;
 }
 
