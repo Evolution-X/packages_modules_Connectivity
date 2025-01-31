@@ -22,6 +22,7 @@ import static android.Manifest.permission.NETWORK_SETTINGS;
 import static android.Manifest.permission.TETHER_PRIVILEGED;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
+import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_FAILED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STARTED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STOPPED;
@@ -637,17 +638,16 @@ public final class CtsTetheringUtils {
 
     /**
      * Calls {@link TetheringManager#stopTethering(TetheringRequest, Executor,
-     * TetheringManager.StopTetheringCallback)} and verifies it throws an
-     * UnsupportedOperationException.
+     * TetheringManager.StopTetheringCallback)} and verifies if it succeeded or failed.
      */
-    public void stopTethering(final TetheringRequest request) {
-        final StopTetheringCallback callback = new StopTetheringCallback();
+    public void stopTethering(final TetheringRequest request, boolean expectSuccess) {
+        final StopTetheringCallback stopTetheringCallback = new StopTetheringCallback();
         runAsShell(TETHER_PRIVILEGED, () -> {
-            try {
-                mTm.stopTethering(request, Runnable::run /* Executor */, callback);
-                fail("stopTethering should throw UnsupportedOperationException");
-            } catch (UnsupportedOperationException expected) {
-                // Success.
+            mTm.stopTethering(request, c -> c.run() /* executor */, stopTetheringCallback);
+            if (expectSuccess) {
+                stopTetheringCallback.verifyStopTetheringSucceeded();
+            } else {
+                stopTetheringCallback.expectStopTetheringFailed(TETHER_ERROR_UNKNOWN_REQUEST);
             }
         });
     }

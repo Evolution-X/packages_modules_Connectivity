@@ -18,6 +18,7 @@ package android.net;
 import android.net.IIntResultListener;
 import android.net.ITetheringEventCallback;
 import android.net.TetheringRequestParcel;
+import android.net.TetheringManager.TetheringRequest;
 import android.os.ResultReceiver;
 
 /** @hide */
@@ -36,6 +37,9 @@ oneway interface ITetheringConnector {
 
     void stopTethering(int type, String callerPkg, String callingAttributionTag,
             IIntResultListener receiver);
+
+    void stopTetheringRequest(in TetheringRequest request, String callerPkg,
+            String callingAttributionTag, IIntResultListener receiver);
 
     void requestLatestTetheringEntitlementResult(int type, in ResultReceiver receiver,
             boolean showEntitlementUi, String callerPkg, String callingAttributionTag);
