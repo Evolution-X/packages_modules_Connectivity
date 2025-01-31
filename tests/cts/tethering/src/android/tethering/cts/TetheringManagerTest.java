@@ -458,8 +458,25 @@ public class TetheringManagerTest {
     @Test
     public void testStopTetheringRequest() throws Exception {
         assumeTrue(isTetheringWithSoftApConfigEnabled());
-        TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
-        mCtsTetheringUtils.stopTethering(request);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+
+            // stopTethering without any tethering active should fail.
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
+            mCtsTetheringUtils.stopTethering(request, false /* succeeded */);
+
+            // Start wifi tethering
+            mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
+
+            // stopTethering should succeed now that there's a request.
+            mCtsTetheringUtils.stopTethering(request, true /* succeeded */);
+            tetherEventCallback.expectNoTetheringActive();
+        } finally {
+            mCtsTetheringUtils.stopAllTethering();
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
     }
 
     private boolean isTetheringWithSoftApConfigEnabled() {
