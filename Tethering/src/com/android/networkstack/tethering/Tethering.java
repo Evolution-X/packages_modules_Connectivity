@@ -736,6 +736,9 @@ public class Tethering {
             if (mPendingTetheringRequests.valueAt(i).getTetheringType() == type) return true;
         }
         for (TetherState state : mTetherStates.values()) {
+            // TODO: isCurrentlyServing only starts returning true once the IpServer has processed
+            // the CMD_TETHER_REQUESTED. Ensure that we consider the request to be serving even when
+            // that has not happened yet.
             if (state.isCurrentlyServing() && state.ipServer.interfaceType() == type) return true;
         }
         return false;
