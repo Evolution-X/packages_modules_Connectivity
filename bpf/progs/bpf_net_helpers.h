@@ -84,6 +84,8 @@ struct frag_hdr {
 #define ETH_IP6_TCP_OFFSET(field) (ETH_HLEN + IP6_TCP_OFFSET(field))
 #define ETH_IP6_UDP_OFFSET(field) (ETH_HLEN + IP6_UDP_OFFSET(field))
 
+static uint64_t (*bpf_get_netns_cookie)(void* ctx) = (void*)BPF_FUNC_get_netns_cookie;
+
 // this returns 0 iff skb->sk is NULL
 static uint64_t (*bpf_get_socket_cookie)(struct __sk_buff* skb) = (void*)BPF_FUNC_get_socket_cookie;
 static uint64_t (*bpf_get_sk_cookie)(struct bpf_sock* sk) = (void*)BPF_FUNC_get_socket_cookie;
