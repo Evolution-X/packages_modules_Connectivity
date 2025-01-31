@@ -419,6 +419,22 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
     DEFINE_BPF_MAP_UGM(the_map, TYPE, KeyType, ValueType, num_entries, \
                        DEFAULT_BPF_MAP_UID, gid, 0660)
 
+// idea from Linux include/linux/compiler_types.h (eBPF is always a 64-bit arch)
+#define NATIVE_WORD(t) ((sizeof(t) == 1) || (sizeof(t) == 2) || (sizeof(t) == 4) || (sizeof(t) == 8))
+
+// simplified from Linux include/asm-generic/rwonce.h
+#define READ_ONCE(x) \
+  ({ \
+    _Static_assert(NATIVE_WORD(x), "READ_ONCE requires a native word size"); \
+    (*(const volatile typeof(x) *)&(x)) \
+  })
+
+#define WRITE_ONCE(x, value) \
+  do { \
+    _Static_assert(NATIVE_WORD(x), "WRITE_ONCE requires a native word size"); \
+    *(volatile typeof(x) *)&(x) = (value); \
+  } while (0)
+
 // LLVM eBPF builtins: they directly generate BPF_LD_ABS/BPF_LD_IND (skb may be ignored?)
 unsigned long long load_byte(void* skb, unsigned long long off) asm("llvm.bpf.load.byte");
 unsigned long long load_half(void* skb, unsigned long long off) asm("llvm.bpf.load.half");
