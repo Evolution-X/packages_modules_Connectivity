@@ -34,7 +34,7 @@ public interface CertificateTransparencyLogger {
      * @param failureReason reason why the log list wasn't updated
      * @param failureCount number of consecutive log list update failures
      */
-    void logCTLogListUpdateStateChangedEvent(int failureReason, int failureCount);
+    void logCTLogListUpdateStateChangedEvent(CTLogListUpdateState failureReason, int failureCount);
 
     /**
      * Logs a CTLogListUpdateStateChanged event to statsd with an HTTP error status code.
@@ -44,6 +44,20 @@ public interface CertificateTransparencyLogger {
      * @param httpErrorStatusCode if relevant, the HTTP error status code from DownloadManager
      */
     void logCTLogListUpdateStateChangedEvent(
-            int failureReason, int failureCount, int httpErrorStatusCode);
+            CTLogListUpdateState failureReason, int failureCount, int httpErrorStatusCode);
 
+    /**
+     * Intermediate enum for use with CertificateTransparencyStatsLog.
+     *
+     * This enum primarily exists to avoid 100+ char line alert fatigue.
+     */
+    enum CTLogListUpdateState {
+        UNKNOWN_STATE,
+        HTTP_ERROR,
+        PUBLIC_KEY_NOT_FOUND,
+        SIGNATURE_INVALID,
+        SIGNATURE_NOT_FOUND,
+        SIGNATURE_VERIFICATION_FAILED,
+        VERSION_ALREADY_EXISTS
+    }
 }
