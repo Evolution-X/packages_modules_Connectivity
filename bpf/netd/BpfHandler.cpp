@@ -36,6 +36,8 @@ namespace net {
 using base::unique_fd;
 using base::WaitForProperty;
 using bpf::getSocketCookie;
+using bpf::isAtLeastKernelVersion;
+using bpf::queryProgram;
 using bpf::retrieveProgram;
 using netdutils::Status;
 using netdutils::statusFromErrno;
@@ -56,7 +58,7 @@ static Status attachProgramToCgroup(const char* programPath, const unique_fd& cg
     if (!cgroupProg.ok()) {
         return statusFromErrno(errno, fmt::format("Failed to get program from {}", programPath));
     }
-    if (android::bpf::attachProgram(type, cgroupProg, cgroupFd)) {
+    if (bpf::attachProgram(type, cgroupProg, cgroupFd)) {
         return statusFromErrno(errno, fmt::format("Program {} attach failed", programPath));
     }
     return netdutils::status::ok;
@@ -84,12 +86,12 @@ static Status initPrograms(const char* cg2_path) {
     if (!modules::sdklevel::IsAtLeastT()) return Status("S- platform is unsupported");
 
     // S requires eBPF support which was only added in 4.9, so this should be satisfied.
-    if (!bpf::isAtLeastKernelVersion(4, 9, 0)) {
+    if (!isAtLeastKernelVersion(4, 9, 0)) {
         return Status("kernel version < 4.9.0 is unsupported");
     }
 
     // U bumps the kernel requirement up to 4.14
-    if (modules::sdklevel::IsAtLeastU() && !bpf::isAtLeastKernelVersion(4, 14, 0)) {
+    if (modules::sdklevel::IsAtLeastU() && !isAtLeastKernelVersion(4, 14, 0)) {
         return Status("U+ platform with kernel version < 4.14.0 is unsupported");
     }
 
@@ -99,12 +101,12 @@ static Status initPrograms(const char* cg2_path) {
     }
 
     // V bumps the kernel requirement up to 4.19
-    if (modules::sdklevel::IsAtLeastV() && !bpf::isAtLeastKernelVersion(4, 19, 0)) {
+    if (modules::sdklevel::IsAtLeastV() && !isAtLeastKernelVersion(4, 19, 0)) {
         return Status("V+ platform with kernel version < 4.19.0 is unsupported");
     }
 
     // 25Q2 bumps the kernel requirement up to 5.4
-    if (isAtLeast25Q2() && !bpf::isAtLeastKernelVersion(5, 4, 0)) {
+    if (isAtLeast25Q2() && !isAtLeastKernelVersion(5, 4, 0)) {
         return Status("25Q2+ platform with kernel version < 5.4.0 is unsupported");
     }
 
@@ -123,12 +125,12 @@ static Status initPrograms(const char* cg2_path) {
     // cgroup if the program is pinned properly.
     // TODO: delete the if statement once all devices should support cgroup
     // socket filter (ie. the minimum kernel version required is 4.14).
-    if (bpf::isAtLeastKernelVersion(4, 14, 0)) {
+    if (isAtLeastKernelVersion(4, 14, 0)) {
         RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_INET_CREATE_PROG_PATH,
                                     cg_fd, BPF_CGROUP_INET_SOCK_CREATE));
     }
 
-    if (bpf::isAtLeastKernelVersion(5, 10, 0)) {
+    if (isAtLeastKernelVersion(5, 10, 0)) {
         RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_INET_RELEASE_PROG_PATH,
                                     cg_fd, BPF_CGROUP_INET_SOCK_RELEASE));
     }
@@ -136,7 +138,7 @@ static Status initPrograms(const char* cg2_path) {
     if (modules::sdklevel::IsAtLeastV()) {
         // V requires 4.19+, so technically this 2nd 'if' is not required, but it
         // doesn't hurt us to try to support AOSP forks that try to support older kernels.
-        if (bpf::isAtLeastKernelVersion(4, 19, 0)) {
+        if (isAtLeastKernelVersion(4, 19, 0)) {
             RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_CONNECT4_PROG_PATH,
                                         cg_fd, BPF_CGROUP_INET4_CONNECT));
             RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_CONNECT6_PROG_PATH,
@@ -151,7 +153,7 @@ static Status initPrograms(const char* cg2_path) {
                                         cg_fd, BPF_CGROUP_UDP6_SENDMSG));
         }
 
-        if (bpf::isAtLeastKernelVersion(5, 4, 0)) {
+        if (isAtLeastKernelVersion(5, 4, 0)) {
             RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_GETSOCKOPT_PROG_PATH,
                                         cg_fd, BPF_CGROUP_GETSOCKOPT));
             RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_SETSOCKOPT_PROG_PATH,
@@ -159,7 +161,7 @@ static Status initPrograms(const char* cg2_path) {
         }
     }
 
-    if (bpf::isAtLeastKernelVersion(4, 19, 0)) {
+    if (isAtLeastKernelVersion(4, 19, 0)) {
         RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_BIND4_PROG_PATH,
                 cg_fd, BPF_CGROUP_INET4_BIND));
         RETURN_IF_NOT_OK(attachProgramToCgroup(CGROUP_BIND6_PROG_PATH,
@@ -167,32 +169,32 @@ static Status initPrograms(const char* cg2_path) {
 
         // This should trivially pass, since we just attached up above,
         // but BPF_PROG_QUERY is only implemented on 4.19+ kernels.
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET_EGRESS) <= 0) abort();
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET_INGRESS) <= 0) abort();
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_CREATE) <= 0) abort();
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET4_BIND) <= 0) abort();
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET6_BIND) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_EGRESS) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_INGRESS) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_CREATE) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET4_BIND) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET6_BIND) <= 0) abort();
     }
 
-    if (bpf::isAtLeastKernelVersion(5, 10, 0)) {
-        if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_RELEASE) <= 0) abort();
+    if (isAtLeastKernelVersion(5, 10, 0)) {
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_RELEASE) <= 0) abort();
     }
 
     if (modules::sdklevel::IsAtLeastV()) {
         // V requires 4.19+, so technically this 2nd 'if' is not required, but it
         // doesn't hurt us to try to support AOSP forks that try to support older kernels.
-        if (bpf::isAtLeastKernelVersion(4, 19, 0)) {
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET4_CONNECT) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_INET6_CONNECT) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP4_RECVMSG) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP6_RECVMSG) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP4_SENDMSG) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_UDP6_SENDMSG) <= 0) abort();
+        if (isAtLeastKernelVersion(4, 19, 0)) {
+            if (queryProgram(cg_fd, BPF_CGROUP_INET4_CONNECT) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_INET6_CONNECT) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_UDP4_RECVMSG) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_UDP6_RECVMSG) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_UDP4_SENDMSG) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_UDP6_SENDMSG) <= 0) abort();
         }
 
-        if (bpf::isAtLeastKernelVersion(5, 4, 0)) {
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_GETSOCKOPT) <= 0) abort();
-            if (bpf::queryProgram(cg_fd, BPF_CGROUP_SETSOCKOPT) <= 0) abort();
+        if (isAtLeastKernelVersion(5, 4, 0)) {
+            if (queryProgram(cg_fd, BPF_CGROUP_GETSOCKOPT) <= 0) abort();
+            if (queryProgram(cg_fd, BPF_CGROUP_SETSOCKOPT) <= 0) abort();
         }
     }
 
@@ -232,7 +234,7 @@ static inline void waitForBpf() {
         // but there could be platform provided (xt_)bpf programs that oem/vendor
         // modified netd (which calls us during init) depends on...
         ALOGI("Waiting for platform BPF programs");
-        android::bpf::waitForProgsLoaded();
+        bpf::waitForProgsLoaded();
     }
 
     if (!mainlineNetBpfLoadDone()) {
@@ -306,7 +308,7 @@ static void mapLockTest(void) {
 
 Status BpfHandler::initMaps() {
     // bpfLock() requires bpfGetFdMapId which is only available on 4.14+ kernels.
-    if (bpf::isAtLeastKernelVersion(4, 14, 0)) {
+    if (isAtLeastKernelVersion(4, 14, 0)) {
         mapLockTest();
     }
 
