@@ -21,8 +21,13 @@ import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFIC
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_DOWNLOAD_CANNOT_RESUME;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_NO_DISK_SPACE;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_INVALID;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_TOO_MANY_REDIRECTS;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_UNKNOWN;
+import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS;
 import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__PENDING_WAITING_FOR_WIFI;
 
 import android.app.DownloadManager;
@@ -34,17 +39,28 @@ class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger
     public void logCTLogListUpdateStateChangedEventWithDownloadStatus(
             int downloadStatus, int failureCount) {
         logCTLogListUpdateStateChangedEvent(
-                downloadStatusToFailureReason(downloadStatus), failureCount);
-    }
-
-    @Override
-    public void logCTLogListUpdateStateChangedEvent(int failureReason, int failureCount) {
-        logCTLogListUpdateStateChangedEvent(
-                failureReason, failureCount, /* httpErrorStatusCode= */ 0);
+                downloadStatusToFailureReason(downloadStatus),
+                failureCount,
+                /* httpErrorStatusCode= */ 0);
     }
 
     @Override
     public void logCTLogListUpdateStateChangedEvent(
+            CTLogListUpdateState failureReason, int failureCount) {
+        logCTLogListUpdateStateChangedEvent(
+                localEnumToStatsLogEnum(failureReason),
+                failureCount,
+                /* httpErrorStatusCode= */ 0);
+    }
+
+    @Override
+    public void logCTLogListUpdateStateChangedEvent(
+            CTLogListUpdateState failureReason, int failureCount, int httpErrorStatusCode) {
+        logCTLogListUpdateStateChangedEvent(
+                localEnumToStatsLogEnum(failureReason), failureCount, httpErrorStatusCode);
+    }
+
+    private void logCTLogListUpdateStateChangedEvent(
             int failureReason, int failureCount, int httpErrorStatusCode) {
         CertificateTransparencyStatsLog.write(
                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED,
@@ -72,6 +88,27 @@ class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger
                 return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_NO_DISK_SPACE;
             case DownloadManager.PAUSED_QUEUED_FOR_WIFI:
                 return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__PENDING_WAITING_FOR_WIFI;
+            default:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_UNKNOWN;
+        }
+    }
+
+    /** Converts the local enum to the corresponding auto-generated one used by CTStatsLog. */
+    private int localEnumToStatsLogEnum(CTLogListUpdateState updateState) {
+        switch (updateState) {
+            case HTTP_ERROR:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR;
+            case PUBLIC_KEY_NOT_FOUND:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
+            case SIGNATURE_INVALID:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_INVALID;
+            case SIGNATURE_NOT_FOUND:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND;
+            case SIGNATURE_VERIFICATION_FAILED:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
+            case VERSION_ALREADY_EXISTS:
+                return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS;
+            case UNKNOWN_STATE:
             default:
                 return CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_UNKNOWN;
         }
