@@ -16,11 +16,6 @@
 
 package com.android.server.net.ct;
 
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS;
-
 import android.annotation.RequiresApi;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
@@ -33,6 +28,7 @@ import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState;
 import com.android.server.net.ct.DownloadHelper.DownloadStatus;
 
 import java.io.IOException;
@@ -231,19 +227,17 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         }
 
         boolean success = false;
-        int failureReason = -1;
+        CTLogListUpdateState failureReason = CTLogListUpdateState.UNKNOWN_STATE;
 
         try {
             success = mSignatureVerifier.verify(contentUri, metadataUri);
         } catch (MissingPublicKeyException e) {
             updateFailureCount();
-            failureReason =
-                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
+            failureReason = CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND;
             Log.e(TAG, "No public key found for log list verification", e);
         } catch (InvalidKeyException e) {
             updateFailureCount();
-            failureReason =
-                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
+            failureReason = CTLogListUpdateState.SIGNATURE_INVALID;
             Log.e(TAG, "Signature invalid for log list verification", e);
         } catch (IOException | GeneralSecurityException e) {
             Log.e(TAG, "Could not verify new log list", e);
@@ -253,18 +247,16 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             Log.w(TAG, "Log list did not pass verification");
 
             // Avoid logging failure twice
-            if (failureReason == -1) {
+            if (failureReason == CTLogListUpdateState.UNKNOWN_STATE) {
                 updateFailureCount();
-                failureReason =
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
+                failureReason = CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED;
             }
 
-            if (failureReason != -1) {
-                mLogger.logCTLogListUpdateStateChangedEvent(
-                        failureReason,
-                        mDataStore.getPropertyInt(
-                                Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
-            }
+            mLogger.logCTLogListUpdateStateChangedEvent(
+                    failureReason,
+                    mDataStore.getPropertyInt(
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+
             return;
         }
 
@@ -282,7 +274,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
         } else {
             updateFailureCount();
             mLogger.logCTLogListUpdateStateChangedEvent(
-                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS,
+                    CTLogListUpdateState.VERSION_ALREADY_EXISTS,
                     mDataStore.getPropertyInt(
                             Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
             }
@@ -298,7 +290,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
 
         if (status.isHttpError()) {
             mLogger.logCTLogListUpdateStateChangedEvent(
-                    CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_HTTP_ERROR,
+                    CTLogListUpdateState.HTTP_ERROR,
                     failureCount,
                     status.reason());
         } else {
