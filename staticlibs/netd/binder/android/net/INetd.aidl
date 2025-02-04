@@ -933,24 +933,27 @@ interface INetd {
    /**
     * NO_PERMISSIONS indicates that this app is installed and doesn't have either
     * PERMISSION_INTERNET or PERMISSION_UPDATE_DEVICE_STATS.
-    * TODO: use PERMISSION_NONE to represent this case
+    * @deprecated usage is internal to module.
     */
     const int NO_PERMISSIONS = 0;
 
    /**
-    * PERMISSION_INTERNET indicates that the app can create AF_INET and AF_INET6 sockets
+    * PERMISSION_INTERNET indicates that the app can create AF_INET and AF_INET6 sockets.
+    * @deprecated usage is internal to module.
     */
     const int PERMISSION_INTERNET = 4;
 
    /**
     * PERMISSION_UPDATE_DEVICE_STATS is used for system UIDs and privileged apps
-    * that have the UPDATE_DEVICE_STATS permission
+    * that have the UPDATE_DEVICE_STATS permission.
+    * @deprecated usage is internal to module.
     */
     const int PERMISSION_UPDATE_DEVICE_STATS = 8;
 
    /**
     * PERMISSION_UNINSTALLED is used when an app is uninstalled from the device. All internet
-    * related permissions need to be cleaned
+    * related permissions need to be cleaned.
+    * @deprecated usage is internal to module.
     */
     const int PERMISSION_UNINSTALLED = -1;
 
