@@ -16,11 +16,6 @@
 
 package com.android.server.net.ct;
 
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION;
-import static com.android.server.net.ct.CertificateTransparencyStatsLog.CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS;
-
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +38,8 @@ import android.database.MatrixCursor;
 import android.net.Uri;
 
 import androidx.test.platform.app.InstrumentationRegistry;
+
+import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -358,17 +355,19 @@ public class CertificateTransparencyDownloaderTest {
                 .isEqualTo(1);
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND,
+                        CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND,
                         /* failureCount= */ 1);
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
+                        eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION),
+                        eq(CTLogListUpdateState.SIGNATURE_INVALID),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED),
                         anyInt());
     }
 
@@ -396,15 +395,22 @@ public class CertificateTransparencyDownloaderTest {
                         mDataStore.getPropertyInt(
                                 Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0))
                 .isEqualTo(1);
-        verify(mLogger, never())
-                .logCTLogListUpdateStateChangedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
-                        anyInt());
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
+                        CTLogListUpdateState.SIGNATURE_INVALID,
                         /* failureCount= */ 1);
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
+                        anyInt());
     }
 
     @Test
@@ -433,17 +439,19 @@ public class CertificateTransparencyDownloaderTest {
                 .isEqualTo(1);
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_NOT_FOUND),
+                        eq(CTLogListUpdateState.SIGNATURE_NOT_FOUND),
                         anyInt());
         verify(mLogger, never())
                 .logCTLogListUpdateStateChangedEvent(
-                        eq(
-                                CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_PUBLIC_KEY_NOT_FOUND),
+                        eq(CTLogListUpdateState.SIGNATURE_INVALID),
+                        anyInt());
+        verify(mLogger, never())
+                .logCTLogListUpdateStateChangedEvent(
+                        eq(CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND),
                         anyInt());
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_SIGNATURE_VERIFICATION,
+                        CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED,
                         /* failureCount= */ 1);
     }
 
@@ -467,7 +475,7 @@ public class CertificateTransparencyDownloaderTest {
                 .isEqualTo(1);
         verify(mLogger, times(1))
                 .logCTLogListUpdateStateChangedEvent(
-                        CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED__UPDATE_STATUS__FAILURE_VERSION_ALREADY_EXISTS,
+                        CTLogListUpdateState.VERSION_ALREADY_EXISTS,
                         /* failureCount= */ 1);
     }
 
