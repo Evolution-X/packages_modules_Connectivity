@@ -729,6 +729,12 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
         }
 
         enum bpf_map_type type = md[i].type;
+        if (type == BPF_MAP_TYPE_LPM_TRIE && !isAtLeastKernelVersion(4, 14, 0)) {
+            // On Linux Kernels older than 4.14 this map type doesn't exist - autoskip.
+            ALOGD("skipping LPM_TRIE map %s - requires kver 4.14+", mapNames[i].c_str());
+            mapFds.push_back(unique_fd());
+            continue;
+        }
         if (type == BPF_MAP_TYPE_DEVMAP && !isAtLeastKernelVersion(4, 14, 0)) {
             // On Linux Kernels older than 4.14 this map type doesn't exist, but it can kind
             // of be approximated: ARRAY has the same userspace api, though it is not usable
