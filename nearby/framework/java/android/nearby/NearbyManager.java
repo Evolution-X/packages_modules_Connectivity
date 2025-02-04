@@ -46,6 +46,7 @@ import java.util.Objects;
 import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * This class provides a way to perform Nearby related operations such as scanning, broadcasting
@@ -503,7 +504,7 @@ public class NearbyManager {
                     PoweredOffFindingEphemeralId ephemeralId = new PoweredOffFindingEphemeralId();
                     ephemeralId.bytes = eid;
                     return ephemeralId;
-                }).toList();
+                }).collect(Collectors.toUnmodifiableList());
         try {
             mService.setPoweredOffFindingEphemeralIds(ephemeralIdList);
         } catch (RemoteException e) {
