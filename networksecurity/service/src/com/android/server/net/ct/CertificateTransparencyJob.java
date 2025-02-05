@@ -17,12 +17,12 @@ package com.android.server.net.ct;
 
 import android.annotation.RequiresApi;
 import android.app.AlarmManager;
+import android.app.DownloadManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.ConfigUpdate;
 import android.os.SystemClock;
@@ -33,28 +33,28 @@ import android.util.Log;
 public class CertificateTransparencyJob extends BroadcastReceiver {
 
     private static final String TAG = "CertificateTransparencyJob";
-    private static final String UPDATE_CONFIG_PERMISSION = "android.permission.UPDATE_CONFIG";
 
     private final Context mContext;
-    private final CompatibilityVersion mCompatVersion;
+    private final DataStore mDataStore;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
+    private final CompatibilityVersion mCompatVersion;
     private final AlarmManager mAlarmManager;
     private final PendingIntent mPendingIntent;
 
+    private boolean mScheduled = false;
     private boolean mDependenciesReady = false;
 
     /** Creates a new {@link CertificateTransparencyJob} object. */
     public CertificateTransparencyJob(
-            Context context, CertificateTransparencyDownloader certificateTransparencyDownloader) {
+            Context context,
+            DataStore dataStore,
+            CertificateTransparencyDownloader certificateTransparencyDownloader,
+            CompatibilityVersion compatVersion) {
         mContext = context;
-        mCompatVersion =
-                new CompatibilityVersion(
-                        Config.COMPATIBILITY_VERSION,
-                        Config.URL_SIGNATURE,
-                        Config.URL_LOG_LIST,
-                        Config.CT_ROOT_DIRECTORY_PATH);
+        mDataStore = dataStore;
         mCertificateTransparencyDownloader = certificateTransparencyDownloader;
-        mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
+        mCompatVersion = compatVersion;
+
         mAlarmManager = context.getSystemService(AlarmManager.class);
         mPendingIntent =
                 PendingIntent.getBroadcast(
@@ -65,15 +65,19 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     }
 
     void schedule() {
-        mContext.registerReceiver(
-                this,
-                new IntentFilter(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
-                Context.RECEIVER_EXPORTED);
-        mAlarmManager.setInexactRepeating(
-                AlarmManager.ELAPSED_REALTIME,
-                SystemClock.elapsedRealtime(), // schedule first job at earliest convenient time.
-                AlarmManager.INTERVAL_DAY,
-                mPendingIntent);
+        if (!mScheduled) {
+            mContext.registerReceiver(
+                    this,
+                    new IntentFilter(ConfigUpdate.ACTION_UPDATE_CT_LOGS),
+                    Context.RECEIVER_EXPORTED);
+            mAlarmManager.setInexactRepeating(
+                    AlarmManager.ELAPSED_REALTIME,
+                    SystemClock
+                            .elapsedRealtime(), // schedule first job at earliest convenient time.
+                    AlarmManager.INTERVAL_DAY,
+                    mPendingIntent);
+        }
+        mScheduled = true;
 
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyJob scheduled.");
@@ -81,11 +85,18 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     }
 
     void cancel() {
-        mContext.unregisterReceiver(this);
-        mAlarmManager.cancel(mPendingIntent);
-        mCertificateTransparencyDownloader.stop();
-        mCompatVersion.delete();
+        if (mScheduled) {
+            mContext.unregisterReceiver(this);
+            mAlarmManager.cancel(mPendingIntent);
+        }
+        mScheduled = false;
+
+        if (mDependenciesReady) {
+            stopDependencies();
+        }
         mDependenciesReady = false;
+
+        mCompatVersion.delete();
 
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyJob canceled.");
@@ -98,16 +109,11 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Log.w(TAG, "Received unexpected broadcast with action " + intent);
             return;
         }
-        if (context.checkCallingOrSelfPermission(UPDATE_CONFIG_PERMISSION)
-                != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "Caller does not have UPDATE_CONFIG permission.");
-            return;
-        }
         if (Config.DEBUG) {
             Log.d(TAG, "Starting CT daily job.");
         }
         if (!mDependenciesReady) {
-            mCertificateTransparencyDownloader.start();
+            startDependencies();
             mDependenciesReady = true;
         }
 
@@ -115,6 +121,29 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Log.e(TAG, "Public key download not started.");
         } else if (Config.DEBUG) {
             Log.d(TAG, "Public key download started successfully.");
+        }
+    }
+
+    private void startDependencies() {
+        mDataStore.load();
+        mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
+        mContext.registerReceiver(
+                mCertificateTransparencyDownloader,
+                new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                Context.RECEIVER_EXPORTED);
+
+        if (Config.DEBUG) {
+            Log.d(TAG, "CertificateTransparencyJob dependencies ready.");
+        }
+    }
+
+    private void stopDependencies() {
+        mContext.unregisterReceiver(mCertificateTransparencyDownloader);
+        mCertificateTransparencyDownloader.clearCompatibilityVersions();
+        mDataStore.delete();
+
+        if (Config.DEBUG) {
+            Log.d(TAG, "CertificateTransparencyJob dependencies stopped.");
         }
     }
 }
