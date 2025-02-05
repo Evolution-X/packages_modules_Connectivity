@@ -24,6 +24,8 @@ import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateSt
 
 import com.google.auto.value.AutoValue;
 
+import java.util.Optional;
+
 /** Class to represent the signature verification status for Certificate Transparency. */
 @AutoValue
 public abstract class LogListUpdateStatus {
@@ -33,6 +35,10 @@ public abstract class LogListUpdateStatus {
     abstract String signature();
 
     abstract long logListTimestamp();
+
+    abstract int httpErrorStatusCode();
+
+    abstract Optional<Integer> downloadStatus();
 
     boolean isSignatureVerified() {
         // Check that none of the signature verification failures have been set as the state
@@ -54,6 +60,10 @@ public abstract class LogListUpdateStatus {
 
         abstract Builder setLogListTimestamp(long timestamp);
 
+        abstract Builder setHttpErrorStatusCode(int httpStatusCode);
+
+        abstract Builder setDownloadStatus(Optional<Integer> downloadStatus);
+
         abstract LogListUpdateStatus build();
     }
 
@@ -63,6 +73,8 @@ public abstract class LogListUpdateStatus {
         return new AutoValue_LogListUpdateStatus.Builder()
             .setState(CTLogListUpdateState.UNKNOWN_STATE)
             .setSignature("")
-            .setLogListTimestamp(0L);
+            .setLogListTimestamp(0L)
+            .setHttpErrorStatusCode(0)
+            .setDownloadStatus(Optional.empty());
     }
 }
