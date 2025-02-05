@@ -41,8 +41,6 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
 
     private final CertificateTransparencyJob mCertificateTransparencyJob;
 
-    private boolean started = false;
-
     /**
      * @return true if the CertificateTransparency service is enabled.
      */
@@ -53,16 +51,22 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
     /** Creates a new {@link CertificateTransparencyService} object. */
     public CertificateTransparencyService(Context context) {
         DataStore dataStore = new DataStore(Config.PREFERENCES_FILE);
-        DownloadHelper downloadHelper = new DownloadHelper(context);
-        SignatureVerifier signatureVerifier = new SignatureVerifier(context);
-        CertificateTransparencyDownloader downloader =
-                new CertificateTransparencyDownloader(
+
+        mCertificateTransparencyJob =
+                new CertificateTransparencyJob(
                         context,
                         dataStore,
-                        downloadHelper,
-                        signatureVerifier,
-                        new CertificateTransparencyLoggerImpl());
-        mCertificateTransparencyJob = new CertificateTransparencyJob(context, downloader);
+                        new CertificateTransparencyDownloader(
+                                context,
+                                dataStore,
+                                new DownloadHelper(context),
+                                new SignatureVerifier(context),
+                                new CertificateTransparencyLoggerImpl()),
+                        new CompatibilityVersion(
+                                Config.COMPATIBILITY_VERSION,
+                                Config.URL_SIGNATURE,
+                                Config.URL_LOG_LIST,
+                                Config.CT_ROOT_DIRECTORY_PATH));
     }
 
     /**
@@ -104,19 +108,13 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyService start");
         }
-        if (!started) {
-            mCertificateTransparencyJob.schedule();
-            started = true;
-        }
+        mCertificateTransparencyJob.schedule();
     }
 
     private void stopService() {
         if (Config.DEBUG) {
             Log.d(TAG, "CertificateTransparencyService stop");
         }
-        if (started) {
-            mCertificateTransparencyJob.cancel();
-            started = false;
-        }
+        mCertificateTransparencyJob.cancel();
     }
 }
