@@ -34,7 +34,6 @@ import com.android.server.net.ct.DownloadHelper.DownloadStatus;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -226,39 +225,23 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             return;
         }
 
-        boolean success = false;
-        CTLogListUpdateState failureReason = CTLogListUpdateState.UNKNOWN_STATE;
+        LogListUpdateStatus updateStatus = mSignatureVerifier.verify(contentUri, metadataUri);
+        // TODO(b/391327942): parse file and log the timestamp of the log list
 
-        try {
-            success = mSignatureVerifier.verify(contentUri, metadataUri);
-        } catch (MissingPublicKeyException e) {
+        if (!updateStatus.isSignatureVerified()) {
             updateFailureCount();
-            failureReason = CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND;
-            Log.e(TAG, "No public key found for log list verification", e);
-        } catch (InvalidKeyException e) {
-            updateFailureCount();
-            failureReason = CTLogListUpdateState.SIGNATURE_INVALID;
-            Log.e(TAG, "Signature invalid for log list verification", e);
-        } catch (IOException | GeneralSecurityException e) {
-            Log.e(TAG, "Could not verify new log list", e);
-        }
-
-        if (!success) {
             Log.w(TAG, "Log list did not pass verification");
 
-            // Avoid logging failure twice
-            if (failureReason == CTLogListUpdateState.UNKNOWN_STATE) {
-                updateFailureCount();
-                failureReason = CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED;
-            }
-
             mLogger.logCTLogListUpdateStateChangedEvent(
-                    failureReason,
+                    updateStatus.state(),
                     mDataStore.getPropertyInt(
-                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0),
+                    updateStatus.signature());
 
             return;
         }
+
+        boolean success = false;
 
         try (InputStream inputStream = mContext.getContentResolver().openInputStream(contentUri)) {
             success = compatVersion.install(inputStream);
@@ -276,7 +259,8 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             mLogger.logCTLogListUpdateStateChangedEvent(
                     CTLogListUpdateState.VERSION_ALREADY_EXISTS,
                     mDataStore.getPropertyInt(
-                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0));
+                            Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0),
+                    updateStatus.signature());
             }
         }
 
@@ -288,6 +272,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
                 mDataStore.getPropertyInt(
                         Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
 
+        // Unable to log the signature, as that is dependent on successful downloads
         if (status.isHttpError()) {
             mLogger.logCTLogListUpdateStateChangedEvent(
                     CTLogListUpdateState.HTTP_ERROR,
