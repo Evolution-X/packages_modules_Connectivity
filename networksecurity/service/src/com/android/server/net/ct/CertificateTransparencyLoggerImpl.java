@@ -35,47 +35,54 @@ import android.app.DownloadManager;
 /** Implementation for logging to statsd for Certificate Transparency. */
 class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger {
 
-    @Override
-    public void logCTLogListUpdateStateChangedEventWithDownloadStatus(
-            int downloadStatus, int failureCount) {
-        logCTLogListUpdateStateChangedEvent(
-                downloadStatusToFailureReason(downloadStatus),
-                failureCount,
-                /* httpErrorStatusCode= */ 0,
-                /* signature= */ "");
+    private final DataStore mDataStore;
+
+    CertificateTransparencyLoggerImpl(DataStore dataStore) {
+        mDataStore = dataStore;
     }
 
     @Override
-    public void logCTLogListUpdateStateChangedEvent(
-            CTLogListUpdateState failureReason, int failureCount, String signature) {
-        logCTLogListUpdateStateChangedEvent(
-                localEnumToStatsLogEnum(failureReason),
-                failureCount,
-                /* httpErrorStatusCode= */ 0,
-                signature);
-    }
+    public void logCTLogListUpdateStateChangedEvent(LogListUpdateStatus updateStatus) {
+        int updateState =
+                updateStatus
+                        .downloadStatus()
+                        .map(s -> downloadStatusToFailureReason(s))
+                        .orElseGet(() -> localEnumToStatsLogEnum(updateStatus.state()));
+        int failureCount =
+                mDataStore.getPropertyInt(
+                        Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
 
-    @Override
-    public void logCTLogListUpdateStateChangedEvent(
-            CTLogListUpdateState failureReason,
-            int failureCount,
-            int httpErrorStatusCode) {
         logCTLogListUpdateStateChangedEvent(
-                localEnumToStatsLogEnum(failureReason),
+                updateState,
                 failureCount,
-                httpErrorStatusCode,
-                /* signature= */ "");
+                updateStatus.httpErrorStatusCode(),
+                updateStatus.signature());
     }
 
     private void logCTLogListUpdateStateChangedEvent(
-            int failureReason, int failureCount, int httpErrorStatusCode, String signature) {
+            int updateState, int failureCount, int httpErrorStatusCode, String signature) {
+        updateFailureCount();
+
         CertificateTransparencyStatsLog.write(
                 CERTIFICATE_TRANSPARENCY_LOG_LIST_UPDATE_STATE_CHANGED,
-                failureReason,
+                updateState,
                 failureCount,
                 httpErrorStatusCode,
                 signature,
                 /* logListTimestampMs= */ 0);
+    }
+
+    /**
+     * Updates the data store with the current number of consecutive log list update failures.
+     */
+    private void updateFailureCount() {
+        int failure_count =
+                mDataStore.getPropertyInt(
+                        Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
+        int new_failure_count = failure_count + 1;
+
+        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
+        mDataStore.store();
     }
 
     /** Converts DownloadStatus reason into failure reason to log. */
