@@ -55,34 +55,6 @@ java_defaults {
     host_required: ["net-tests-utils-host-common"],
 }
 
-// Tethering CTS tests that target the latest released SDK. These tests can be installed on release
-// devices which has equal or lowner sdk version than target sdk and are useful for qualifying
-// mainline modules on release devices.
-android_test {
-    name: "CtsTetheringTestLatestSdk",
-    defaults: [
-        "ConnectivityTestsLatestSdkDefaults",
-        "CtsTetheringTestDefaults",
-    ],
-
-    min_sdk_version: "30",
-
-    static_libs: [
-        "TetheringIntegrationTestsLatestSdkLib",
-    ],
-
-    test_suites: [
-        "general-tests",
-        "mts-tethering",
-    ],
-
-    test_config_template: "AndroidTestTemplate.xml",
-
-    // Include both the 32 and 64 bit versions
-    compile_multilib: "both",
-    jarjar_rules: ":NetworkStackJarJarRules",
-}
-
 // Tethering CTS tests for development and release. These tests always target the platform SDK
 // version, and are subject to all the restrictions appropriate to that version. Before SDK
 // finalization, these tests have a min_sdk_version of 10000, but they can still be installed on
