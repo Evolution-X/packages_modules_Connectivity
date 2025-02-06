@@ -5801,7 +5801,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
 
             if (shouldTrackUidsForBlockedStatusCallbacks()
-                    && isAppRequest(nri)
+                    && nri.mMessenger != null
                     && !nri.mUidTrackedForBlockedStatus) {
                 Log.wtf(TAG, "Registered nri is not tracked for sending blocked status: " + nri);
             }
