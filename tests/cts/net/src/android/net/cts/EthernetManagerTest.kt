@@ -605,6 +605,9 @@ class EthernetManagerTest {
     }
 
     private fun assumeNoInterfaceForTetheringAvailable() {
+         // Requesting a tethered interface will stop IpClient. Prevent it from doing so
+         // if adb is connected over ethernet.
+         assumeFalse(isAdbOverEthernet())
         // Interfaces that have configured NetworkCapabilities will never be used for tethering,
         // see aosp/2123900.
         try {
