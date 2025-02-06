@@ -361,7 +361,7 @@ public:
 const sockaddr_nl KERNEL_NLADDR = {AF_NETLINK, 0, 0, 0};
 const uint16_t NETLINK_REQUEST_FLAGS = NLM_F_REQUEST | NLM_F_ACK;
 
-int sendAndProcessNetlinkResponse(const void *req, int len) {
+int sendAndProcessNetlinkResponse(const void *req, int len, bool enoent_ok) {
   // TODO: use unique_fd instead of ScopeGuard
   unique_fd fd(socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE));
   if (!fd.ok()) {
@@ -445,7 +445,9 @@ int sendAndProcessNetlinkResponse(const void *req, int len) {
     return -ENOMSG;
   }
 
-  if (resp.e.error) {
+  if (resp.e.error == -ENOENT) {
+    if (!enoent_ok) ALOGE("NLMSG_ERROR message returned ENOENT");
+  } else if (resp.e.error) {
     ALOGE("NLMSG_ERROR message return error: %d", resp.e.error);
   }
   return resp.e.error; // returns 0 on success
@@ -560,7 +562,8 @@ int doTcQdiscClsact(int ifIndex, uint16_t nlMsgType, uint16_t nlMsgFlags) {
   };
 #undef CLSACT
 
-  return sendAndProcessNetlinkResponse(&req, sizeof(req));
+  const bool enoent_ok = (nlMsgType == RTM_DELQDISC);
+  return sendAndProcessNetlinkResponse(&req, sizeof(req), enoent_ok);
 }
 
 // tc filter add dev .. in/egress prio 1 protocol ipv6/ip bpf object-pinned
@@ -666,7 +669,7 @@ int tcAddBpfFilter(int ifIndex, bool ingress, uint16_t prio, uint16_t proto,
   snprintf(req.options.name.str, sizeof(req.options.name.str), "%s:[*fsobj]",
            basename(bpfProgPath));
 
-  int error = sendAndProcessNetlinkResponse(&req, sizeof(req));
+  int error = sendAndProcessNetlinkResponse(&req, sizeof(req), false);
   return error;
 }
 
@@ -698,7 +701,8 @@ int tcAddIngressPoliceFilter(int ifIndex, uint16_t prio, uint16_t proto,
     return error;
   }
   return sendAndProcessNetlinkResponse(filter.getRequest(),
-                                       filter.getRequestSize());
+                                       filter.getRequestSize(),
+                                       false);
 }
 
 // tc filter del dev .. in/egress prio .. protocol ..
@@ -726,7 +730,7 @@ int tcDeleteFilter(int ifIndex, bool ingress, uint16_t prio, uint16_t proto) {
           },
   };
 
-  return sendAndProcessNetlinkResponse(&req, sizeof(req));
+  return sendAndProcessNetlinkResponse(&req, sizeof(req), true);
 }
 
 } // namespace android
