@@ -170,6 +170,9 @@
 // IPv6 extension headers (HOPOPTS, DSTOPS, FRAG) begin with a u8 nexthdr
 #define BPF_LOAD_NETX_RELATIVE_V6EXTHDR_NEXTHDR BPF_LOAD_NETX_RELATIVE_L4_U8(0)
 
+// IPv6 MLD start with u8 type
+#define BPF_LOAD_NETX_RELATIVE_MLD_TYPE BPF_LOAD_NETX_RELATIVE_L4_U8(0)
+
 // IPv6 fragment header is always exactly 8 bytes long
 #define BPF_LOAD_CONSTANT_V6FRAGHDR_LEN \
     BPF_STMT(BPF_LD | BPF_IMM, 8)
