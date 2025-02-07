@@ -25,7 +25,7 @@ rust_defaults {
     ],
     prefer_rlib: true,
     apex_available: [
-        "com.android.remoteauth",
+        "com.android.tethering",
     ],
     host_supported: true,
 }
