@@ -55,6 +55,20 @@ import java.util.Map;
 
 public class L2capNetworkProvider {
     private static final String TAG = L2capNetworkProvider.class.getSimpleName();
+    private static final NetworkCapabilities COMMON_CAPABILITIES =
+            // TODO: add NET_CAPABILITY_NOT_RESTRICTED and check that getRequestorUid() has
+            // BLUETOOTH_CONNECT permission.
+            NetworkCapabilities.Builder.withoutDefaultCapabilities()
+                    .addTransportType(TRANSPORT_BLUETOOTH)
+                    // TODO: remove NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED.
+                    .addCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
+                    .addCapability(NET_CAPABILITY_NOT_CONGESTED)
+                    .addCapability(NET_CAPABILITY_NOT_METERED)
+                    .addCapability(NET_CAPABILITY_NOT_ROAMING)
+                    .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
+                    .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+                    .addCapability(NET_CAPABILITY_NOT_VPN)
+                    .build();
     private final Dependencies mDeps;
     private final Context mContext;
     private final HandlerThread mHandlerThread;
@@ -78,21 +92,15 @@ public class L2capNetworkProvider {
         // Note the missing NET_CAPABILITY_NOT_RESTRICTED marking the network as restricted.
         public static final NetworkCapabilities CAPABILITIES;
         static {
+            // Below capabilities will match any reservation request with an L2capNetworkSpecifier
+            // that specifies ROLE_SERVER or without a NetworkSpecifier.
             final L2capNetworkSpecifier l2capNetworkSpecifier = new L2capNetworkSpecifier.Builder()
                     .setRole(ROLE_SERVER)
                     .build();
-            NetworkCapabilities caps = NetworkCapabilities.Builder.withoutDefaultCapabilities()
-                    .addTransportType(TRANSPORT_BLUETOOTH)
-                    // TODO: consider removing NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED.
-                    .addCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
-                    .addCapability(NET_CAPABILITY_NOT_CONGESTED)
-                    .addCapability(NET_CAPABILITY_NOT_METERED)
-                    .addCapability(NET_CAPABILITY_NOT_ROAMING)
-                    .addCapability(NET_CAPABILITY_NOT_SUSPENDED)
-                    .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
-                    .addCapability(NET_CAPABILITY_NOT_VPN)
+            NetworkCapabilities caps = new NetworkCapabilities.Builder(COMMON_CAPABILITIES)
                     .setNetworkSpecifier(l2capNetworkSpecifier)
                     .build();
+            // TODO: add #setReservationId() to NetworkCapabilities.Builder
             caps.setReservationId(RES_ID_MATCH_ALL_RESERVATIONS);
             CAPABILITIES = caps;
         }
