@@ -161,6 +161,7 @@ java_library {
     ],
     libs: [
         "framework-annotations-lib",
+        "framework-bluetooth.stubs.module_lib",
         "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity-pre-jarjar",
         // The framework-connectivity-t library is only available on T+ platforms
