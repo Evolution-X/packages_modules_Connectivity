@@ -165,3 +165,12 @@ flag {
   bug: "372936361"
   is_fixed_read_only: true
 }
+
+flag {
+  name: "restrict_local_network"
+  is_exported: true
+  namespace: "android_core_networking"
+  description: "Flag for controlling access to the local network behind a new runtime permission. Requires ConnectivityCompatChanges.RESTRICT_LOCAL_NETWORK to enable feature."
+  bug: "365139289"
+  is_fixed_read_only: true
+}
