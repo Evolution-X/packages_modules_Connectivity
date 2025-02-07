@@ -90,7 +90,6 @@ import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
-import static android.net.cts.util.CtsNetUtils.ConnectivityActionReceiver;
 import static android.net.cts.util.CtsNetUtils.HTTP_PORT;
 import static android.net.cts.util.CtsNetUtils.NETWORK_CALLBACK_ACTION;
 import static android.net.cts.util.CtsNetUtils.TEST_HOST;
@@ -111,6 +110,7 @@ import static com.android.net.module.util.NetworkStackConstants.TEST_CAPTIVE_POR
 import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_LOCKDOWN_VPN;
 import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_NONE;
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_EXPORTED;
+import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_NOT_EXPORTED;
 import static com.android.testutils.Cleanup.testAndCleanup;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 import static com.android.testutils.MiscAsserts.assertEventuallyTrue;
@@ -178,6 +178,7 @@ import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.MessageQueue;
@@ -1229,46 +1230,71 @@ public class ConnectivityManagerTest {
      * {@link #testRegisterNetworkCallback} except that a {@code PendingIntent} is used instead
      * of a {@code NetworkCallback}.
      */
-    @AppModeFull(reason = "Cannot get WifiManager in instant app mode")
     @Test
     public void testRegisterNetworkCallback_withPendingIntent() {
-        assumeTrue(mPackageManager.hasSystemFeature(FEATURE_WIFI));
+        final ConditionVariable received = new ConditionVariable();
 
-        // Create a ConnectivityActionReceiver that has an IntentFilter for our locally defined
-        // action, NETWORK_CALLBACK_ACTION.
-        final IntentFilter filter = new IntentFilter();
-        filter.addAction(NETWORK_CALLBACK_ACTION);
+        // Register a callback with intent and a request for any Internet-providing network,
+        // which should match the currently connected network.
+        final BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(final Context context, final Intent intent) {
+                received.open();
+            }
+        };
 
-        final ConnectivityActionReceiver receiver = new ConnectivityActionReceiver(
-                mCm, ConnectivityManager.TYPE_WIFI, NetworkInfo.State.CONNECTED);
-        final int flags = SdkLevel.isAtLeastT() ? RECEIVER_EXPORTED : 0;
-        mContext.registerReceiver(receiver, filter, flags);
+        final int flags = SdkLevel.isAtLeastT() ? RECEIVER_NOT_EXPORTED : 0;
+        mContext.registerReceiver(receiver, new IntentFilter(NETWORK_CALLBACK_ACTION), flags);
 
         // Create a broadcast PendingIntent for NETWORK_CALLBACK_ACTION.
         final Intent intent = new Intent(NETWORK_CALLBACK_ACTION)
                 .setPackage(mContext.getPackageName());
-        // While ConnectivityService would put extra info such as network or request id before
-        // broadcasting the inner intent. The MUTABLE flag needs to be added accordingly.
         final PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0 /*requestCode*/,
                 intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
 
-        // We will register for a WIFI network being available or lost.
-        mCm.registerNetworkCallback(makeWifiNetworkRequest(), pendingIntent);
+        // Register for a network providing Internet being available or lost.
+        final NetworkRequest nr = new NetworkRequest.Builder()
+                .addCapability(NET_CAPABILITY_INTERNET)
+                .build();
+        mCm.registerNetworkCallback(nr, pendingIntent);
 
         try {
             mCtsNetUtils.ensureWifiConnected();
 
-            // Now we expect to get the Intent delivered notifying of the availability of the wifi
+            // Wait for delivery of the Intent notifying of the availability of the INTERNET
             // network even if it was already connected as a state-based action when the callback
             // is registered.
-            assertTrue("Did not receive expected Intent " + intent + " for TRANSPORT_WIFI",
-                    receiver.waitForState());
-        } catch (InterruptedException e) {
-            fail("Broadcast receiver or NetworkCallback wait was interrupted.");
+            assertTrue("Did not receive expected Intent " + intent + " for INTERNET",
+                    received.block(NETWORK_CALLBACK_TIMEOUT_MS));
         } finally {
             mCm.unregisterNetworkCallback(pendingIntent);
             pendingIntent.cancel();
             mContext.unregisterReceiver(receiver);
+        }
+    }
+
+    // Up to R ConnectivityService can't be updated through mainline, and there was a bug
+    // where registering a callback with a canceled pending intent would crash the system.
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.R)
+    public void testRegisterNetworkCallback_pendingIntent_classNotFound() {
+        final Intent intent = new Intent()
+                .setClassName(mContext.getPackageName(), "NonExistent");
+        final PendingIntent pi = PendingIntent.getActivity(mContext, /* requestCode */ 1,
+                intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
+
+        final NetworkRequest nr = new NetworkRequest.Builder()
+                .addCapability(NET_CAPABILITY_INTERNET)
+                .build();
+        try {
+            // Before the fix delivered through Mainline, this used to crash the system, because
+            // trying to send the pending intent would throw which would prompt ConnectivityService
+            // to release the wake lock, but it would still send a finished notification at which
+            // point CS would try to release the wake lock again and crash.
+            mCm.registerNetworkCallback(nr, pi);
+        } finally {
+            mCm.unregisterNetworkCallback(pi);
+            pi.cancel();
         }
     }
 
