@@ -71,6 +71,7 @@ import static com.android.server.ConnectivityStatsLog.NETWORK_BPF_MAP_INFO;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -99,6 +100,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.IBpfMap;
+import com.android.net.module.util.Struct.Bool;
 import com.android.net.module.util.Struct.S32;
 import com.android.net.module.util.Struct.U32;
 import com.android.net.module.util.Struct.U8;
@@ -106,6 +108,7 @@ import com.android.net.module.util.bpf.CookieTagMapKey;
 import com.android.net.module.util.bpf.CookieTagMapValue;
 import com.android.net.module.util.bpf.IngressDiscardKey;
 import com.android.net.module.util.bpf.IngressDiscardValue;
+import com.android.net.module.util.bpf.LocalNetAccessKey;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
@@ -171,6 +174,10 @@ public final class BpfNetMapsTest {
     private final IBpfMap<S32, UidOwnerValue> mUidOwnerMap =
             new TestBpfMap<>(S32.class, UidOwnerValue.class);
     private final IBpfMap<S32, U8> mUidPermissionMap = new TestBpfMap<>(S32.class, U8.class);
+    private final IBpfMap<U32, Bool> mLocalNetBlockedUidMap =
+            new TestBpfMap<>(U32.class, Bool.class);
+    private final IBpfMap<LocalNetAccessKey, Bool> mLocalNetAccessMap =
+            new TestBpfMap<>(LocalNetAccessKey.class, Bool.class);
     private final IBpfMap<CookieTagMapKey, CookieTagMapValue> mCookieTagMap =
             spy(new TestBpfMap<>(CookieTagMapKey.class, CookieTagMapValue.class));
     private final IBpfMap<S32, U8> mDataSaverEnabledMap = new TestBpfMap<>(S32.class, U8.class);
@@ -189,6 +196,8 @@ public final class BpfNetMapsTest {
                 CURRENT_STATS_MAP_CONFIGURATION_KEY, new U32(STATS_SELECT_MAP_A));
         BpfNetMaps.setUidOwnerMapForTest(mUidOwnerMap);
         BpfNetMaps.setUidPermissionMapForTest(mUidPermissionMap);
+        BpfNetMaps.setLocalNetAccessMapForTest(mLocalNetAccessMap);
+        BpfNetMaps.setLocalNetBlockedUidMapForTest(mLocalNetBlockedUidMap);
         BpfNetMaps.setCookieTagMapForTest(mCookieTagMap);
         BpfNetMaps.setDataSaverEnabledMapForTest(mDataSaverEnabledMap);
         mDataSaverEnabledMap.updateEntry(DATA_SAVER_ENABLED_KEY, new U8(DATA_SAVER_DISABLED));
@@ -232,6 +241,138 @@ public final class BpfNetMapsTest {
 
     private void doTestIsChainEnabled(final int enableChain) throws Exception {
         doTestIsChainEnabled(List.of(enableChain));
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testAddLocalNetAccessBeforeV() {
+        assertThrows(UnsupportedOperationException.class, () ->
+                mBpfNetMaps.addLocalNetAccess(0, TEST_IF_NAME, Inet6Address.ANY, 0, 0, true));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testAddLocalNetAccessAfterV() throws Exception {
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mBpfNetMaps.addLocalNetAccess(160, TEST_IF_NAME,
+                Inet4Address.getByName("196.68.0.0"), 0, 0, true);
+
+        assertNotNull(mLocalNetAccessMap.getValue(new LocalNetAccessKey(160, TEST_IF_INDEX,
+                Inet4Address.getByName("196.68.0.0"), 0, 0)));
+        assertNull(mLocalNetAccessMap.getValue(new LocalNetAccessKey(160, TEST_IF_INDEX,
+                Inet4Address.getByName("100.68.0.0"), 0, 0)));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testAddLocalNetAccessAfterVWithIncorrectInterface() throws Exception {
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mBpfNetMaps.addLocalNetAccess(160, "wlan2",
+                Inet4Address.getByName("196.68.0.0"), 0, 0, true);
+
+        assertTrue(mLocalNetAccessMap.isEmpty());
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testGetLocalNetAccessBeforeV() {
+        assertThrows(UnsupportedOperationException.class, () ->
+                mBpfNetMaps.getLocalNetAccess(0, TEST_IF_NAME, Inet6Address.ANY, 0, 0));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testGetLocalNetAccessAfterV() throws Exception {
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mLocalNetAccessMap.updateEntry(new LocalNetAccessKey(160, TEST_IF_INDEX,
+                Inet4Address.getByName("196.68.0.0"), 0, 0),
+                new Bool(false));
+
+        assertNotNull(mLocalNetAccessMap.getValue(new LocalNetAccessKey(160, TEST_IF_INDEX,
+                Inet4Address.getByName("196.68.0.0"), 0, 0)));
+
+        assertFalse(mBpfNetMaps.getLocalNetAccess(160, TEST_IF_NAME,
+                Inet4Address.getByName("196.68.0.0"), 0, 0));
+        assertTrue(mBpfNetMaps.getLocalNetAccess(160, TEST_IF_NAME,
+                Inet4Address.getByName("100.68.0.0"), 0, 0));
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testAddUidToLocalNetBlockMapBeforeV() {
+        assertThrows(UnsupportedOperationException.class, () ->
+                mBpfNetMaps.addUidToLocalNetBlockMap(0));
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testIsUidPresentInLocalNetBlockMapBeforeV() {
+        assertThrows(UnsupportedOperationException.class, () ->
+                mBpfNetMaps.getUidValueFromLocalNetBlockMap(0));
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testRemoveUidFromLocalNetBlockMapBeforeV() {
+        assertThrows(UnsupportedOperationException.class, () ->
+                mBpfNetMaps.removeUidFromLocalNetBlockMap(0));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testAddUidFromLocalNetBlockMapAfterV() throws Exception {
+        final int uid0 = TEST_UIDS[0];
+        final int uid1 = TEST_UIDS[1];
+
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mBpfNetMaps.addUidToLocalNetBlockMap(uid0);
+        assertTrue(mLocalNetBlockedUidMap.getValue(new U32(uid0)).val);
+        assertNull(mLocalNetBlockedUidMap.getValue(new U32(uid1)));
+
+        mBpfNetMaps.addUidToLocalNetBlockMap(uid1);
+        assertTrue(mLocalNetBlockedUidMap.getValue(new U32(uid1)).val);
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testIsUidPresentInLocalNetBlockMapAfterV() throws Exception {
+        final int uid0 = TEST_UIDS[0];
+        final int uid1 = TEST_UIDS[1];
+
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mLocalNetBlockedUidMap.updateEntry(new U32(uid0), new Bool(true));
+        assertTrue(mBpfNetMaps.getUidValueFromLocalNetBlockMap(uid0));
+        assertFalse(mBpfNetMaps.getUidValueFromLocalNetBlockMap(uid1));
+
+        mLocalNetBlockedUidMap.updateEntry(new U32(uid1), new Bool(true));
+        assertTrue(mBpfNetMaps.getUidValueFromLocalNetBlockMap(uid1));
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testRemoveUidFromLocalNetBlockMapAfterV() throws Exception {
+        final int uid0 = TEST_UIDS[0];
+        final int uid1 = TEST_UIDS[1];
+
+        assertTrue(mLocalNetAccessMap.isEmpty());
+
+        mLocalNetBlockedUidMap.updateEntry(new U32(uid0), new Bool(true));
+        mLocalNetBlockedUidMap.updateEntry(new U32(uid1), new Bool(true));
+
+        assertTrue(mLocalNetBlockedUidMap.getValue(new U32(uid0)).val);
+        assertTrue(mLocalNetBlockedUidMap.getValue(new U32(uid1)).val);
+
+        mBpfNetMaps.removeUidFromLocalNetBlockMap(uid0);
+        assertNull(mLocalNetBlockedUidMap.getValue(new U32(uid0)));
+        assertTrue(mLocalNetBlockedUidMap.getValue(new U32(uid1)).val);
+
+        mBpfNetMaps.removeUidFromLocalNetBlockMap(uid1);
+        assertNull(mLocalNetBlockedUidMap.getValue(new U32(uid1)));
     }
 
     @Test
