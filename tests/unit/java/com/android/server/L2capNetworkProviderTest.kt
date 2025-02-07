@@ -52,13 +52,13 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
-const val TAG = "L2capNetworkProviderTest"
+private const val TAG = "L2capNetworkProviderTest"
 
-val RESERVATION_CAPS = NetworkCapabilities.Builder.withoutDefaultCapabilities()
+private val RESERVATION_CAPS = NetworkCapabilities.Builder.withoutDefaultCapabilities()
     .addTransportType(TRANSPORT_BLUETOOTH)
     .build()
 
-val RESERVATION = NetworkRequest(
+private val RESERVATION = NetworkRequest(
         NetworkCapabilities(RESERVATION_CAPS),
         TYPE_NONE,
         42 /* rId */,
