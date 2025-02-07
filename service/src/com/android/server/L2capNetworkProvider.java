@@ -209,10 +209,17 @@ public class L2capNetworkProvider {
 
             // Note that the reserved offer gets torn down when the reservation goes away, even if
             // there are active (non-reservation) requests for said offer.
-            mReservedServerOffers.remove(reservedOffer);
-            reservedOffer.tearDown();
-            mProvider.unregisterNetworkOffer(reservedOffer);
+            destroyAndUnregisterReservedOffer(reservedOffer);
         }
+    }
+
+    private void destroyAndUnregisterReservedOffer(ReservedServerOffer reservedOffer) {
+        // Ensure the offer still exists if this was posted on the handler.
+        if (!mReservedServerOffers.contains(reservedOffer)) return;
+        mReservedServerOffers.remove(reservedOffer);
+
+        reservedOffer.tearDown();
+        mProvider.unregisterNetworkOffer(reservedOffer);
     }
 
     private class ReservedServerOffer implements NetworkOfferCallback {
