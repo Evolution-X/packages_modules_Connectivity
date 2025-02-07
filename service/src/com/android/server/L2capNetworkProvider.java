@@ -242,11 +242,13 @@ public class L2capNetworkProvider {
      * Called on CS Handler thread.
      */
     public void start() {
-        final PackageManager pm = mContext.getPackageManager();
-        if (pm.hasSystemFeature(FEATURE_BLUETOOTH_LE)) {
-            mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
-            mProvider.registerNetworkOffer(BlanketReservationOffer.SCORE,
-                    BlanketReservationOffer.CAPABILITIES, mHandler::post, mBlanketOffer);
-        }
+        mHandler.post(() -> {
+            final PackageManager pm = mContext.getPackageManager();
+            if (pm.hasSystemFeature(FEATURE_BLUETOOTH_LE)) {
+                mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
+                mProvider.registerNetworkOffer(BlanketReservationOffer.SCORE,
+                        BlanketReservationOffer.CAPABILITIES, mHandler::post, mBlanketOffer);
+            }
+        });
     }
 }
