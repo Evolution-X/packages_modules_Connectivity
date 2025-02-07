@@ -31,6 +31,7 @@ import static android.net.INetd.PERMISSION_SYSTEM;
 import static android.net.INetd.PERMISSION_UNINSTALLED;
 import static android.net.INetd.PERMISSION_UPDATE_DEVICE_STATS;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
+import static android.net.connectivity.ConnectivityCompatChanges.RESTRICT_LOCAL_NETWORK;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 
@@ -38,6 +39,7 @@ import static com.android.net.module.util.CollectionUtils.toIntArray;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.compat.CompatChanges;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -70,6 +72,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.apishim.ProcessShimImpl;
@@ -279,6 +282,12 @@ public class PermissionMonitor {
         mContext = context;
         mBpfNetMaps = bpfNetMaps;
         mThread = thread;
+        if (Flags.restrictLocalNetwork()) {
+            // This listener should finish registration by the time the system has completed
+            // boot setup such that any changes to runtime permissions for local network
+            // restrictions can only occur after this registration has completed.
+            mPackageManager.addOnPermissionsChangeListener(new PermissionChangeListener());
+        }
     }
 
     private void ensureRunningOnHandlerThread() {
@@ -1310,5 +1319,20 @@ public class PermissionMonitor {
 
     private static void loge(String s, Throwable e) {
         Log.e(TAG, s, e);
+    }
+
+    private class PermissionChangeListener implements PackageManager.OnPermissionsChangedListener {
+        @Override
+        public void onPermissionsChanged(int uid) {
+            // RESTRICT_LOCAL_NETWORK is a compat change that is enabled when developers manually
+            // opt-in to this change, or when the app's targetSdkVersion is greater than 36.
+            // The RESTRICT_LOCAL_NETWORK compat change is used here instead of the
+            // Flags.restrictLocalNetwork() is used to offer the feature to devices, but it will
+            // only be enforced when develoeprs choose to enable it.
+            // TODO(b/394567896): Update compat change checks
+            if (CompatChanges.isChangeEnabled(RESTRICT_LOCAL_NETWORK, uid)) {
+                // TODO(b/388803658): Update network permissions and record change
+            }
+        }
     }
 }
