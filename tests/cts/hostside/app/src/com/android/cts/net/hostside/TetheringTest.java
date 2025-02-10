@@ -16,6 +16,8 @@
 
 package com.android.cts.net.hostside;
 
+import static android.net.TetheringManager.TETHERING_WIFI;
+
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
 import static org.junit.Assert.assertEquals;
@@ -71,6 +73,9 @@ public class TetheringTest {
                 mCtsTetheringUtils.startWifiTethering(mTetheringEventCallback, softApConfig);
         assertNotNull(tetheringInterface);
         assertEquals(softApConfig, tetheringInterface.getSoftApConfiguration());
+        assertEquals(new TetheringInterface(
+                TETHERING_WIFI, tetheringInterface.getInterface(), softApConfig),
+                tetheringInterface);
         TetheringInterface tetheringInterfaceForApp2 =
                 mTetheringHelperClient.getTetheredWifiInterface();
         assertNotNull(tetheringInterfaceForApp2);
