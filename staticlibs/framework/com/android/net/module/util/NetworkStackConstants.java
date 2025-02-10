@@ -153,7 +153,8 @@ public final class NetworkStackConstants {
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::2");
     public static final Inet6Address IPV6_ADDR_ALL_HOSTS_MULTICAST =
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::3");
-
+    public static final Inet6Address IPV6_ADDR_NODE_LOCAL_ALL_NODES_MULTICAST =
+             (Inet6Address) InetAddresses.parseNumericAddress("ff01::1");
     public static final int IPPROTO_FRAGMENT = 44;
 
     /**
