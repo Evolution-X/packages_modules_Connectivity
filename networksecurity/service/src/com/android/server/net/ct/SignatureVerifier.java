@@ -32,7 +32,6 @@ import androidx.annotation.VisibleForTesting;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -105,9 +104,9 @@ public class SignatureVerifier {
             verifier.update(fileStream.readAllBytes());
 
             byte[] signatureBytes = signatureStream.readAllBytes();
+            statusBuilder.setSignature(new String(signatureBytes));
             try {
                 byte[] decodedSigBytes = Base64.getDecoder().decode(signatureBytes);
-                statusBuilder.setSignature(new String(decodedSigBytes, StandardCharsets.UTF_8));
 
                 if (!verifier.verify(decodedSigBytes)) {
                     // Leave the UpdateState as UNKNOWN_STATE if successful as there are other
@@ -116,7 +115,6 @@ public class SignatureVerifier {
                 }
             } catch (IllegalArgumentException e) {
                 Log.w(TAG, "Invalid signature base64 encoding", e);
-                statusBuilder.setSignature(new String(signatureBytes, StandardCharsets.UTF_8));
                 statusBuilder.setState(SIGNATURE_INVALID);
                 return statusBuilder.build();
             }
