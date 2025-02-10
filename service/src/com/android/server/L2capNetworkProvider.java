@@ -19,6 +19,7 @@ package com.android.server;
 import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN;
 import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_ANY;
 import static android.net.L2capNetworkSpecifier.PSM_ANY;
+import static android.net.L2capNetworkSpecifier.ROLE_CLIENT;
 import static android.net.L2capNetworkSpecifier.ROLE_SERVER;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED;
@@ -88,6 +89,7 @@ public class L2capNetworkProvider {
     private final NetworkProvider mProvider;
     private final BlanketReservationOffer mBlanketOffer;
     private final Set<ReservedServerOffer> mReservedServerOffers = new ArraySet<>();
+    private final ClientOffer mClientOffer;
     // mBluetoothManager guaranteed non-null when read on handler thread after start() is called
     @Nullable
     private BluetoothManager mBluetoothManager;
@@ -405,6 +407,31 @@ public class L2capNetworkProvider {
         }
     }
 
+    private class ClientOffer implements NetworkOfferCallback {
+        public static final NetworkScore SCORE = new NetworkScore.Builder().build();
+        public static final NetworkCapabilities CAPABILITIES;
+        static {
+            // Below capabilities will match any request with an L2capNetworkSpecifier
+            // that specifies ROLE_CLIENT or without a NetworkSpecifier.
+            final L2capNetworkSpecifier l2capNetworkSpecifier = new L2capNetworkSpecifier.Builder()
+                    .setRole(ROLE_CLIENT)
+                    .build();
+            CAPABILITIES = new NetworkCapabilities.Builder(COMMON_CAPABILITIES)
+                    .setNetworkSpecifier(l2capNetworkSpecifier)
+                    .build();
+        }
+
+        @Override
+        public void onNetworkNeeded(NetworkRequest request) {
+
+        }
+
+        @Override
+        public void onNetworkUnneeded(NetworkRequest request) {
+
+        }
+    }
+
     @VisibleForTesting
     public static class Dependencies {
         /** Get NetworkProvider */
@@ -432,6 +459,7 @@ public class L2capNetworkProvider {
         mHandler = new Handler(mHandlerThread.getLooper());
         mProvider = mDeps.getNetworkProvider(context, mHandlerThread.getLooper());
         mBlanketOffer = new BlanketReservationOffer();
+        mClientOffer = new ClientOffer();
     }
 
     /**
@@ -454,6 +482,8 @@ public class L2capNetworkProvider {
             mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
             mProvider.registerNetworkOffer(BlanketReservationOffer.SCORE,
                     BlanketReservationOffer.CAPABILITIES, mHandler::post, mBlanketOffer);
+            mProvider.registerNetworkOffer(ClientOffer.SCORE,
+                    ClientOffer.CAPABILITIES, mHandler::post, mClientOffer);
         });
     }
 }
