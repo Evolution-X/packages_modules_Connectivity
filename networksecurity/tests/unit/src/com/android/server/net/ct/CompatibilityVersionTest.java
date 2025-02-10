@@ -15,6 +15,11 @@
  */
 package com.android.server.net.ct;
 
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.LOG_LIST_INVALID;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SUCCESS;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.UNKNOWN_STATE;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.VERSION_ALREADY_EXISTS;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -37,6 +42,8 @@ import java.io.InputStream;
 public class CompatibilityVersionTest {
 
     private static final String TEST_VERSION = "v123";
+    private static final long LOG_LIST_TIMESTAMP = 123456789L;
+    private static final String SIGNATURE = "fake_signature";
 
     private final File mTestDir =
             InstrumentationRegistry.getInstrumentation().getContext().getFilesDir();
@@ -52,6 +59,7 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_versionDirectory_setupSuccessful() {
         File versionDir = mCompatVersion.getVersionDir();
+
         assertThat(versionDir.exists()).isFalse();
         assertThat(versionDir.getAbsolutePath()).startsWith(mTestDir.getAbsolutePath());
         assertThat(versionDir.getAbsolutePath()).endsWith(TEST_VERSION);
@@ -60,6 +68,7 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_symlink_setupSuccessful() {
         File dirSymlink = mCompatVersion.getLogsDirSymlink();
+
         assertThat(dirSymlink.exists()).isFalse();
         assertThat(dirSymlink.getAbsolutePath())
                 .startsWith(mCompatVersion.getVersionDir().getAbsolutePath());
@@ -68,9 +77,32 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_logsFile_setupSuccessful() {
         File logsFile = mCompatVersion.getLogsFile();
+
         assertThat(logsFile.exists()).isFalse();
         assertThat(logsFile.getAbsolutePath())
                 .startsWith(mCompatVersion.getLogsDirSymlink().getAbsolutePath());
+    }
+
+    @Test
+    public void testCompatibilityVersion_installSuccessful_keepsStatusDetails() throws Exception {
+        String version = "i_am_version";
+        JSONObject logList = makeLogList(version, "i_am_content");
+
+        try (InputStream inputStream = asStream(logList)) {
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream,
+                                    LogListUpdateStatus.builder()
+                                            .setSignature(SIGNATURE)
+                                            .setState(UNKNOWN_STATE)))
+                    .isEqualTo(
+                            LogListUpdateStatus.builder()
+                                    .setSignature(SIGNATURE)
+                                    .setLogListTimestamp(LOG_LIST_TIMESTAMP)
+                                    // Ensure the state is correctly overridden to SUCCESS
+                                    .setState(SUCCESS)
+                                    .build());
+        }
     }
 
     @Test
@@ -79,7 +111,10 @@ public class CompatibilityVersionTest {
         JSONObject logList = makeLogList(version, "i_am_content");
 
         try (InputStream inputStream = asStream(logList)) {
-            assertThat(mCompatVersion.install(inputStream)).isTrue();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(getSuccessfulUpdateStatus());
         }
 
         File logListFile = mCompatVersion.getLogsFile();
@@ -107,7 +142,10 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_deleteSuccessfully() throws Exception {
         try (InputStream inputStream = asStream(makeLogList(/* version= */ "123"))) {
-            assertThat(mCompatVersion.install(inputStream)).isTrue();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(getSuccessfulUpdateStatus());
         }
 
         mCompatVersion.delete();
@@ -118,7 +156,10 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_invalidLogList() throws Exception {
         try (InputStream inputStream = new ByteArrayInputStream(("not_a_valid_list".getBytes()))) {
-            assertThat(mCompatVersion.install(inputStream)).isFalse();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(LogListUpdateStatus.builder().setState(LOG_LIST_INVALID).build());
         }
 
         assertThat(mCompatVersion.getLogsFile().exists()).isFalse();
@@ -138,7 +179,10 @@ public class CompatibilityVersionTest {
 
         JSONObject newLogList = makeLogList(existingVersion, "i_am_the_real_content");
         try (InputStream inputStream = asStream(newLogList)) {
-            assertThat(mCompatVersion.install(inputStream)).isTrue();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(getSuccessfulUpdateStatus());
         }
 
         assertThat(readAsString(logsListFile)).isEqualTo(newLogList.toString());
@@ -149,11 +193,21 @@ public class CompatibilityVersionTest {
         String existingVersion = "666";
         JSONObject existingLogList = makeLogList(existingVersion, "i_was_installed_successfully");
         try (InputStream inputStream = asStream(existingLogList)) {
-            assertThat(mCompatVersion.install(inputStream)).isTrue();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(getSuccessfulUpdateStatus());
         }
 
         try (InputStream inputStream = asStream(makeLogList(existingVersion, "i_am_ignored"))) {
-            assertThat(mCompatVersion.install(inputStream)).isFalse();
+            assertThat(
+                            mCompatVersion.install(
+                                    inputStream, LogListUpdateStatus.builder()))
+                    .isEqualTo(
+                            LogListUpdateStatus.builder()
+                                    .setState(VERSION_ALREADY_EXISTS)
+                                    .setLogListTimestamp(LOG_LIST_TIMESTAMP)
+                                    .build());
         }
 
         assertThat(readAsString(mCompatVersion.getLogsFile()))
@@ -165,11 +219,20 @@ public class CompatibilityVersionTest {
     }
 
     private static JSONObject makeLogList(String version) throws JSONException {
-        return new JSONObject().put("version", version);
+        return new JSONObject()
+                .put("version", version)
+                .put("log_list_timestamp", LOG_LIST_TIMESTAMP);
     }
 
     private static JSONObject makeLogList(String version, String content) throws JSONException {
         return makeLogList(version).put("content", content);
+    }
+
+    private static LogListUpdateStatus getSuccessfulUpdateStatus() {
+        return LogListUpdateStatus.builder()
+                .setState(SUCCESS)
+                .setLogListTimestamp(LOG_LIST_TIMESTAMP)
+                .build();
     }
 
     private static String readAsString(File file) throws IOException {
