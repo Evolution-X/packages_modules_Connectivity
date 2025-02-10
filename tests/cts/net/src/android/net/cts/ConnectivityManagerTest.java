@@ -4087,4 +4087,11 @@ public class ConnectivityManagerTest {
         // shims, and @IgnoreUpTo does not check that.
         assumeTrue(TestUtils.shouldTestSApis());
     }
+
+    @Test
+    public void testLegacyTetherApisThrowUnsupportedOperationExceptionAfterV() {
+        assumeTrue(Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM);
+        assertThrows(UnsupportedOperationException.class, () -> mCm.tether("iface"));
+        assertThrows(UnsupportedOperationException.class, () -> mCm.untether("iface"));
+    }
 }
