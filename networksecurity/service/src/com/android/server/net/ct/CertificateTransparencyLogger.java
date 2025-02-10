@@ -35,10 +35,12 @@ public interface CertificateTransparencyLogger {
     enum CTLogListUpdateState {
         UNKNOWN_STATE,
         HTTP_ERROR,
+        LOG_LIST_INVALID,
         PUBLIC_KEY_NOT_FOUND,
         SIGNATURE_INVALID,
         SIGNATURE_NOT_FOUND,
         SIGNATURE_VERIFICATION_FAILED,
+        SUCCESS,
         VERSION_ALREADY_EXISTS
     }
 }

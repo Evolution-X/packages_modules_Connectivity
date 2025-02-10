@@ -19,6 +19,7 @@ import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListU
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_INVALID;
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SUCCESS;
 
 import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState;
 
@@ -50,6 +51,14 @@ public abstract class LogListUpdateStatus {
 
     boolean hasSignature() {
         return signature() != null && signature().length() > 0;
+    }
+
+    boolean isSuccessful() {
+        return state() == SUCCESS;
+    }
+
+    static LogListUpdateStatus getDefaultInstance() {
+        return builder().build();
     }
 
     @AutoValue.Builder
