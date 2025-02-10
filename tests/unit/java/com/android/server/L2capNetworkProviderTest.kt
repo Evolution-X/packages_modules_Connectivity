@@ -35,6 +35,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
+import com.android.testutils.waitForIdle
 import kotlin.test.assertTrue
 import org.junit.After
 import org.junit.Before
@@ -52,13 +53,14 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
-const val TAG = "L2capNetworkProviderTest"
+private const val TAG = "L2capNetworkProviderTest"
+private const val TIMEOUT_MS = 1000
 
-val RESERVATION_CAPS = NetworkCapabilities.Builder.withoutDefaultCapabilities()
+private val RESERVATION_CAPS = NetworkCapabilities.Builder.withoutDefaultCapabilities()
     .addTransportType(TRANSPORT_BLUETOOTH)
     .build()
 
-val RESERVATION = NetworkRequest(
+private val RESERVATION = NetworkRequest(
         NetworkCapabilities(RESERVATION_CAPS),
         TYPE_NONE,
         42 /* rId */,
@@ -96,6 +98,7 @@ class L2capNetworkProviderTest {
     @Test
     fun testNetworkProvider_registeredWhenSupported() {
         L2capNetworkProvider(deps, context).start()
+        handlerThread.waitForIdle(TIMEOUT_MS)
         verify(cm).registerNetworkProvider(eq(provider))
         verify(provider).registerNetworkOffer(any(), any(), any(), any())
     }
@@ -104,12 +107,14 @@ class L2capNetworkProviderTest {
     fun testNetworkProvider_notRegisteredWhenNotSupported() {
         doReturn(false).`when`(pm).hasSystemFeature(FEATURE_BLUETOOTH_LE)
         L2capNetworkProvider(deps, context).start()
+        handlerThread.waitForIdle(TIMEOUT_MS)
         verify(cm, never()).registerNetworkProvider(eq(provider))
     }
 
     fun doTestBlanketOfferIgnoresRequest(request: NetworkRequest) {
         clearInvocations(provider)
         L2capNetworkProvider(deps, context).start()
+        handlerThread.waitForIdle(TIMEOUT_MS)
 
         val blanketOfferCaptor = ArgumentCaptor.forClass(NetworkOfferCallback::class.java)
         verify(provider).registerNetworkOffer(any(), any(), any(), blanketOfferCaptor.capture())
@@ -124,6 +129,7 @@ class L2capNetworkProviderTest {
     ) {
         clearInvocations(provider)
         L2capNetworkProvider(deps, context).start()
+        handlerThread.waitForIdle(TIMEOUT_MS)
 
         val blanketOfferCaptor = ArgumentCaptor.forClass(NetworkOfferCallback::class.java)
         verify(provider).registerNetworkOffer(any(), any(), any(), blanketOfferCaptor.capture())
