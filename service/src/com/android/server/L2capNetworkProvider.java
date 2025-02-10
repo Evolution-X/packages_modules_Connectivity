@@ -55,6 +55,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.system.Os;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -63,6 +64,9 @@ import com.android.net.module.util.ServiceConnectivityJni;
 import com.android.server.net.L2capNetwork;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -421,6 +425,21 @@ public class L2capNetworkProvider {
                     .build();
         }
 
+        private final Map<L2capNetworkSpecifier, ClientRequestInfo> mClientNetworkRequests =
+                new ArrayMap<>();
+
+        /**
+         * State object to store information for client NetworkRequests.
+         */
+        private static class ClientRequestInfo {
+            public final List<NetworkRequest> requests = new ArrayList<>();
+
+            public ClientRequestInfo(NetworkRequest request) {
+                requests.add(request);
+            }
+        }
+
+
         private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
             if (spec == null) return false;
 
@@ -452,11 +471,56 @@ public class L2capNetworkProvider {
                 return;
             }
 
+            final L2capNetworkSpecifier requestSpecifier =
+                    (L2capNetworkSpecifier) request.getNetworkSpecifier();
+             // Check whether this exact request is already being tracked.
+            final ClientRequestInfo cri = mClientNetworkRequests.get(requestSpecifier);
+            if (cri != null) {
+                Log.d(TAG, "The request is already being tracked. NetworkRequest: " + request);
+                cri.requests.add(request);
+                return;
+            }
+
+            // Check whether a fuzzy match shows a mismatch in header compression by calling
+            // canBeSatisfiedBy().
+            // TODO: Add a copy constructor to L2capNetworkSpecifier.Builder.
+            final L2capNetworkSpecifier matchAnyHeaderCompressionSpecifier =
+                    new L2capNetworkSpecifier.Builder()
+                            .setRole(requestSpecifier.getRole())
+                            .setRemoteAddress(requestSpecifier.getRemoteAddress())
+                            .setPsm(requestSpecifier.getPsm())
+                            .setHeaderCompression(HEADER_COMPRESSION_ANY)
+                            .build();
+            for (L2capNetworkSpecifier existingSpecifier : mClientNetworkRequests.keySet()) {
+                if (existingSpecifier.canBeSatisfiedBy(matchAnyHeaderCompressionSpecifier)) {
+                    // This requeset can never be serviced as this network already exists with a
+                    // different header compression mechanism.
+                    mProvider.declareNetworkRequestUnfulfillable(request);
+                    return;
+                }
+            }
+
+            // If the code reaches here, this is a new request.
+            mClientNetworkRequests.put(requestSpecifier, new ClientRequestInfo(request));
+
             // TODO: implement onNetworkNeeded
         }
 
         @Override
         public void onNetworkUnneeded(NetworkRequest request) {
+            final L2capNetworkSpecifier specifier =
+                    (L2capNetworkSpecifier) request.getNetworkSpecifier();
+
+            // Map#get() is safe to call with null key
+            final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
+            if (cri == null) return;
+
+            cri.requests.remove(request);
+            if (cri.requests.size() > 0) return;
+
+            // If the code reaches here, the network needs to be torn down.
+            mClientNetworkRequests.remove(specifier);
+
             // TODO: implement onNetworkUnneeded
         }
     }
