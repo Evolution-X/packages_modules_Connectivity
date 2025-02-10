@@ -23,6 +23,8 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
 
+import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -69,22 +71,29 @@ class CompatibilityVersion {
      * Installs a log list within this compatibility version directory.
      *
      * @param newContent an input stream providing the log list
+     * @param statusBuilder status obj builder containing details of the log list update process
      * @return true if the log list was installed successfully, false otherwise.
      * @throws IOException if the list cannot be saved in the CT directory.
      */
-    boolean install(InputStream newContent) throws IOException {
+    LogListUpdateStatus install(
+            InputStream newContent, LogListUpdateStatus.Builder statusBuilder) throws IOException {
         String content = new String(newContent.readAllBytes(), UTF_8);
         try {
+            JSONObject contentJson = new JSONObject(content);
             return install(
                     new ByteArrayInputStream(content.getBytes()),
-                    new JSONObject(content).getString("version"));
+                    contentJson.getString("version"),
+                    statusBuilder.setLogListTimestamp(contentJson.getLong("log_list_timestamp")));
         } catch (JSONException e) {
             Log.e(TAG, "invalid log list format", e);
-            return false;
+
+            return statusBuilder.setState(CTLogListUpdateState.LOG_LIST_INVALID).build();
         }
     }
 
-    private boolean install(InputStream newContent, String version) throws IOException {
+    LogListUpdateStatus install(
+            InputStream newContent, String version, LogListUpdateStatus.Builder statusBuilder)
+            throws IOException {
         // To support atomically replacing the old configuration directory with the new
         // there's a bunch of steps. We create a new directory with the logs and then do
         // an atomic update of the current symlink to point to the new directory.
@@ -100,7 +109,7 @@ class CompatibilityVersion {
             if (newLogsDir.getCanonicalPath().equals(mCurrentLogsDirSymlink.getCanonicalPath())) {
                 Log.i(TAG, newLogsDir + " already exists, skipping install.");
                 deleteOldLogDirectories();
-                return false;
+                return statusBuilder.setState(CTLogListUpdateState.VERSION_ALREADY_EXISTS).build();
             }
             // If the symlink has not been updated then the previous installation failed and
             // this is a re-attempt. Clean-up leftover files and try again.
@@ -134,7 +143,7 @@ class CompatibilityVersion {
         // 7. Cleanup
         Log.i(TAG, "New logs installed at " + newLogsDir);
         deleteOldLogDirectories();
-        return true;
+        return statusBuilder.setState(CTLogListUpdateState.SUCCESS).build();
     }
 
     String getCompatVersion() {
