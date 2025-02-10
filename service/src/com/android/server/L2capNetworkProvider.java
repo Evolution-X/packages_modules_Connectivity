@@ -421,14 +421,43 @@ public class L2capNetworkProvider {
                     .build();
         }
 
+        private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
+            if (spec == null) return false;
+
+            // If not null, guaranteed to be L2capNetworkSepcifier.
+            final L2capNetworkSpecifier l2capSpec = (L2capNetworkSpecifier) spec;
+
+            // The ROLE_CLIENT offer can be satisfied by a ROLE_ANY request.
+            if (l2capSpec.getRole() != ROLE_CLIENT) return false;
+
+            // HEADER_COMPRESSION_ANY is never valid in a request.
+            if (l2capSpec.getHeaderCompression() == HEADER_COMPRESSION_ANY) return false;
+
+            // remoteAddr must not be null for ROLE_CLIENT requests.
+            if (l2capSpec.getRemoteAddress() == null) return false;
+
+            // Client network requests require a PSM to be specified.
+            // Ensure the PSM is within the valid range of dynamic BLE L2CAP values.
+            if (l2capSpec.getPsm() < 0x80) return false;
+            if (l2capSpec.getPsm() > 0xFF) return false;
+
+            return true;
+        }
+
         @Override
         public void onNetworkNeeded(NetworkRequest request) {
+            Log.d(TAG, "New client network request: " + request);
+            if (!isValidL2capSpecifier(request.getNetworkSpecifier())) {
+                Log.w(TAG, "Ignoring invalid client request: " + request);
+                return;
+            }
 
+            // TODO: implement onNetworkNeeded
         }
 
         @Override
         public void onNetworkUnneeded(NetworkRequest request) {
-
+            // TODO: implement onNetworkUnneeded
         }
     }
 
