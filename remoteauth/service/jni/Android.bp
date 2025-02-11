@@ -24,9 +24,6 @@ rust_defaults {
         "libasync_trait",
     ],
     prefer_rlib: true,
-    apex_available: [
-        "com.android.tethering",
-    ],
     host_supported: true,
 }
 
