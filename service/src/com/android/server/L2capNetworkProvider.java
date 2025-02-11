@@ -437,6 +437,8 @@ public class L2capNetworkProvider {
             public final List<NetworkRequest> requests = new ArrayList<>();
             // TODO: add support for retries.
             public final ConnectThread connectThread;
+            @Nullable
+            public L2capNetwork network;
 
             public ClientRequestInfo(NetworkRequest request, ConnectThread connectThread) {
                 this.specifier = (L2capNetworkSpecifier) request.getNetworkSpecifier();
@@ -494,8 +496,29 @@ public class L2capNetworkProvider {
             final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
             if (cri == null) return false;
 
-            // TODO: implement createClientNetwork
-            return false;
+            final NetworkCapabilities caps = new NetworkCapabilities.Builder(CAPABILITIES)
+                    .setNetworkSpecifier(specifier)
+                    .build();
+
+            final L2capNetwork network = createL2capNetwork(socket, caps,
+                    new L2capNetwork.ICallback() {
+                // TODO: do not send onUnavailable() after the network has become available. The
+                // right thing to do here is to tearDown the network (if it still exists, because
+                // note that the request might have already been removed in the meantime, so
+                // `network` cannot be used directly.
+                @Override
+                public void onError(L2capNetwork network) {
+                    declareAllNetworkRequestsUnfulfillable(specifier);
+                }
+                @Override
+                public void onNetworkUnwanted(L2capNetwork network) {
+                    declareAllNetworkRequestsUnfulfillable(specifier);
+                }
+            });
+            if (network == null) return false;
+
+            cri.network = network;
+            return true;
         }
 
         private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
@@ -612,6 +635,10 @@ public class L2capNetworkProvider {
                 // createClientNetwork() call is processed on the handler, so it is safe to call
                 // #abort().
                 cri.connectThread.abort();
+            }
+
+            if (cri.network != null) {
+                cri.network.tearDown();
             }
         }
 
