@@ -16,6 +16,9 @@
 
 package com.android.server
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothServerSocket
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE
@@ -75,6 +78,9 @@ class L2capNetworkProviderTest {
     @Mock private lateinit var provider: NetworkProvider
     @Mock private lateinit var cm: ConnectivityManager
     @Mock private lateinit var pm: PackageManager
+    @Mock private lateinit var bm: BluetoothManager
+    @Mock private lateinit var adapter: BluetoothAdapter
+    @Mock private lateinit var serverSocket: BluetoothServerSocket
 
     private val handlerThread = HandlerThread("$TAG handler thread").apply { start() }
     private val handler = Handler(handlerThread.looper)
@@ -87,6 +93,11 @@ class L2capNetworkProviderTest {
         doReturn(cm).`when`(context).getSystemService(eq(ConnectivityManager::class.java))
         doReturn(pm).`when`(context).getPackageManager()
         doReturn(true).`when`(pm).hasSystemFeature(FEATURE_BLUETOOTH_LE)
+
+        doReturn(bm).`when`(context).getSystemService(eq(BluetoothManager::class.java))
+        doReturn(adapter).`when`(bm).getAdapter()
+        doReturn(serverSocket).`when`(adapter).listenUsingInsecureL2capChannel()
+        doReturn(0x80).`when`(serverSocket).getPsm()
     }
 
     @After
