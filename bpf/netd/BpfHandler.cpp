@@ -318,7 +318,6 @@ Status BpfHandler::initMaps() {
     RETURN_IF_NOT_OK(mUidPermissionMap.init(UID_PERMISSION_MAP_PATH));
     // initialized last so mCookieTagMap.isValid() implies everything else is valid too
     RETURN_IF_NOT_OK(mCookieTagMap.init(COOKIE_TAG_MAP_PATH));
-    ALOGI("%s successfully", __func__);
 
     return netdutils::status::ok;
 }
