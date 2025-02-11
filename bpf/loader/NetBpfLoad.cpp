@@ -1490,6 +1490,11 @@ static int doLoad(char** argv, char * const envp[]) {
         if (!isTV()) return 1;
     }
 
+    if (isKernel32Bit() && isAtLeast25Q2) {
+        ALOGE("Android 25Q2 requires 64 bit kernel.");
+        return 1;
+    }
+
     // 6.6 is highest version supported by Android V, so this is effectively W+ (sdk=36+)
     if (isKernel32Bit() && isAtLeastKernelVersion(6, 7, 0)) {
         ALOGE("Android platform with 32 bit kernel version >= 6.7.0 is unsupported");
