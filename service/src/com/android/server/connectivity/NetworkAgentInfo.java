@@ -1128,6 +1128,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         int delta = add ? +1 : -1;
         switch (request.type) {
             case REQUEST:
+            case RESERVATION:
                 mNumRequestNetworkRequests += delta;
                 break;
 
