@@ -1737,27 +1737,7 @@ public class Tethering {
                 break;
             case IFACE_IP_MODE_LOCAL_ONLY:
                 type = maybeInferWifiTetheringType(ifname);
-                // BUG: this request is incorrect - instead of LOHS, it will reflect whatever
-                // request (if any) is being processed for TETHERING_WIFI. However, this is the
-                // historical behaviour. It mostly works because a) most of the time there is no
-                // such request b) tetherinternal doesn't look at the connectivity scope of the
-                // request, it takes the scope from requestedState.
-                request = getPendingTetheringRequest(type);
-                if (request == null) {
-                    request = createImplicitLocalOnlyTetheringRequest(TETHERING_WIFI);
-                } else {
-                    // If we've taken this request from the pending requests, then force the
-                    // connectivity scope to local so we start IpServer in local-only mode (this
-                    // matches historical behavior). This should be OK since the connectivity scope
-                    // is only used to start IpServer in the correct mode.
-                    // TODO: This will break fuzzy-matching logic for start/stop tethering in the
-                    //       future. Figure out how to reconcile that with this forced scope.
-                    //       Possibly ignore the connectivity scope for wifi if both requests are
-                    //       explicit, since explicit Wifi requests may only have
-                    //       CONNECTIVITY_SCOPE_GLOBAL. Or possibly, don't add any edge case and
-                    //       treat it as a different request entirely.
-                    request.getParcel().connectivityScope = CONNECTIVITY_SCOPE_LOCAL;
-                }
+                request = createImplicitLocalOnlyTetheringRequest(type);
                 break;
             default:
                 mLog.e("Cannot enable IP serving in unknown WiFi mode: " + wifiIpMode);
