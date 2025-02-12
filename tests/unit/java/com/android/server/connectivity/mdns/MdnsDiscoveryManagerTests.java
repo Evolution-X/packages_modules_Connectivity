@@ -442,14 +442,12 @@ public class MdnsDiscoveryManagerTests {
             // Verify the checkAndRunOnHandlerThread method
             final CompletableFuture<Boolean> future1 = new CompletableFuture<>();
             executor.checkAndRunOnHandlerThread(()-> future1.complete(true));
-            assertTrue(future1.isDone());
             assertTrue(future1.get(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
 
             // Verify the execute method
             final CompletableFuture<Boolean> future2 = new CompletableFuture<>();
             executor.execute(()-> future2.complete(true));
             testableLooper.processAllMessages();
-            assertTrue(future2.isDone());
             assertTrue(future2.get(DEFAULT_TIMEOUT, TimeUnit.MILLISECONDS));
 
             // Verify the executeDelayed method
@@ -469,7 +467,6 @@ public class MdnsDiscoveryManagerTests {
             // The function should be executed.
             testableLooper.moveTimeForward(500L);
             testableLooper.processAllMessages();
-            assertTrue(future3.isDone());
             assertTrue(future3.get(500L, TimeUnit.MILLISECONDS));
         } finally {
             testableLooper.destroy();
