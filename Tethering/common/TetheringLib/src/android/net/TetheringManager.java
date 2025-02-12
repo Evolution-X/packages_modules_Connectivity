@@ -333,6 +333,11 @@ public class TetheringManager {
     public static final int TETHER_ERROR_UNKNOWN_REQUEST = 17;
     @FlaggedApi(Flags.FLAG_TETHERING_WITH_SOFT_AP_CONFIG)
     public static final int TETHER_ERROR_DUPLICATE_REQUEST = 18;
+    /**
+     * Never used outside Tethering.java.
+     * @hide
+     */
+    public static final int TETHER_ERROR_BLUETOOTH_SERVICE_PENDING = 19;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
