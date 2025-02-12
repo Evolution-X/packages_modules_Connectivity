@@ -17,8 +17,7 @@
 package com.android.net.module.util;
 
 import android.annotation.NonNull;
-
-import java.io.IOException;
+import android.system.ErrnoException;
 
 /**
  * Contains JNI functions for use in service-connectivity
@@ -38,17 +37,17 @@ public class ServiceConnectivityJni {
     /**
      * Create a timerfd.
      *
-     * @throws IOException if the timerfd creation is failed.
+     * @throws ErrnoException if the timerfd creation is failed.
      */
-    public static native int createTimerFd() throws IOException;
+    public static native int createTimerFd() throws ErrnoException;
 
     /**
      * Set given time to the timerfd.
      *
      * @param timeMs target time
-     * @throws IOException if setting expiration time is failed.
+     * @throws ErrnoException if setting expiration time is failed.
      */
-    public static native void setTimerFdTime(int fd, long timeMs) throws IOException;
+    public static native void setTimerFdTime(int fd, long timeMs) throws ErrnoException;
 
     /** Create tun/tap interface */
     public static native int createTunTap(boolean isTun, boolean hasCarrier,
