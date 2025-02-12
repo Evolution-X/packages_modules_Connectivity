@@ -23,6 +23,7 @@ import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.FEATURE_BLUETOOTH
+import android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE
 import android.content.pm.PackageManager.FEATURE_ETHERNET
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.content.pm.PackageManager.FEATURE_WIFI_DIRECT
@@ -103,7 +104,13 @@ internal fun makeActivityManager() = mock<ActivityManager>().also {
 }
 
 internal fun makeMockPackageManager(realContext: Context) = mock<PackageManager>().also { pm ->
-    val supported = listOf(FEATURE_WIFI, FEATURE_WIFI_DIRECT, FEATURE_BLUETOOTH, FEATURE_ETHERNET)
+    val supported = listOf(
+            FEATURE_WIFI,
+            FEATURE_WIFI_DIRECT,
+            FEATURE_BLUETOOTH,
+            FEATURE_BLUETOOTH_LE,
+            FEATURE_ETHERNET
+    )
     doReturn(true).`when`(pm).hasSystemFeature(argThat { supported.contains(it) })
     val myPackageName = realContext.packageName
     val myPackageInfo = realContext.packageManager.getPackageInfo(myPackageName,

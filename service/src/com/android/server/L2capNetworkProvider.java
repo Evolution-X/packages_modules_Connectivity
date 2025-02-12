@@ -655,11 +655,6 @@ public class L2capNetworkProvider {
 
     @VisibleForTesting
     public static class Dependencies {
-        /** Get NetworkProvider */
-        public NetworkProvider getNetworkProvider(Context context, Looper looper) {
-            return new NetworkProvider(context, looper, TAG);
-        }
-
         /** Get the HandlerThread for L2capNetworkProvider to run on */
         public HandlerThread getHandlerThread() {
             final HandlerThread thread = new HandlerThread("L2capNetworkProviderThread");
@@ -678,7 +673,7 @@ public class L2capNetworkProvider {
         mContext = context;
         mHandlerThread = mDeps.getHandlerThread();
         mHandler = new Handler(mHandlerThread.getLooper());
-        mProvider = mDeps.getNetworkProvider(context, mHandlerThread.getLooper());
+        mProvider = new NetworkProvider(context, mHandlerThread.getLooper(), TAG);
         mBlanketOffer = new BlanketReservationOffer();
         mClientOffer = new ClientOffer();
     }
