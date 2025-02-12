@@ -16,10 +16,8 @@
 
 package com.android.net.module.util;
 
-import android.os.Process;
+import android.system.ErrnoException;
 import android.util.Log;
-
-import java.io.IOException;
 
 /**
  * Contains mostly timerfd functionality.
@@ -33,7 +31,7 @@ public class TimerFdUtils {
     static int createTimerFileDescriptor() {
         try {
             return ServiceConnectivityJni.createTimerFd();
-        } catch (IOException e) {
+        } catch (ErrnoException e) {
             Log.e(TAG, "createTimerFd failed", e);
             return -1;
         }
@@ -45,7 +43,7 @@ public class TimerFdUtils {
     static boolean setExpirationTime(int fd, long expirationTimeMs) {
         try {
             ServiceConnectivityJni.setTimerFdTime(fd, expirationTimeMs);
-        } catch (IOException e) {
+        } catch (ErrnoException e) {
             Log.e(TAG, "setExpirationTime failed", e);
             return false;
         }
