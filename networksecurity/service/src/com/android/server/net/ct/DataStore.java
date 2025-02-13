@@ -44,8 +44,9 @@ class DataStore extends Properties {
         }
         try (InputStream in = new FileInputStream(mPropertyFile)) {
             load(in);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             Log.e(TAG, "Error loading property store", e);
+            delete();
         }
     }
 
