@@ -184,6 +184,7 @@ class L2capPacketForwarderTest {
                 handler,
                 FdWrapper(ParcelFileDescriptor(tunFds[0])),
                 BluetoothSocketWrapper(bluetoothSocket),
+                false /* compressHeaders */,
                 callback
         )
     }
