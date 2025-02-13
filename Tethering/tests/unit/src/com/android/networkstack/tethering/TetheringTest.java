@@ -93,7 +93,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.notNull;
@@ -2787,6 +2786,10 @@ public class TetheringTest {
         public void assertHasResult() {
             if (!mHasResult) fail("No callback result");
         }
+
+        public void assertDoesNotHaveResult() {
+            if (mHasResult) fail("Has callback result");
+        }
     }
 
     @Test
@@ -3395,10 +3398,9 @@ public class TetheringTest {
     }
 
     @Test
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testBluetoothTethering() throws Exception {
         initTetheringOnTestThread();
-        // Switch to @IgnoreUpTo(Build.VERSION_CODES.S_V2) when it is available for AOSP.
-        assumeTrue(isAtLeastT());
 
         final ResultListener result = new ResultListener(TETHER_ERROR_NO_ERROR);
         mockBluetoothSettings(true /* bluetoothOn */, true /* tetheringOn */);
@@ -3432,10 +3434,9 @@ public class TetheringTest {
     }
 
     @Test
+    @IgnoreAfter(Build.VERSION_CODES.S_V2)
     public void testBluetoothTetheringBeforeT() throws Exception {
         initTetheringOnTestThread();
-        // Switch to @IgnoreAfter(Build.VERSION_CODES.S_V2) when it is available for AOSP.
-        assumeFalse(isAtLeastT());
 
         final ResultListener result = new ResultListener(TETHER_ERROR_NO_ERROR);
         mockBluetoothSettings(true /* bluetoothOn */, true /* tetheringOn */);
@@ -3513,6 +3514,23 @@ public class TetheringTest {
         mLooper.dispatchAll();
 
         verifyNetdCommandForBtTearDown();
+    }
+
+    @Test
+    public void testPendingPanEnableRequestFailedUponDisableRequest() throws Exception {
+        initTetheringOnTestThread();
+
+        mockBluetoothSettings(true /* bluetoothOn */, true /* tetheringOn */);
+        final ResultListener failedEnable = new ResultListener(TETHER_ERROR_SERVICE_UNAVAIL);
+        mTethering.startTethering(createTetheringRequest(TETHERING_BLUETOOTH),
+                TEST_CALLER_PKG, failedEnable);
+        mLooper.dispatchAll();
+        failedEnable.assertDoesNotHaveResult();
+
+        // Stop tethering before the pan service connects. This should fail the enable request.
+        mTethering.stopTethering(TETHERING_BLUETOOTH);
+        mLooper.dispatchAll();
+        failedEnable.assertHasResult();
     }
 
     private void mockBluetoothSettings(boolean bluetoothOn, boolean tetheringOn) {
