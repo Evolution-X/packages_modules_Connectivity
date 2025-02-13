@@ -497,4 +497,33 @@ public class NetlinkUtils {
             return false;
         }
     }
+
+    /**
+     * Sends a netlink request to set MTU for given interface
+     *
+     * @param interfaceName The name of the network interface to query.
+     * @param mtu MTU value to set for the interface.
+     * @return true if the request finished successfully, otherwise false.
+     */
+    public static boolean setInterfaceMtu(@NonNull String interfaceName, int mtu) {
+        if (mtu < 68) {
+            Log.e(TAG, "Invalid mtu: " + mtu + ", mtu should be greater than 68 referring RFC791");
+            return false;
+        }
+        final RtNetlinkLinkMessage ntMsg =
+                RtNetlinkLinkMessage.createSetMtuMessage(interfaceName, /*seqNo*/ 0, mtu);
+        if (ntMsg == null) {
+            Log.e(TAG, "Failed to create message to set MTU to " + mtu
+                    + "for interface " + interfaceName);
+            return false;
+        }
+        final byte[] msg = ntMsg.pack(ByteOrder.nativeOrder());
+        try {
+            NetlinkUtils.sendOneShotKernelMessage(NETLINK_ROUTE, msg);
+            return true;
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Failed to set MTU to " + mtu + " for: " + interfaceName, e);
+            return false;
+        }
+    }
 }

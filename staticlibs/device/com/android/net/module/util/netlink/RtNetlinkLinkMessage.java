@@ -364,6 +364,37 @@ public class RtNetlinkLinkMessage extends NetlinkMessage {
                 DEFAULT_MTU, /*hardwareAddress*/ null, /*interfaceName*/ null);
     }
 
+    /**
+     * Creates an {@link RtNetlinkLinkMessage} instance that can be used to set the MTU of a
+     * network interface.
+     *
+     * @param interfaceName The name of the network interface to query.
+     * @param sequenceNumber The sequence number for the Netlink message.
+     * @param mtu MTU value to set for the interface.
+     * @return An `RtNetlinkLinkMessage` instance representing the request to query the interface.
+     */
+    @Nullable
+    public static RtNetlinkLinkMessage createSetMtuMessage(@NonNull String interfaceName,
+            int sequenceNumber, int mtu) {
+        return createSetMtuMessage(
+            interfaceName, sequenceNumber, mtu, new OsAccess());
+    }
+
+    @VisibleForTesting
+    @Nullable
+    protected static RtNetlinkLinkMessage createSetMtuMessage(@NonNull String interfaceName,
+            int sequenceNumber, int mtu, @NonNull OsAccess osAccess) {
+        final int interfaceIndex = osAccess.if_nametoindex(interfaceName);
+        if (interfaceIndex == OsAccess.INVALID_INTERFACE_INDEX) {
+            return null;
+        }
+        return RtNetlinkLinkMessage.build(
+            new StructNlMsgHdr(/*payloadLen*/ 0, RTM_NEWLINK, NLM_F_REQUEST_ACK , sequenceNumber),
+            new StructIfinfoMsg((short) AF_UNSPEC, /*type*/ 0, interfaceIndex,
+                /*flags*/ 0, /*change*/ 0),
+            mtu, /*hardwareAddress*/ null, /*interfaceName*/ null);
+    }
+
     @Override
     public String toString() {
         return "RtNetlinkLinkMessage{ "
