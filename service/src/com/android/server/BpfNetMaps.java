@@ -464,7 +464,7 @@ public class BpfNetMaps {
      ToDo : Remove this method when SdkLevel.isAtLeastB() is fixed, aosp is at sdk level 36 or use
      NetworkStackUtils.isAtLeast25Q2 when it is moved to a static lib.
      */
-    private static boolean isAtLeast25Q2() {
+    public static boolean isAtLeast25Q2() {
         return SdkLevel.isAtLeastB()  || (SdkLevel.isAtLeastV()
                 && "Baklava".equals(Build.VERSION.CODENAME));
     }
