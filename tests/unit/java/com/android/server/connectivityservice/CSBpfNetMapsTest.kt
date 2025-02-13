@@ -21,7 +21,10 @@ import android.net.ConnectivityManager.ACTION_RESTRICT_BACKGROUND_CHANGED
 import android.net.ConnectivityManager.RESTRICT_BACKGROUND_STATUS_DISABLED
 import android.net.ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
 import android.net.ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED
+import android.net.InetAddresses
+import android.net.LinkProperties
 import android.os.Build
+import android.os.Build.VERSION_CODES
 import androidx.test.filters.SmallTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter
@@ -33,10 +36,31 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.eq
+import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+
+internal val LOCAL_DNS = InetAddresses.parseNumericAddress("224.0.1.2")
+internal val NON_LOCAL_DNS = InetAddresses.parseNumericAddress("76.76.75.75")
+
+private const val IFNAME_1 = "wlan1"
+private const val IFNAME_2 = "wlan2"
+private const val PORT_53 = 53
+private const val PROTOCOL_TCP = 6
+private const val PROTOCOL_UDP = 17
+
+private val lpWithNoLocalDns = LinkProperties().apply {
+    addDnsServer(NON_LOCAL_DNS)
+    interfaceName = IFNAME_1
+}
+
+private val lpWithLocalDns = LinkProperties().apply {
+    addDnsServer(LOCAL_DNS)
+    interfaceName = IFNAME_2
+}
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
@@ -67,6 +91,81 @@ class CSBpfNetMapsTest : CSTest() {
             mockDataSaverStatus(it)
             verify(bpfNetMaps, never()).setDataSaverEnabled(anyBoolean())
         }
+    }
+
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @Test
+    fun testLocalPrefixesUpdatedInBpfMap() {
+        // Connect Wi-Fi network with non-local dns.
+        val wifiAgent = Agent(nc = defaultNc(), lp = lpWithNoLocalDns)
+        wifiAgent.connect()
+
+        // Verify that block rule is added to BpfMap for local prefixes.
+        verify(bpfNetMaps, atLeastOnce()).addLocalNetAccess(any(), eq(IFNAME_1),
+            any(), eq(0), eq(0), eq(false))
+
+        wifiAgent.disconnect()
+        val cellAgent = Agent(nc = defaultNc(), lp = lpWithLocalDns)
+        cellAgent.connect()
+
+        // Verify that block rule is removed from BpfMap for local prefixes.
+        verify(bpfNetMaps, atLeastOnce()).removeLocalNetAccess(any(), eq(IFNAME_1),
+            any(), eq(0), eq(0))
+
+        cellAgent.disconnect()
+    }
+
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @Test
+    fun testLocalDnsNotUpdatedInBpfMap() {
+        // Connect Wi-Fi network with non-local dns.
+        val wifiAgent = Agent(nc = defaultNc(), lp = lpWithNoLocalDns)
+        wifiAgent.connect()
+
+        // Verify that No allow rule is added to BpfMap since there is no local dns.
+        verify(bpfNetMaps, never()).addLocalNetAccess(any(), any(), any(), any(), any(),
+            eq(true))
+
+        wifiAgent.disconnect()
+        val cellAgent = Agent(nc = defaultNc(), lp = lpWithLocalDns)
+        cellAgent.connect()
+
+        // Verify that No allow rule from port 53 is removed on network change
+        // because no dns was added
+        verify(bpfNetMaps, never()).removeLocalNetAccess(eq(192), eq(IFNAME_1),
+            eq(NON_LOCAL_DNS), any(), eq(PORT_53))
+
+        cellAgent.disconnect()
+    }
+
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @Test
+    fun testLocalDnsUpdatedInBpfMap() {
+        // Connect Wi-Fi network with one local Dns.
+        val wifiAgent = Agent(nc = defaultNc(), lp = lpWithLocalDns)
+        wifiAgent.connect()
+
+        // Verify that allow rule is added to BpfMap for local dns at port 53,
+        // for TCP(=6) protocol
+        verify(bpfNetMaps, atLeastOnce()).addLocalNetAccess(eq(192), eq(IFNAME_2),
+            eq(LOCAL_DNS), eq(PROTOCOL_TCP), eq(PORT_53), eq(true))
+        // And for UDP(=17) protocol
+        verify(bpfNetMaps, atLeastOnce()).addLocalNetAccess(eq(192), eq(IFNAME_2),
+            eq(LOCAL_DNS), eq(PROTOCOL_UDP), eq(PORT_53), eq(true))
+
+        wifiAgent.disconnect()
+        val cellAgent = Agent(nc = defaultNc(), lp = lpWithNoLocalDns)
+        cellAgent.connect()
+
+        // Verify that allow rule is removed for local dns on network change,
+        // for TCP(=6) protocol
+        verify(bpfNetMaps, atLeastOnce()).removeLocalNetAccess(eq(192), eq(IFNAME_2),
+            eq(LOCAL_DNS), eq(PROTOCOL_TCP), eq(PORT_53))
+        // And for UDP(=17) protocol
+        verify(bpfNetMaps, atLeastOnce()).removeLocalNetAccess(eq(192), eq(IFNAME_2),
+            eq(LOCAL_DNS), eq(PROTOCOL_UDP), eq(PORT_53))
+
+        cellAgent.disconnect()
     }
 
     private fun mockDataSaverStatus(status: Int) {
