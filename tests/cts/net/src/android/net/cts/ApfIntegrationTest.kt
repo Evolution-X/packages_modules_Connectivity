@@ -591,6 +591,13 @@ class ApfIntegrationTest {
 
         val program = gen.generate()
         assertThat(program.size).isLessThan(counterRegion)
+        val randomProgram = ByteArray(1) { 0 } +
+                ByteArray(counterRegion - 1).also { Random.nextBytes(it) }
+        // There are known firmware bugs where they calculate the number of non-zero bytes within
+        // the program to determine the program length. Modify the test to first install a longer
+        // program before installing a program that do the program length check. This should help us
+        // catch these types of firmware bugs in CTS. (b/395545572)
+        installAndVerifyProgram(randomProgram)
         installAndVerifyProgram(program)
 
         // Trigger the program by sending a ping and waiting on the reply.
