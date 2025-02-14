@@ -1102,10 +1102,13 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             }
         }
 
-        int progId = bpfGetFdProgId(fd);
-        if (progId == -1) {
-            ALOGE("bpfGetFdProgId failed, ret: %d [%d]", progId, errno);
-        } else {
+        if (isAtLeastKernelVersion(4, 14, 0)) {
+            int progId = bpfGetFdProgId(fd);
+            if (progId == -1) {
+                const int err = errno;
+                ALOGE("bpfGetFdProgId failed, errno: %d", err);
+                return -err;
+            }
             ALOGI("prog %s id %d", progPinLoc.c_str(), progId);
         }
     }
