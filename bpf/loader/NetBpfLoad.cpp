@@ -823,14 +823,14 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
                                    "tmp_map_" + objName + "_" + mapNames[i];
                 ret = bpfFdPin(fd, createLoc.c_str());
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("create %s -> %d [%d:%s]", createLoc.c_str(), ret, err, strerror(err));
                     return -err;
                 }
                 ret = renameat2(AT_FDCWD, createLoc.c_str(),
                                 AT_FDCWD, mapPinLoc.c_str(), RENAME_NOREPLACE);
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("rename %s %s -> %d [%d:%s]", createLoc.c_str(), mapPinLoc.c_str(), ret,
                           err, strerror(err));
                     return -err;
@@ -838,21 +838,21 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             } else {
                 ret = bpfFdPin(fd, mapPinLoc.c_str());
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("pin %s -> %d [%d:%s]", mapPinLoc.c_str(), ret, err, strerror(err));
                     return -err;
                 }
             }
             ret = chmod(mapPinLoc.c_str(), md[i].mode);
             if (ret) {
-                int err = errno;
+                const int err = errno;
                 ALOGE("chmod(%s, 0%o) = %d [%d:%s]", mapPinLoc.c_str(), md[i].mode, ret, err,
                       strerror(err));
                 return -err;
             }
             ret = chown(mapPinLoc.c_str(), (uid_t)md[i].uid, (gid_t)md[i].gid);
             if (ret) {
-                int err = errno;
+                const int err = errno;
                 ALOGE("chown(%s, %u, %u) = %d [%d:%s]", mapPinLoc.c_str(), md[i].uid, md[i].gid,
                       ret, err, strerror(err));
                 return -err;
@@ -1066,14 +1066,14 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
                                    "tmp_prog_" + objName + '_' + string(name);
                 ret = bpfFdPin(fd, createLoc.c_str());
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("create %s -> %d [%d:%s]", createLoc.c_str(), ret, err, strerror(err));
                     return -err;
                 }
                 ret = renameat2(AT_FDCWD, createLoc.c_str(),
                                 AT_FDCWD, progPinLoc.c_str(), RENAME_NOREPLACE);
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("rename %s %s -> %d [%d:%s]", createLoc.c_str(), progPinLoc.c_str(), ret,
                           err, strerror(err));
                     return -err;
@@ -1081,19 +1081,19 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             } else {
                 ret = bpfFdPin(fd, progPinLoc.c_str());
                 if (ret) {
-                    int err = errno;
+                    const int err = errno;
                     ALOGE("create %s -> %d [%d:%s]", progPinLoc.c_str(), ret, err, strerror(err));
                     return -err;
                 }
             }
             if (chmod(progPinLoc.c_str(), 0440)) {
-                int err = errno;
+                const int err = errno;
                 ALOGE("chmod %s 0440 -> [%d:%s]", progPinLoc.c_str(), err, strerror(err));
                 return -err;
             }
             if (chown(progPinLoc.c_str(), (uid_t)cs[i].prog_def->uid,
                       (gid_t)cs[i].prog_def->gid)) {
-                int err = errno;
+                const int err = errno;
                 ALOGE("chown %s %d %d -> [%d:%s]", progPinLoc.c_str(), cs[i].prog_def->uid,
                       cs[i].prog_def->gid, err, strerror(err));
                 return -err;
