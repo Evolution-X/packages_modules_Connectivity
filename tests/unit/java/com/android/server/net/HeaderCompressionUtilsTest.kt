@@ -52,7 +52,7 @@ class HeaderCompressionUtilsTest {
     fun testHeaderDecompression() {
         // TF: 00, NH: 0, HLIM: 00, CID: 0, SAC: 0, SAM: 00, M: 0, DAC: 0, DAM: 00
         var input = "6000" +
-                    "ccf" +                               // ECN + DSCP + 4-bit Pad (puts f in padding)
+                    "ccf" +                               // ECN + DSCP + 4-bit Pad (here "f")
                     "12345" +                             // flow label
                     "11" +                                // next header
                     "e7" +                                // hop limit
@@ -73,7 +73,7 @@ class HeaderCompressionUtilsTest {
 
         // TF: 01, NH: 0, HLIM: 01, CID: 0, SAC: 0, SAM: 01, M: 0, DAC: 0, DAM: 01
         input  = "6911" +
-                 "5" +                                // ECN + 2-bit pad (puts 1 in padding)
+                 "5" +                                // ECN + 2-bit pad (here "1")
                  "f100e" +                            // flow label
                  "42" +                               // next header
                  "1102030405060708" +                 // source
