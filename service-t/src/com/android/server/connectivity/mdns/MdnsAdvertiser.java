@@ -1007,6 +1007,19 @@ public class MdnsAdvertiser {
         });
     }
 
+    private List<String> getOffloadSubtype(@NonNull NsdServiceInfo nsdServiceInfo) {
+        // Workaround: Google Cast doesn't announce subtypes per DNS-SD/mDNS spec.
+        // Thus, subtypes aren't offloaded; only "_googlecast._tcp" is.
+        // Subtype responses occur when hardware offload is off.
+        // This solution works because Google Cast doesn't follow the intended usage of subtypes in
+        // the spec, as it always discovers for both the subtype+base type, and only uses the mDNS
+        // subtype as an optimization.
+        if (nsdServiceInfo.getServiceType().equals("_googlecast._tcp")) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(nsdServiceInfo.getSubtypes());
+    }
+
     private OffloadServiceInfoWrapper createOffloadService(int serviceId,
             @NonNull Registration registration, byte[] rawOffloadPacket) {
         final NsdServiceInfo nsdServiceInfo = registration.getServiceInfo();
@@ -1017,7 +1030,7 @@ public class MdnsAdvertiser {
         final OffloadServiceInfo offloadServiceInfo = new OffloadServiceInfo(
                 new OffloadServiceInfo.Key(nsdServiceInfo.getServiceName(),
                         nsdServiceInfo.getServiceType()),
-                new ArrayList<>(nsdServiceInfo.getSubtypes()),
+                getOffloadSubtype(nsdServiceInfo),
                 String.join(".", mDeviceHostName),
                 rawOffloadPacket,
                 priority,
