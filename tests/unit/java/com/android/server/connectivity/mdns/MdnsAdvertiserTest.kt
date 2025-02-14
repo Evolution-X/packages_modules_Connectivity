@@ -92,6 +92,13 @@ private val SERVICE_1 = NsdServiceInfo("TestServiceName", "_advertisertest._tcp"
     network = TEST_NETWORK_1
 }
 
+private val GOOGLECAST_SERVICE = NsdServiceInfo("TestServiceName", "_googlecast._tcp").apply {
+    subtypes = setOf(TEST_SUBTYPE)
+    port = 12345
+    hostAddresses = listOf(TEST_ADDR)
+    network = TEST_NETWORK_1
+}
+
 private val SERVICE_1_SUBTYPE = NsdServiceInfo("TestServiceName", "_advertisertest._tcp").apply {
     subtypes = setOf(TEST_SUBTYPE)
     port = 12345
@@ -140,6 +147,15 @@ private val OFFLOAD_SERVICEINFO = OffloadServiceInfo(
     "Android_test.local",
     TEST_OFFLOAD_PACKET1,
     0, /* priority */
+    OffloadEngine.OFFLOAD_TYPE_REPLY.toLong()
+)
+
+private val OFFLOAD_SERVICE_INFO_GOOGLECAST = OffloadServiceInfo(
+    OffloadServiceInfo.Key("TestServiceName", "_googlecast._tcp"),
+    listOf(),
+    "Android_test.local",
+    TEST_OFFLOAD_PACKET1,
+    Int.MAX_VALUE,
     OffloadEngine.OFFLOAD_TYPE_REPLY.toLong()
 )
 
@@ -505,6 +521,44 @@ class MdnsAdvertiserTest {
             Integer.MAX_VALUE, /* priority */
             OffloadEngine.OFFLOAD_TYPE_REPLY.toLong()
         )))
+    }
+
+    @Test
+    fun testAddService_NoSubtypeForGoogleCastOffload() {
+        val advertiser =
+            MdnsAdvertiser(thread.looper, socketProvider, cb, mockDeps, sharedlog, flags, context)
+        postSync {
+            advertiser.addOrUpdateService(
+                SERVICE_ID_1,
+                GOOGLECAST_SERVICE,
+                DEFAULT_ADVERTISING_OPTION,
+                TEST_CLIENT_UID_1
+            )
+        }
+        val socketCbCaptor = ArgumentCaptor.forClass(SocketCallback::class.java)
+        verify(socketProvider).requestSocket(eq(SERVICE_1.network), socketCbCaptor.capture())
+
+        val socketCb = socketCbCaptor.value
+        postSync { socketCb.onSocketCreated(TEST_SOCKETKEY_1, mockSocket1, listOf(TEST_LINKADDR)) }
+
+        val intAdvCbCaptor1 = ArgumentCaptor.forClass(MdnsInterfaceAdvertiser.Callback::class.java)
+        verify(mockDeps).makeAdvertiser(
+            eq(mockSocket1),
+            eq(listOf(TEST_LINKADDR)),
+            eq(thread.looper),
+            any(),
+            intAdvCbCaptor1.capture(),
+            eq(TEST_HOSTNAME),
+            any(),
+            any()
+        )
+
+        doReturn(false).`when`(mockInterfaceAdvertiser1).isProbing(SERVICE_ID_1)
+        postSync {
+            intAdvCbCaptor1.value.onServiceProbingSucceeded(mockInterfaceAdvertiser1, SERVICE_ID_1)
+        }
+
+        verify(cb).onOffloadStartOrUpdate(eq(TEST_INTERFACE1), eq(OFFLOAD_SERVICE_INFO_GOOGLECAST))
     }
 
     @Test
