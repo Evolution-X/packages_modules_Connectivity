@@ -290,8 +290,8 @@ public class L2capPacketForwarder {
     }
 
     public L2capPacketForwarder(Handler handler, ParcelFileDescriptor tunFd, BluetoothSocket socket,
-            ICallback cb) {
-        this(handler, new FdWrapper(tunFd), new BluetoothSocketWrapper(socket), false, cb);
+            boolean compressHdrs, ICallback cb) {
+        this(handler, new FdWrapper(tunFd), new BluetoothSocketWrapper(socket), compressHdrs, cb);
     }
 
     @VisibleForTesting
