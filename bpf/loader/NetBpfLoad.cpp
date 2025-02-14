@@ -1006,7 +1006,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
         if (access(progPinLoc.c_str(), F_OK) == 0) {
             fd.reset(retrieveProgram(progPinLoc.c_str()));
             ALOGD("New bpf prog load reusing prog %s, ret: %d (%s)", progPinLoc.c_str(), fd.get(),
-                  (!fd.ok() ? std::strerror(errno) : "no error"));
+                  !fd.ok() ? std::strerror(errno) : "ok");
             reuse = true;
         } else {
             static char log_buf[1 << 20];  // 1 MiB logging buffer
@@ -1037,7 +1037,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
 
             ALOGD("BPF_PROG_LOAD call for %s (%s) returned '%s' fd: %d (%s)", elfPath,
                   cs[i].name.c_str(), log_oneline ? log_buf : "{multiline}",
-                  fd.get(), (!fd.ok() ? std::strerror(errno) : "ok"));
+                  fd.get(), !fd.ok() ? std::strerror(errno) : "ok");
 
             if (!fd.ok()) {
                 // kernel NULL terminates log_buf, so this checks for non-empty string
