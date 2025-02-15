@@ -37,6 +37,7 @@ import static android.system.OsConstants.O_NONBLOCK;
 
 import android.annotation.Nullable;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
@@ -275,6 +276,14 @@ public class L2capNetworkProvider {
         return new L2capNetwork(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
     }
 
+    private static void closeBluetoothSocket(BluetoothSocket socket) {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to close BluetoothSocket", e);
+        }
+    }
+
     private class ReservedServerOffer implements NetworkOfferCallback {
         private final NetworkCapabilities mReservedCapabilities;
         private final AcceptThread mAcceptThread;
@@ -297,14 +306,6 @@ public class L2capNetworkProvider {
                 mHandler.post(() -> {
                     destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
                 });
-            }
-
-            private static void closeBluetoothSocket(BluetoothSocket socket) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    Log.w(TAG, "Failed to close BluetoothSocket", e);
-                }
             }
 
             private void postCreateServerNetwork(BluetoothSocket connectedSocket) {
@@ -432,13 +433,70 @@ public class L2capNetworkProvider {
          * State object to store information for client NetworkRequests.
          */
         private static class ClientRequestInfo {
+            public final L2capNetworkSpecifier specifier;
             public final List<NetworkRequest> requests = new ArrayList<>();
+            // TODO: add support for retries.
+            public final ConnectThread connectThread;
 
-            public ClientRequestInfo(NetworkRequest request) {
-                requests.add(request);
+            public ClientRequestInfo(NetworkRequest request, ConnectThread connectThread) {
+                this.specifier = (L2capNetworkSpecifier) request.getNetworkSpecifier();
+                this.requests.add(request);
+                this.connectThread = connectThread;
             }
         }
 
+        // TODO: consider using ExecutorService
+        private class ConnectThread extends Thread {
+            private final L2capNetworkSpecifier mSpecifier;
+            private final BluetoothSocket mSocket;
+            private volatile boolean mIsAborted = false;
+
+            public ConnectThread(L2capNetworkSpecifier specifier, BluetoothSocket socket) {
+                mSpecifier = specifier;
+                mSocket = socket;
+            }
+
+            public void run() {
+                try {
+                    mSocket.connect();
+                    mHandler.post(() -> {
+                        final boolean success = createClientNetwork(mSpecifier, mSocket);
+                        if (!success) closeBluetoothSocket(mSocket);
+                    });
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to connect", e);
+                    if (mIsAborted) return;
+
+                    closeBluetoothSocket(mSocket);
+                    mHandler.post(() -> {
+                        declareAllNetworkRequestsUnfulfillable(mSpecifier);
+                    });
+                }
+            }
+
+            public void abort() {
+                mIsAborted = true;
+                // Closing the BluetoothSocket is the only way to unblock connect() because it calls
+                // shutdown on the underlying (connected) SOCK_SEQPACKET.
+                // It is safe to call BluetoothSocket#close() multiple times.
+                closeBluetoothSocket(mSocket);
+                try {
+                    join();
+                } catch (InterruptedException e) {
+                    Log.i(TAG, "Interrupted while joining ConnectThread", e);
+                }
+            }
+        }
+
+        private boolean createClientNetwork(L2capNetworkSpecifier specifier,
+                BluetoothSocket socket) {
+            // Check whether request still exists
+            final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
+            if (cri == null) return false;
+
+            // TODO: implement createClientNetwork
+            return false;
+        }
 
         private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
             if (spec == null) return false;
@@ -501,9 +559,28 @@ public class L2capNetworkProvider {
             }
 
             // If the code reaches here, this is a new request.
-            mClientNetworkRequests.put(requestSpecifier, new ClientRequestInfo(request));
+            final BluetoothAdapter bluetoothAdapter = mBluetoothManager.getAdapter();
+            if (bluetoothAdapter == null) {
+                Log.w(TAG, "Failed to get BluetoothAdapter");
+                mProvider.declareNetworkRequestUnfulfillable(request);
+                return;
+            }
 
-            // TODO: implement onNetworkNeeded
+            final byte[] macAddress = requestSpecifier.getRemoteAddress().toByteArray();
+            final BluetoothDevice bluetoothDevice = bluetoothAdapter.getRemoteDevice(macAddress);
+            final BluetoothSocket socket;
+            try {
+                socket = bluetoothDevice.createInsecureL2capChannel(requestSpecifier.getPsm());
+            } catch (IOException e) {
+                Log.w(TAG, "Failed to createInsecureL2capChannel", e);
+                mProvider.declareNetworkRequestUnfulfillable(request);
+                return;
+            }
+
+            final ConnectThread connectThread = new ConnectThread(requestSpecifier, socket);
+            connectThread.start();
+            final ClientRequestInfo newRequestInfo = new ClientRequestInfo(request, connectThread);
+            mClientNetworkRequests.put(requestSpecifier, newRequestInfo);
         }
 
         @Override
@@ -519,9 +596,33 @@ public class L2capNetworkProvider {
             if (cri.requests.size() > 0) return;
 
             // If the code reaches here, the network needs to be torn down.
-            mClientNetworkRequests.remove(specifier);
+            releaseClientNetworkRequest(cri);
+        }
 
-            // TODO: implement onNetworkUnneeded
+        /**
+         * Release the client network request and tear down all associated state.
+         *
+         * Only call this when all associated NetworkRequests have been released.
+         */
+        private void releaseClientNetworkRequest(ClientRequestInfo cri) {
+            mClientNetworkRequests.remove(cri.specifier);
+            if (cri.connectThread.isAlive()) {
+                // Note that if ConnectThread succeeds between calling #isAlive() and #abort(), the
+                // request will already be removed from mClientNetworkRequests by the time the
+                // createClientNetwork() call is processed on the handler, so it is safe to call
+                // #abort().
+                cri.connectThread.abort();
+            }
+        }
+
+        private void declareAllNetworkRequestsUnfulfillable(L2capNetworkSpecifier specifier) {
+            final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
+            if (cri == null) return;
+
+            for (NetworkRequest request : cri.requests) {
+                mProvider.declareNetworkRequestUnfulfillable(request);
+            }
+            releaseClientNetworkRequest(cri);
         }
     }
 
