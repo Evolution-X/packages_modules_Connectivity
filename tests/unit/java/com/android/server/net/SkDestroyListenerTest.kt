@@ -54,7 +54,7 @@ class SkDestroyListenerTest {
         doReturn(sharedLog).`when`(sharedLog).forSubComponent(any())
 
         val handler = Handler(handlerThread.looper)
-        val skDestroylistener = SkDestroyListener(null /* cookieTagMap */, handler, sharedLog)
+        val skDestroylistener = SkDestroyListener({} /* consumer */, handler, sharedLog)
         val pw = PrintWriter(System.out)
         skDestroylistener.dump(pw)
 
