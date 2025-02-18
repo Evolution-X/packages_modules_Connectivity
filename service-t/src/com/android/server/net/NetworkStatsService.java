@@ -191,7 +191,6 @@ import com.android.net.module.util.bpf.CookieTagMapValue;
 import com.android.networkstack.apishim.BroadcastOptionsShimImpl;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.common.UnsupportedApiLevelException;
-import com.android.server.BpfNetMaps;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.File;
@@ -726,11 +725,6 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             mTrafficStatsUidCache = null;
         }
 
-        // TODO: Remove bpfNetMaps creation and always start SkDestroyListener
-        // Following code is for the experiment to verify the SkDestroyListener refactoring. Based
-        // on the experiment flag, BpfNetMaps starts C SkDestroyListener (existing code) or
-        // NetworkStatsService starts Java SkDestroyListener (new code).
-        final BpfNetMaps bpfNetMaps = mDeps.makeBpfNetMaps(mContext);
         mSkDestroyListener = mDeps.makeSkDestroyListener(mCookieTagMap, mHandler);
         mHandler.post(mSkDestroyListener::start);
     }
@@ -950,11 +944,6 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         /** Gets whether the build is userdebug. */
         public boolean isDebuggable() {
             return Build.isDebuggable();
-        }
-
-        /** Create a new BpfNetMaps. */
-        public BpfNetMaps makeBpfNetMaps(Context ctx) {
-            return new BpfNetMaps(ctx);
         }
 
         /** Create a new SkDestroyListener. */
