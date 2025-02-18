@@ -911,7 +911,7 @@ public class BpfNetMaps {
                     + "(" + iface + ")");
             return;
         }
-        LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
                 address, protocol, remotePort);
 
         try {
@@ -923,13 +923,43 @@ public class BpfNetMaps {
     }
 
     /**
-     * False if the configuration is disallowed.
-     *
+     * Remove configuration to local_net_access trie map.
+     * @param lpmBitlen prefix length that will be used for longest matching
+     * @param iface interface name
+     * @param address remote address. ipv4 addresses would be mapped to v6
+     * @param protocol required for longest match in special cases
+     * @param remotePort src/dst port for ingress/egress
+     */
+    @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
+    public void removeLocalNetAccess(final int lpmBitlen, final String iface,
+            final InetAddress address, final int protocol, final int remotePort) {
+        throwIfPre25Q2("removeLocalNetAccess is not available on pre-B devices");
+        final int ifIndex = mDeps.getIfIndex(iface);
+        if (ifIndex == 0) {
+            Log.e(TAG, "Failed to get if index, skip removeLocalNetAccess for " + address
+                    + "(" + iface + ")");
+            return;
+        }
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+                address, protocol, remotePort);
+
+        try {
+            sLocalNetAccessMap.deleteEntry(localNetAccessKey);
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Failed to remove local network access for localNetAccessKey : "
+                    + localNetAccessKey);
+        }
+    }
+
+    /**
+     * Fetches value available in local_net_access bpf map for provided configuration
      * @param lpmBitlen  prefix length that will be used for longest matching
      * @param iface    interface name
      * @param address    remote address. ipv4 addresses would be mapped to v6
      * @param protocol   required for longest match in special cases
      * @param remotePort src/dst port for ingress/egress
+     * @return false if the configuration is disallowed, true if the configuration is absent i.e. it
+     * is not local network or if configuration is allowed like local dns servers.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
     public boolean getLocalNetAccess(final int lpmBitlen, final String iface,
@@ -941,10 +971,10 @@ public class BpfNetMaps {
                     + address + "(" + iface + ")");
             return true;
         }
-        LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
                 address, protocol, remotePort);
         try {
-            Bool value = sLocalNetAccessMap.getValue(localNetAccessKey);
+            final Bool value = sLocalNetAccessMap.getValue(localNetAccessKey);
             return value == null ? true : value.val;
         } catch (ErrnoException e) {
             Log.e(TAG, "Failed to find local network access configuration for "
@@ -972,10 +1002,10 @@ public class BpfNetMaps {
      * @param uid application uid that needs check if local network calls are blocked.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
-    public boolean getUidValueFromLocalNetBlockMap(final int uid) {
-        throwIfPre25Q2("getUidValueFromLocalNetBlockMap is not available on pre-B devices");
+    public boolean isUidBlockedFromUsingLocalNetwork(final int uid) {
+        throwIfPre25Q2("isUidBlockedFromUsingLocalNetwork is not available on pre-B devices");
         try {
-            Bool value = sLocalNetBlockedUidMap.getValue(new U32(uid));
+            final Bool value = sLocalNetBlockedUidMap.getValue(new U32(uid));
             return value == null ? false : value.val;
         } catch (ErrnoException e) {
             Log.e(TAG, "Failed to find uid(" + uid
