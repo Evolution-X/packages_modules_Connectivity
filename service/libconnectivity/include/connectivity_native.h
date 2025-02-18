@@ -20,12 +20,6 @@
 #include <sys/cdefs.h>
 #include <netinet/in.h>
 
-// For branches that do not yet have __ANDROID_API_U__ defined, like module
-// release branches.
-#ifndef __ANDROID_API_U__
-#define __ANDROID_API_U__ 34
-#endif
-
 __BEGIN_DECLS
 
 /**
@@ -41,7 +35,7 @@ __BEGIN_DECLS
  *
  * @param port Int corresponding to port number.
  */
-int AConnectivityNative_blockPortForBind(in_port_t port) __INTRODUCED_IN(__ANDROID_API_U__);
+int AConnectivityNative_blockPortForBind(in_port_t port) __INTRODUCED_IN(34);
 
 /**
  * Unblocks a port that has previously been blocked.
@@ -54,7 +48,7 @@ int AConnectivityNative_blockPortForBind(in_port_t port) __INTRODUCED_IN(__ANDRO
  *
  * @param port Int corresponding to port number.
  */
-int AConnectivityNative_unblockPortForBind(in_port_t port) __INTRODUCED_IN(__ANDROID_API_U__);
+int AConnectivityNative_unblockPortForBind(in_port_t port) __INTRODUCED_IN(34);
 
 /**
  * Unblocks all ports that have previously been blocked.
@@ -64,7 +58,7 @@ int AConnectivityNative_unblockPortForBind(in_port_t port) __INTRODUCED_IN(__AND
  *  - EPERM if the UID of the client doesn't have network stack permission
  *  - Other errors as per https://man7.org/linux/man-pages/man2/bpf.2.html
  */
-int AConnectivityNative_unblockAllPortsForBind() __INTRODUCED_IN(__ANDROID_API_U__);
+int AConnectivityNative_unblockAllPortsForBind() __INTRODUCED_IN(34);
 
 /**
  * Gets the list of ports that have been blocked.
@@ -79,7 +73,7 @@ int AConnectivityNative_unblockAllPortsForBind() __INTRODUCED_IN(__ANDROID_API_U
  *              blocked ports, which may be larger than the ports array that was filled.
  */
 int AConnectivityNative_getPortsBlockedForBind(in_port_t* _Nonnull ports, size_t* _Nonnull count)
-    __INTRODUCED_IN(__ANDROID_API_U__);
+    __INTRODUCED_IN(34);
 
 __END_DECLS
 
