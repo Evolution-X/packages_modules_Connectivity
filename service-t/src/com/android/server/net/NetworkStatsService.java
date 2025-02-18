@@ -959,7 +959,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         /** Create a new SkDestroyListener. */
         public SkDestroyListener makeSkDestroyListener(Consumer<InetDiagMessage> consumer,
                 Handler handler) {
-            return new SkDestroyListener(consumer, handler,
+            return SkDestroyListener.makeSkDestroyListener(consumer, handler,
                     new SharedLog(MAX_SOCKET_DESTROY_LISTENER_LOGS, TAG));
         }
 

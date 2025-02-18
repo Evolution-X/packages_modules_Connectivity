@@ -19,6 +19,7 @@ package com.android.server.net
 import android.os.Handler
 import android.os.HandlerThread
 import com.android.net.module.util.SharedLog
+import com.android.server.net.SkDestroyListener.makeSkDestroyListener
 import com.android.testutils.DevSdkIgnoreRunner
 import java.io.PrintWriter
 import org.junit.After
@@ -54,7 +55,7 @@ class SkDestroyListenerTest {
         doReturn(sharedLog).`when`(sharedLog).forSubComponent(any())
 
         val handler = Handler(handlerThread.looper)
-        val skDestroylistener = SkDestroyListener({} /* consumer */, handler, sharedLog)
+        val skDestroylistener = makeSkDestroyListener({} /* consumer */, handler, sharedLog)
         val pw = PrintWriter(System.out)
         skDestroylistener.dump(pw)
 
