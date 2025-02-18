@@ -162,7 +162,6 @@ java_defaults {
     srcs: [":httpclient_api_sources"],
     static_libs: [
         "com.android.net.http.flags-aconfig-java",
-        "modules-utils-expresslog",
     ],
     libs: [
         "androidx.annotation_annotation",
