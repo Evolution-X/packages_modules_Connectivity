@@ -9785,10 +9785,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 newLp != null ? newLp.getAllInterfaceNames() : null);
 
         for (final String iface : interfaceDiff.added) {
-            addLocalAddressesToBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES);
+            addLocalAddressesToBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES, newLp);
         }
         for (final String iface : interfaceDiff.removed) {
-            removeLocalAddressesFromBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES);
+            removeLocalAddressesFromBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES, oldLp);
         }
 
         final CompareResult<LinkAddress> linkAddressDiff = new CompareResult<>(
@@ -9813,7 +9813,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // If newLp is not null, adding local network prefixes using interface name of newLp
         if (newLp != null) {
             addLocalAddressesToBpfMap(newLp.getInterfaceName(),
-                    new ArrayList<>(unicastLocalPrefixesToBeAdded));
+                    new ArrayList<>(unicastLocalPrefixesToBeAdded), newLp);
         }
         if (oldLp != null) {
             // excluding removal of ip prefixes that needs to be added for newLp, but also
@@ -9824,7 +9824,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
             // removing ip local network prefixes because of change in link addresses.
             removeLocalAddressesFromBpfMap(oldLp.getInterfaceName(),
-                    new ArrayList<>(unicastLocalPrefixesToBeRemoved));
+                    new ArrayList<>(unicastLocalPrefixesToBeRemoved), oldLp);
         }
 
     }
@@ -9859,10 +9859,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
      * Adds list of prefixes(addresses) to local network access map.
      * @param iface interface name
      * @param prefixes list of prefixes/addresses
+     * @param lp LinkProperties
      */
-    private void addLocalAddressesToBpfMap(final String iface, final List<IpPrefix> prefixes) {
+    private void addLocalAddressesToBpfMap(final String iface, final List<IpPrefix> prefixes,
+                                           @Nullable final LinkProperties lp) {
         if (!BpfNetMaps.isAtLeast25Q2()) return;
+
         for (IpPrefix prefix : prefixes) {
+            // Add local dnses allow rule To BpfMap before adding the block rule for prefix
+            addLocalDnsesToBpfMap(iface, prefix, lp);
             /*
             Prefix length is used by LPM trie map(local_net_access_map) for performing longest
             prefix matching, this length represents the maximum number of bits used for matching.
@@ -9884,15 +9889,76 @@ public class ConnectivityService extends IConnectivityManager.Stub
      * Removes list of prefixes(addresses) from local network access map.
      * @param iface interface name
      * @param prefixes list of prefixes/addresses
+     * @param lp LinkProperties
      */
-    private void removeLocalAddressesFromBpfMap(final String iface, final List<IpPrefix> prefixes) {
+    private void removeLocalAddressesFromBpfMap(final String iface, final List<IpPrefix> prefixes,
+                                                @Nullable final LinkProperties lp) {
         if (!BpfNetMaps.isAtLeast25Q2()) return;
+
         for (IpPrefix prefix : prefixes) {
             // The reasoning for prefix length is explained in addLocalAddressesToBpfMap()
             final int prefixLengthConstant = (prefix.isIPv4() ? (32 + 96) : 32);
             mBpfNetMaps.removeLocalNetAccess(prefixLengthConstant
                     + prefix.getPrefixLength(), iface, prefix.getAddress(), 0, 0);
+
+            // Also remove the allow rule for dnses included in the prefix after removing the block
+            // rule for prefix.
+            removeLocalDnsesFromBpfMap(iface, prefix, lp);
         }
+    }
+
+    /**
+     * Adds DNS servers to local network access map, if included in the interface prefix
+     * @param iface interface name
+     * @param prefix IpPrefix
+     * @param lp LinkProperties
+     */
+    private void addLocalDnsesToBpfMap(final String iface, IpPrefix prefix,
+            @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2() || lp == null) return;
+
+        for (InetAddress dnsServer : lp.getDnsServers()) {
+            // Adds dns allow rule to LocalNetAccessMap for both TCP and UDP protocol at port 53,
+            // if it is a local dns (ie. it falls in the local prefix range).
+            if (prefix.contains(dnsServer)) {
+                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_UDP, 53, true);
+                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 53, true);
+            }
+        }
+    }
+
+    /**
+     * Removes DNS servers from local network access map, if included in the interface prefix
+     * @param iface interface name
+     * @param prefix IpPrefix
+     * @param lp LinkProperties
+     */
+    private void removeLocalDnsesFromBpfMap(final String iface, IpPrefix prefix,
+            @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2() || lp == null) return;
+
+        for (InetAddress dnsServer : lp.getDnsServers()) {
+            // Removes dns allow rule from LocalNetAccessMap for both TCP and UDP protocol
+            // at port 53, if it is a local dns (ie. it falls in the prefix range).
+            if (prefix.contains(dnsServer)) {
+                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_UDP, 53);
+                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 53);
+            }
+        }
+    }
+
+    /**
+     * Returns total bit length of an Ipv4 mapped address.
+     */
+    private int getIpv4MappedAddressBitLen() {
+        final int ifaceLen = 32; // bit length of interface
+        final int inetAddressLen = 32 + 96; // length of ipv4 mapped addresses
+        final int portProtocolLen = 32;  //16 for port + 16 for protocol;
+        return ifaceLen + inetAddressLen + portProtocolLen;
     }
 
     /**
