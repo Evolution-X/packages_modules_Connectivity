@@ -1152,7 +1152,10 @@ public class Tethering {
             } catch (RemoteException e) { }
         }
 
-        final TetheringRequest request = createLegacyGlobalScopeTetheringRequest(type);
+        TetheringRequest request = getPendingTetheringRequest(type);
+        if (request == null) {
+            request = createLegacyGlobalScopeTetheringRequest(type);
+        }
         int result = tetherInternal(request, iface);
         switch (type) {
             case TETHERING_WIFI:
