@@ -130,6 +130,7 @@ public class ThreadIntegrationTest {
     public void setUp() throws Exception {
         mExecutor = Executors.newSingleThreadExecutor();
         mOtCtl = new OtDaemonController();
+        mController.setEnabledAndWait(true);
         mController.leaveAndWait();
 
         // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
