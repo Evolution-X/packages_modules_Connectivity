@@ -1023,6 +1023,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final LingerMonitor mLingerMonitor;
     private final SatelliteAccessController mSatelliteAccessController;
 
+    private final L2capNetworkProvider mL2capNetworkProvider;
+
     // sequence number of NetworkRequests
     private int mNextNetworkRequestId = NetworkRequest.FIRST_REQUEST_ID;
 
@@ -1623,6 +1625,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     connectivityServiceInternalHandler);
         }
 
+        /** Creates an L2capNetworkProvider */
+        public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
+            return new L2capNetworkProvider(context);
+        }
+
         /** Returns the data inactivity timeout to be used for cellular networks */
         public int getDefaultCellularDataInactivityTimeout() {
             return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING_BOOT,
@@ -2094,6 +2101,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         mIngressToVpnAddressFiltering = mDeps.isAtLeastT()
                 && mDeps.isFeatureNotChickenedOut(mContext, INGRESS_TO_VPN_ADDRESS_FILTERING);
+
+        mL2capNetworkProvider = mDeps.makeL2capNetworkProvider(mContext);
     }
 
     /**
@@ -4127,6 +4136,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         if (mCarrierPrivilegeAuthenticator != null) {
             mCarrierPrivilegeAuthenticator.start();
+        }
+
+        if (mL2capNetworkProvider != null) {
+            mL2capNetworkProvider.start();
         }
 
         // On T+ devices, register callback for statsd to pull NETWORK_BPF_MAP_INFO atom

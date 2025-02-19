@@ -16,6 +16,9 @@
 
 package com.android.server.net;
 
+import static com.android.server.net.HeaderCompressionUtils.compress6lowpan;
+import static com.android.server.net.HeaderCompressionUtils.decompress6lowpan;
+
 import android.bluetooth.BluetoothSocket;
 import android.os.Handler;
 import android.os.ParcelFileDescriptor;
@@ -29,6 +32,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.BufferUnderflowException;
 
 /**
  * Forwards packets from a BluetoothSocket of type L2CAP to a tun fd and vice versa.
@@ -222,13 +226,18 @@ public class L2capPacketForwarder {
         private volatile boolean mIsRunning = true;
 
         private final String mLogTag;
-        private IReadWriteFd mReadFd;
-        private IReadWriteFd mWriteFd;
+        private final IReadWriteFd mReadFd;
+        private final IReadWriteFd mWriteFd;
+        private final boolean mIsIngress;
+        private final boolean mCompressHeaders;
 
-        L2capThread(String logTag, IReadWriteFd readFd, IReadWriteFd writeFd) {
-            mLogTag = logTag;
+        L2capThread(IReadWriteFd readFd, IReadWriteFd writeFd, boolean isIngress,
+                boolean compressHeaders) {
+            mLogTag = isIngress ? "L2capForwarderThread-Ingress" : "L2capForwarderThread-Egress";
             mReadFd = readFd;
             mWriteFd = writeFd;
+            mIsIngress = isIngress;
+            mCompressHeaders = compressHeaders;
         }
 
         private void postOnError() {
@@ -242,20 +251,28 @@ public class L2capPacketForwarder {
         public void run() {
             while (mIsRunning) {
                 try {
-                    final int readBytes = mReadFd.read(mBuffer, 0 /*off*/, mBuffer.length);
+                    int readBytes = mReadFd.read(mBuffer, 0 /*off*/, mBuffer.length);
                     // No bytes to write, continue.
                     if (readBytes <= 0) {
                         Log.w(mLogTag, "Zero-byte read encountered: " + readBytes);
                         continue;
                     }
 
-                    // If the packet exceeds MTU, drop it.
+                    if (mCompressHeaders) {
+                        if (mIsIngress) {
+                            readBytes = decompress6lowpan(mBuffer, readBytes);
+                        } else {
+                            readBytes = compress6lowpan(mBuffer, readBytes);
+                        }
+                    }
+
+                    // If the packet is 0-length post de/compression or exceeds MTU, drop it.
                     // Note that a large read on BluetoothSocket throws an IOException to tear down
                     // the network.
-                    if (readBytes > MTU) continue;
+                    if (readBytes <= 0 || readBytes > MTU) continue;
 
                     mWriteFd.write(mBuffer, 0 /*off*/, readBytes);
-                } catch (IOException e) {
+                } catch (IOException|BufferUnderflowException e) {
                     Log.e(mLogTag, "L2capThread exception", e);
                     // Tear down the network on any error.
                     mIsRunning = false;
@@ -273,19 +290,20 @@ public class L2capPacketForwarder {
     }
 
     public L2capPacketForwarder(Handler handler, ParcelFileDescriptor tunFd, BluetoothSocket socket,
-            ICallback cb) {
-        this(handler, new FdWrapper(tunFd), new BluetoothSocketWrapper(socket), cb);
+            boolean compressHdrs, ICallback cb) {
+        this(handler, new FdWrapper(tunFd), new BluetoothSocketWrapper(socket), compressHdrs, cb);
     }
 
     @VisibleForTesting
-    L2capPacketForwarder(Handler handler, IReadWriteFd tunFd, IReadWriteFd l2capFd, ICallback cb) {
+    L2capPacketForwarder(Handler handler, IReadWriteFd tunFd, IReadWriteFd l2capFd,
+            boolean compressHeaders, ICallback cb) {
         mHandler = handler;
         mTunFd = tunFd;
         mL2capFd = l2capFd;
         mCallback = cb;
 
-        mIngressThread = new L2capThread("L2capThread-Ingress", l2capFd, tunFd);
-        mEgressThread = new L2capThread("L2capThread-Egress", tunFd, l2capFd);
+        mIngressThread = new L2capThread(l2capFd, tunFd, true /*isIngress*/, compressHeaders);
+        mEgressThread = new L2capThread(tunFd, l2capFd, false /*isIngress*/, compressHeaders);
 
         mIngressThread.start();
         mEgressThread.start();
