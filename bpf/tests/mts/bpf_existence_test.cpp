@@ -21,7 +21,6 @@
 #include <string>
 
 #include <android-base/properties.h>
-#include <android-modules-utils/sdk_level.h>
 #include <android/api-level.h>
 #include <bpf/BpfUtils.h>
 
@@ -32,11 +31,6 @@ using std::set;
 using std::string;
 
 using android::bpf::isAtLeastKernelVersion;
-using android::modules::sdklevel::IsAtLeastR;
-using android::modules::sdklevel::IsAtLeastS;
-using android::modules::sdklevel::IsAtLeastT;
-using android::modules::sdklevel::IsAtLeastU;
-using android::modules::sdklevel::IsAtLeastV;
 
 #define PLATFORM "/sys/fs/bpf/"
 #define TETHERING "/sys/fs/bpf/tethering/"
@@ -48,10 +42,15 @@ using android::modules::sdklevel::IsAtLeastV;
 class BpfExistenceTest : public ::testing::Test {
 };
 
-//ToDo: replace isAtLeast25Q2 with IsAtLeastB once sdk_level have been upgraded to 36 on aosp/main
 const bool unreleased = (android::base::GetProperty("ro.build.version.codename", "REL") != "REL");
-const int api_level = unreleased ? __ANDROID_API_FUTURE__ : android_get_device_api_level();
-const bool isAtLeast25Q2 = (api_level > __ANDROID_API_V__);
+const int api_level = unreleased ? 10000 : android_get_device_api_level();
+const bool isAtLeastR = (api_level >= 30);
+const bool isAtLeastS = (api_level >= 31);
+// Sv2 is 32
+const bool isAtLeastT = (api_level >= 33);
+const bool isAtLeastU = (api_level >= 34);
+const bool isAtLeastV = (api_level >= 35);
+const bool isAtLeast25Q2 = (api_level >= 36);
 
 // Part of Android R platform (for 4.9+), but mainlined in S
 static const set<string> PLATFORM_ONLY_IN_R = {
@@ -194,33 +193,33 @@ TEST_F(BpfExistenceTest, TestPrograms) {
     // and for the presence of mainline stuff.
 
     // Note: Q is no longer supported by mainline
-    ASSERT_TRUE(IsAtLeastR());
+    ASSERT_TRUE(isAtLeastR);
 
     // R can potentially run on pre-4.9 kernel non-eBPF capable devices.
-    DO_EXPECT(IsAtLeastR() && !IsAtLeastS() && isAtLeastKernelVersion(4, 9, 0), PLATFORM_ONLY_IN_R);
+    DO_EXPECT(isAtLeastR && !isAtLeastS && isAtLeastKernelVersion(4, 9, 0), PLATFORM_ONLY_IN_R);
 
     // S requires Linux Kernel 4.9+ and thus requires eBPF support.
-    if (IsAtLeastS()) ASSERT_TRUE(isAtLeastKernelVersion(4, 9, 0));
-    DO_EXPECT(IsAtLeastS(), MAINLINE_FOR_S_PLUS);
+    if (isAtLeastS) ASSERT_TRUE(isAtLeastKernelVersion(4, 9, 0));
+    DO_EXPECT(isAtLeastS, MAINLINE_FOR_S_PLUS);
 
     // Nothing added or removed in SCv2.
 
     // T still only requires Linux Kernel 4.9+.
-    DO_EXPECT(IsAtLeastT(), MAINLINE_FOR_T_PLUS);
-    DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(4, 14, 0), MAINLINE_FOR_T_4_14_PLUS);
-    DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(4, 19, 0), MAINLINE_FOR_T_4_19_PLUS);
-    DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_T_5_10_PLUS);
-    DO_EXPECT(IsAtLeastT() && isAtLeastKernelVersion(5, 15, 0), MAINLINE_FOR_T_5_15_PLUS);
+    DO_EXPECT(isAtLeastT, MAINLINE_FOR_T_PLUS);
+    DO_EXPECT(isAtLeastT && isAtLeastKernelVersion(4, 14, 0), MAINLINE_FOR_T_4_14_PLUS);
+    DO_EXPECT(isAtLeastT && isAtLeastKernelVersion(4, 19, 0), MAINLINE_FOR_T_4_19_PLUS);
+    DO_EXPECT(isAtLeastT && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_T_5_10_PLUS);
+    DO_EXPECT(isAtLeastT && isAtLeastKernelVersion(5, 15, 0), MAINLINE_FOR_T_5_15_PLUS);
 
     // U requires Linux Kernel 4.14+, but nothing (as yet) added or removed in U.
-    if (IsAtLeastU()) ASSERT_TRUE(isAtLeastKernelVersion(4, 14, 0));
-    DO_EXPECT(IsAtLeastU(), MAINLINE_FOR_U_PLUS);
-    DO_EXPECT(IsAtLeastU() && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_U_5_10_PLUS);
+    if (isAtLeastU) ASSERT_TRUE(isAtLeastKernelVersion(4, 14, 0));
+    DO_EXPECT(isAtLeastU, MAINLINE_FOR_U_PLUS);
+    DO_EXPECT(isAtLeastU && isAtLeastKernelVersion(5, 10, 0), MAINLINE_FOR_U_5_10_PLUS);
 
     // V requires Linux Kernel 4.19+, but nothing (as yet) added or removed in V.
-    if (IsAtLeastV()) ASSERT_TRUE(isAtLeastKernelVersion(4, 19, 0));
-    DO_EXPECT(IsAtLeastV(), MAINLINE_FOR_V_PLUS);
-    DO_EXPECT(IsAtLeastV() && isAtLeastKernelVersion(5, 4, 0), MAINLINE_FOR_V_5_4_PLUS);
+    if (isAtLeastV) ASSERT_TRUE(isAtLeastKernelVersion(4, 19, 0));
+    DO_EXPECT(isAtLeastV, MAINLINE_FOR_V_PLUS);
+    DO_EXPECT(isAtLeastV && isAtLeastKernelVersion(5, 4, 0), MAINLINE_FOR_V_5_4_PLUS);
 
     if (isAtLeast25Q2) ASSERT_TRUE(isAtLeastKernelVersion(5, 4, 0));
     DO_EXPECT(isAtLeast25Q2, MAINLINE_FOR_25Q2_PLUS);
