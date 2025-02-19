@@ -16,7 +16,7 @@
 
 package com.android.server;
 
-import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN;
+import static android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE;
 import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_ANY;
 import static android.net.L2capNetworkSpecifier.PSM_ANY;
 import static android.net.L2capNetworkSpecifier.ROLE_CLIENT;
@@ -30,7 +30,6 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
 import static android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS;
 import static android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH;
-import static android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE;
 import static android.system.OsConstants.F_GETFL;
 import static android.system.OsConstants.F_SETFL;
 import static android.system.OsConstants.O_NONBLOCK;
@@ -50,10 +49,8 @@ import android.net.NetworkProvider;
 import android.net.NetworkProvider.NetworkOfferCallback;
 import android.net.NetworkRequest;
 import android.net.NetworkScore;
-import android.net.NetworkSpecifier;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.system.Os;
 import android.util.ArrayMap;
