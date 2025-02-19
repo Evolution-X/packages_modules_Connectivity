@@ -111,12 +111,7 @@ public class L2capNetworkProvider {
      * requests that do not have a NetworkSpecifier set.
      */
     private class BlanketReservationOffer implements NetworkOfferCallback {
-        // Set as transport primary to ensure that the BlanketReservationOffer always outscores the
-        // ReservedServerOffer, because as soon as the BlanketReservationOffer receives an
-        // onNetworkUnneeded() callback, it will tear down the associated reserved offer.
-        public static final NetworkScore SCORE = new NetworkScore.Builder()
-                .setTransportPrimary(true)
-                .build();
+        public static final NetworkScore SCORE = new NetworkScore.Builder().build();
         // Note the missing NET_CAPABILITY_NOT_RESTRICTED marking the network as restricted.
         public static final NetworkCapabilities CAPABILITIES;
         static {
