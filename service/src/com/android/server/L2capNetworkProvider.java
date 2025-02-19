@@ -243,7 +243,7 @@ public class L2capNetworkProvider {
             return null;
         }
 
-        return new L2capNetwork(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
+        return L2capNetwork.create(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
     }
 
     private static void closeBluetoothSocket(BluetoothSocket socket) {

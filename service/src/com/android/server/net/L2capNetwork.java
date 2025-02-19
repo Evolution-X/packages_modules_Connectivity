@@ -42,10 +42,8 @@ public class L2capNetwork {
     private static final NetworkScore NETWORK_SCORE = new NetworkScore.Builder().build();
     private final String mLogTag;
     private final Handler mHandler;
-    private final String mIfname;
     private final L2capPacketForwarder mForwarder;
     private final NetworkCapabilities mNetworkCapabilities;
-    private final L2capIpClient mIpClient;
     private final NetworkAgent mNetworkAgent;
 
     /** IpClient wrapper to handle IPv6 link-local provisioning for L2CAP tun.
@@ -102,29 +100,24 @@ public class L2capNetwork {
         void onNetworkUnwanted(L2capNetwork network);
     }
 
-    public L2capNetwork(Handler handler, Context context, NetworkProvider provider, String ifname,
-            BluetoothSocket socket, ParcelFileDescriptor tunFd,
-            NetworkCapabilities networkCapabilities, ICallback cb) {
-        // TODO: add a check that this constructor is invoked on the handler thread.
-        mLogTag = String.format("L2capNetwork[%s]", ifname);
+    public L2capNetwork(String logTag, Handler handler, Context context, NetworkProvider provider,
+            BluetoothSocket socket, ParcelFileDescriptor tunFd, NetworkCapabilities nc,
+            LinkProperties lp, ICallback cb) {
+        mLogTag = logTag;
         mHandler = handler;
-        mIfname = ifname;
+        mNetworkCapabilities = nc;
 
-        // Guaranteed non-null.
-        final L2capNetworkSpecifier spec =
-                (L2capNetworkSpecifier) networkCapabilities.getNetworkSpecifier();
+        final L2capNetworkSpecifier spec = (L2capNetworkSpecifier) nc.getNetworkSpecifier();
         final boolean compressHeaders = spec.getHeaderCompression() == HEADER_COMPRESSION_6LOWPAN;
+
         mForwarder = new L2capPacketForwarder(handler, tunFd, socket, compressHeaders, () -> {
             // TODO: add a check that this callback is invoked on the handler thread.
             cb.onError(L2capNetwork.this);
         });
-        mNetworkCapabilities = networkCapabilities;
-        mIpClient = new L2capIpClient(mLogTag, context, ifname);
-        final LinkProperties linkProperties = mIpClient.start();
 
         final NetworkAgentConfig config = new NetworkAgentConfig.Builder().build();
         mNetworkAgent = new NetworkAgent(context, mHandler.getLooper(), mLogTag,
-                networkCapabilities, linkProperties, NETWORK_SCORE, config, provider) {
+                nc, lp, NETWORK_SCORE, config, provider) {
             @Override
             public void onNetworkUnwanted() {
                 Log.i(mLogTag, mIfname + ": Network is unwanted");
@@ -134,6 +127,17 @@ public class L2capNetwork {
         };
         mNetworkAgent.register();
         mNetworkAgent.markConnected();
+    }
+
+    /** Create an L2capNetwork or return null on failure. */
+    @Nullable
+    public static L2capNetwork create(Handler handler, Context context, NetworkProvider provider,
+            String ifname, BluetoothSocket socket, ParcelFileDescriptor tunFd,
+            NetworkCapabilities nc, ICallback cb) {
+        // TODO: add a check that this function is invoked on the handler thread.
+        final String logTag = String.format("L2capNetwork[%s]", ifname);
+        final LinkProperties lp = new L2capIpClient(logTag, context, ifname).start();
+        return new L2capNetwork(logTag, handler, context, provider, socket, tunFd, nc, lp, cb);
     }
 
     /** Get the NetworkCapabilities used for this Network */
