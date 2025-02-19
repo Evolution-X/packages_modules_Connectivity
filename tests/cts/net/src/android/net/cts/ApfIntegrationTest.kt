@@ -489,15 +489,15 @@ class ApfIntegrationTest {
 
     fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply() {
         // If not IPv6 -> PASS
-        addLoad16(R0, ETH_ETHERTYPE_OFFSET)
+        addLoad16intoR0(ETH_ETHERTYPE_OFFSET)
         addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), BaseApfGenerator.PASS_LABEL)
 
         // If not ICMPv6 -> PASS
-        addLoad8(R0, IPV6_NEXT_HEADER_OFFSET)
+        addLoad8intoR0(IPV6_NEXT_HEADER_OFFSET)
         addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), BaseApfGenerator.PASS_LABEL)
 
         // If not echo reply -> PASS
-        addLoad8(R0, ICMP6_TYPE_OFFSET)
+        addLoad8intoR0(ICMP6_TYPE_OFFSET)
         addJumpIfR0NotEquals(0x81, BaseApfGenerator.PASS_LABEL)
     }
 
@@ -744,11 +744,11 @@ class ApfIntegrationTest {
         //     transmit 3 ICMPv6 echo requests with random first byte
         //     increase DROPPED_IPV6_NS_REPLIED_NON_DAD counter
         //     drop
-        gen.addLoad16(R0, ETH_ETHERTYPE_OFFSET)
+        gen.addLoad16intoR0(ETH_ETHERTYPE_OFFSET)
                 .addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), skipPacketLabel)
-                .addLoad8(R0, IPV6_NEXT_HEADER_OFFSET)
+                .addLoad8intoR0(IPV6_NEXT_HEADER_OFFSET)
                 .addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), skipPacketLabel)
-                .addLoad8(R0, ICMP6_TYPE_OFFSET)
+                .addLoad8intoR0(ICMP6_TYPE_OFFSET)
                 .addJumpIfR0NotEquals(ICMP6_ECHO_REPLY.toLong(), skipPacketLabel)
                 .addLoadFromMemory(R0, MemorySlot.PACKET_SIZE)
                 .addCountAndPassIfR0Equals(
