@@ -16,9 +16,12 @@
 
 package com.android.server.net;
 
+import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN;
+
 import android.annotation.Nullable;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
+import android.net.L2capNetworkSpecifier;
 import android.net.LinkProperties;
 import android.net.NetworkAgent;
 import android.net.NetworkAgentConfig;
@@ -106,7 +109,12 @@ public class L2capNetwork {
         mLogTag = String.format("L2capNetwork[%s]", ifname);
         mHandler = handler;
         mIfname = ifname;
-        mForwarder = new L2capPacketForwarder(handler, tunFd, socket, () -> {
+
+        // Guaranteed non-null.
+        final L2capNetworkSpecifier spec =
+                (L2capNetworkSpecifier) networkCapabilities.getNetworkSpecifier();
+        final boolean compressHeaders = spec.getHeaderCompression() == HEADER_COMPRESSION_6LOWPAN;
+        mForwarder = new L2capPacketForwarder(handler, tunFd, socket, compressHeaders, () -> {
             // TODO: add a check that this callback is invoked on the handler thread.
             cb.onError(L2capNetwork.this);
         });

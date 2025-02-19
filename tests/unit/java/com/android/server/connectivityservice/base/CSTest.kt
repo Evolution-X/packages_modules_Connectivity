@@ -18,6 +18,7 @@ package com.android.server
 
 import android.app.AlarmManager
 import android.app.AppOpsManager
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -209,6 +210,7 @@ open class CSTest {
         doReturn(true).`when`(it).isDataCapable()
     }
     val subscriptionManager = mock<SubscriptionManager>()
+    val bluetoothManager = mock<BluetoothManager>()
 
     val multicastRoutingCoordinatorService = mock<MulticastRoutingCoordinatorService>()
     val satelliteAccessController = mock<SatelliteAccessController>()
@@ -393,6 +395,8 @@ open class CSTest {
             // Call mocked destroyLiveTcpSocketsByOwnerUids so that test can verify this method call
             destroySocketsWrapper.destroyLiveTcpSocketsByOwnerUids(ownerUids)
         }
+
+        override fun makeL2capNetworkProvider(context: Context) = null
     }
 
     inner class CSContext(base: Context) : BroadcastInterceptingContext(base) {
@@ -503,6 +507,7 @@ open class CSTest {
             Context.BATTERY_STATS_SERVICE -> batteryManager
             Context.STATS_MANAGER -> null // Stats manager is final and can't be mocked
             Context.APP_OPS_SERVICE -> appOpsManager
+            Context.BLUETOOTH_SERVICE -> bluetoothManager
             else -> super.getSystemService(serviceName)
         }
 

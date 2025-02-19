@@ -55,6 +55,7 @@ import com.android.net.module.util.BpfUtils
 import com.android.networkstack.apishim.TelephonyManagerShimImpl
 import com.android.server.BpfNetMaps
 import com.android.server.ConnectivityService
+import com.android.server.L2capNetworkProvider
 import com.android.server.NetworkAgentWrapper
 import com.android.server.TestNetIdManager
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator
@@ -272,6 +273,8 @@ class ConnectivityServiceIntegrationTest {
             connectivityServiceInternalHandler: Handler
         ): SatelliteAccessController? = mock(
             SatelliteAccessController::class.java)
+
+        override fun makeL2capNetworkProvider(context: Context) = null
     }
 
     @After
