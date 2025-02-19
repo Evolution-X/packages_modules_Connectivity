@@ -19,6 +19,7 @@ package com.android.server.net;
 import static android.net.NetworkStats.INTERFACES_ALL;
 import static android.net.NetworkStats.TAG_ALL;
 import static android.net.NetworkStats.UID_ALL;
+import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 
 import android.annotation.NonNull;
 import android.content.Context;
@@ -26,15 +27,21 @@ import android.net.NetworkStats;
 import android.net.UnderlyingNetworkInfo;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
+import android.util.ArraySet;
+import android.util.Log;
+import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.DeviceConfigUtils;
 import com.android.server.BpfNetMaps;
 import com.android.server.connectivity.InterfaceTracker;
 
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -64,6 +71,17 @@ public class NetworkStatsFactory {
 
     /** Set containing info about active VPNs and their underlying networks. */
     private volatile UnderlyingNetworkInfo[] mUnderlyingNetworkInfos = new UnderlyingNetworkInfo[0];
+
+    static final String CONFIG_PER_UID_TAG_THROTTLING = "per_uid_tag_throttling";
+    static final String CONFIG_PER_UID_TAG_THROTTLING_THRESHOLD =
+            "per_uid_tag_throttling_threshold";
+    private static final int DEFAULT_TAGS_PER_UID_THRESHOLD = 1000;
+    private final boolean mSupportPerUidTagThrottling;
+    private final int mPerUidTagThrottlingThreshold;
+
+    // Map for set of distinct tags per uid. Used for tag count limiting.
+    @GuardedBy("mPersistentDataLock")
+    private final SparseArray<SparseBooleanArray> mUidTagSets = new SparseArray<>();
 
     // A persistent snapshot of cumulative stats since device start
     @GuardedBy("mPersistentDataLock")
@@ -109,6 +127,26 @@ public class NetworkStatsFactory {
         /** Create a new {@link BpfNetMaps}. */
         public BpfNetMaps createBpfNetMaps(@NonNull Context ctx) {
             return new BpfNetMaps(ctx, new InterfaceTracker(ctx));
+        }
+
+        /**
+         * Check whether one specific feature is not disabled.
+         * @param name Flag name of the experiment in the tethering namespace.
+         * @see DeviceConfigUtils#isTetheringFeatureNotChickenedOut(Context, String)
+         */
+        public boolean isFeatureNotChickenedOut(@NonNull Context context, @NonNull String name) {
+            return DeviceConfigUtils.isTetheringFeatureNotChickenedOut(context, name);
+        }
+
+        /**
+         * Wrapper method for DeviceConfigUtils#getDeviceConfigPropertyInt for test injections.
+         *
+         * See {@link DeviceConfigUtils#getDeviceConfigPropertyInt(String, String, int)}
+         * for more detailed information.
+         */
+        public int getDeviceConfigPropertyInt(@NonNull String name, int defaultValue) {
+            return DeviceConfigUtils.getDeviceConfigPropertyInt(
+                    NAMESPACE_TETHERING, name, defaultValue);
         }
     }
 
@@ -162,6 +200,10 @@ public class NetworkStatsFactory {
         }
         mContext = ctx;
         mDeps = deps;
+        mSupportPerUidTagThrottling = mDeps.isFeatureNotChickenedOut(
+            ctx, CONFIG_PER_UID_TAG_THROTTLING);
+        mPerUidTagThrottlingThreshold = mDeps.getDeviceConfigPropertyInt(
+                CONFIG_PER_UID_TAG_THROTTLING_THRESHOLD, DEFAULT_TAGS_PER_UID_THRESHOLD);
     }
 
     /**
@@ -210,10 +252,13 @@ public class NetworkStatsFactory {
             requestSwapActiveStatsMapLocked();
             // Stats are always read from the inactive map, so they must be read after the
             // swap
-            final NetworkStats stats = mDeps.getNetworkStatsDetail();
+            final NetworkStats diff = mDeps.getNetworkStatsDetail();
+            // Filter based on UID tag set before merging.
+            final NetworkStats filteredDiff = mSupportPerUidTagThrottling
+                    ? filterStatsByUidTagSets(diff) : diff;
             // BPF stats are incremental; fold into mPersistSnapshot.
-            mPersistSnapshot.setElapsedRealtime(stats.getElapsedRealtime());
-            mPersistSnapshot.combineAllValues(stats);
+            mPersistSnapshot.setElapsedRealtime(diff.getElapsedRealtime());
+            mPersistSnapshot.combineAllValues(filteredDiff);
 
             NetworkStats adjustedStats = adjustForTunAnd464Xlat(mPersistSnapshot, prev, vpnArray);
 
@@ -221,6 +266,41 @@ public class NetworkStatsFactory {
             adjustedStats.filter(limitUid, limitIfaces, limitTag);
             return adjustedStats;
         }
+    }
+
+    @GuardedBy("mPersistentDataLock")
+    private NetworkStats filterStatsByUidTagSets(NetworkStats stats) {
+        final NetworkStats filteredStats =
+                new NetworkStats(stats.getElapsedRealtime(), stats.size());
+
+        final NetworkStats.Entry entry = new NetworkStats.Entry();
+        final Set<Integer> tooManyTagsUidSet = new ArraySet<>();
+        for (int i = 0; i < stats.size(); i++) {
+            stats.getValues(i, entry);
+            final int uid = entry.uid;
+            final int tag = entry.tag;
+
+            if (tag == NetworkStats.TAG_NONE) {
+                filteredStats.combineValues(entry);
+                continue;
+            }
+
+            SparseBooleanArray tagSet = mUidTagSets.get(uid);
+            if (tagSet == null) {
+                tagSet = new SparseBooleanArray();
+            }
+            if (tagSet.size() < mPerUidTagThrottlingThreshold || tagSet.get(tag)) {
+                filteredStats.combineValues(entry);
+                tagSet.put(tag, true);
+                mUidTagSets.put(uid, tagSet);
+            } else {
+                tooManyTagsUidSet.add(uid);
+            }
+        }
+        if (tooManyTagsUidSet.size() > 0) {
+            Log.wtf(TAG, "Too many tags detected for uids: " + tooManyTagsUidSet);
+        }
+        return filteredStats;
     }
 
     @GuardedBy("mPersistentDataLock")
