@@ -238,31 +238,10 @@ public class L2capNetworkProvider {
     }
 
     @Nullable
-    private static ParcelFileDescriptor createTunInterface(String ifname) {
-        final ParcelFileDescriptor fd;
-        try {
-            fd = ParcelFileDescriptor.adoptFd(
-                    ServiceConnectivityJni.createTunTap(
-                            true /*isTun*/, true /*hasCarrier*/, true /*setIffMulticast*/, ifname));
-            ServiceConnectivityJni.bringUpInterface(ifname);
-            // TODO: consider adding a parameter to createTunTap() (or the Builder that should
-            // be added) to configure i/o blocking.
-            final int flags = Os.fcntlInt(fd.getFileDescriptor(), F_GETFL, 0);
-            Os.fcntlInt(fd.getFileDescriptor(), F_SETFL, flags & ~O_NONBLOCK);
-        } catch (Exception e) {
-            // Note: createTunTap currently throws an IllegalStateException on failure.
-            // TODO: native functions should throw ErrnoException.
-            Log.e(TAG, "Failed to create tun interface", e);
-            return null;
-        }
-        return fd;
-    }
-
-    @Nullable
     private L2capNetwork createL2capNetwork(BluetoothSocket socket, NetworkCapabilities caps,
             L2capNetwork.ICallback cb) {
         final String ifname = TUN_IFNAME + String.valueOf(sTunIndex++);
-        final ParcelFileDescriptor tunFd = createTunInterface(ifname);
+        final ParcelFileDescriptor tunFd = mDeps.createTunInterface(ifname);
         if (tunFd == null) {
             return null;
         }
@@ -651,6 +630,29 @@ public class L2capNetworkProvider {
             final HandlerThread thread = new HandlerThread("L2capNetworkProviderThread");
             thread.start();
             return thread;
+        }
+
+        @Nullable
+        public ParcelFileDescriptor createTunInterface(String ifname) {
+            final ParcelFileDescriptor fd;
+            try {
+                fd = ParcelFileDescriptor.adoptFd(ServiceConnectivityJni.createTunTap(
+                        true /*isTun*/,
+                        true /*hasCarrier*/,
+                        true /*setIffMulticast*/,
+                        ifname));
+                ServiceConnectivityJni.bringUpInterface(ifname);
+                // TODO: consider adding a parameter to createTunTap() (or the Builder that should
+                // be added) to configure i/o blocking.
+                final int flags = Os.fcntlInt(fd.getFileDescriptor(), F_GETFL, 0);
+                Os.fcntlInt(fd.getFileDescriptor(), F_SETFL, flags & ~O_NONBLOCK);
+            } catch (Exception e) {
+                // Note: createTunTap currently throws an IllegalStateException on failure.
+                // TODO: native functions should throw ErrnoException.
+                Log.e(TAG, "Failed to create tun interface", e);
+                return null;
+            }
+            return fd;
         }
     }
 
