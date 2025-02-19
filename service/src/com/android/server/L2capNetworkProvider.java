@@ -58,6 +58,7 @@ import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.ServiceConnectivityJni;
 import com.android.server.net.L2capNetwork;
 
@@ -226,6 +227,7 @@ public class L2capNetworkProvider {
     }
 
     private void destroyAndUnregisterReservedOffer(ReservedServerOffer reservedOffer) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
         // Ensure the offer still exists if this was posted on the handler.
         if (!mReservedServerOffers.contains(reservedOffer)) return;
         mReservedServerOffers.remove(reservedOffer);
@@ -237,6 +239,7 @@ public class L2capNetworkProvider {
     @Nullable
     private L2capNetwork createL2capNetwork(BluetoothSocket socket, NetworkCapabilities caps,
             L2capNetwork.ICallback cb) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
         final String ifname = TUN_IFNAME + String.valueOf(sTunIndex++);
         final ParcelFileDescriptor tunFd = mDeps.createTunInterface(ifname);
         if (tunFd == null) {
@@ -273,18 +276,21 @@ public class L2capNetworkProvider {
             }
 
             private void postDestroyAndUnregisterReservedOffer() {
+                // Called on AcceptThread
                 mHandler.post(() -> {
                     destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
                 });
             }
 
             private void postCreateServerNetwork(BluetoothSocket connectedSocket) {
+                // Called on AcceptThread
                 mHandler.post(() -> {
                     final boolean success = createServerNetwork(connectedSocket);
                     if (!success) closeBluetoothSocket(connectedSocket);
                 });
             }
 
+            @Override
             public void run() {
                 while (mIsRunning) {
                     final BluetoothSocket connectedSocket;
@@ -304,6 +310,7 @@ public class L2capNetworkProvider {
             }
 
             public void tearDown() {
+                HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                 mIsRunning = false;
                 try {
                     // BluetoothServerSocket.close() is thread-safe.
@@ -320,6 +327,7 @@ public class L2capNetworkProvider {
         }
 
         private boolean createServerNetwork(BluetoothSocket socket) {
+            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
             // It is possible the offer went away.
             if (!mReservedServerOffers.contains(this)) return false;
 
@@ -332,10 +340,12 @@ public class L2capNetworkProvider {
                     new L2capNetwork.ICallback() {
                 @Override
                 public void onError(L2capNetwork network) {
+                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                     destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
                 }
                 @Override
                 public void onNetworkUnwanted(L2capNetwork network) {
+                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                     // Leave reservation in place.
                     final boolean networkExists = mL2capNetworks.remove(network);
                     if (!networkExists) return; // already torn down.
@@ -375,6 +385,7 @@ public class L2capNetworkProvider {
 
         /** Called when the reservation goes away and the reserved offer must be torn down. */
         public void tearDown() {
+            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
             mAcceptThread.tearDown();
             for (L2capNetwork network : mL2capNetworks) {
                 network.tearDown();
@@ -428,6 +439,7 @@ public class L2capNetworkProvider {
                 mSocket = socket;
             }
 
+            @Override
             public void run() {
                 try {
                     mSocket.connect();
@@ -447,6 +459,7 @@ public class L2capNetworkProvider {
             }
 
             public void abort() {
+                HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                 mIsAborted = true;
                 // Closing the BluetoothSocket is the only way to unblock connect() because it calls
                 // shutdown on the underlying (connected) SOCK_SEQPACKET.
@@ -462,6 +475,7 @@ public class L2capNetworkProvider {
 
         private boolean createClientNetwork(L2capNetworkSpecifier specifier,
                 BluetoothSocket socket) {
+            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
             // Check whether request still exists
             final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
             if (cri == null) return false;
@@ -478,10 +492,12 @@ public class L2capNetworkProvider {
                 // `network` cannot be used directly.
                 @Override
                 public void onError(L2capNetwork network) {
+                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                     declareAllNetworkRequestsUnfulfillable(specifier);
                 }
                 @Override
                 public void onNetworkUnwanted(L2capNetwork network) {
+                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
                     declareAllNetworkRequestsUnfulfillable(specifier);
                 }
             });
@@ -595,6 +611,7 @@ public class L2capNetworkProvider {
          * Only call this when all associated NetworkRequests have been released.
          */
         private void releaseClientNetworkRequest(ClientRequestInfo cri) {
+            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
             mClientNetworkRequests.remove(cri.specifier);
             if (cri.connectThread.isAlive()) {
                 // Note that if ConnectThread succeeds between calling #isAlive() and #abort(), the
@@ -610,6 +627,7 @@ public class L2capNetworkProvider {
         }
 
         private void declareAllNetworkRequestsUnfulfillable(L2capNetworkSpecifier specifier) {
+            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
             final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
             if (cri == null) return;
 
