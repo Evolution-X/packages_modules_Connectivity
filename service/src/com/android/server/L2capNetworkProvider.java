@@ -129,12 +129,7 @@ public class L2capNetworkProvider {
         }
 
         // TODO: consider moving this into L2capNetworkSpecifier as #isValidServerReservation().
-        private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
-            if (spec == null) return false;
-            // If spec is not null, L2capNetworkSpecifier#canBeSatisfiedBy() guarantees the
-            // specifier is of type L2capNetworkSpecifier.
-            final L2capNetworkSpecifier l2capSpec = (L2capNetworkSpecifier) spec;
-
+        private boolean isValidL2capServerSpecifier(L2capNetworkSpecifier l2capSpec) {
             // The ROLE_SERVER offer can be satisfied by a ROLE_ANY request.
             if (l2capSpec.getRole() != ROLE_SERVER) return false;
 
@@ -152,9 +147,13 @@ public class L2capNetworkProvider {
 
         @Override
         public void onNetworkNeeded(NetworkRequest request) {
-            Log.d(TAG, "New reservation request: " + request);
-            if (!isValidL2capSpecifier(request.getNetworkSpecifier())) {
-                Log.w(TAG, "Ignoring invalid reservation request: " + request);
+            // The NetworkSpecifier is guaranteed to be either null or an L2capNetworkSpecifier, so
+            // this cast is safe.
+            final L2capNetworkSpecifier specifier =
+                    (L2capNetworkSpecifier) request.getNetworkSpecifier();
+            if (specifier == null) return;
+            if (!isValidL2capServerSpecifier(specifier)) {
+                Log.i(TAG, "Ignoring invalid reservation request: " + request);
                 return;
             }
 
@@ -516,12 +515,7 @@ public class L2capNetworkProvider {
             return true;
         }
 
-        private boolean isValidL2capSpecifier(@Nullable NetworkSpecifier spec) {
-            if (spec == null) return false;
-
-            // If not null, guaranteed to be L2capNetworkSepcifier.
-            final L2capNetworkSpecifier l2capSpec = (L2capNetworkSpecifier) spec;
-
+        private boolean isValidL2capClientSpecifier(L2capNetworkSpecifier l2capSpec) {
             // The ROLE_CLIENT offer can be satisfied by a ROLE_ANY request.
             if (l2capSpec.getRole() != ROLE_CLIENT) return false;
 
@@ -541,14 +535,16 @@ public class L2capNetworkProvider {
 
         @Override
         public void onNetworkNeeded(NetworkRequest request) {
-            Log.d(TAG, "New client network request: " + request);
-            if (!isValidL2capSpecifier(request.getNetworkSpecifier())) {
-                Log.w(TAG, "Ignoring invalid client request: " + request);
+            // The NetworkSpecifier is guaranteed to be either null or an L2capNetworkSpecifier, so
+            // this cast is safe.
+            final L2capNetworkSpecifier requestSpecifier =
+                    (L2capNetworkSpecifier) request.getNetworkSpecifier();
+            if (requestSpecifier == null) return;
+            if (!isValidL2capClientSpecifier(requestSpecifier)) {
+                Log.i(TAG, "Ignoring invalid client request: " + request);
                 return;
             }
 
-            final L2capNetworkSpecifier requestSpecifier =
-                    (L2capNetworkSpecifier) request.getNetworkSpecifier();
              // Check whether this exact request is already being tracked.
             final ClientRequestInfo cri = mClientNetworkRequests.get(requestSpecifier);
             if (cri != null) {
