@@ -61,6 +61,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.ServiceConnectivityJni;
 import com.android.server.net.L2capNetwork;
+import com.android.server.net.L2capPacketForwarder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -245,7 +246,8 @@ public class L2capNetworkProvider {
             return null;
         }
 
-        return L2capNetwork.create(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
+        return L2capNetwork.create(
+                mHandler, mContext, mProvider, ifname, socket, tunFd, caps, mDeps, cb);
     }
 
     private static void closeBluetoothSocket(BluetoothSocket socket) {
@@ -668,13 +670,18 @@ public class L2capNetworkProvider {
             }
             return fd;
         }
+
+        public L2capPacketForwarder createL2capPacketForwarder(Handler handler,
+                ParcelFileDescriptor tunFd, BluetoothSocket socket, boolean compressHeaders,
+                L2capPacketForwarder.ICallback cb) {
+            return new L2capPacketForwarder(handler, tunFd, socket, compressHeaders, cb);
+        }
     }
 
     public L2capNetworkProvider(Context context) {
         this(new Dependencies(), context);
     }
 
-    @VisibleForTesting
     public L2capNetworkProvider(Dependencies deps, Context context) {
         mDeps = deps;
         mContext = context;
