@@ -309,16 +309,18 @@ public class InetDiagMessage extends NetlinkMessage {
     }
 
     private static void sendNetlinkDestroyRequest(FileDescriptor fd, int proto,
-            InetDiagMessage diagMsg) throws InterruptedIOException, ErrnoException {
+            StructInetDiagSockId id, short family, int state)
+            throws InterruptedIOException, ErrnoException {
+        // TODO: Investigate if it's fine to always set 0 to state and remove state from the arg
         final byte[] destroyMsg = InetDiagMessage.inetDiagReqV2(
                 proto,
-                diagMsg.inetDiagMsg.id,
-                diagMsg.inetDiagMsg.idiag_family,
+                id,
+                family,
                 SOCK_DESTROY,
                 (short) (StructNlMsgHdr.NLM_F_REQUEST | StructNlMsgHdr.NLM_F_ACK),
                 0 /* pad */,
                 0 /* idiagExt */,
-                1 << diagMsg.inetDiagMsg.idiag_state
+                state
         );
         NetlinkUtils.sendMessage(fd, destroyMsg, 0, destroyMsg.length, IO_TIMEOUT_MS);
         NetlinkUtils.receiveNetlinkAck(fd);
@@ -343,7 +345,8 @@ public class InetDiagMessage extends NetlinkMessage {
         Consumer<InetDiagMessage> handleNlDumpMsg = (diagMsg) -> {
             if (filter.test(diagMsg)) {
                 try {
-                    sendNetlinkDestroyRequest(destroyFd, proto, diagMsg);
+                    sendNetlinkDestroyRequest(destroyFd, proto, diagMsg.inetDiagMsg.id,
+                            diagMsg.inetDiagMsg.idiag_family, 1 << diagMsg.inetDiagMsg.idiag_state);
                     destroyedSockets.getAndIncrement();
                 } catch (InterruptedIOException | ErrnoException e) {
                     if (!(e instanceof ErrnoException
@@ -482,6 +485,30 @@ public class InetDiagMessage extends NetlinkMessage {
                         && !isAdbSocket(diagMsg));
         final long durationMs = SystemClock.elapsedRealtime() - startTimeMs;
         Log.d(TAG, "Destroyed live tcp sockets for uids=" + ownerUids + " in " + durationMs + "ms");
+    }
+
+    /**
+     * Close the udp socket which can be uniquely identified with the cookie and other information.
+     */
+    public static void destroyUdpSocket(final InetSocketAddress src, final InetSocketAddress dst,
+            final int ifIndex, final long cookie)
+            throws ErrnoException, SocketException, InterruptedIOException {
+        FileDescriptor fd = null;
+
+        try {
+            fd = NetlinkUtils.createNetLinkInetDiagSocket();
+            connectToKernel(fd);
+            final int family = (src.getAddress() instanceof Inet6Address) ? AF_INET6 : AF_INET;
+            final StructInetDiagSockId id = new StructInetDiagSockId(
+                    src,
+                    dst,
+                    ifIndex,
+                    cookie
+            );
+            sendNetlinkDestroyRequest(fd, IPPROTO_UDP, id, (short) family, 0 /* state */);
+        } finally {
+            closeSocketQuietly(fd);
+        }
     }
 
     @Override
