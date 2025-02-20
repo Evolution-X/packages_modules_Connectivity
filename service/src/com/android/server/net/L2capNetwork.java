@@ -77,6 +77,19 @@ public class L2capNetwork {
             mOnProvisioningSuccessCv.open();
         }
 
+        @Override
+        public void onProvisioningFailure(LinkProperties lp) {
+            Log.i(mLogTag, "Failed to provision l2cap tun: " + lp);
+            mLinkProperties = null;
+            mOnProvisioningSuccessCv.open();
+        }
+
+        /**
+         * Starts IPv6 link-local provisioning.
+         *
+         * @return LinkProperties on success, null on failure.
+         */
+        @Nullable
         public LinkProperties start() {
             mOnIpClientCreatedCv.block();
             // mIpClient guaranteed non-null.
@@ -136,7 +149,14 @@ public class L2capNetwork {
             NetworkCapabilities nc, ICallback cb) {
         // TODO: add a check that this function is invoked on the handler thread.
         final String logTag = String.format("L2capNetwork[%s]", ifname);
+
+        // L2capIpClient#start() blocks until provisioning either succeeds (and returns
+        // LinkProperties) or fails (and returns null).
+        // Note that since L2capNetwork is using IPv6 link-local provisioning the most likely
+        // (only?) failure mode is due to the interface disappearing.
         final LinkProperties lp = new L2capIpClient(logTag, context, ifname).start();
+        if (lp == null) return null;
+
         return new L2capNetwork(logTag, handler, context, provider, socket, tunFd, nc, lp, cb);
     }
 
