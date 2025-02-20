@@ -650,6 +650,7 @@ public class L2capNetworkProvider {
             return thread;
         }
 
+        /** Create a tun interface configured for blocking i/o */
         @Nullable
         public ParcelFileDescriptor createTunInterface(String ifname) {
             final ParcelFileDescriptor fd;
@@ -673,6 +674,7 @@ public class L2capNetworkProvider {
             return fd;
         }
 
+        /** Create an L2capPacketForwarder and start forwarding */
         public L2capPacketForwarder createL2capPacketForwarder(Handler handler,
                 ParcelFileDescriptor tunFd, BluetoothSocket socket, boolean compressHeaders,
                 L2capPacketForwarder.ICallback cb) {
