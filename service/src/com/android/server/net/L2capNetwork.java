@@ -57,7 +57,7 @@ public class L2capNetwork {
         @Nullable
         private IpClientManager mIpClient;
         @Nullable
-        private LinkProperties mLinkProperties;
+        private volatile LinkProperties mLinkProperties;
 
         L2capIpClient(String logTag, Context context, String ifname) {
             mLogTag = logTag;
