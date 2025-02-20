@@ -41,11 +41,14 @@ import com.android.server.L2capNetworkProvider
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
+import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
 import java.io.IOException
+import java.util.Optional
 import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import org.junit.After
 import org.junit.Before
@@ -54,6 +57,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.MockitoAnnotations
 
@@ -72,7 +76,10 @@ class CSL2capProviderTest : CSTest() {
     private val btServerSocket = mock<BluetoothServerSocket>()
     private val btSocket = mock<BluetoothSocket>()
     private val providerDeps = mock<L2capNetworkProvider.Dependencies>()
-    private val acceptQueue = LinkedBlockingQueue<BluetoothSocket>()
+    // BlockingQueue does not support put(null) operations, as null is used as an internal sentinel
+    // value. Therefore, use Optional<BluetoothSocket> where an empty optional signals the
+    // BluetoothServerSocket#close() operation.
+    private val acceptQueue = LinkedBlockingQueue<Optional<BluetoothSocket>>()
 
     private val handlerThread = HandlerThread("CSL2capProviderTest thread").apply { start() }
 
@@ -87,11 +94,12 @@ class CSL2capProviderTest : CSTest() {
 
         doAnswer {
             val sock = acceptQueue.take()
-            sock ?: throw IOException()
+            if (sock == null || !sock.isPresent()) throw IOException()
+            sock.get()
         }.`when`(btServerSocket).accept()
 
         doAnswer {
-            acceptQueue.put(null)
+            acceptQueue.put(Optional.empty())
         }.`when`(btServerSocket).close()
 
         doReturn(handlerThread).`when`(providerDeps).getHandlerThread()
@@ -187,5 +195,43 @@ class CSL2capProviderTest : CSTest() {
                 .build()
         nr = REQUEST.copyWithSpecifier(specifier)
         reserveNetwork(nr).assertNoCallback()
+    }
+
+    @Test
+    fun testBluetoothException_listenUsingInsecureL2capChannelThrows() {
+        doThrow(IOException()).`when`(btAdapter).listenUsingInsecureL2capChannel()
+        var specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        var nr = REQUEST.copyWithSpecifier(specifier)
+        reserveNetwork(nr).expect<Unavailable>()
+
+        doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
+        reserveNetwork(nr).expect<Reserved>()
+    }
+
+    @Test
+    fun testBluetoothException_acceptThrows() {
+        doThrow(IOException()).`when`(btServerSocket).accept()
+        var specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        var nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = reserveNetwork(nr)
+        cb.expect<Reserved>()
+        cb.expect<Unavailable>()
+
+        // BluetoothServerSocket#close() puts Optional.empty() on the acceptQueue.
+        acceptQueue.clear()
+        doAnswer {
+            val sock = acceptQueue.take()
+            assertFalse(sock.isPresent())
+            throw IOException() // to indicate the socket was closed.
+        }.`when`(btServerSocket).accept()
+        val cb2 = reserveNetwork(nr)
+        cb2.expect<Reserved>()
+        cb2.assertNoCallback()
     }
 }
