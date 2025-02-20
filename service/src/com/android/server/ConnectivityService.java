@@ -9804,42 +9804,61 @@ public class ConnectivityService extends IConnectivityManager.Stub
             removeLocalAddressesFromBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES, oldLp);
         }
 
-        final CompareResult<LinkAddress> linkAddressDiff = new CompareResult<>(
-                oldLp != null ? oldLp.getLinkAddresses() : null,
-                newLp != null ? newLp.getLinkAddresses() : null);
+        // The both list contain current link properties + stacked links for new and old LP.
+        List<LinkProperties> newLinkProperties = new ArrayList<>();
+        List<LinkProperties> oldLinkProperties = new ArrayList<>();
 
-        List<IpPrefix> unicastLocalPrefixesToBeAdded = new ArrayList<>();
-        List<IpPrefix> unicastLocalPrefixesToBeRemoved = new ArrayList<>();
-
-        // Finding the list of local network prefixes that needs to be added
         if (newLp != null) {
-            for (LinkAddress linkAddress : newLp.getLinkAddresses()) {
+            newLinkProperties.add(newLp);
+            newLinkProperties.addAll(newLp.getStackedLinks());
+        }
+        if (oldLp != null) {
+            oldLinkProperties.add(oldLp);
+            oldLinkProperties.addAll(oldLp.getStackedLinks());
+        }
+
+        // map contains interface name to list of local network prefixes added because of change
+        // in link properties
+        Map<String, List<IpPrefix>> prefixesAddedForInterface = new ArrayMap<>();
+
+        final CompareResult<LinkProperties> linkPropertiesDiff = new CompareResult<>(
+                oldLinkProperties, newLinkProperties);
+
+        for (LinkProperties linkProperty : linkPropertiesDiff.added) {
+            List<IpPrefix> unicastLocalPrefixesToBeAdded = new ArrayList<>();
+            for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
                 unicastLocalPrefixesToBeAdded.addAll(
                         getLocalNetworkPrefixesForAddress(linkAddress));
             }
-        }
+            addLocalAddressesToBpfMap(linkProperty.getInterfaceName(),
+                    unicastLocalPrefixesToBeAdded, linkProperty);
 
-        for (LinkAddress linkAddress : linkAddressDiff.removed) {
-            unicastLocalPrefixesToBeRemoved.addAll(getLocalNetworkPrefixesForAddress(linkAddress));
-        }
-
-        // If newLp is not null, adding local network prefixes using interface name of newLp
-        if (newLp != null) {
-            addLocalAddressesToBpfMap(newLp.getInterfaceName(),
-                    new ArrayList<>(unicastLocalPrefixesToBeAdded), newLp);
-        }
-        if (oldLp != null) {
-            // excluding removal of ip prefixes that needs to be added for newLp, but also
-            // removed for oldLp.
-            if (newLp != null && Objects.equals(oldLp.getInterfaceName(),
-                    newLp.getInterfaceName())) {
-                unicastLocalPrefixesToBeRemoved.removeAll(unicastLocalPrefixesToBeAdded);
+            // adding iterface name -> ip prefixes that we added to map
+            if (!prefixesAddedForInterface.containsKey(linkProperty.getInterfaceName())) {
+                prefixesAddedForInterface.put(linkProperty.getInterfaceName(), new ArrayList<>());
             }
-            // removing ip local network prefixes because of change in link addresses.
-            removeLocalAddressesFromBpfMap(oldLp.getInterfaceName(),
-                    new ArrayList<>(unicastLocalPrefixesToBeRemoved), oldLp);
+            prefixesAddedForInterface.get(linkProperty.getInterfaceName())
+                    .addAll(unicastLocalPrefixesToBeAdded);
         }
 
+        for (LinkProperties linkProperty : linkPropertiesDiff.removed) {
+            List<IpPrefix> unicastLocalPrefixesToBeRemoved = new ArrayList<>();
+            List<IpPrefix> unicastLocalPrefixesAdded = prefixesAddedForInterface.getOrDefault(
+                    linkProperty.getInterfaceName(), new ArrayList<>());
+
+            for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
+                unicastLocalPrefixesToBeRemoved.addAll(
+                        getLocalNetworkPrefixesForAddress(linkAddress));
+            }
+
+            // This is to ensure if 10.0.10.0/24 was added and 10.0.11.0/24 was removed both will
+            // still populate the same prefix of 10.0.0.0/8, which mean we should not remove the
+            // prefix because of removal of 10.0.11.0/24
+            unicastLocalPrefixesToBeRemoved.removeAll(unicastLocalPrefixesAdded);
+
+            removeLocalAddressesFromBpfMap(linkProperty.getInterfaceName(),
+                    new ArrayList<>(unicastLocalPrefixesToBeRemoved), linkProperty);
+        }
     }
 
     /**
