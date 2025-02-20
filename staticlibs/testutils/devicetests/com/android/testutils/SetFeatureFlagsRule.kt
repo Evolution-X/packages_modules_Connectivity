@@ -68,10 +68,15 @@ class SetFeatureFlagsRule(
      * If any `@FeatureFlag` annotation is found, it passes every feature flag's name
      * and enabled state into the user-specified lambda to apply custom actions.
      */
+    private val parameterizedRegexp = Regex("\\[\\d+\\]$")
     override fun apply(base: Statement, description: Description): Statement {
         return object : Statement() {
             override fun evaluate() {
-                val testMethod = description.testClass.getMethod(description.methodName)
+                // If the same class also uses Parameterized, depending on evaluation order the
+                // method names here may be synthetic method names, where [0] [1] or so are added
+                // at the end of the method name. Find the original method name.
+                val methodName = description.methodName.replace(parameterizedRegexp, "")
+                val testMethod = description.testClass.getMethod(methodName)
                 val featureFlagAnnotations = testMethod.getAnnotationsByType(
                     FeatureFlag::class.java
                 )
