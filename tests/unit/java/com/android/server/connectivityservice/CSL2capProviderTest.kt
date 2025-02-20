@@ -20,24 +20,17 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
-import android.content.Context
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_NONE
 import android.net.L2capNetworkSpecifier.ROLE_SERVER
-import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
-import android.net.NetworkProvider
-import android.net.NetworkProvider.NetworkOfferCallback
 import android.net.NetworkRequest
-import android.net.NetworkScore
 import android.net.NetworkSpecifier
 import android.os.Build
 import android.os.HandlerThread
-import android.os.Looper
-import com.android.server.L2capNetworkProvider
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
@@ -46,7 +39,6 @@ import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.waitForIdle
 import java.io.IOException
 import java.util.Optional
-import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -55,12 +47,10 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
-import org.mockito.MockitoAnnotations
 
 private const val PSM = 0x85
 private val REMOTE_MAC = byteArrayOf(1, 2, 3, 4, 5, 6)
@@ -93,7 +83,7 @@ class CSL2capProviderTest : CSTest() {
     fun innerSetUp() {
         doReturn(btAdapter).`when`(bluetoothManager).getAdapter()
         doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
-        doReturn(PSM).`when`(btServerSocket).getPsm();
+        doReturn(PSM).`when`(btServerSocket).getPsm()
 
         doAnswer {
             val sock = acceptQueue.take()
