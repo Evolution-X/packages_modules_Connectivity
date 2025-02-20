@@ -62,6 +62,7 @@ import com.android.server.connectivity.CarrierPrivilegeAuthenticator
 import com.android.server.connectivity.ConnectivityResources
 import com.android.server.connectivity.MockableSystemProperties
 import com.android.server.connectivity.MultinetworkPolicyTracker
+import com.android.server.connectivity.PermissionMonitor
 import com.android.server.connectivity.ProxyTracker
 import com.android.server.connectivity.SatelliteAccessController
 import com.android.testutils.DevSdkIgnoreRunner
@@ -222,7 +223,7 @@ class ConnectivityServiceIntegrationTest {
     }
 
     private inner class TestConnectivityService(deps: Dependencies) : ConnectivityService(
-            context, dnsResolver, log, netd, deps)
+            context, dnsResolver, log, netd, deps, PermissionMonitorDependencies())
 
     private inner class TestDependencies : ConnectivityService.Dependencies() {
         override fun getNetworkStack() = networkStackClient
@@ -275,6 +276,10 @@ class ConnectivityServiceIntegrationTest {
             SatelliteAccessController::class.java)
 
         override fun makeL2capNetworkProvider(context: Context) = null
+    }
+
+    private inner class PermissionMonitorDependencies : PermissionMonitor.Dependencies() {
+        override fun shouldEnforceLocalNetRestrictions(uid: Int) = false
     }
 
     @After
