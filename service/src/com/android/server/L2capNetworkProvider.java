@@ -338,19 +338,19 @@ public class L2capNetworkProvider {
 
             final L2capNetwork network = createL2capNetwork(socket, mReservedCapabilities,
                     new L2capNetwork.ICallback() {
-                @Override
-                public void onError(L2capNetwork network) {
-                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                    destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
-                }
-                @Override
-                public void onNetworkUnwanted(L2capNetwork network) {
-                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                    // Leave reservation in place.
-                    final boolean networkExists = mL2capNetworks.remove(network);
-                    if (!networkExists) return; // already torn down.
-                    network.tearDown();
-                }
+                    @Override
+                    public void onError(L2capNetwork network) {
+                        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+                        destroyAndUnregisterReservedOffer(ReservedServerOffer.this);
+                    }
+                    @Override
+                    public void onNetworkUnwanted(L2capNetwork network) {
+                        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+                        // Leave reservation in place.
+                        final boolean networkExists = mL2capNetworks.remove(network);
+                        if (!networkExists) return; // already torn down.
+                        network.tearDown();
+                    }
             });
 
             if (network == null) {
@@ -486,20 +486,20 @@ public class L2capNetworkProvider {
 
             final L2capNetwork network = createL2capNetwork(socket, caps,
                     new L2capNetwork.ICallback() {
-                // TODO: do not send onUnavailable() after the network has become available. The
-                // right thing to do here is to tearDown the network (if it still exists, because
-                // note that the request might have already been removed in the meantime, so
-                // `network` cannot be used directly.
-                @Override
-                public void onError(L2capNetwork network) {
-                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                    declareAllNetworkRequestsUnfulfillable(specifier);
-                }
-                @Override
-                public void onNetworkUnwanted(L2capNetwork network) {
-                    HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                    declareAllNetworkRequestsUnfulfillable(specifier);
-                }
+                    // TODO: do not send onUnavailable() after the network has become available. The
+                    // right thing to do here is to tearDown the network (if it still exists,
+                    // because note that the request might have already been removed in the
+                    // meantime, so `network` cannot be used directly.
+                    @Override
+                    public void onError(L2capNetwork network) {
+                        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+                        declareAllNetworkRequestsUnfulfillable(specifier);
+                    }
+                    @Override
+                    public void onNetworkUnwanted(L2capNetwork network) {
+                        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+                        declareAllNetworkRequestsUnfulfillable(specifier);
+                    }
             });
             if (network == null) return false;
 
