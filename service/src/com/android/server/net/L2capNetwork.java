@@ -72,7 +72,7 @@ public class L2capNetwork {
 
         @Override
         public void onProvisioningSuccess(LinkProperties lp) {
-            Log.d(mLogTag, "Successfully provisionined l2cap tun: " + lp);
+            Log.d(mLogTag, "Successfully provisioned l2cap tun: " + lp);
             mLinkProperties = lp;
             mOnProvisioningSuccessCv.open();
         }
@@ -120,7 +120,7 @@ public class L2capNetwork {
                 nc, lp, NETWORK_SCORE, config, provider) {
             @Override
             public void onNetworkUnwanted() {
-                Log.i(mLogTag, mIfname + ": Network is unwanted");
+                Log.i(mLogTag, "Network is unwanted");
                 // TODO: add a check that this callback is invoked on the handler thread.
                 cb.onNetworkUnwanted(L2capNetwork.this);
             }
