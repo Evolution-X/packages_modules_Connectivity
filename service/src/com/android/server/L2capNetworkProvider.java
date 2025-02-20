@@ -273,6 +273,7 @@ public class L2capNetworkProvider {
             private volatile boolean mIsRunning = true;
 
             public AcceptThread(BluetoothServerSocket serverSocket) {
+                super("L2capNetworkProvider-AcceptThread");
                 mServerSocket = serverSocket;
             }
 
@@ -436,6 +437,7 @@ public class L2capNetworkProvider {
             private volatile boolean mIsAborted = false;
 
             public ConnectThread(L2capNetworkSpecifier specifier, BluetoothSocket socket) {
+                super("L2capNetworkProvider-ConnectThread");
                 mSpecifier = specifier;
                 mSocket = socket;
             }

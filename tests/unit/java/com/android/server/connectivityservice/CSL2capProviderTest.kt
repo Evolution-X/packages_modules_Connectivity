@@ -43,6 +43,7 @@ import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.waitForIdle
 import java.io.IOException
 import java.util.Optional
 import java.util.concurrent.Executor
@@ -71,6 +72,7 @@ private val REQUEST = NetworkRequest.Builder()
 
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.R)
+@DevSdkIgnoreRunner.MonitorThreadLeak
 class CSL2capProviderTest : CSTest() {
     private val btAdapter = mock<BluetoothAdapter>()
     private val btServerSocket = mock<BluetoothServerSocket>()
@@ -82,6 +84,7 @@ class CSL2capProviderTest : CSTest() {
     private val acceptQueue = LinkedBlockingQueue<Optional<BluetoothSocket>>()
 
     private val handlerThread = HandlerThread("CSL2capProviderTest thread").apply { start() }
+    private val registeredCallbacks = ArrayList<TestableNetworkCallback>()
 
     // Requires Dependencies mock to be setup before creation.
     private lateinit var provider: L2capNetworkProvider
@@ -109,16 +112,30 @@ class CSL2capProviderTest : CSTest() {
 
     @After
     fun innerTearDown() {
+        // Unregistering a callback which has previously been unregistered by virtue of receiving
+        // onUnavailable is a noop.
+        registeredCallbacks.forEach { cm.unregisterNetworkCallback(it) }
+        // Wait for CS handler idle, meaning the unregisterNetworkCallback has been processed and
+        // L2capNetworkProvider has been notified.
+        waitForIdle()
+
+        // While quitSafely() effectively waits for idle, it is not enough, because the tear down
+        // path itself posts on the handler thread. This means that waitForIdle() needs to run
+        // twice. The first time, to ensure all active threads have been joined, and the second time
+        // to run all associated clean up actions.
+        handlerThread.waitForIdle(HANDLER_TIMEOUT_MS)
         handlerThread.quitSafely()
         handlerThread.join()
     }
 
     private fun reserveNetwork(nr: NetworkRequest) = TestableNetworkCallback().also {
         cm.reserveNetwork(nr, csHandler, it)
+        registeredCallbacks.add(it)
     }
 
     private fun requestNetwork(nr: NetworkRequest) = TestableNetworkCallback().also {
         cm.requestNetwork(nr, it, csHandler)
+        registeredCallbacks.add(it)
     }
 
     private fun NetworkRequest.copyWithSpecifier(specifier: NetworkSpecifier): NetworkRequest {
