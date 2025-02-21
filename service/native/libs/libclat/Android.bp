@@ -47,6 +47,7 @@ cc_test {
     srcs: [
         "clatutils_test.cpp",
     ],
+    stl: "libc++_static",
     header_libs: [
         "bpf_connectivity_headers",
     ],
