@@ -188,6 +188,8 @@ import com.android.net.module.util.Struct.S32;
 import com.android.net.module.util.Struct.U8;
 import com.android.net.module.util.bpf.CookieTagMapKey;
 import com.android.net.module.util.bpf.CookieTagMapValue;
+import com.android.net.module.util.netlink.InetDiagMessage;
+import com.android.net.module.util.netlink.StructInetDiagSockId;
 import com.android.networkstack.apishim.BroadcastOptionsShimImpl;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.common.UnsupportedApiLevelException;
@@ -215,6 +217,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Collect and persist detailed network statistics, and provide this data to
@@ -725,7 +728,14 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             mTrafficStatsUidCache = null;
         }
 
-        mSkDestroyListener = mDeps.makeSkDestroyListener(mCookieTagMap, mHandler);
+        mSkDestroyListener = mDeps.makeSkDestroyListener((message) -> {
+            final StructInetDiagSockId sockId = message.inetDiagMsg.id;
+            try {
+                mCookieTagMap.deleteEntry(new CookieTagMapKey(sockId.cookie));
+            } catch (ErrnoException e) {
+                Log.e(TAG, "Failed to delete CookieTagMap entry for " + sockId.cookie  + ": " + e);
+            }
+        }, mHandler);
         mHandler.post(mSkDestroyListener::start);
     }
 
@@ -947,10 +957,10 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         }
 
         /** Create a new SkDestroyListener. */
-        public SkDestroyListener makeSkDestroyListener(
-                IBpfMap<CookieTagMapKey, CookieTagMapValue> cookieTagMap, Handler handler) {
-            return new SkDestroyListener(
-                    cookieTagMap, handler, new SharedLog(MAX_SOCKET_DESTROY_LISTENER_LOGS, TAG));
+        public SkDestroyListener makeSkDestroyListener(Consumer<InetDiagMessage> consumer,
+                Handler handler) {
+            return new SkDestroyListener(consumer, handler,
+                    new SharedLog(MAX_SOCKET_DESTROY_LISTENER_LOGS, TAG));
         }
 
         /**
