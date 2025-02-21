@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package com.android.server.net;
+package com.android.net.module.util;
 
 import static android.system.OsConstants.NETLINK_INET_DIAG;
 
 import android.os.Handler;
 
-import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.InetDiagMessage;
 import com.android.net.module.util.netlink.NetlinkMessage;
