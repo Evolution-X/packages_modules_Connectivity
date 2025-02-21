@@ -168,6 +168,7 @@ import com.android.net.module.util.Struct.S32;
 import com.android.net.module.util.Struct.U8;
 import com.android.net.module.util.bpf.CookieTagMapKey;
 import com.android.net.module.util.bpf.CookieTagMapValue;
+import com.android.net.module.util.netlink.InetDiagMessage;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.net.NetworkStatsService.AlertObserver;
 import com.android.server.net.NetworkStatsService.NetworkStatsSettings;
@@ -210,6 +211,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Tests for {@link NetworkStatsService}.
@@ -605,8 +607,8 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
         }
 
         @Override
-        public SkDestroyListener makeSkDestroyListener(
-                IBpfMap<CookieTagMapKey, CookieTagMapValue> cookieTagMap, Handler handler) {
+        public SkDestroyListener makeSkDestroyListener(Consumer<InetDiagMessage> consumer,
+                Handler handler) {
             return mSkDestroyListener;
         }
 
