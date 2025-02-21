@@ -76,7 +76,6 @@ public class L2capNetworkProvider {
             // BLUETOOTH_CONNECT permission.
             NetworkCapabilities.Builder.withoutDefaultCapabilities()
                     .addTransportType(TRANSPORT_BLUETOOTH)
-                    // TODO: remove NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED.
                     .addCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
                     .addCapability(NET_CAPABILITY_NOT_CONGESTED)
                     .addCapability(NET_CAPABILITY_NOT_METERED)
