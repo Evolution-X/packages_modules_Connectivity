@@ -610,6 +610,7 @@ public class MdnsSocketProviderTest {
 
     @Test
     public void testSocketCreatedForMulticastInterface() throws Exception {
+        doReturn(true).when(mTestNetworkIfaceWrapper).isPointToPoint();
         doReturn(true).when(mTestNetworkIfaceWrapper).supportsMulticast();
         startMonitoringSockets();
 
@@ -618,18 +619,6 @@ public class MdnsSocketProviderTest {
 
         postNetworkAvailable(TRANSPORT_BLUETOOTH);
         testCallback.expectedSocketCreatedForNetwork(TEST_NETWORK, List.of(LINKADDRV4));
-    }
-
-    @Test
-    public void testNoSocketCreatedForPTPInterface() throws Exception {
-        doReturn(true).when(mTestNetworkIfaceWrapper).isPointToPoint();
-        startMonitoringSockets();
-
-        final TestSocketCallback testCallback = new TestSocketCallback();
-        runOnHandler(() -> mSocketProvider.requestSocket(TEST_NETWORK, testCallback));
-
-        postNetworkAvailable(TRANSPORT_BLUETOOTH);
-        testCallback.expectedNoCallback();
     }
 
     @Test
