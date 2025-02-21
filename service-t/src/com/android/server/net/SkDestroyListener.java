@@ -46,14 +46,53 @@ public class SkDestroyListener extends NetlinkMonitor {
 
     private final Consumer<InetDiagMessage> mSkDestroyCallback;
 
-    SkDestroyListener(final Consumer<InetDiagMessage> consumer, final Handler handler,
-            final SharedLog log) {
+    /**
+     * Return SkDestroyListener that monitor both TCP and UDP socket destroy
+     *
+     * @param consumer The consumer that processes InetDiagMessage
+     * @param handler The Handler on which to poll for messages
+     * @param log A SharedLog to log to.
+     * @return SkDestroyListener
+     */
+    public static SkDestroyListener makeSkDestroyListener(final Consumer<InetDiagMessage> consumer,
+            final Handler handler, final SharedLog log) {
+        return makeSkDestroyListener(consumer, true /* monitorTcpSocket */,
+                true /* monitorUdpSocket */, handler, log);
+    }
+
+    /**
+     * Return SkDestroyListener that monitor socket destroy
+     *
+     * @param consumer The consumer that processes InetDiagMessage
+     * @param monitorTcpSocket {@code true} to monitor TCP socket destroy
+     * @param monitorUdpSocket {@code true} to monitor UDP socket destroy
+     * @param handler The Handler on which to poll for messages
+     * @param log A SharedLog to log to.
+     * @return SkDestroyListener
+     */
+    public static SkDestroyListener makeSkDestroyListener(final Consumer<InetDiagMessage> consumer,
+            final boolean monitorTcpSocket, final boolean monitorUdpSocket,
+            final Handler handler, final SharedLog log) {
+        if (!monitorTcpSocket && !monitorUdpSocket) {
+            throw new IllegalArgumentException(
+                    "Both monitorTcpSocket and monitorUdpSocket can not be false");
+        }
+        int bindGroups = 0;
+        if (monitorTcpSocket) {
+            bindGroups |= 1 << (SKNLGRP_INET_TCP_DESTROY - 1)
+                    | 1 << (SKNLGRP_INET6_TCP_DESTROY - 1);
+        }
+        if (monitorUdpSocket) {
+            bindGroups |= 1 << (SKNLGRP_INET_UDP_DESTROY - 1)
+                    | 1 << (SKNLGRP_INET6_UDP_DESTROY - 1);
+        }
+        return new SkDestroyListener(consumer, bindGroups, handler, log);
+    }
+
+    private SkDestroyListener(final Consumer<InetDiagMessage> consumer, final int bindGroups,
+            final Handler handler, final SharedLog log) {
         super(handler, log, "SkDestroyListener", NETLINK_INET_DIAG,
-                1 << (SKNLGRP_INET_TCP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET_UDP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET6_TCP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET6_UDP_DESTROY - 1),
-                SOCK_RCV_BUF_SIZE);
+                bindGroups, SOCK_RCV_BUF_SIZE);
         mSkDestroyCallback = consumer;
     }
 
