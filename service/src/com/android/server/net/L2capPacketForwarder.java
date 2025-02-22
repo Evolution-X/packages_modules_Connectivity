@@ -233,6 +233,7 @@ public class L2capPacketForwarder {
 
         L2capThread(IReadWriteFd readFd, IReadWriteFd writeFd, boolean isIngress,
                 boolean compressHeaders) {
+            super("L2capNetworkProvider-ForwarderThread");
             mLogTag = isIngress ? "L2capForwarderThread-Ingress" : "L2capForwarderThread-Egress";
             mReadFd = readFd;
             mWriteFd = writeFd;

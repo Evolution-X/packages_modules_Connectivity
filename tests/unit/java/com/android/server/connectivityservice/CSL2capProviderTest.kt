@@ -20,42 +20,37 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
-import android.content.Context
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_NONE
 import android.net.L2capNetworkSpecifier.ROLE_SERVER
-import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
-import android.net.NetworkProvider
-import android.net.NetworkProvider.NetworkOfferCallback
 import android.net.NetworkRequest
-import android.net.NetworkScore
 import android.net.NetworkSpecifier
 import android.os.Build
 import android.os.HandlerThread
-import android.os.Looper
-import com.android.server.L2capNetworkProvider
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
+import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.waitForIdle
 import java.io.IOException
-import java.util.concurrent.Executor
+import java.util.Optional
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
-import org.mockito.MockitoAnnotations
 
 private const val PSM = 0x85
 private val REMOTE_MAC = byteArrayOf(1, 2, 3, 4, 5, 6)
@@ -67,14 +62,19 @@ private val REQUEST = NetworkRequest.Builder()
 
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.R)
+@DevSdkIgnoreRunner.MonitorThreadLeak
 class CSL2capProviderTest : CSTest() {
     private val btAdapter = mock<BluetoothAdapter>()
     private val btServerSocket = mock<BluetoothServerSocket>()
     private val btSocket = mock<BluetoothSocket>()
     private val providerDeps = mock<L2capNetworkProvider.Dependencies>()
-    private val acceptQueue = LinkedBlockingQueue<BluetoothSocket>()
+    // BlockingQueue does not support put(null) operations, as null is used as an internal sentinel
+    // value. Therefore, use Optional<BluetoothSocket> where an empty optional signals the
+    // BluetoothServerSocket#close() operation.
+    private val acceptQueue = LinkedBlockingQueue<Optional<BluetoothSocket>>()
 
     private val handlerThread = HandlerThread("CSL2capProviderTest thread").apply { start() }
+    private val registeredCallbacks = ArrayList<TestableNetworkCallback>()
 
     // Requires Dependencies mock to be setup before creation.
     private lateinit var provider: L2capNetworkProvider
@@ -83,15 +83,16 @@ class CSL2capProviderTest : CSTest() {
     fun innerSetUp() {
         doReturn(btAdapter).`when`(bluetoothManager).getAdapter()
         doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
-        doReturn(PSM).`when`(btServerSocket).getPsm();
+        doReturn(PSM).`when`(btServerSocket).getPsm()
 
         doAnswer {
             val sock = acceptQueue.take()
-            sock ?: throw IOException()
+            if (sock == null || !sock.isPresent()) throw IOException()
+            sock.get()
         }.`when`(btServerSocket).accept()
 
         doAnswer {
-            acceptQueue.put(null)
+            acceptQueue.put(Optional.empty())
         }.`when`(btServerSocket).close()
 
         doReturn(handlerThread).`when`(providerDeps).getHandlerThread()
@@ -101,16 +102,30 @@ class CSL2capProviderTest : CSTest() {
 
     @After
     fun innerTearDown() {
+        // Unregistering a callback which has previously been unregistered by virtue of receiving
+        // onUnavailable is a noop.
+        registeredCallbacks.forEach { cm.unregisterNetworkCallback(it) }
+        // Wait for CS handler idle, meaning the unregisterNetworkCallback has been processed and
+        // L2capNetworkProvider has been notified.
+        waitForIdle()
+
+        // While quitSafely() effectively waits for idle, it is not enough, because the tear down
+        // path itself posts on the handler thread. This means that waitForIdle() needs to run
+        // twice. The first time, to ensure all active threads have been joined, and the second time
+        // to run all associated clean up actions.
+        handlerThread.waitForIdle(HANDLER_TIMEOUT_MS)
         handlerThread.quitSafely()
         handlerThread.join()
     }
 
     private fun reserveNetwork(nr: NetworkRequest) = TestableNetworkCallback().also {
         cm.reserveNetwork(nr, csHandler, it)
+        registeredCallbacks.add(it)
     }
 
     private fun requestNetwork(nr: NetworkRequest) = TestableNetworkCallback().also {
         cm.requestNetwork(nr, it, csHandler)
+        registeredCallbacks.add(it)
     }
 
     private fun NetworkRequest.copyWithSpecifier(specifier: NetworkSpecifier): NetworkRequest {
@@ -187,5 +202,43 @@ class CSL2capProviderTest : CSTest() {
                 .build()
         nr = REQUEST.copyWithSpecifier(specifier)
         reserveNetwork(nr).assertNoCallback()
+    }
+
+    @Test
+    fun testBluetoothException_listenUsingInsecureL2capChannelThrows() {
+        doThrow(IOException()).`when`(btAdapter).listenUsingInsecureL2capChannel()
+        var specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        var nr = REQUEST.copyWithSpecifier(specifier)
+        reserveNetwork(nr).expect<Unavailable>()
+
+        doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
+        reserveNetwork(nr).expect<Reserved>()
+    }
+
+    @Test
+    fun testBluetoothException_acceptThrows() {
+        doThrow(IOException()).`when`(btServerSocket).accept()
+        var specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        var nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = reserveNetwork(nr)
+        cb.expect<Reserved>()
+        cb.expect<Unavailable>()
+
+        // BluetoothServerSocket#close() puts Optional.empty() on the acceptQueue.
+        acceptQueue.clear()
+        doAnswer {
+            val sock = acceptQueue.take()
+            assertFalse(sock.isPresent())
+            throw IOException() // to indicate the socket was closed.
+        }.`when`(btServerSocket).accept()
+        val cb2 = reserveNetwork(nr)
+        cb2.expect<Reserved>()
+        cb2.assertNoCallback()
     }
 }

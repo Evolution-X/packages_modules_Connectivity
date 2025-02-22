@@ -61,6 +61,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.ServiceConnectivityJni;
 import com.android.server.net.L2capNetwork;
+import com.android.server.net.L2capPacketForwarder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -245,7 +246,8 @@ public class L2capNetworkProvider {
             return null;
         }
 
-        return L2capNetwork.create(mHandler, mContext, mProvider, ifname, socket, tunFd, caps, cb);
+        return L2capNetwork.create(
+                mHandler, mContext, mProvider, ifname, socket, tunFd, caps, mDeps, cb);
     }
 
     private static void closeBluetoothSocket(BluetoothSocket socket) {
@@ -271,6 +273,7 @@ public class L2capNetworkProvider {
             private volatile boolean mIsRunning = true;
 
             public AcceptThread(BluetoothServerSocket serverSocket) {
+                super("L2capNetworkProvider-AcceptThread");
                 mServerSocket = serverSocket;
             }
 
@@ -434,6 +437,7 @@ public class L2capNetworkProvider {
             private volatile boolean mIsAborted = false;
 
             public ConnectThread(L2capNetworkSpecifier specifier, BluetoothSocket socket) {
+                super("L2capNetworkProvider-ConnectThread");
                 mSpecifier = specifier;
                 mSocket = socket;
             }
@@ -646,6 +650,7 @@ public class L2capNetworkProvider {
             return thread;
         }
 
+        /** Create a tun interface configured for blocking i/o */
         @Nullable
         public ParcelFileDescriptor createTunInterface(String ifname) {
             final ParcelFileDescriptor fd;
@@ -668,13 +673,19 @@ public class L2capNetworkProvider {
             }
             return fd;
         }
+
+        /** Create an L2capPacketForwarder and start forwarding */
+        public L2capPacketForwarder createL2capPacketForwarder(Handler handler,
+                ParcelFileDescriptor tunFd, BluetoothSocket socket, boolean compressHeaders,
+                L2capPacketForwarder.ICallback cb) {
+            return new L2capPacketForwarder(handler, tunFd, socket, compressHeaders, cb);
+        }
     }
 
     public L2capNetworkProvider(Context context) {
         this(new Dependencies(), context);
     }
 
-    @VisibleForTesting
     public L2capNetworkProvider(Dependencies deps, Context context) {
         mDeps = deps;
         mContext = context;
