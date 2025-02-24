@@ -105,8 +105,9 @@ class CSL2capProviderTest : CSTest() {
     fun innerSetUp() {
         doReturn(btAdapter).`when`(bluetoothManager).getAdapter()
         doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
-        doReturn(btDevice).`when`(btAdapter).getRemoteDevice(eq(REMOTE_MAC))
         doReturn(PSM).`when`(btServerSocket).getPsm()
+        doReturn(btDevice).`when`(btAdapter).getRemoteDevice(eq(REMOTE_MAC))
+        doReturn(btSocket).`when`(btDevice).createInsecureL2capChannel(eq(PSM))
 
         doAnswer {
             val sock = acceptQueue.take()
@@ -313,6 +314,22 @@ class CSL2capProviderTest : CSTest() {
     @Test
     fun testBluetoothException_createInsecureL2capChannelThrows() {
         doThrow(IOException()).`when`(btDevice).createInsecureL2capChannel(any())
+
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+
+        cb.expect<Unavailable>()
+    }
+
+    @Test
+    fun testBluetoothException_bluetoothSocketConnectThrows() {
+        doThrow(IOException()).`when`(btSocket).connect()
 
         val specifier = L2capNetworkSpecifier.Builder()
                 .setRole(ROLE_CLIENT)
