@@ -61,6 +61,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.ServiceConnectivityJni;
 import com.android.server.net.L2capNetwork;
+import com.android.server.net.L2capNetwork.L2capIpClient;
 import com.android.server.net.L2capPacketForwarder;
 
 import java.io.IOException;
@@ -679,6 +680,11 @@ public class L2capNetworkProvider {
                 ParcelFileDescriptor tunFd, BluetoothSocket socket, boolean compressHeaders,
                 L2capPacketForwarder.ICallback cb) {
             return new L2capPacketForwarder(handler, tunFd, socket, compressHeaders, cb);
+        }
+
+        /** Create an L2capIpClient */
+        public L2capIpClient createL2capIpClient(String logTag, Context context, String ifname) {
+            return new L2capIpClient(logTag, context, ifname);
         }
     }
 
