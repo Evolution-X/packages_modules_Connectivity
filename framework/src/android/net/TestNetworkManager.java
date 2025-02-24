@@ -198,26 +198,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface for testing purposes
-     *
-     * @param bringUp whether to bring up the interface before returning it.
-     *
-     * @return A ParcelFileDescriptor of the underlying TAP interface. Close this to tear down the
-     *     TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean bringUp) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, bringUp, USE_IPV6_PROV_DELAY,
-                    NO_ADDRS, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Create a tap interface with a given interface name for testing purposes
      *
      * @param bringUp whether to bring up the interface before returning it.
