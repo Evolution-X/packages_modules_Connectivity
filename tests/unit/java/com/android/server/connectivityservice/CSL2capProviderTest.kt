@@ -17,6 +17,7 @@
 package com.android.server
 
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.net.INetworkMonitor
@@ -25,9 +26,11 @@ import android.net.IpPrefix
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_NONE
+import android.net.L2capNetworkSpecifier.ROLE_CLIENT
 import android.net.L2capNetworkSpecifier.ROLE_SERVER
 import android.net.LinkAddress
 import android.net.LinkProperties
+import android.net.MacAddress
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
@@ -56,6 +59,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
@@ -78,6 +82,7 @@ class CSL2capProviderTest : CSTest() {
     private val networkMonitor = mock<INetworkMonitor>()
 
     private val btAdapter = mock<BluetoothAdapter>()
+    private val btDevice = mock<BluetoothDevice>()
     private val btServerSocket = mock<BluetoothServerSocket>()
     private val btSocket = mock<BluetoothSocket>()
     private val tunInterface = mock<ParcelFileDescriptor>()
@@ -100,6 +105,7 @@ class CSL2capProviderTest : CSTest() {
     fun innerSetUp() {
         doReturn(btAdapter).`when`(bluetoothManager).getAdapter()
         doReturn(btServerSocket).`when`(btAdapter).listenUsingInsecureL2capChannel()
+        doReturn(btDevice).`when`(btAdapter).getRemoteDevice(eq(REMOTE_MAC))
         doReturn(PSM).`when`(btServerSocket).getPsm()
 
         doAnswer {
@@ -302,5 +308,21 @@ class CSL2capProviderTest : CSTest() {
         // Verify that packet forwarding was started.
         // TODO: stop mocking L2capPacketForwarder.
         verify(providerDeps).createL2capPacketForwarder(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun testBluetoothException_createInsecureL2capChannelThrows() {
+        doThrow(IOException()).`when`(btDevice).createInsecureL2capChannel(any())
+
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+
+        cb.expect<Unavailable>()
     }
 }
