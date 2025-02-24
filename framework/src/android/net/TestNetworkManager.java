@@ -243,27 +243,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface for testing purposes.
-     *
-     * @param disableIpv6ProvisioningDelay whether to disable DAD and RS delay.
-     * @param linkAddrs an array of LinkAddresses to assign to the TAP interface
-     * @return A TestNetworkInterface representing the underlying TAP interface. Close the contained
-     *     ParcelFileDescriptor to tear down the TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean disableIpv6ProvisioningDelay,
-            @NonNull LinkAddress[] linkAddrs) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, BRING_UP, disableIpv6ProvisioningDelay,
-                    linkAddrs, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Enable / disable carrier on TestNetworkInterface
      *
      * Note: TUNSETCARRIER is not supported until kernel version 5.0.
