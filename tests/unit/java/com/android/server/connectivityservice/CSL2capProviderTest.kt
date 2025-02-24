@@ -17,25 +17,34 @@
 package com.android.server
 
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.net.INetworkMonitor
+import android.net.INetworkMonitorCallbacks
+import android.net.IpPrefix
 import android.net.L2capNetworkSpecifier
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
 import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_NONE
 import android.net.L2capNetworkSpecifier.ROLE_SERVER
+import android.net.LinkAddress
+import android.net.LinkProperties
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
 import android.net.NetworkRequest
 import android.net.NetworkSpecifier
+import android.net.RouteInfo
 import android.os.Build
 import android.os.HandlerThread
+import android.os.ParcelFileDescriptor
+import com.android.server.net.L2capNetwork.L2capIpClient
+import com.android.server.net.L2capPacketForwarder
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.anyNetwork
 import com.android.testutils.waitForIdle
 import java.io.IOException
 import java.util.Optional
@@ -47,10 +56,12 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 
 private const val PSM = 0x85
 private val REMOTE_MAC = byteArrayOf(1, 2, 3, 4, 5, 6)
@@ -64,10 +75,16 @@ private val REQUEST = NetworkRequest.Builder()
 @IgnoreUpTo(Build.VERSION_CODES.R)
 @DevSdkIgnoreRunner.MonitorThreadLeak
 class CSL2capProviderTest : CSTest() {
+    private val networkMonitor = mock<INetworkMonitor>()
+
     private val btAdapter = mock<BluetoothAdapter>()
     private val btServerSocket = mock<BluetoothServerSocket>()
     private val btSocket = mock<BluetoothSocket>()
+    private val tunInterface = mock<ParcelFileDescriptor>()
+    private val l2capIpClient = mock<L2capIpClient>()
+    private val packetForwarder = mock<L2capPacketForwarder>()
     private val providerDeps = mock<L2capNetworkProvider.Dependencies>()
+
     // BlockingQueue does not support put(null) operations, as null is used as an internal sentinel
     // value. Therefore, use Optional<BluetoothSocket> where an empty optional signals the
     // BluetoothServerSocket#close() operation.
@@ -96,6 +113,30 @@ class CSL2capProviderTest : CSTest() {
         }.`when`(btServerSocket).close()
 
         doReturn(handlerThread).`when`(providerDeps).getHandlerThread()
+        doReturn(tunInterface).`when`(providerDeps).createTunInterface(any())
+        doReturn(packetForwarder).`when`(providerDeps)
+                .createL2capPacketForwarder(any(), any(), any(), any(), any())
+        doReturn(l2capIpClient).`when`(providerDeps).createL2capIpClient(any(), any(), any())
+
+        val lp = LinkProperties()
+        val ifname = "l2cap-tun0"
+        lp.setInterfaceName(ifname)
+        lp.addLinkAddress(LinkAddress("fe80::1/64"))
+        lp.addRoute(RouteInfo(IpPrefix("fe80::/64"), null /* nextHop */, ifname))
+        doReturn(lp).`when`(l2capIpClient).start()
+
+        // Note: In order to properly register a NetworkAgent, a NetworkMonitor must be created for
+        // the agent. CSAgentWrapper already does some of this, but requires adding additional
+        // Dependencies to the production code. Create a mocked NM inside this test instead.
+        doAnswer { i ->
+            val cb = i.arguments[2] as INetworkMonitorCallbacks
+            cb.onNetworkMonitorCreated(networkMonitor)
+        }.`when`(networkStack).makeNetworkMonitor(
+                any() /* network */,
+                isNull() /* name */,
+                any() /* callbacks */
+        )
+
         provider = L2capNetworkProvider(providerDeps, context)
         provider.start()
     }
@@ -240,5 +281,26 @@ class CSL2capProviderTest : CSTest() {
         val cb2 = reserveNetwork(nr)
         cb2.expect<Reserved>()
         cb2.assertNoCallback()
+    }
+
+    @Test
+    fun testServerNetwork() {
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = reserveNetwork(nr)
+        cb.expect<Reserved>()
+
+        // Unblock BluetoothServerSocket#accept()
+        doReturn(true).`when`(btSocket).isConnected()
+        acceptQueue.put(Optional.of(btSocket))
+
+        cb.expectAvailableCallbacks(anyNetwork(), validated = false)
+        cb.assertNoCallback()
+        // Verify that packet forwarding was started.
+        // TODO: stop mocking L2capPacketForwarder.
+        verify(providerDeps).createL2capPacketForwarder(any(), any(), any(), any(), any())
     }
 }
