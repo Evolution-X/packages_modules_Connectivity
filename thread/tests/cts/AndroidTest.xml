@@ -57,13 +57,4 @@
         <option name="exclude-annotation" value="org.junit.Ignore"/>
     </test>
 
-    <!--
-        This doesn't override a read-only flag, to run the tests locally with `epskc_enabled` flag
-        enabled, set the flag to `is_fixed_read_only: false`. This should be removed after the
-        `epskc_enabled` flag is rolled out.
-    -->
-    <target_preparer class="com.android.tradefed.targetprep.FeatureFlagTargetPreparer">
-        <option name="flag-value"
-                value="thread_network/com.android.net.thread.flags.epskc_enabled=true"/>
-    </target_preparer>
 </configuration>
