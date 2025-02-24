@@ -19,8 +19,6 @@
 
 package android.net.cts
 
-import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
-import android.Manifest.permission.WRITE_DEVICE_CONFIG
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.content.pm.PackageManager.FEATURE_WIFI
@@ -55,8 +53,6 @@ import android.os.PowerManager
 import android.os.SystemProperties
 import android.os.UserManager
 import android.platform.test.annotations.AppModeFull
-import android.provider.DeviceConfig
-import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
 import android.system.Os
 import android.system.OsConstants
 import android.system.OsConstants.AF_INET6
@@ -90,7 +86,6 @@ import com.android.testutils.RecorderCallback.CallbackEntry.Available
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.SkipPresubmit
 import com.android.testutils.TestableNetworkCallback
-import com.android.testutils.runAsShell
 import com.android.testutils.waitForIdle
 import com.google.common.truth.Expect
 import com.google.common.truth.Truth.assertThat
@@ -116,7 +111,6 @@ import org.junit.runner.RunWith
 
 private const val TAG = "ApfIntegrationTest"
 private const val TIMEOUT_MS = 2000L
-private const val APF_NEW_RA_FILTER_VERSION = "apf_new_ra_filter_version"
 private const val POLLING_INTERVAL_MS: Int = 100
 private const val RCV_BUFFER_SIZE = 1480
 private const val PING_HEADER_LENGTH = 8
@@ -192,16 +186,6 @@ class ApfIntegrationTest {
             Thread.sleep(1000)
             // TODO: check that there is no active wifi network. Otherwise, ApfFilter has already been
             // created.
-            // APF adb cmds are only implemented in ApfFilter.java. Enable experiment to prevent
-            // LegacyApfFilter.java from being used.
-            runAsShell(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG) {
-                DeviceConfig.setProperty(
-                        NAMESPACE_CONNECTIVITY,
-                        APF_NEW_RA_FILTER_VERSION,
-                        "1",  // value => force enabled
-                        false // makeDefault
-                )
-            }
         }
 
         @AfterClass
