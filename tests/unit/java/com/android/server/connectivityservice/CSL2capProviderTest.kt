@@ -342,4 +342,56 @@ class CSL2capProviderTest : CSTest() {
 
         cb.expect<Unavailable>()
     }
+
+    @Test
+    fun testClientNetwork() {
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+        cb.expectAvailableCallbacks(anyNetwork(), validated = false)
+    }
+
+    @Test
+    fun testClientNetwork_headerCompressionMismatch() {
+        var specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        var nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+        cb.expectAvailableCallbacks(anyNetwork(), validated = false)
+
+        specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        nr = REQUEST.copyWithSpecifier(specifier)
+        val cb2 = requestNetwork(nr)
+        cb2.expect<Unavailable>()
+    }
+
+    @Test
+    fun testClientNetwork_multipleRequests() {
+        val specifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_CLIENT)
+                .setHeaderCompression(HEADER_COMPRESSION_NONE)
+                .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+                .setPsm(PSM)
+                .build()
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+        cb.expectAvailableCallbacks(anyNetwork(), validated = false)
+
+        val cb2 = requestNetwork(nr)
+        cb2.expectAvailableCallbacks(anyNetwork(), validated = false)
+    }
 }
