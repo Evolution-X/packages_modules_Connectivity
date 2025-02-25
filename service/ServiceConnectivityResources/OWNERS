@@ -1,2 +1,3 @@
+per-file res/raw/ct_public_keys.pem = file:platform/packages/modules/Connectivity:main:/networksecurity/OWNERS
 per-file res/values/config_thread.xml = file:platform/packages/modules/Connectivity:main:/thread/OWNERS
 per-file res/values/overlayable.xml = file:platform/packages/modules/Connectivity:main:/thread/OWNERS
