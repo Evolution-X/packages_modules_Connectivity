@@ -150,7 +150,9 @@ class ApfIntegrationTest {
                 // This is a workaround for b/366037029.
                 Thread.sleep(2000L)
             } else {
-                val result = pollingCheck({ powerManager.isInteractive() }, timeout_ms = 2000)
+                val result = pollingCheck(timeout_ms = 2000) {
+                    powerManager.isInteractive()
+                }
                 assertThat(result).isEqualTo(interactive)
             }
         }
