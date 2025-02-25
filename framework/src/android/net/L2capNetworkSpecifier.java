@@ -171,6 +171,28 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
     }
 
     /**
+     * Checks whether the given L2capNetworkSpecifier is valid as part of a server network
+     * reservation request.
+     *
+     * @hide
+     */
+    public boolean isValidServerReservationSpecifier() {
+        // The ROLE_SERVER offer can be satisfied by a ROLE_ANY request.
+        if (mRole != ROLE_SERVER) return false;
+
+        // HEADER_COMPRESSION_ANY is never valid in a request.
+        if (mHeaderCompression == HEADER_COMPRESSION_ANY) return false;
+
+        // Remote address must be null for ROLE_SERVER requests.
+        if (mRemoteAddress != null) return false;
+
+        // reservation must allocate a PSM, so only PSM_ANY can be passed.
+        if (mPsm != PSM_ANY) return false;
+
+        return true;
+    }
+
+    /**
      * Checks whether the given L2capNetworkSpecifier is valid as part of a client network request.
      *
      * @hide
