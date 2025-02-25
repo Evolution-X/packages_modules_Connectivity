@@ -52,7 +52,7 @@ public class L2capNetwork {
      *
      * Note that the IpClient does not need to be stopped.
      */
-    private static class L2capIpClient extends IpClientCallbacks {
+    public static class L2capIpClient extends IpClientCallbacks {
         private final String mLogTag;
         private final ConditionVariable mOnIpClientCreatedCv = new ConditionVariable(false);
         private final ConditionVariable mOnProvisioningSuccessCv = new ConditionVariable(false);
@@ -61,7 +61,7 @@ public class L2capNetwork {
         @Nullable
         private volatile LinkProperties mLinkProperties;
 
-        L2capIpClient(String logTag, Context context, String ifname) {
+        public L2capIpClient(String logTag, Context context, String ifname) {
             mLogTag = logTag;
             IpClientUtil.makeIpClient(context, ifname, this);
         }
@@ -157,7 +157,7 @@ public class L2capNetwork {
         // LinkProperties) or fails (and returns null).
         // Note that since L2capNetwork is using IPv6 link-local provisioning the most likely
         // (only?) failure mode is due to the interface disappearing.
-        final LinkProperties lp = new L2capIpClient(logTag, context, ifname).start();
+        final LinkProperties lp = deps.createL2capIpClient(logTag, context, ifname).start();
         if (lp == null) return null;
 
         return new L2capNetwork(
