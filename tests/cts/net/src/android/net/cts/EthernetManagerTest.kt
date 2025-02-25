@@ -51,6 +51,7 @@ import android.net.NetworkRequest
 import android.net.StaticIpConfiguration
 import android.net.TestNetworkInterface
 import android.net.TestNetworkManager
+import android.net.TestNetworkManager.TestInterfaceRequest
 import android.net.cts.EthernetManagerTest.EthernetStateListener.CallbackEntry.EthernetStateChanged
 import android.net.cts.EthernetManagerTest.EthernetStateListener.CallbackEntry.InterfaceStateChanged
 import android.os.Build
@@ -169,7 +170,12 @@ class EthernetManagerTest {
                 // false, it is subsequently disabled. This means that the interface may briefly get
                 // link. With IPv6 provisioning delays (RS delay and DAD) disabled, this can cause
                 // tests that expect no network to come up when hasCarrier is false to become flaky.
-                tnm.createTapInterface(hasCarrier, false /* bringUp */)
+                val req = TestInterfaceRequest.Builder()
+                        .setTap()
+                        .setHasCarrier(hasCarrier)
+                        .setBringUp(false)
+                        .build()
+                tnm.createTestInterface(req)
             }
             val mtu = tapInterface.mtu
             packetReader = PollPacketReader(

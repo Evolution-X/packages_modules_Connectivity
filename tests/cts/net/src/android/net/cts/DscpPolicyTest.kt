@@ -44,6 +44,7 @@ import android.net.NetworkRequest
 import android.net.RouteInfo
 import android.net.TestNetworkInterface
 import android.net.TestNetworkManager
+import android.net.TestNetworkManager.TestInterfaceRequest
 import android.net.cts.util.CtsNetUtils.TestNetworkCallback
 import android.os.HandlerThread
 import android.os.SystemClock
@@ -164,7 +165,11 @@ class DscpPolicyTest {
 
             // Only statically configure the IPv4 address; for IPv6, use the SLAAC generated
             // address.
-            iface = tnm.createTapInterface(arrayOf(LinkAddress(LOCAL_IPV4_ADDRESS, IP4_PREFIX_LEN)))
+            val req = TestInterfaceRequest.Builder()
+                    .setTap()
+                    .addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, IP4_PREFIX_LEN))
+                    .build()
+            iface = tnm.createTestInterface(req)
             assertNotNull(iface)
         }
 

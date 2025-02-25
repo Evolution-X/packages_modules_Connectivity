@@ -198,45 +198,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface for testing purposes
-     *
-     * @param linkAddrs an array of LinkAddresses to assign to the TAP interface
-     * @return A TestNetworkInterface representing the underlying TAP interface. Close the contained
-     *     ParcelFileDescriptor to tear down the TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(@NonNull LinkAddress[] linkAddrs) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, BRING_UP, USE_IPV6_PROV_DELAY,
-                    linkAddrs, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Create a tap interface for testing purposes
-     *
-     * @param bringUp whether to bring up the interface before returning it.
-     *
-     * @return A ParcelFileDescriptor of the underlying TAP interface. Close this to tear down the
-     *     TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean bringUp) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, bringUp, USE_IPV6_PROV_DELAY,
-                    NO_ADDRS, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Create a tap interface with a given interface name for testing purposes
      *
      * @param bringUp whether to bring up the interface before returning it.
@@ -260,26 +221,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface with or without carrier for testing purposes.
-     *
-     * Note: setting carrierUp = false is not supported until kernel version 6.0.
-     *
-     * @param carrierUp whether the created interface has a carrier or not.
-     * @param bringUp whether to bring up the interface before returning it.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean carrierUp, boolean bringUp) {
-        try {
-            return mService.createInterface(TAP, carrierUp, bringUp, USE_IPV6_PROV_DELAY, NO_ADDRS,
-                    null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Create a tap interface for testing purposes.
      *
      * Note: setting carrierUp = false is not supported until kernel version 6.0.
@@ -296,27 +237,6 @@ public class TestNetworkManager {
         try {
             return mService.createInterface(TAP, carrierUp, bringUp, disableIpv6ProvisioningDelay,
                     NO_ADDRS, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Create a tap interface for testing purposes.
-     *
-     * @param disableIpv6ProvisioningDelay whether to disable DAD and RS delay.
-     * @param linkAddrs an array of LinkAddresses to assign to the TAP interface
-     * @return A TestNetworkInterface representing the underlying TAP interface. Close the contained
-     *     ParcelFileDescriptor to tear down the TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean disableIpv6ProvisioningDelay,
-            @NonNull LinkAddress[] linkAddrs) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, BRING_UP, disableIpv6ProvisioningDelay,
-                    linkAddrs, null /* iface */);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
