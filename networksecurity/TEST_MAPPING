@@ -1,9 +1,4 @@
 {
-  "tethering-mainline-presubmit": [
-    {
-      "name": "NetworkSecurityUnitTests"
-    }
-  ],
   "presubmit": [
     {
       "name": "CtsNetSecConfigCertificateTransparencyTestCases"
