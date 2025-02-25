@@ -434,7 +434,6 @@ public class L2capNetworkProvider {
         private class ConnectThread extends Thread {
             private final L2capNetworkSpecifier mSpecifier;
             private final BluetoothSocket mSocket;
-            private volatile boolean mIsAborted = false;
 
             public ConnectThread(L2capNetworkSpecifier specifier, BluetoothSocket socket) {
                 super("L2capNetworkProvider-ConnectThread");
@@ -451,11 +450,12 @@ public class L2capNetworkProvider {
                         if (!success) closeBluetoothSocket(mSocket);
                     });
                 } catch (IOException e) {
-                    Log.e(TAG, "Failed to connect", e);
-                    if (mIsAborted) return;
-
+                    Log.w(TAG, "BluetoothSocket was closed or #connect failed", e);
+                    // It is safe to call BluetoothSocket#close() multiple times.
                     closeBluetoothSocket(mSocket);
                     mHandler.post(() -> {
+                        // Note that if the Socket was closed, this call is a noop as the
+                        // ClientNetworkRequest has already been removed.
                         declareAllNetworkRequestsUnfulfillable(mSpecifier);
                     });
                 }
@@ -463,7 +463,6 @@ public class L2capNetworkProvider {
 
             public void abort() {
                 HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                mIsAborted = true;
                 // Closing the BluetoothSocket is the only way to unblock connect() because it calls
                 // shutdown on the underlying (connected) SOCK_SEQPACKET.
                 // It is safe to call BluetoothSocket#close() multiple times.
