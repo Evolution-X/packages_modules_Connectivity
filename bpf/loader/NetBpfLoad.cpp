@@ -1414,37 +1414,6 @@ static bool isWear() {
 static int doLoad(char** argv, char * const envp[]) {
     const bool runningAsRoot = !getuid();  // true iff U QPR3 or V+
 
-    // Any released device will have codename REL instead of a 'real' codename.
-    // For safety: default to 'REL' so we default to unreleased=false on failure.
-    const bool unreleased = (GetProperty("ro.build.version.codename", "REL") != "REL");
-
-    // goog/main device_api_level is bumped *way* before aosp/main api level
-    // (the latter only gets bumped during the push of goog/main to aosp/main)
-    //
-    // Since we develop in AOSP, we want it to behave as if it was bumped too.
-    //
-    // Note that AOSP doesn't really have a good api level (for example during
-    // early V dev cycle, it would have *all* of T, some but not all of U, and some V).
-    // One could argue that for our purposes AOSP api level should be infinite or 10000.
-    //
-    // This could also cause api to be increased in goog/main or other branches,
-    // but I can't imagine a case where this would be a problem: the problem
-    // is rather a too low api level, rather than some ill defined high value.
-    // For example as I write this aosp is 34/U, and goog is 35/V,
-    // we want to treat both goog & aosp as 35/V, but it's harmless if we
-    // treat goog as 36 because that value isn't yet defined to mean anything,
-    // and we thus never compare against it.
-    //
-    // Also note that 'android_get_device_api_level()' is what the
-    //   //system/core/init/apex_init_util.cpp
-    // apex init .XXrc parsing code uses for XX filtering, and that code
-    // (now) similarly uses __ANDROID_API_FUTURE__ for non 'REL' codenames.
-    const int api_level = unreleased ? __ANDROID_API_FUTURE__ : android_get_device_api_level();
-    const bool isAtLeastT = (api_level >= __ANDROID_API_T__);
-    const bool isAtLeastU = (api_level >= __ANDROID_API_U__);
-    const bool isAtLeastV = (api_level >= __ANDROID_API_V__);
-    const bool isAtLeast25Q2 = (api_level > __ANDROID_API_V__);  // TODO: fix >
-
     const int first_api_level = GetIntProperty("ro.board.first_api_level", api_level);
 
     // last in U QPR2 beta1
@@ -1591,7 +1560,7 @@ static int doLoad(char** argv, char * const envp[]) {
         if (isArm() && (isTV() || isWear())) {
             // exempt Arm TV or Wear devices (arm32 ABI is far less problematic than x86-32)
             ALOGW("[Arm TV/Wear] 32-bit userspace unsupported on 6.2+ kernels.");
-        } else if (first_api_level <= __ANDROID_API_T__ && isArm()) {
+        } else if (first_api_level <= 33 /*T*/ && isArm()) {
             // also exempt Arm devices upgrading with major kernel rev from T-
             // might possibly be better for them to run with a newer kernel...
             ALOGW("[Arm KernelUpRev] 32-bit userspace unsupported on 6.2+ kernels.");
