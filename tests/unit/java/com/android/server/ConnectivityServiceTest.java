@@ -154,7 +154,6 @@ import static android.net.OemNetworkPreferences.OEM_NETWORK_PREFERENCE_UNINITIAL
 import static android.net.Proxy.PROXY_CHANGE_ACTION;
 import static android.net.RouteInfo.RTN_UNREACHABLE;
 import static android.net.connectivity.ConnectivityCompatChanges.NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION;
-import static android.net.connectivity.ConnectivityCompatChanges.RESTRICT_LOCAL_NETWORK;
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.PREFIX_OPERATION_ADDED;
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.PREFIX_OPERATION_REMOVED;
 import static android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener.VALIDATION_RESULT_FAILURE;
@@ -258,7 +257,6 @@ import android.app.BroadcastOptions;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManager;
-import android.app.compat.CompatChanges;
 import android.app.usage.NetworkStatsManager;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.BroadcastReceiver;
@@ -2206,6 +2204,10 @@ public class ConnectivityServiceTest {
                 case BACKGROUND_FIREWALL_CHAIN:
                     return true;
                 case DELAY_DESTROY_SOCKETS:
+                    return true;
+                case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
+                    return true;
+                case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                     return true;
                 default:
                     return super.isFeatureNotChickenedOut(context, name);

@@ -1913,11 +1913,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 && mDeps.isFeatureEnabled(context, REQUEST_RESTRICTED_WIFI);
         mBackgroundFirewallChainEnabled = mDeps.isAtLeastV() && mDeps.isFeatureNotChickenedOut(
                 context, ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN);
-        mUseDeclaredMethodsForCallbacksEnabled = mDeps.isFeatureEnabled(context,
-                ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
+        mUseDeclaredMethodsForCallbacksEnabled =
+                mDeps.isFeatureNotChickenedOut(context,
+                        ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
-                && mDeps.isFeatureEnabled(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
+                && mDeps.isFeatureNotChickenedOut(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
         mCarrierPrivilegeAuthenticator = mDeps.makeCarrierPrivilegeAuthenticator(
                 mContext, mTelephonyManager, mRequestRestrictedWifiEnabled,
                 this::handleUidCarrierPrivilegesLost, mHandler);
