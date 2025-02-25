@@ -163,10 +163,7 @@ import static android.system.OsConstants.IPPROTO_TCP;
 import static android.telephony.DataConnectionRealTimeInfo.DC_POWER_STATE_HIGH;
 import static android.telephony.DataConnectionRealTimeInfo.DC_POWER_STATE_LOW;
 
-import static com.android.server.ConnectivityService.ALLOW_SATALLITE_NETWORK_FALLBACK;
 import static com.android.net.module.util.DeviceConfigUtils.TETHERING_MODULE_NAME;
-import static com.android.server.ConnectivityService.ALLOW_SYSUI_CONNECTIVITY_REPORTS;
-import static com.android.server.ConnectivityService.KEY_DESTROY_FROZEN_SOCKETS_VERSION;
 import static com.android.server.ConnectivityService.MAX_NETWORK_REQUESTS_PER_SYSTEM_UID;
 import static com.android.server.ConnectivityService.PREFERENCE_ORDER_MOBILE_DATA_PREFERERRED;
 import static com.android.server.ConnectivityService.PREFERENCE_ORDER_OEM;
@@ -177,9 +174,6 @@ import static com.android.server.ConnectivityService.makeNflogPrefix;
 import static com.android.server.ConnectivityServiceTestUtils.transportToLegacyType;
 import static com.android.server.NetworkAgentWrapper.CallbackType.OnQosCallbackRegister;
 import static com.android.server.NetworkAgentWrapper.CallbackType.OnQosCallbackUnregister;
-import static com.android.server.connectivity.ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN;
-import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
-import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 import static com.android.testutils.Cleanup.testAndCleanup;
 import static com.android.testutils.ConcurrentUtils.await;
 import static com.android.testutils.ConcurrentUtils.durationOf;
@@ -2185,32 +2179,30 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.REQUEST_RESTRICTED_WIFI:
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
-                case KEY_DESTROY_FROZEN_SOCKETS_VERSION:
+                case ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN:
+                case ConnectivityService.KEY_DESTROY_FROZEN_SOCKETS_VERSION:
                     return true;
                 default:
-                    return super.isFeatureEnabled(context, name);
+                    // This is a unit test and must never depend on actual device flag values.
+                    throw new UnsupportedOperationException("Unknown flag " + name
+                            + ", update this test");
             }
         }
 
         @Override
         public boolean isFeatureNotChickenedOut(Context context, String name) {
             switch (name) {
-                case ALLOW_SYSUI_CONNECTIVITY_REPORTS:
-                    return true;
-                case ALLOW_SATALLITE_NETWORK_FALLBACK:
-                    return true;
-                case INGRESS_TO_VPN_ADDRESS_FILTERING:
-                    return true;
-                case BACKGROUND_FIREWALL_CHAIN:
-                    return true;
-                case DELAY_DESTROY_SOCKETS:
-                    return true;
+                case ConnectivityService.ALLOW_SYSUI_CONNECTIVITY_REPORTS:
+                case ConnectivityService.ALLOW_SATALLITE_NETWORK_FALLBACK:
+                case ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING:
+                case ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN:
+                case ConnectivityFlags.DELAY_DESTROY_SOCKETS:
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
-                    return true;
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                     return true;
                 default:
-                    return super.isFeatureNotChickenedOut(context, name);
+                    throw new UnsupportedOperationException("Unknown flag " + name
+                            + ", update this test");
             }
         }
 
@@ -2451,6 +2443,10 @@ public class ConnectivityServiceTest {
 
     @After
     public void tearDown() throws Exception {
+        // Don't attempt to tear down if setUp didn't even get as far as creating the service.
+        // Otherwise, exceptions here will mask the actual exception in setUp, making failures
+        // harder to diagnose.
+        if (mService == null) return;
         unregisterDefaultNetworkCallbacks();
         maybeTearDownEnterpriseNetwork();
         setAlwaysOnNetworks(false);
