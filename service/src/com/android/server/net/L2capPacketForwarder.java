@@ -109,10 +109,10 @@ public class L2capPacketForwarder {
         public int read(byte[] bytes, int off, int len) throws IOException {
             // Note: EINTR is handled internally and automatically triggers a retry loop.
             int bytesRead = mInputStream.read(bytes, off, len);
-            if (bytesRead > MTU) {
+            if (bytesRead < 0 || bytesRead > MTU) {
                 // Don't try to recover, just trigger network teardown. This might indicate a bug in
                 // the Bluetooth stack.
-                throw new IOException("Packet exceeds MTU");
+                throw new IOException("Packet exceeds MTU or reached EOF. Read: " + bytesRead);
             }
             return bytesRead;
         }
