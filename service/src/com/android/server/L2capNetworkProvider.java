@@ -271,7 +271,6 @@ public class L2capNetworkProvider {
         private class AcceptThread extends Thread {
             private static final int TIMEOUT_MS = 500;
             private final BluetoothServerSocket mServerSocket;
-            private volatile boolean mIsRunning = true;
 
             public AcceptThread(BluetoothServerSocket serverSocket) {
                 super("L2capNetworkProvider-AcceptThread");
@@ -295,16 +294,17 @@ public class L2capNetworkProvider {
 
             @Override
             public void run() {
-                while (mIsRunning) {
+                while (true) {
                     final BluetoothSocket connectedSocket;
                     try {
                         connectedSocket = mServerSocket.accept();
                     } catch (IOException e) {
-                        // BluetoothServerSocket was closed().
-                        if (!mIsRunning) return;
-
-                        // Else, BluetoothServerSocket encountered exception.
-                        Log.e(TAG, "BluetoothServerSocket#accept failed", e);
+                        // Note calling BluetoothServerSocket#close() also triggers an IOException
+                        // which is indistinguishable from any other exceptional behavior.
+                        // postDestroyAndUnregisterReservedOffer() is always safe to call as it
+                        // first checks whether the offer still exists; so if the
+                        // BluetoothServerSocket was closed (i.e. on tearDown()) this is a noop.
+                        Log.w(TAG, "BluetoothServerSocket closed or #accept failed", e);
                         postDestroyAndUnregisterReservedOffer();
                         return; // stop running immediately on error
                     }
@@ -314,7 +314,6 @@ public class L2capNetworkProvider {
 
             public void tearDown() {
                 HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-                mIsRunning = false;
                 try {
                     // BluetoothServerSocket.close() is thread-safe.
                     mServerSocket.close();
