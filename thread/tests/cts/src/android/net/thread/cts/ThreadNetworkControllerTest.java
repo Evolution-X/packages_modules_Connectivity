@@ -1296,6 +1296,7 @@ public class ThreadNetworkControllerTest {
     }
 
     @Test
+    @Ignore("b/333649897, b/332195449: The 3 meshcop tests are flaky in different environments")
     public void meshcopService_threadEnabledButNotJoined_discoveredButNoNetwork() throws Exception {
         setUpTestNetwork();
 
@@ -1348,6 +1349,7 @@ public class ThreadNetworkControllerTest {
     }
 
     @Test
+    @Ignore("b/333649897, b/332195449: The 3 meshcop tests are flaky in different environments")
     public void meshcopService_threadDisabled_notDiscovered() throws Exception {
         setUpTestNetwork();
         CompletableFuture<NsdServiceInfo> serviceLostFuture = new CompletableFuture<>();
