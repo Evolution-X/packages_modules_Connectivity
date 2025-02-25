@@ -18,7 +18,6 @@ package com.android.server;
 
 import static android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE;
 import static android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_ANY;
-import static android.net.L2capNetworkSpecifier.PSM_ANY;
 import static android.net.L2capNetworkSpecifier.ROLE_CLIENT;
 import static android.net.L2capNetworkSpecifier.ROLE_SERVER;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED;
@@ -127,23 +126,6 @@ public class L2capNetworkProvider {
             CAPABILITIES = caps;
         }
 
-        // TODO: consider moving this into L2capNetworkSpecifier as #isValidServerReservation().
-        private boolean isValidL2capServerSpecifier(L2capNetworkSpecifier l2capSpec) {
-            // The ROLE_SERVER offer can be satisfied by a ROLE_ANY request.
-            if (l2capSpec.getRole() != ROLE_SERVER) return false;
-
-            // HEADER_COMPRESSION_ANY is never valid in a request.
-            if (l2capSpec.getHeaderCompression() == HEADER_COMPRESSION_ANY) return false;
-
-            // remoteAddr must be null for ROLE_SERVER requests.
-            if (l2capSpec.getRemoteAddress() != null) return false;
-
-            // reservation must allocate a PSM, so only PSM_ANY can be passed.
-            if (l2capSpec.getPsm() != PSM_ANY) return false;
-
-            return true;
-        }
-
         @Override
         public void onNetworkNeeded(NetworkRequest request) {
             // The NetworkSpecifier is guaranteed to be either null or an L2capNetworkSpecifier, so
@@ -151,7 +133,7 @@ public class L2capNetworkProvider {
             final L2capNetworkSpecifier specifier =
                     (L2capNetworkSpecifier) request.getNetworkSpecifier();
             if (specifier == null) return;
-            if (!isValidL2capServerSpecifier(specifier)) {
+            if (!specifier.isValidServerReservationSpecifier()) {
                 Log.i(TAG, "Ignoring invalid reservation request: " + request);
                 return;
             }
