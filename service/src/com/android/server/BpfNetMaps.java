@@ -906,7 +906,12 @@ public class BpfNetMaps {
             final InetAddress address, final int protocol, final int remotePort,
             final boolean isAllowed) {
         throwIfPre25Q2("addLocalNetAccess is not available on pre-B devices");
-        final int ifIndex = mDeps.getIfIndex(iface);
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip addLocalNetAccess for " + address
                     + "(" + iface + ")");
@@ -935,7 +940,12 @@ public class BpfNetMaps {
     public void removeLocalNetAccess(final int lpmBitlen, final String iface,
             final InetAddress address, final int protocol, final int remotePort) {
         throwIfPre25Q2("removeLocalNetAccess is not available on pre-B devices");
-        final int ifIndex = mDeps.getIfIndex(iface);
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip removeLocalNetAccess for " + address
                     + "(" + iface + ")");
@@ -966,7 +976,12 @@ public class BpfNetMaps {
     public boolean getLocalNetAccess(final int lpmBitlen, final String iface,
             final InetAddress address, final int protocol, final int remotePort) {
         throwIfPre25Q2("getLocalNetAccess is not available on pre-B devices");
-        final int ifIndex = mDeps.getIfIndex(iface);
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, returning default from getLocalNetAccess for "
                     + address + "(" + iface + ")");
