@@ -430,32 +430,19 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
      * @param dumpsysCmd The dumpsys command to run (for example "connectivity").
      * @param exceptionContext An exception to write a stacktrace to the dump for context.
      */
-    fun collectDumpsys(dumpsysCmd: String, exceptionContext: Throwable? = null) =
-        collectCommandOutput("dumpsys $dumpsysCmd", exceptionContext = exceptionContext)
-
-    /**
-     * Add the output of a command to the test data dump.
-     *
-     * <p>The output will be collected immediately, and exported to a test artifact file when the
-     * test ends.
-     * @param cmd The command to run. Stdout of the command will be collected.
-     * @param shell The shell to run the command in.
-     * @param exceptionContext An exception to write a stacktrace to the dump for context.
-     */
-    fun collectCommandOutput(
-        cmd: String,
-        shell: String = "sh",
-        exceptionContext: Throwable? = null
-    ) {
-        Log.i(TAG, "Collecting '$cmd' for test artifacts")
+    fun collectDumpsys(dumpsysCmd: String, exceptionContext: Throwable? = null) {
+        Log.i(TAG, "Collecting dumpsys $dumpsysCmd for test artifacts")
         PrintWriter(buffer).let {
-            it.println("--- $cmd at ${ZonedDateTime.now()} ---")
+            it.println("--- Dumpsys $dumpsysCmd at ${ZonedDateTime.now()} ---")
             maybeWriteExceptionContext(it, exceptionContext)
             it.flush()
         }
-
-        runCommandInShell(cmd, shell) { stdout, _ ->
-            stdout.copyTo(buffer)
+        ParcelFileDescriptor.AutoCloseInputStream(
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                "dumpsys $dumpsysCmd"
+            )
+        ).use {
+            it.copyTo(buffer)
         }
     }
 
