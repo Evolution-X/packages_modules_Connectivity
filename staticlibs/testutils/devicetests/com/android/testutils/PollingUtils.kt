@@ -19,7 +19,7 @@ package com.android.testutils
 private const val POLLING_INTERVAL_MS: Int = 100
 
 /** Calls condition() until it returns true or timeout occurs. */
-fun pollingCheck(condition: () -> Boolean, timeout_ms: Int): Boolean {
+fun pollingCheck(timeout_ms: Long, condition: () -> Boolean): Boolean {
     var polling_time = 0
     do {
         Thread.sleep(POLLING_INTERVAL_MS.toLong())
