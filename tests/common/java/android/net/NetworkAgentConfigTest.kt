@@ -20,7 +20,6 @@ import androidx.test.filters.SmallTest
 import androidx.test.runner.AndroidJUnit4
 import com.android.modules.utils.build.SdkLevel.isAtLeastS
 import com.android.modules.utils.build.SdkLevel.isAtLeastT
-import com.android.modules.utils.build.SdkLevel.isAtLeastV
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.assertParcelingIsLossless
 import org.junit.Assert.assertEquals
@@ -48,9 +47,6 @@ class NetworkAgentConfigTest {
                 setLocalRoutesExcludedForVpn(true)
                 setVpnRequiresValidation(true)
             }
-            if (isAtLeastV()) {
-                setSkipNativeNetworkCreation(true)
-            }
         }.build()
         assertParcelingIsLossless(config)
     }
@@ -75,9 +71,6 @@ class NetworkAgentConfigTest {
                 setLocalRoutesExcludedForVpn(true)
                 setVpnRequiresValidation(true)
             }
-            if (isAtLeastV()) {
-                setSkipNativeNetworkCreation(true)
-            }
         }.build()
 
         assertTrue(config.isExplicitlySelected())
@@ -86,9 +79,6 @@ class NetworkAgentConfigTest {
         assertFalse(config.isPartialConnectivityAcceptable())
         assertTrue(config.isUnvalidatedConnectivityAcceptable())
         assertEquals("TEST_NETWORK", config.getLegacyTypeName())
-        if (isAtLeastV()) {
-            assertTrue(config.shouldSkipNativeNetworkCreation())
-        }
         if (isAtLeastT()) {
             assertTrue(config.areLocalRoutesExcludedForVpn())
             assertTrue(config.isVpnValidationRequired())
