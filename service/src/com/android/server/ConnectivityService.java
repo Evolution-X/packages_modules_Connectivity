@@ -5405,12 +5405,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     @VisibleForTesting
-    protected static boolean shouldCreateNetworksImmediately() {
+    protected static boolean shouldCreateNetworksImmediately(@NonNull NetworkCapabilities caps) {
         // The feature of creating the networks immediately was slated for U, but race conditions
         // detected late required this was flagged off.
         // TODO : enable this in a Mainline update or in V, and re-enable the test for this
         // in NetworkAgentTest.
-        return false;
+        return caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK);
     }
 
     private static boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
@@ -5419,12 +5419,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (state == NetworkInfo.State.CONNECTED) return true;
         if (state != NetworkInfo.State.CONNECTING) {
             // TODO: throw if no WTFs are observed in the field.
-            if (shouldCreateNetworksImmediately()) {
+            if (shouldCreateNetworksImmediately(nai.getCapsNoCopy())) {
                 Log.wtf(TAG, "Uncreated network in invalid state: " + state);
             }
             return false;
         }
-        return nai.isVPN() || shouldCreateNetworksImmediately();
+        return nai.isVPN() || shouldCreateNetworksImmediately(nai.getCapsNoCopy());
     }
 
     private static boolean shouldDestroyNativeNetwork(@NonNull NetworkAgentInfo nai) {
@@ -12048,7 +12048,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // interfaces and routing rules have been added, DNS servers programmed, etc.
             // For VPNs, this must be done before the capabilities are updated, because as soon as
             // that happens, UIDs are routed to the network.
-            if (shouldCreateNetworksImmediately()) {
+            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
                 applyInitialLinkProperties(networkAgent);
             }
 
@@ -12073,7 +12073,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             networkAgent.getAndSetNetworkCapabilities(networkAgent.networkCapabilities);
 
             handlePerNetworkPrivateDnsConfig(networkAgent, mDnsManager.getPrivateDnsConfig());
-            if (!shouldCreateNetworksImmediately()) {
+            if (!shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
                 applyInitialLinkProperties(networkAgent);
             } else {
                 // The network was created when the agent registered, and the LinkProperties are
