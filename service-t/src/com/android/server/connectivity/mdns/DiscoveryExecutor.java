@@ -27,6 +27,7 @@ import android.util.Pair;
 import androidx.annotation.GuardedBy;
 
 import com.android.net.module.util.HandlerUtils;
+import com.android.net.module.util.RealtimeScheduler;
 
 import java.util.ArrayList;
 import java.util.concurrent.Executor;
@@ -49,7 +50,13 @@ public class DiscoveryExecutor implements Executor {
     @NonNull
     private final ArrayList<Pair<Runnable, Long>> mPendingTasks = new ArrayList<>();
 
-    DiscoveryExecutor(@Nullable Looper defaultLooper) {
+    @GuardedBy("mPendingTasks")
+    @Nullable
+    RealtimeScheduler mRealtimeScheduler;
+    @NonNull private final MdnsFeatureFlags mMdnsFeatureFlags;
+
+    DiscoveryExecutor(@Nullable Looper defaultLooper, @NonNull MdnsFeatureFlags mdnsFeatureFlags) {
+        mMdnsFeatureFlags = mdnsFeatureFlags;
         if (defaultLooper != null) {
             this.mHandlerThread = null;
             synchronized (mPendingTasks) {
@@ -62,7 +69,7 @@ public class DiscoveryExecutor implements Executor {
                     synchronized (mPendingTasks) {
                         mHandler = new Handler(getLooper());
                         for (Pair<Runnable, Long> pendingTask : mPendingTasks) {
-                            mHandler.postDelayed(pendingTask.first, pendingTask.second);
+                            executeDelayed(pendingTask.first, pendingTask.second);
                         }
                         mPendingTasks.clear();
                     }
@@ -95,21 +102,44 @@ public class DiscoveryExecutor implements Executor {
     /** Execute the given function after the specified amount of time elapses. */
     public void executeDelayed(Runnable function, long delayMillis) {
         final Handler handler;
+        final RealtimeScheduler realtimeScheduler;
         synchronized (mPendingTasks) {
             if (this.mHandler == null) {
                 mPendingTasks.add(Pair.create(function, delayMillis));
                 return;
             } else {
                 handler = this.mHandler;
+                if (mMdnsFeatureFlags.mIsAccurateDelayCallbackEnabled
+                        && this.mRealtimeScheduler == null) {
+                    this.mRealtimeScheduler = new RealtimeScheduler(mHandler);
+                }
+                realtimeScheduler = this.mRealtimeScheduler;
             }
         }
-        handler.postDelayed(function, delayMillis);
+        if (realtimeScheduler != null) {
+            if (delayMillis == 0L) {
+                handler.post(function);
+                return;
+            }
+            if (HandlerUtils.isRunningOnHandlerThread(handler)) {
+                realtimeScheduler.postDelayed(function, delayMillis);
+            } else {
+                handler.post(() -> realtimeScheduler.postDelayed(function, delayMillis));
+            }
+        } else {
+            handler.postDelayed(function, delayMillis);
+        }
     }
 
     /** Shutdown the thread if necessary. */
     public void shutDown() {
         if (this.mHandlerThread != null) {
             this.mHandlerThread.quitSafely();
+        }
+        synchronized (mPendingTasks) {
+            if (mRealtimeScheduler != null) {
+                mRealtimeScheduler.close();
+            }
         }
     }
 
