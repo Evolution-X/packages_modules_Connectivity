@@ -22,6 +22,9 @@ import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.google.common.truth.Truth.assertThat
+import java.io.IOException
+import java.nio.BufferUnderflowException
+import kotlin.test.assertFailsWith
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -180,6 +183,83 @@ class HeaderCompressionUtilsTest {
                  "ff020000000000000000000000000089" + // dest
                  "abcdef01"                           // payload
         assertThat(decompressHex(input)).isEqualTo(output.decodeHex())
+    }
+
+    @Test
+    fun testHeaderDecompression_invalidPacket() {
+        // 1-byte packet
+        var input = "60"
+        assertFailsWith(BufferUnderflowException::class) { decompressHex(input) }
+
+        // Short packet -- incomplete header
+        // TF: 11, NH: 0, HLIM: 11, CID: 0, SAC: 0, SAM: 10, M: 1, DAC: 0, DAM: 11
+        input  = "7b2b" +
+                 "44" +                               // next header
+                 "1234"                               // source
+        assertFailsWith(BufferUnderflowException::class) { decompressHex(input) }
+
+        // Packet starts with 0b111 instead of 0b011
+        // TF: 11, NH: 0, HLIM: 11, CID: 0, SAC: 0, SAM: 10, M: 1, DAC: 0, DAM: 11
+        input  = "fb2b" +
+                 "44" +                               // next header
+                 "1234" +                             // source
+                 "89" +                               // dest
+                 "abcdef01"                           // payload
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+        // Illegal option NH = 1. Note that the packet is not valid as the code should throw as soon
+        // as the illegal option is encountered.
+        // TF: 11, NH: 1, HLIM: 11, CID: 0, SAC: 0, SAM: 10, M: 1, DAC: 0, DAM: 11
+        input  = "7f2b" +
+                 "1234" +                             // source
+                 "89" +                               // dest
+                 "e0"                                 // Hop-by-hop options NHC
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+        // Illegal option CID = 1.
+        // TF: 11, NH: 0, HLIM: 11, CID: 1, SAC: 0, SAM: 10, M: 1, DAC: 0, DAM: 11
+        input  = "7bab00" +
+                 "1234" +                             // source
+                 "89" +                               // dest
+                 "e0"                                 // Hop-by-hop options NHC
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+        // Illegal option SAC = 1.
+        // TF: 11, NH: 0, HLIM: 11, CID: 0, SAC: 1, SAM: 10, M: 1, DAC: 0, DAM: 11
+        input  = "7b6b" +
+                 "1234" +                             // source
+                 "89" +                               // dest
+                 "e0"                                 // Hop-by-hop options NHC
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+        // Illegal option DAC = 1.
+        // TF: 10, NH: 0, HLIM: 10, CID: 0, SAC: 0, SAM: 10, M: 0, DAC: 1, DAM: 10
+        input  = "7226" +
+                 "cc" +                               // traffic class
+                 "43" +                               // next header
+                 "1234" +                             // source
+                 "abcd" +                             // dest
+                 "abcdef"                             // payload
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+
+        // Unsupported option DAM = 11
+        // TF: 10, NH: 0, HLIM: 10, CID: 0, SAC: 0, SAM: 10, M: 0, DAC: 0, DAM: 11
+        input  = "7223" +
+                 "cc" +                               // traffic class
+                 "43" +                               // next header
+                 "1234" +                             // source
+                 "abcdef"                             // payload
+        assertFailsWith(IOException::class) { decompressHex(input) }
+
+        // Unsupported option SAM = 11
+        // TF: 10, NH: 0, HLIM: 10, CID: 0, SAC: 0, SAM: 11, M: 0, DAC: 0, DAM: 10
+        input  = "7232" +
+                 "cc" +                               // traffic class
+                 "43" +                               // next header
+                 "abcd" +                             // dest
+                 "abcdef"                             // payload
+        assertFailsWith(IOException::class) { decompressHex(input) }
     }
 
     @Test
