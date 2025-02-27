@@ -17,7 +17,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="connectivityResourcesAppLabel" msgid="2476261877900882974">"सिस्टम कनेक्टिव्हिटी चे स्रोत"</string>
+    <string name="connectivityResourcesAppLabel" msgid="2476261877900882974">"सिस्टीम कनेक्टिव्हिटीचे स्रोत"</string>
     <string name="wifi_available_sign_in" msgid="8041178343789805553">"वाय-फाय नेटवर्कमध्‍ये साइन इन करा"</string>
     <string name="network_available_sign_in" msgid="2622520134876355561">"नेटवर्कवर साइन इन करा"</string>
     <!-- no translation found for network_available_sign_in_detailed (8439369644697866359) -->
