@@ -521,7 +521,7 @@ public final class FullThreadDevice {
     }
 
     /** Waits for an SRP server to be present in Network Data */
-    private void waitForSrpServer() throws TimeoutException {
+    public void waitForSrpServer() throws TimeoutException {
         // CLI output:
         // > srp client server
         // [fd64:db12:25f4:7e0b:1bfc:6344:25ac:2dd7]:53538
