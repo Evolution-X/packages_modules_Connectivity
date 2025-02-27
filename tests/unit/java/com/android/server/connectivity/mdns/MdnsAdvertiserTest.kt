@@ -99,6 +99,13 @@ private val GOOGLECAST_SERVICE = NsdServiceInfo("TestServiceName", "_googlecast.
     network = TEST_NETWORK_1
 }
 
+private val GOOGLEZONE_SERVICE = NsdServiceInfo("TestServiceName", "_GOOglezone._tcp").apply {
+    subtypes = setOf(TEST_SUBTYPE)
+    port = 12345
+    hostAddresses = listOf(TEST_ADDR)
+    network = TEST_NETWORK_1
+}
+
 private val SERVICE_1_SUBTYPE = NsdServiceInfo("TestServiceName", "_advertisertest._tcp").apply {
     subtypes = setOf(TEST_SUBTYPE)
     port = 12345
@@ -183,6 +190,10 @@ private val SERVICES_PRIORITY_LIST = arrayOf(
     "5:_otherprioritytest._tcp"
 )
 
+private val SERVICES_DENY_LIST = arrayOf(
+    "_googlezone._tcp",
+)
+
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.S_V2)
 class MdnsAdvertiserTest {
@@ -246,6 +257,9 @@ class MdnsAdvertiserTest {
         doReturn(resources).`when`(context).getResources()
         doReturn(SERVICES_PRIORITY_LIST).`when`(resources).getStringArray(
             R.array.config_nsdOffloadServicesPriority
+        )
+        doReturn(SERVICES_DENY_LIST).`when`(resources).getStringArray(
+            R.array.config_nsdOffloadServicesDenyList
         )
         ConnectivityResources.setResourcesContextForTest(context)
     }
@@ -521,6 +535,44 @@ class MdnsAdvertiserTest {
             Integer.MAX_VALUE, /* priority */
             OffloadEngine.OFFLOAD_TYPE_REPLY.toLong()
         )))
+    }
+
+    @Test
+    fun testAddService_NoOffloadForServiceTypeInDenyList() {
+        val advertiser =
+            MdnsAdvertiser(thread.looper, socketProvider, cb, mockDeps, sharedlog, flags, context)
+        postSync {
+            advertiser.addOrUpdateService(
+                SERVICE_ID_1,
+                GOOGLEZONE_SERVICE,
+                DEFAULT_ADVERTISING_OPTION,
+                TEST_CLIENT_UID_1
+            )
+        }
+        val socketCbCaptor = ArgumentCaptor.forClass(SocketCallback::class.java)
+        verify(socketProvider).requestSocket(eq(SERVICE_1.network), socketCbCaptor.capture())
+
+        val socketCb = socketCbCaptor.value
+        postSync { socketCb.onSocketCreated(TEST_SOCKETKEY_1, mockSocket1, listOf(TEST_LINKADDR)) }
+
+        val intAdvCbCaptor1 = ArgumentCaptor.forClass(MdnsInterfaceAdvertiser.Callback::class.java)
+        verify(mockDeps).makeAdvertiser(
+            eq(mockSocket1),
+            eq(listOf(TEST_LINKADDR)),
+            eq(thread.looper),
+            any(),
+            intAdvCbCaptor1.capture(),
+            eq(TEST_HOSTNAME),
+            any(),
+            any()
+        )
+
+        doReturn(false).`when`(mockInterfaceAdvertiser1).isProbing(SERVICE_ID_1)
+        postSync {
+            intAdvCbCaptor1.value.onServiceProbingSucceeded(mockInterfaceAdvertiser1, SERVICE_ID_1)
+        }
+
+        verify(cb, never()).onOffloadStartOrUpdate(eq(TEST_INTERFACE1), any())
     }
 
     @Test
