@@ -85,6 +85,11 @@ int ipv4_packet(clat_packet out, clat_packet_index pos, const uint8_t *packet, s
     return 0;
   }
 
+  if ((header->daddr & 0xf0000000) == 0xe0000000) {
+    logmsg_dbg(ANDROID_LOG_INFO, "ip_packet/daddr is multicast: %x", header->daddr);
+    return 0;
+  }
+
   /* rfc6145 - If any IPv4 options are present in the IPv4 packet, they MUST be
    * ignored and the packet translated normally; there is no attempt to
    * translate the options.
