@@ -1259,11 +1259,8 @@ public class ConnectivityManagerTest {
         mCm.registerNetworkCallback(nr, pendingIntent);
 
         try {
-            mCtsNetUtils.ensureWifiConnected();
-
-            // Wait for delivery of the Intent notifying of the availability of the INTERNET
-            // network even if it was already connected as a state-based action when the callback
-            // is registered.
+            // Wait for delivery of the Intent notifying of the availability of the
+            // INTERNET-providing network. Test setup makes sure it's already connected.
             assertTrue("Did not receive expected Intent " + intent + " for INTERNET",
                     received.block(NETWORK_CALLBACK_TIMEOUT_MS));
         } finally {
