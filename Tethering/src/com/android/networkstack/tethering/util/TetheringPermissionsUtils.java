@@ -19,7 +19,9 @@ package com.android.networkstack.tethering.util;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Binder;
 import android.os.UserHandle;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -67,5 +69,21 @@ public class TetheringPermissionsUtils {
             Log.w(TAG, "Error retrieving DPM service");
         }
         return devicePolicyManager;
+    }
+
+    /**
+     * Checks if the package name has carrier privileges.
+     */
+    public boolean isCarrierPrivileged(@NonNull final String packageName) {
+        TelephonyManager telephonyManager = mContext.getSystemService(TelephonyManager.class);
+        if (telephonyManager == null) return false;
+
+        long ident = Binder.clearCallingIdentity();
+        try {
+            return telephonyManager.checkCarrierPrivilegesForPackageAnyPhone(packageName)
+                    == TelephonyManager.CARRIER_PRIVILEGE_STATUS_HAS_ACCESS;
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
     }
 }

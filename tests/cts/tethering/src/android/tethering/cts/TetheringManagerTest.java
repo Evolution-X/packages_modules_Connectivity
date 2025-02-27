@@ -36,6 +36,7 @@ import static android.net.TetheringManager.TETHER_ERROR_DUPLICATE_REQUEST;
 import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
 import static android.net.TetheringManager.TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
+import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
 import static android.net.cts.util.CtsTetheringUtils.isAnyIfaceMatch;
 import static android.os.Process.INVALID_UID;
 
@@ -713,5 +714,186 @@ public class TetheringManagerTest {
         assumeTrue(SdkLevel.isAtLeastB());
         assertThrows(UnsupportedOperationException.class, () -> mTM.tether("iface"));
         assertThrows(UnsupportedOperationException.class, () -> mTM.untether("iface"));
+    }
+
+    @Test
+    public void testCarrierPrivilegedIsTetheringSupported() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+
+            assertTrue(mTM.isTetheringSupported());
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStartTetheringNonWifiFails() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            StartTetheringCallback callback = new StartTetheringCallback();
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_USB).build();
+
+            mTM.startTethering(request, Runnable::run, callback);
+
+            callback.expectTetheringFailed(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStartTetheringWifiWithoutConfigFails() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            StartTetheringCallback callback = new StartTetheringCallback();
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
+
+            mTM.startTethering(request, Runnable::run, callback);
+
+            callback.expectTetheringFailed(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStartTetheringWifiWithConfigSucceeds() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            SoftApConfiguration softApConfig = createSoftApConfiguration("Carrier-privileged");
+
+            mCtsTetheringUtils.startWifiTetheringNoPermissions(tetherEventCallback, softApConfig);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStopTetheringNonWifiFails() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_USB).build();
+            CtsTetheringUtils.StopTetheringCallback
+                    callback = new CtsTetheringUtils.StopTetheringCallback();
+
+            mTM.stopTethering(request, Runnable::run, callback);
+
+            callback.expectStopTetheringFailed(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStopTetheringWifiWithoutConfigFails() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
+            CtsTetheringUtils.StopTetheringCallback
+                    callback = new CtsTetheringUtils.StopTetheringCallback();
+
+            mTM.stopTethering(request, Runnable::run, callback);
+
+            callback.expectStopTetheringFailed(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStopTetheringWifiWithConfigButNoActiveRequestFails()
+            throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            SoftApConfiguration softApConfig = createSoftApConfiguration("Carrier-privileged");
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI)
+                    .setSoftApConfiguration(softApConfig)
+                    .build();
+            CtsTetheringUtils.StopTetheringCallback
+                    callback = new CtsTetheringUtils.StopTetheringCallback();
+
+            mTM.stopTethering(request, Runnable::run, callback);
+
+            callback.expectStopTetheringFailed(TETHER_ERROR_UNKNOWN_REQUEST);
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
+    }
+
+    @Test
+    public void testCarrierPrivilegedStopTetheringWifiWithConfigSucceeds() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+        assumeTrue(mPm.hasSystemFeature(FEATURE_TELEPHONY));
+        int defaultSubId = SubscriptionManager.getDefaultSubscriptionId();
+        mCarrierConfigRule.acquireCarrierPrivilege(defaultSubId);
+        final TestTetheringEventCallback tetherEventCallback =
+                mCtsTetheringUtils.registerTetheringEventCallback();
+        try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+            SoftApConfiguration softApConfig = createSoftApConfiguration("Carrier-privileged");
+            mCtsTetheringUtils.startWifiTetheringNoPermissions(tetherEventCallback, softApConfig);
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI)
+                    .setSoftApConfiguration(softApConfig)
+                    .build();
+            CtsTetheringUtils.StopTetheringCallback
+                    callback = new CtsTetheringUtils.StopTetheringCallback();
+
+            mTM.stopTethering(request, Runnable::run, callback);
+
+            callback.verifyStopTetheringSucceeded();
+        } finally {
+            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
+        }
     }
 }

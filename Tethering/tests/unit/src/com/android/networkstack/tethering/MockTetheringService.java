@@ -37,6 +37,7 @@ public class MockTetheringService extends TetheringService {
     private final ArrayMap<String, Integer> mMockedPermissions = new ArrayMap<>();
     private final ArrayMap<String, Integer> mMockedPackageUids = new ArrayMap<>();
     private final Set<String> mMockedDeviceOwnerPackages = new ArraySet<>();
+    private final Set<String> mMockedCarrierPrivilegedPackages = new ArraySet<>();
     private int mMockCallingUid;
 
     @Override
@@ -81,6 +82,11 @@ public class MockTetheringService extends TetheringService {
     @Override
     boolean isDeviceOwner(final int uid, final String callerPkg) {
         return mMockedDeviceOwnerPackages.contains(callerPkg);
+    }
+
+    @Override
+    boolean isCarrierPrivileged(final String callerPkg) {
+        return mMockedCarrierPrivilegedPackages.contains(callerPkg);
     }
 
     public Tethering getTethering() {
@@ -140,6 +146,20 @@ public class MockTetheringService extends TetheringService {
          */
         public void removeDeviceOwnerPackage(final String packageName) {
             mMockedDeviceOwnerPackages.remove(packageName);
+        }
+
+        /**
+         * Add a mocked carrier privileges package
+         */
+        public void addCarrierPrivilegedPackage(final String packageName) {
+            mMockedCarrierPrivilegedPackages.add(packageName);
+        }
+
+        /**
+         * Remove a mocked carrier privileges package
+         */
+        public void removeCarrierPrivilegedPackage(final String packageName) {
+            mMockedCarrierPrivilegedPackages.remove(packageName);
         }
     }
 }
