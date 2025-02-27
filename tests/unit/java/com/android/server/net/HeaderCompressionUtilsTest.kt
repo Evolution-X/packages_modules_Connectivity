@@ -17,12 +17,11 @@
 package com.android.server.net
 
 import android.os.Build
+import com.android.internal.util.HexDump
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
-import com.android.internal.util.HexDump
 import com.google.common.truth.Truth.assertThat
-
 import org.junit.Test
 import org.junit.runner.RunWith
 
