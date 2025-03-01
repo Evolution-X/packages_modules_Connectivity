@@ -9810,8 +9810,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
 
         // The both list contain current link properties + stacked links for new and old LP.
-        List<LinkProperties> newLinkProperties = new ArrayList<>();
-        List<LinkProperties> oldLinkProperties = new ArrayList<>();
+        final List<LinkProperties> newLinkProperties = new ArrayList<>();
+        final List<LinkProperties> oldLinkProperties = new ArrayList<>();
 
         if (newLp != null) {
             newLinkProperties.add(newLp);
@@ -9824,13 +9824,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         // map contains interface name to list of local network prefixes added because of change
         // in link properties
-        Map<String, List<IpPrefix>> prefixesAddedForInterface = new ArrayMap<>();
+        final Map<String, List<IpPrefix>> prefixesAddedForInterface = new ArrayMap<>();
 
         final CompareResult<LinkProperties> linkPropertiesDiff = new CompareResult<>(
                 oldLinkProperties, newLinkProperties);
 
         for (LinkProperties linkProperty : linkPropertiesDiff.added) {
-            List<IpPrefix> unicastLocalPrefixesToBeAdded = new ArrayList<>();
+            final List<IpPrefix> unicastLocalPrefixesToBeAdded = new ArrayList<>();
             for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
                 unicastLocalPrefixesToBeAdded.addAll(
                         getLocalNetworkPrefixesForAddress(linkAddress));
@@ -9838,7 +9838,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             addLocalAddressesToBpfMap(linkProperty.getInterfaceName(),
                     unicastLocalPrefixesToBeAdded, linkProperty);
 
-            // adding iterface name -> ip prefixes that we added to map
+            // populating interface name -> ip prefixes which were added to local_net_access map.
             if (!prefixesAddedForInterface.containsKey(linkProperty.getInterfaceName())) {
                 prefixesAddedForInterface.put(linkProperty.getInterfaceName(), new ArrayList<>());
             }
@@ -9847,9 +9847,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
 
         for (LinkProperties linkProperty : linkPropertiesDiff.removed) {
-            List<IpPrefix> unicastLocalPrefixesToBeRemoved = new ArrayList<>();
-            List<IpPrefix> unicastLocalPrefixesAdded = prefixesAddedForInterface.getOrDefault(
-                    linkProperty.getInterfaceName(), new ArrayList<>());
+            final List<IpPrefix> unicastLocalPrefixesToBeRemoved = new ArrayList<>();
+            final List<IpPrefix> unicastLocalPrefixesAdded = prefixesAddedForInterface.getOrDefault(
+                    linkProperty.getInterfaceName(), Collections.emptyList());
 
             for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
                 unicastLocalPrefixesToBeRemoved.addAll(
@@ -9857,8 +9857,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
 
             // This is to ensure if 10.0.10.0/24 was added and 10.0.11.0/24 was removed both will
-            // still populate the same prefix of 10.0.0.0/8, which mean we should not remove the
-            // prefix because of removal of 10.0.11.0/24
+            // still populate the same prefix of 10.0.0.0/8, which mean 10.0.0.0/8 should not be
+            // removed due to removal of 10.0.11.0/24
             unicastLocalPrefixesToBeRemoved.removeAll(unicastLocalPrefixesAdded);
 
             removeLocalAddressesFromBpfMap(linkProperty.getInterfaceName(),
