@@ -38,6 +38,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.never
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
 private const val LONG_TIMEOUT_MS = 5_000
@@ -45,6 +46,7 @@ private const val PREFIX_LENGTH_IPV4 = 32 + 96
 private const val PREFIX_LENGTH_IPV6 = 32
 private const val WIFI_IFNAME = "wlan0"
 private const val WIFI_IFNAME_2 = "wlan1"
+private const val WIFI_IFNAME_3 = "wlan2"
 
 private val wifiNc = NetworkCapabilities.Builder()
         .addTransportType(TRANSPORT_WIFI)
@@ -76,6 +78,20 @@ class CSLocalNetworkProtectionTest : CSTest() {
     private val LOCAL_IPV6_LINK_ADDRESS = LinkAddress(
         LOCAL_IPV6_IP_ADDRESS_PREFIX.getAddress(),
         LOCAL_IPV6_IP_ADDRESS_PREFIX.getPrefixLength()
+    )
+
+    private val LOCAL_IPV6_IP_ADDRESS_2_PREFIX =
+            IpPrefix("2601:19b:67f:e220:1cf1:35ff:fe8c:db87/64")
+    private val LOCAL_IPV6_LINK_ADDRESS_2 = LinkAddress(
+            LOCAL_IPV6_IP_ADDRESS_2_PREFIX.getAddress(),
+            LOCAL_IPV6_IP_ADDRESS_2_PREFIX.getPrefixLength()
+    )
+
+    private val LOCAL_IPV6_IP_ADDRESS_3_PREFIX =
+            IpPrefix("fe80::/10")
+    private val LOCAL_IPV6_LINK_ADDRESS_3 = LinkAddress(
+            LOCAL_IPV6_IP_ADDRESS_3_PREFIX.getAddress(),
+            LOCAL_IPV6_IP_ADDRESS_3_PREFIX.getPrefixLength()
     )
 
     private val LOCAL_IPV4_IP_ADDRESS_PREFIX_1 = IpPrefix("10.0.0.184/24")
@@ -190,7 +206,7 @@ class CSLocalNetworkProtectionTest : CSTest() {
     }
 
     @Test
-    fun testStackedLinkPropertiesWithDifferentLinkAddresses_AddressAddedInBpfMap() {
+    fun testAddingThenRemovingStackedLinkProperties_AddressAddedThenRemovedInBpfMap() {
         val nr = nr(TRANSPORT_WIFI)
         val cb = TestableNetworkCallback()
         cm.requestNetwork(nr, cb)
@@ -198,49 +214,6 @@ class CSLocalNetworkProtectionTest : CSTest() {
         val wifiLp = lp(WIFI_IFNAME, LOCAL_IPV6_LINK_ADDRESS)
         val wifiLp2 = lp(WIFI_IFNAME_2, LOCAL_IPV4_LINK_ADDRRESS_1)
         // Adding stacked link
-        wifiLp.addStackedLink(wifiLp2)
-        val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
-        wifiAgent.connect()
-        cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
-
-        // Multicast and Broadcast address should always be populated in local_net_access map
-        verifyPopulationOfMulticastAndBroadcastAddress()
-        // Verifying IPv6 address should be populated in local_net_access map
-        verify(bpfNetMaps).addLocalNetAccess(
-                eq(PREFIX_LENGTH_IPV6 + LOCAL_IPV6_IP_ADDRESS_PREFIX.getPrefixLength()),
-                eq(WIFI_IFNAME),
-                eq(LOCAL_IPV6_IP_ADDRESS_PREFIX.getAddress()),
-                eq(0),
-                eq(0),
-                eq(false)
-        )
-
-        // Multicast and Broadcast address should always be populated on stacked link
-        // in local_net_access map
-        verifyPopulationOfMulticastAndBroadcastAddress(WIFI_IFNAME_2)
-        // Verifying IPv4 matching prefix(10.0.0.0/8) should be populated as part of stacked link
-        // in local_net_access map
-        verify(bpfNetMaps).addLocalNetAccess(
-                eq(PREFIX_LENGTH_IPV4 + 8),
-                eq(WIFI_IFNAME_2),
-                eq(InetAddresses.parseNumericAddress("10.0.0.0")),
-                eq(0),
-                eq(0),
-                eq(false)
-        )
-        // As both addresses are in stacked links, so no address should be removed from the map.
-        verify(bpfNetMaps, never()).removeLocalNetAccess(any(), any(), any(), any(), any())
-    }
-
-    @Test
-    fun testRemovingStackedLinkProperties_AddressRemovedInBpfMap() {
-        val nr = nr(TRANSPORT_WIFI)
-        val cb = TestableNetworkCallback()
-        cm.requestNetwork(nr, cb)
-
-        val wifiLp = lp(WIFI_IFNAME, LOCAL_IPV6_LINK_ADDRESS)
-        val wifiLp2 = lp(WIFI_IFNAME_2, LOCAL_IPV4_LINK_ADDRRESS_1)
-        // populating stacked link
         wifiLp.addStackedLink(wifiLp2)
         val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
         wifiAgent.connect()
@@ -281,6 +254,107 @@ class CSLocalNetworkProtectionTest : CSTest() {
 
         // As both stacked links is removed, 10.0.0.0/8 should be removed from local_net_access map.
         verify(bpfNetMaps).removeLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV4 + 8),
+                eq(WIFI_IFNAME_2),
+                eq(InetAddresses.parseNumericAddress("10.0.0.0")),
+                eq(0),
+                eq(0)
+        )
+    }
+
+    @Test
+    fun testChangeStackedLinkProperties_AddressReplacedBpfMap() {
+        val nr = nr(TRANSPORT_WIFI)
+        val cb = TestableNetworkCallback()
+        cm.requestNetwork(nr, cb)
+
+        val wifiLp = lp(WIFI_IFNAME, LOCAL_IPV6_LINK_ADDRESS)
+        val wifiLp2 = lp(WIFI_IFNAME_2, LOCAL_IPV4_LINK_ADDRRESS_1)
+        // populating stacked link
+        wifiLp.addStackedLink(wifiLp2)
+        val wifiAgent = Agent(nc = wifiNc, lp = wifiLp)
+        wifiAgent.connect()
+        cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
+
+        // Multicast and Broadcast address should always be populated in local_net_access map
+        verifyPopulationOfMulticastAndBroadcastAddress()
+        // Verifying IPv6 address should be populated in local_net_access map
+        verify(bpfNetMaps).addLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV6 + LOCAL_IPV6_IP_ADDRESS_PREFIX.getPrefixLength()),
+                eq(WIFI_IFNAME),
+                eq(LOCAL_IPV6_IP_ADDRESS_PREFIX.getAddress()),
+                eq(0),
+                eq(0),
+                eq(false)
+        )
+
+        // Multicast and Broadcast address should always be populated on stacked link
+        // in local_net_access map
+        verifyPopulationOfMulticastAndBroadcastAddress(WIFI_IFNAME_2)
+        // Verifying IPv4 matching prefix(10.0.0.0/8) should be populated as part of stacked link
+        // in local_net_access map
+        verify(bpfNetMaps).addLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV4 + 8),
+                eq(WIFI_IFNAME_2),
+                eq(InetAddresses.parseNumericAddress("10.0.0.0")),
+                eq(0),
+                eq(0),
+                eq(false)
+        )
+        // As both addresses are in stacked links, so no address should be removed from the map.
+        verify(bpfNetMaps, never()).removeLocalNetAccess(any(), any(), any(), any(), any())
+
+        // replacing link properties multiple stacked links
+        val wifiLp_3 = lp(WIFI_IFNAME, LOCAL_IPV6_LINK_ADDRESS_2)
+        val wifiLp_4 = lp(WIFI_IFNAME_2, LOCAL_IPV4_LINK_ADDRRESS_2)
+        val wifiLp_5 = lp(WIFI_IFNAME_3, LOCAL_IPV6_LINK_ADDRESS_3)
+        wifiLp_3.addStackedLink(wifiLp_4)
+        wifiLp_3.addStackedLink(wifiLp_5)
+        wifiAgent.sendLinkProperties(wifiLp_3)
+        cb.expect<LinkPropertiesChanged>(wifiAgent.network)
+
+        // Multicast and Broadcast address should always be populated on stacked link
+        // in local_net_access map
+        verifyPopulationOfMulticastAndBroadcastAddress(WIFI_IFNAME_3)
+        // Verifying new base IPv6 address should be populated in local_net_access map
+        verify(bpfNetMaps).addLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV6 + LOCAL_IPV6_IP_ADDRESS_2_PREFIX.getPrefixLength()),
+                eq(WIFI_IFNAME),
+                eq(LOCAL_IPV6_IP_ADDRESS_2_PREFIX.getAddress()),
+                eq(0),
+                eq(0),
+                eq(false)
+        )
+        // Verifying IPv4 matching prefix(10.0.0.0/8) should be populated as part of stacked link
+        // in local_net_access map
+        verify(bpfNetMaps, times(2)).addLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV4 + 8),
+                eq(WIFI_IFNAME_2),
+                eq(InetAddresses.parseNumericAddress("10.0.0.0")),
+                eq(0),
+                eq(0),
+                eq(false)
+        )
+        // Verifying newly stacked IPv6 address should be populated in local_net_access map
+        verify(bpfNetMaps).addLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV6 + LOCAL_IPV6_IP_ADDRESS_3_PREFIX.getPrefixLength()),
+                eq(WIFI_IFNAME_3),
+                eq(LOCAL_IPV6_IP_ADDRESS_3_PREFIX.getAddress()),
+                eq(0),
+                eq(0),
+                eq(false)
+        )
+        // Verifying old base IPv6 address should be removed from local_net_access map
+        verify(bpfNetMaps).removeLocalNetAccess(
+                eq(PREFIX_LENGTH_IPV6 + LOCAL_IPV6_IP_ADDRESS_PREFIX.getPrefixLength()),
+                eq(WIFI_IFNAME),
+                eq(LOCAL_IPV6_IP_ADDRESS_PREFIX.getAddress()),
+                eq(0),
+                eq(0)
+        )
+        // As both stacked links is had same prefix, 10.0.0.0/8 should not be removed from
+        // local_net_access map.
+        verify(bpfNetMaps, never()).removeLocalNetAccess(
                 eq(PREFIX_LENGTH_IPV4 + 8),
                 eq(WIFI_IFNAME_2),
                 eq(InetAddresses.parseNumericAddress("10.0.0.0")),
