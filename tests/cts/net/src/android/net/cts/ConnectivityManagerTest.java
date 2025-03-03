@@ -1231,6 +1231,10 @@ public class ConnectivityManagerTest {
      * of a {@code NetworkCallback}.
      */
     @Test
+    // This test is flaky before aosp/3482151 which fixed the issue in the ConnectivityService
+    // code. Unfortunately this means T can't be fixed, so don't run this test with a module
+    // that hasn't been updated.
+    @ConnectivityModuleTest
     public void testRegisterNetworkCallback_withPendingIntent() {
         final ConditionVariable received = new ConditionVariable();
 
@@ -1273,6 +1277,8 @@ public class ConnectivityManagerTest {
     // Up to R ConnectivityService can't be updated through mainline, and there was a bug
     // where registering a callback with a canceled pending intent would crash the system.
     @Test
+    // Running this test without aosp/3482151 will likely crash the device.
+    @ConnectivityModuleTest
     @IgnoreUpTo(Build.VERSION_CODES.R)
     public void testRegisterNetworkCallback_pendingIntent_classNotFound() {
         final Intent intent = new Intent()
@@ -1400,12 +1406,20 @@ public class ConnectivityManagerTest {
     }
 
     @AppModeFull(reason = "Cannot get WifiManager in instant app mode")
+    // This test is flaky before aosp/3482151 which fixed the issue in the ConnectivityService
+    // code. Unfortunately this means T can't be fixed, so don't run this test with a module
+    // that hasn't been updated.
+    @ConnectivityModuleTest
     @Test
     public void testRegisterNetworkRequest_identicalPendingIntents() throws Exception {
         runIdenticalPendingIntentsRequestTest(false /* useListen */);
     }
 
     @AppModeFull(reason = "Cannot get WifiManager in instant app mode")
+    // This test is flaky before aosp/3482151 which fixed the issue in the ConnectivityService
+    // code. Unfortunately this means T can't be fixed, so don't run this test with a module
+    // that hasn't been updated.
+    @ConnectivityModuleTest
     @Test
     public void testRegisterNetworkCallback_identicalPendingIntents() throws Exception {
         runIdenticalPendingIntentsRequestTest(true /* useListen */);
