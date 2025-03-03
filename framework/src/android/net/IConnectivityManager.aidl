@@ -30,6 +30,7 @@ import android.net.LinkProperties;
 import android.net.LocalNetworkConfig;
 import android.net.Network;
 import android.net.NetworkAgentConfig;
+import android.net.NetworkAndAgentRegistryParcelable;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkRequest;
@@ -146,7 +147,8 @@ interface IConnectivityManager
 
     void declareNetworkRequestUnfulfillable(in NetworkRequest request);
 
-    Network registerNetworkAgent(in INetworkAgent na, in NetworkInfo ni, in LinkProperties lp,
+    NetworkAndAgentRegistryParcelable registerNetworkAgent(
+            in INetworkAgent na, in NetworkInfo ni, in LinkProperties lp,
             in NetworkCapabilities nc, in NetworkScore score,
             in LocalNetworkConfig localNetworkConfig, in NetworkAgentConfig config,
             in int factorySerialNumber);
