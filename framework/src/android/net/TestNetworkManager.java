@@ -23,8 +23,10 @@ import android.annotation.SystemApi;
 import android.os.IBinder;
 import android.os.RemoteException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -196,45 +198,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface for testing purposes
-     *
-     * @param linkAddrs an array of LinkAddresses to assign to the TAP interface
-     * @return A TestNetworkInterface representing the underlying TAP interface. Close the contained
-     *     ParcelFileDescriptor to tear down the TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(@NonNull LinkAddress[] linkAddrs) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, BRING_UP, USE_IPV6_PROV_DELAY,
-                    linkAddrs, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Create a tap interface for testing purposes
-     *
-     * @param bringUp whether to bring up the interface before returning it.
-     *
-     * @return A ParcelFileDescriptor of the underlying TAP interface. Close this to tear down the
-     *     TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean bringUp) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, bringUp, USE_IPV6_PROV_DELAY,
-                    NO_ADDRS, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Create a tap interface with a given interface name for testing purposes
      *
      * @param bringUp whether to bring up the interface before returning it.
@@ -252,26 +215,6 @@ public class TestNetworkManager {
         try {
             return mService.createInterface(TAP, CARRIER_UP, bringUp, USE_IPV6_PROV_DELAY,
                     NO_ADDRS, iface);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Create a tap interface with or without carrier for testing purposes.
-     *
-     * Note: setting carrierUp = false is not supported until kernel version 6.0.
-     *
-     * @param carrierUp whether the created interface has a carrier or not.
-     * @param bringUp whether to bring up the interface before returning it.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean carrierUp, boolean bringUp) {
-        try {
-            return mService.createInterface(TAP, carrierUp, bringUp, USE_IPV6_PROV_DELAY, NO_ADDRS,
-                    null /* iface */);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -300,27 +243,6 @@ public class TestNetworkManager {
     }
 
     /**
-     * Create a tap interface for testing purposes.
-     *
-     * @param disableIpv6ProvisioningDelay whether to disable DAD and RS delay.
-     * @param linkAddrs an array of LinkAddresses to assign to the TAP interface
-     * @return A TestNetworkInterface representing the underlying TAP interface. Close the contained
-     *     ParcelFileDescriptor to tear down the TAP interface.
-     * @hide
-     */
-    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
-    @NonNull
-    public TestNetworkInterface createTapInterface(boolean disableIpv6ProvisioningDelay,
-            @NonNull LinkAddress[] linkAddrs) {
-        try {
-            return mService.createInterface(TAP, CARRIER_UP, BRING_UP, disableIpv6ProvisioningDelay,
-                    linkAddrs, null /* iface */);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Enable / disable carrier on TestNetworkInterface
      *
      * Note: TUNSETCARRIER is not supported until kernel version 5.0.
@@ -333,6 +255,112 @@ public class TestNetworkManager {
     public void setCarrierEnabled(@NonNull TestNetworkInterface iface, boolean enabled) {
         try {
             mService.setCarrierEnabled(iface, enabled);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Represents a request to create a tun/tap interface for testing.
+     *
+     * @hide
+     */
+    public static class TestInterfaceRequest {
+        public final boolean isTun;
+        public final boolean hasCarrier;
+        public final boolean bringUp;
+        public final boolean disableIpv6ProvDelay;
+        @Nullable public final String ifname;
+        public final LinkAddress[] linkAddresses;
+
+        private TestInterfaceRequest(boolean isTun, boolean hasCarrier, boolean bringUp,
+                boolean disableProvDelay, @Nullable String ifname, LinkAddress[] linkAddresses) {
+            this.isTun = isTun;
+            this.hasCarrier = hasCarrier;
+            this.bringUp = bringUp;
+            this.disableIpv6ProvDelay = disableProvDelay;
+            this.ifname = ifname;
+            this.linkAddresses = linkAddresses;
+        }
+
+        /**
+         * Builder class for TestInterfaceRequest
+         *
+         * Defaults to a tap interface with carrier that has been brought up.
+         */
+        public static class Builder {
+            private boolean mIsTun = false;
+            private boolean mHasCarrier = true;
+            private boolean mBringUp = true;
+            private boolean mDisableIpv6ProvDelay = false;
+            @Nullable private String mIfname;
+            private List<LinkAddress> mLinkAddresses = new ArrayList<>();
+
+            /** Create tun interface. */
+            public Builder setTun() {
+                mIsTun = true;
+                return this;
+            }
+
+            /** Create tap interface. */
+            public Builder setTap() {
+                mIsTun = false;
+                return this;
+            }
+
+            /** Configure whether the interface has carrier. */
+            public Builder setHasCarrier(boolean hasCarrier) {
+                mHasCarrier = hasCarrier;
+                return this;
+            }
+
+            /** Configure whether the interface should be brought up. */
+            public Builder setBringUp(boolean bringUp) {
+                mBringUp = bringUp;
+                return this;
+            }
+
+            /** Disable DAD and RS delay. */
+            public Builder setDisableIpv6ProvisioningDelay(boolean disableProvDelay) {
+                mDisableIpv6ProvDelay = disableProvDelay;
+                return this;
+            }
+
+            /** Set the interface name. */
+            public Builder setInterfaceName(@Nullable String ifname) {
+                mIfname = ifname;
+                return this;
+            }
+
+            /** The addresses to configure on the interface. */
+            public Builder addLinkAddress(LinkAddress la) {
+                mLinkAddresses.add(la);
+                return this;
+            }
+
+            /** Build TestInterfaceRequest */
+            public TestInterfaceRequest build() {
+                return new TestInterfaceRequest(mIsTun, mHasCarrier, mBringUp,
+                        mDisableIpv6ProvDelay, mIfname, mLinkAddresses.toArray(new LinkAddress[0]));
+            }
+        }
+    }
+
+    /**
+     * Create a TestNetworkInterface (tun or tap) for testing purposes.
+     *
+     * @param request The request describing the interface to create.
+     * @return A TestNetworkInterface representing the underlying tun/tap interface. Close the
+     *         contained ParcelFileDescriptor to tear down the tun/tap interface.
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.MANAGE_TEST_NETWORKS)
+    @NonNull
+    public TestNetworkInterface createTestInterface(@NonNull TestInterfaceRequest request) {
+        try {
+            // TODO: Make TestInterfaceRequest parcelable and pass it instead.
+            return mService.createInterface(request.isTun, request.hasCarrier, request.bringUp,
+                    request.disableIpv6ProvDelay, request.linkAddresses, request.ifname);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -38,16 +38,16 @@ import static android.net.ConnectivityManager.BLOCKED_METERED_REASON_MASK;
 import static android.net.ConnectivityManager.BLOCKED_REASON_NONE;
 import static android.net.ConnectivityManager.FIREWALL_RULE_ALLOW;
 import static android.net.ConnectivityManager.FIREWALL_RULE_DENY;
-import static android.net.INetd.PERMISSION_INTERNET;
-import static android.net.INetd.PERMISSION_NONE;
-import static android.net.INetd.PERMISSION_UNINSTALLED;
-import static android.net.INetd.PERMISSION_UPDATE_DEVICE_STATS;
 import static android.system.OsConstants.EINVAL;
 import static android.system.OsConstants.ENODEV;
 import static android.system.OsConstants.ENOENT;
 import static android.system.OsConstants.EOPNOTSUPP;
 
 import static com.android.server.ConnectivityStatsLog.NETWORK_BPF_MAP_INFO;
+import static com.android.server.connectivity.NetworkPermissions.PERMISSION_NONE;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_INTERNET;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UNINSTALLED;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS;
 
 import android.app.StatsManager;
 import android.content.Context;
@@ -139,8 +139,8 @@ public class BpfNetMaps {
     private static IBpfMap<U32, Bool> sLocalNetBlockedUidMap = null;
 
     private static final List<Pair<Integer, String>> PERMISSION_LIST = Arrays.asList(
-            Pair.create(PERMISSION_INTERNET, "PERMISSION_INTERNET"),
-            Pair.create(PERMISSION_UPDATE_DEVICE_STATS, "PERMISSION_UPDATE_DEVICE_STATS")
+            Pair.create(TRAFFIC_PERMISSION_INTERNET, "PERMISSION_INTERNET"),
+            Pair.create(TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS, "PERMISSION_UPDATE_DEVICE_STATS")
     );
 
     /**
@@ -870,7 +870,8 @@ public class BpfNetMaps {
         }
 
         // Remove the entry if package is uninstalled or uid has only INTERNET permission.
-        if (permissions == PERMISSION_UNINSTALLED || permissions == PERMISSION_INTERNET) {
+        if (permissions == TRAFFIC_PERMISSION_UNINSTALLED
+                || permissions == TRAFFIC_PERMISSION_INTERNET) {
             for (final int uid : uids) {
                 try {
                     sUidPermissionMap.deleteEntry(new S32(uid));
@@ -905,13 +906,18 @@ public class BpfNetMaps {
             final InetAddress address, final int protocol, final int remotePort,
             final boolean isAllowed) {
         throwIfPre25Q2("addLocalNetAccess is not available on pre-B devices");
-        final int ifIndex = mDeps.getIfIndex(iface);
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip addLocalNetAccess for " + address
                     + "(" + iface + ")");
             return;
         }
-        LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
                 address, protocol, remotePort);
 
         try {
@@ -923,28 +929,68 @@ public class BpfNetMaps {
     }
 
     /**
-     * False if the configuration is disallowed.
-     *
+     * Remove configuration to local_net_access trie map.
+     * @param lpmBitlen prefix length that will be used for longest matching
+     * @param iface interface name
+     * @param address remote address. ipv4 addresses would be mapped to v6
+     * @param protocol required for longest match in special cases
+     * @param remotePort src/dst port for ingress/egress
+     */
+    @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
+    public void removeLocalNetAccess(final int lpmBitlen, final String iface,
+            final InetAddress address, final int protocol, final int remotePort) {
+        throwIfPre25Q2("removeLocalNetAccess is not available on pre-B devices");
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
+        if (ifIndex == 0) {
+            Log.e(TAG, "Failed to get if index, skip removeLocalNetAccess for " + address
+                    + "(" + iface + ")");
+            return;
+        }
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+                address, protocol, remotePort);
+
+        try {
+            sLocalNetAccessMap.deleteEntry(localNetAccessKey);
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Failed to remove local network access for localNetAccessKey : "
+                    + localNetAccessKey);
+        }
+    }
+
+    /**
+     * Fetches value available in local_net_access bpf map for provided configuration
      * @param lpmBitlen  prefix length that will be used for longest matching
      * @param iface    interface name
      * @param address    remote address. ipv4 addresses would be mapped to v6
      * @param protocol   required for longest match in special cases
      * @param remotePort src/dst port for ingress/egress
+     * @return false if the configuration is disallowed, true if the configuration is absent i.e. it
+     * is not local network or if configuration is allowed like local dns servers.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
     public boolean getLocalNetAccess(final int lpmBitlen, final String iface,
             final InetAddress address, final int protocol, final int remotePort) {
         throwIfPre25Q2("getLocalNetAccess is not available on pre-B devices");
-        final int ifIndex = mDeps.getIfIndex(iface);
+        final int ifIndex;
+        if (iface == null) {
+            ifIndex = 0;
+        } else {
+            ifIndex = mDeps.getIfIndex(iface);
+        }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, returning default from getLocalNetAccess for "
                     + address + "(" + iface + ")");
             return true;
         }
-        LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
+        final LocalNetAccessKey localNetAccessKey = new LocalNetAccessKey(lpmBitlen, ifIndex,
                 address, protocol, remotePort);
         try {
-            Bool value = sLocalNetAccessMap.getValue(localNetAccessKey);
+            final Bool value = sLocalNetAccessMap.getValue(localNetAccessKey);
             return value == null ? true : value.val;
         } catch (ErrnoException e) {
             Log.e(TAG, "Failed to find local network access configuration for "
@@ -972,10 +1018,10 @@ public class BpfNetMaps {
      * @param uid application uid that needs check if local network calls are blocked.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
-    public boolean getUidValueFromLocalNetBlockMap(final int uid) {
-        throwIfPre25Q2("getUidValueFromLocalNetBlockMap is not available on pre-B devices");
+    public boolean isUidBlockedFromUsingLocalNetwork(final int uid) {
+        throwIfPre25Q2("isUidBlockedFromUsingLocalNetwork is not available on pre-B devices");
         try {
-            Bool value = sLocalNetBlockedUidMap.getValue(new U32(uid));
+            final Bool value = sLocalNetBlockedUidMap.getValue(new U32(uid));
             return value == null ? false : value.val;
         } catch (ErrnoException e) {
             Log.e(TAG, "Failed to find uid(" + uid
@@ -1013,10 +1059,10 @@ public class BpfNetMaps {
             // Key of uid permission map is appId
             // TODO: Rename map name
             final U8 permissions = sUidPermissionMap.getValue(new S32(appId));
-            return permissions != null ? permissions.val : PERMISSION_INTERNET;
+            return permissions != null ? permissions.val : TRAFFIC_PERMISSION_INTERNET;
         } catch (ErrnoException e) {
             Log.wtf(TAG, "Failed to get permission for uid: " + uid);
-            return PERMISSION_INTERNET;
+            return TRAFFIC_PERMISSION_INTERNET;
         }
     }
 
@@ -1165,7 +1211,7 @@ public class BpfNetMaps {
         if (permissionMask == PERMISSION_NONE) {
             return "PERMISSION_NONE";
         }
-        if (permissionMask == PERMISSION_UNINSTALLED) {
+        if (permissionMask == TRAFFIC_PERMISSION_UNINSTALLED) {
             // PERMISSION_UNINSTALLED should never appear in the map
             return "PERMISSION_UNINSTALLED error!";
         }

@@ -23,6 +23,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  * Network constants used by the network stack.
@@ -340,6 +341,26 @@ public final class NetworkStackConstants {
      * following test runs.
      */
     public static final String TEST_URL_EXPIRATION_TIME = "test_url_expiration_time";
+
+    /**
+     * List of IpPrefix that are local network prefixes.
+     */
+    public static final List<IpPrefix> IPV4_LOCAL_PREFIXES = List.of(
+            new IpPrefix("169.254.0.0/16"), // Link Local
+            new IpPrefix("100.64.0.0/10"),  // CGNAT
+            new IpPrefix("10.0.0.0/8"),     // RFC1918
+            new IpPrefix("172.16.0.0/12"),  // RFC1918
+            new IpPrefix("192.168.0.0/16")  // RFC1918
+    );
+
+    /**
+     * List of IpPrefix that are multicast and broadcast prefixes.
+     */
+    public static final List<IpPrefix> MULTICAST_AND_BROADCAST_PREFIXES = List.of(
+            new IpPrefix("224.0.0.0/4"),               // Multicast
+            new IpPrefix("ff00::/8"),                  // Multicast
+            new IpPrefix("255.255.255.255/32")         // Broadcast
+    );
 
     // TODO: Move to Inet4AddressUtils
     // See aosp/1455936: NetworkStackConstants can't depend on it as it causes jarjar-related issues

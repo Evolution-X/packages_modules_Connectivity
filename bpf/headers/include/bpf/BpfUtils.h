@@ -26,12 +26,23 @@
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
+#include <android-base/properties.h>
 #include <log/log.h>
 
 #include "KernelUtils.h"
 
 namespace android {
 namespace bpf {
+
+const bool unreleased = (base::GetProperty("ro.build.version.codename", "REL") != "REL");
+const int api_level = unreleased ? 10000 : android_get_device_api_level();
+const bool isAtLeastR = (api_level >= 30);
+const bool isAtLeastS = (api_level >= 31);
+// Sv2 is 32
+const bool isAtLeastT = (api_level >= 33);
+const bool isAtLeastU = (api_level >= 34);
+const bool isAtLeastV = (api_level >= 35);
+const bool isAtLeast25Q2 = (api_level >= 36);
 
 // See kernel's net/core/sock_diag.c __sock_gen_cookie()
 // the implementation of which guarantees 0 will never be returned,

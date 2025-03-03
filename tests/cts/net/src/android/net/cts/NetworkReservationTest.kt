@@ -16,15 +16,23 @@
 
 package android.net.cts
 
+import android.Manifest.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS
 import android.Manifest.permission.MANAGE_TEST_NETWORKS
 import android.Manifest.permission.NETWORK_SETTINGS
+import android.bluetooth.BluetoothManager
+import android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE
 import android.net.ConnectivityManager
+import android.net.L2capNetworkSpecifier
+import android.net.L2capNetworkSpecifier.HEADER_COMPRESSION_6LOWPAN
+import android.net.L2capNetworkSpecifier.ROLE_SERVER
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED
+import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS
+import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_TEST
 import android.net.NetworkProvider
@@ -35,6 +43,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.platform.test.annotations.AppModeFull
 import androidx.test.platform.app.InstrumentationRegistry
+import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
@@ -42,9 +51,15 @@ import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
+import com.android.testutils.pollingCheck
 import com.android.testutils.runAsShell
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,6 +98,10 @@ class NetworkReservationTest {
     private val handler = Handler(handlerThread.looper)
     private val provider = NetworkProvider(context, handlerThread.looper, TAG)
 
+    private val registeredCallbacks = ArrayList<TestableNetworkCallback>()
+    private val bm = context.getSystemService(BluetoothManager::class.java)!!
+    private var disableBluetoothInTearDown = false
+
     @Before
     fun setUp() {
         runAsShell(NETWORK_SETTINGS) {
@@ -90,18 +109,58 @@ class NetworkReservationTest {
         }
     }
 
+    private fun enableBluetooth() {
+        val adapter = bm.adapter
+        assertNotNull(adapter)
+        if (adapter.isEnabled()) return
+
+        runShellCommandOrThrow("svc bluetooth enable")
+        val bluetoothEnabled = pollingCheck(TIMEOUT_MS) {
+            adapter.isEnabled()
+        }
+        assertTrue(bluetoothEnabled)
+        // Only disable Bluetooth in tear down when it hasn't already been enabled.
+        disableBluetoothInTearDown = true
+    }
+
+    private fun disableBluetooth() {
+        // adapter can't actually be null here, because this function does not run unless
+        // disableBluetoothInTearDown is true. Just in case, refrain from throwing an exception in
+        // tearDown.
+        val adapter = bm.adapter
+        if (adapter == null) return
+
+        runShellCommandOrThrow("svc bluetooth disable")
+        // Wait for #isEnabled() to return false; ignore failures.
+        pollingCheck(TIMEOUT_MS) {
+            !adapter.isEnabled()
+        }
+    }
+
     @After
     fun tearDown() {
+        registeredCallbacks.forEach { cm.unregisterNetworkCallback(it) }
         runAsShell(NETWORK_SETTINGS) {
             // unregisterNetworkProvider unregisters all associated NetworkOffers.
             cm.unregisterNetworkProvider(provider)
         }
         handlerThread.quitSafely()
         handlerThread.join()
+
+        if (disableBluetoothInTearDown) {
+            disableBluetooth()
+        }
     }
 
     fun NetworkCapabilities.copyWithReservationId(resId: Int) = NetworkCapabilities(this).also {
         it.reservationId = resId
+    }
+
+    fun reserveNetwork(nr: NetworkRequest): TestableNetworkCallback {
+        return TestableNetworkCallback().also {
+            cm.reserveNetwork(nr, handler, it)
+            registeredCallbacks.add(it)
+        }
     }
 
     @Test
@@ -112,8 +171,7 @@ class NetworkReservationTest {
             provider.registerNetworkOffer(NETWORK_SCORE, BLANKET_CAPS, handler::post, blanketOffer)
         }
 
-        val cb = TestableNetworkCallback()
-        cm.reserveNetwork(ETHERNET_REQUEST, handler, cb)
+        val cb = reserveNetwork(ETHERNET_REQUEST)
 
         // validate the reservation matches the blanket offer.
         val reservationReq = blanketOffer.expectOnNetworkNeeded(BLANKET_CAPS).request
@@ -136,5 +194,32 @@ class NetworkReservationTest {
         // reserved offer goes away
         provider.unregisterNetworkOffer(reservedOffer)
         cb.expect<Unavailable>()
+    }
+
+    @Test
+    fun testReserveL2capNetwork() {
+        assumeTrue(context.packageManager.hasSystemFeature(FEATURE_BLUETOOTH_LE))
+        enableBluetooth()
+
+        val l2capReservationSpecifier = L2capNetworkSpecifier.Builder()
+                .setRole(ROLE_SERVER)
+                .setHeaderCompression(HEADER_COMPRESSION_6LOWPAN)
+                .build()
+        val l2capRequest = NetworkRequest.Builder()
+                .addTransportType(TRANSPORT_BLUETOOTH)
+                .removeCapability(NET_CAPABILITY_TRUSTED)
+                .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
+                .setNetworkSpecifier(l2capReservationSpecifier)
+                .build()
+        val cb = runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) {
+            reserveNetwork(l2capRequest)
+        }
+
+        val caps = cb.expect<Reserved>().caps
+        val reservedSpec = caps.networkSpecifier
+        assertTrue(reservedSpec is L2capNetworkSpecifier)
+        assertContains(0x80..0xFF, reservedSpec.psm, "PSM is outside of dynamic range")
+        assertEquals(HEADER_COMPRESSION_6LOWPAN, reservedSpec.headerCompression)
+        assertNull(reservedSpec.remoteAddress)
     }
 }

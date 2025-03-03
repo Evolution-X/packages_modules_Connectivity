@@ -170,6 +170,51 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
         return mPsm;
     }
 
+    /**
+     * Checks whether the given L2capNetworkSpecifier is valid as part of a server network
+     * reservation request.
+     *
+     * @hide
+     */
+    public boolean isValidServerReservationSpecifier() {
+        // The ROLE_SERVER offer can be satisfied by a ROLE_ANY request.
+        if (mRole != ROLE_SERVER) return false;
+
+        // HEADER_COMPRESSION_ANY is never valid in a request.
+        if (mHeaderCompression == HEADER_COMPRESSION_ANY) return false;
+
+        // Remote address must be null for ROLE_SERVER requests.
+        if (mRemoteAddress != null) return false;
+
+        // reservation must allocate a PSM, so only PSM_ANY can be passed.
+        if (mPsm != PSM_ANY) return false;
+
+        return true;
+    }
+
+    /**
+     * Checks whether the given L2capNetworkSpecifier is valid as part of a client network request.
+     *
+     * @hide
+     */
+    public boolean isValidClientRequestSpecifier() {
+        // The ROLE_CLIENT offer can be satisfied by a ROLE_ANY request.
+        if (mRole != ROLE_CLIENT) return false;
+
+        // HEADER_COMPRESSION_ANY is never valid in a request.
+        if (mHeaderCompression == HEADER_COMPRESSION_ANY) return false;
+
+        // Remote address must not be null for ROLE_CLIENT requests.
+        if (mRemoteAddress == null) return false;
+
+        // Client network requests require a PSM to be specified.
+        // Ensure the PSM is within the valid range of dynamic BLE L2CAP values.
+        if (mPsm < 0x80) return false;
+        if (mPsm > 0xFF) return false;
+
+        return true;
+    }
+
     /** A builder class for L2capNetworkSpecifier. */
     public static final class Builder {
         @Role

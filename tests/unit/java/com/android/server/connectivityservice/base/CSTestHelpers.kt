@@ -23,6 +23,7 @@ import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.FEATURE_BLUETOOTH
+import android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE
 import android.content.pm.PackageManager.FEATURE_ETHERNET
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.content.pm.PackageManager.FEATURE_WIFI_DIRECT
@@ -53,6 +54,7 @@ import com.android.internal.util.test.FakeSettingsProvider
 import com.android.modules.utils.build.SdkLevel
 import com.android.server.ConnectivityService.Dependencies
 import com.android.server.connectivity.ConnectivityResources
+import com.android.server.connectivity.PermissionMonitor
 import kotlin.test.fail
 import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.any
@@ -103,7 +105,13 @@ internal fun makeActivityManager() = mock<ActivityManager>().also {
 }
 
 internal fun makeMockPackageManager(realContext: Context) = mock<PackageManager>().also { pm ->
-    val supported = listOf(FEATURE_WIFI, FEATURE_WIFI_DIRECT, FEATURE_BLUETOOTH, FEATURE_ETHERNET)
+    val supported = listOf(
+            FEATURE_WIFI,
+            FEATURE_WIFI_DIRECT,
+            FEATURE_BLUETOOTH,
+            FEATURE_BLUETOOTH_LE,
+            FEATURE_ETHERNET
+    )
     doReturn(true).`when`(pm).hasSystemFeature(argThat { supported.contains(it) })
     val myPackageName = realContext.packageName
     val myPackageInfo = realContext.packageManager.getPackageInfo(myPackageName,
@@ -185,13 +193,14 @@ internal fun initMockedResources(res: Resources) {
 
 private val TEST_LINGER_DELAY_MS = 400
 private val TEST_NASCENT_DELAY_MS = 300
-internal fun makeConnectivityService(context: Context, netd: INetd, deps: Dependencies) =
+internal fun makeConnectivityService(context: Context, netd: INetd, deps: Dependencies,
+                                     mPermDeps: PermissionMonitor.Dependencies) =
         ConnectivityService(
                 context,
                 mock<IDnsResolver>(),
                 mock<IpConnectivityLog>(),
                 netd,
-                deps).also {
+                deps, mPermDeps).also {
             it.mLingerDelayMs = TEST_LINGER_DELAY_MS
             it.mNascentDelayMs = TEST_NASCENT_DELAY_MS
         }

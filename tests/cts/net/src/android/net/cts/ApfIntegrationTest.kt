@@ -19,8 +19,6 @@
 
 package android.net.cts
 
-import android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG
-import android.Manifest.permission.WRITE_DEVICE_CONFIG
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.content.pm.PackageManager.FEATURE_WIFI
@@ -55,8 +53,6 @@ import android.os.PowerManager
 import android.os.SystemProperties
 import android.os.UserManager
 import android.platform.test.annotations.AppModeFull
-import android.provider.DeviceConfig
-import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
 import android.system.Os
 import android.system.OsConstants
 import android.system.OsConstants.AF_INET6
@@ -90,7 +86,7 @@ import com.android.testutils.RecorderCallback.CallbackEntry.Available
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.SkipPresubmit
 import com.android.testutils.TestableNetworkCallback
-import com.android.testutils.runAsShell
+import com.android.testutils.pollingCheck
 import com.android.testutils.waitForIdle
 import com.google.common.truth.Expect
 import com.google.common.truth.Truth.assertThat
@@ -116,8 +112,6 @@ import org.junit.runner.RunWith
 
 private const val TAG = "ApfIntegrationTest"
 private const val TIMEOUT_MS = 2000L
-private const val APF_NEW_RA_FILTER_VERSION = "apf_new_ra_filter_version"
-private const val POLLING_INTERVAL_MS: Int = 100
 private const val RCV_BUFFER_SIZE = 1480
 private const val PING_HEADER_LENGTH = 8
 
@@ -134,16 +128,6 @@ class ApfIntegrationTest {
         private val context = InstrumentationRegistry.getInstrumentation().context
         private val powerManager = context.getSystemService(PowerManager::class.java)!!
         private val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG)
-
-        fun pollingCheck(condition: () -> Boolean, timeout_ms: Int): Boolean {
-            var polling_time = 0
-            do {
-                Thread.sleep(POLLING_INTERVAL_MS.toLong())
-                polling_time += POLLING_INTERVAL_MS
-                if (condition()) return true
-            } while (polling_time < timeout_ms)
-            return false
-        }
 
         fun turnScreenOff() {
             if (!wakeLock.isHeld()) wakeLock.acquire()
@@ -166,7 +150,9 @@ class ApfIntegrationTest {
                 // This is a workaround for b/366037029.
                 Thread.sleep(2000L)
             } else {
-                val result = pollingCheck({ powerManager.isInteractive() }, timeout_ms = 2000)
+                val result = pollingCheck(timeout_ms = 2000) {
+                    powerManager.isInteractive()
+                }
                 assertThat(result).isEqualTo(interactive)
             }
         }
@@ -192,16 +178,6 @@ class ApfIntegrationTest {
             Thread.sleep(1000)
             // TODO: check that there is no active wifi network. Otherwise, ApfFilter has already been
             // created.
-            // APF adb cmds are only implemented in ApfFilter.java. Enable experiment to prevent
-            // LegacyApfFilter.java from being used.
-            runAsShell(WRITE_DEVICE_CONFIG, WRITE_ALLOWLISTED_DEVICE_CONFIG) {
-                DeviceConfig.setProperty(
-                        NAMESPACE_CONNECTIVITY,
-                        APF_NEW_RA_FILTER_VERSION,
-                        "1",  // value => force enabled
-                        false // makeDefault
-                )
-            }
         }
 
         @AfterClass
@@ -489,15 +465,15 @@ class ApfIntegrationTest {
 
     fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply() {
         // If not IPv6 -> PASS
-        addLoad16(R0, ETH_ETHERTYPE_OFFSET)
+        addLoad16intoR0(ETH_ETHERTYPE_OFFSET)
         addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), BaseApfGenerator.PASS_LABEL)
 
         // If not ICMPv6 -> PASS
-        addLoad8(R0, IPV6_NEXT_HEADER_OFFSET)
+        addLoad8intoR0(IPV6_NEXT_HEADER_OFFSET)
         addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), BaseApfGenerator.PASS_LABEL)
 
         // If not echo reply -> PASS
-        addLoad8(R0, ICMP6_TYPE_OFFSET)
+        addLoad8intoR0(ICMP6_TYPE_OFFSET)
         addJumpIfR0NotEquals(0x81, BaseApfGenerator.PASS_LABEL)
     }
 
@@ -591,6 +567,13 @@ class ApfIntegrationTest {
 
         val program = gen.generate()
         assertThat(program.size).isLessThan(counterRegion)
+        val randomProgram = ByteArray(1) { 0 } +
+                ByteArray(counterRegion - 1).also { Random.nextBytes(it) }
+        // There are known firmware bugs where they calculate the number of non-zero bytes within
+        // the program to determine the program length. Modify the test to first install a longer
+        // program before installing a program that do the program length check. This should help us
+        // catch these types of firmware bugs in CTS. (b/395545572)
+        installAndVerifyProgram(randomProgram)
         installAndVerifyProgram(program)
 
         // Trigger the program by sending a ping and waiting on the reply.
@@ -744,11 +727,11 @@ class ApfIntegrationTest {
         //     transmit 3 ICMPv6 echo requests with random first byte
         //     increase DROPPED_IPV6_NS_REPLIED_NON_DAD counter
         //     drop
-        gen.addLoad16(R0, ETH_ETHERTYPE_OFFSET)
+        gen.addLoad16intoR0(ETH_ETHERTYPE_OFFSET)
                 .addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), skipPacketLabel)
-                .addLoad8(R0, IPV6_NEXT_HEADER_OFFSET)
+                .addLoad8intoR0(IPV6_NEXT_HEADER_OFFSET)
                 .addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), skipPacketLabel)
-                .addLoad8(R0, ICMP6_TYPE_OFFSET)
+                .addLoad8intoR0(ICMP6_TYPE_OFFSET)
                 .addJumpIfR0NotEquals(ICMP6_ECHO_REPLY.toLong(), skipPacketLabel)
                 .addLoadFromMemory(R0, MemorySlot.PACKET_SIZE)
                 .addCountAndPassIfR0Equals(

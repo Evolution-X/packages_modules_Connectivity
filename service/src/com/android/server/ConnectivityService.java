@@ -109,8 +109,8 @@ import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_5;
 import static android.net.NetworkCapabilities.REDACT_FOR_ACCESS_FINE_LOCATION;
 import static android.net.NetworkCapabilities.REDACT_FOR_LOCAL_MAC_ADDRESS;
 import static android.net.NetworkCapabilities.REDACT_FOR_NETWORK_SETTINGS;
-import static android.net.NetworkCapabilities.RES_ID_UNSET;
 import static android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS;
+import static android.net.NetworkCapabilities.RES_ID_UNSET;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
@@ -146,6 +146,8 @@ import static com.android.net.module.util.BpfUtils.BPF_CGROUP_UDP4_SENDMSG;
 import static com.android.net.module.util.BpfUtils.BPF_CGROUP_UDP6_RECVMSG;
 import static com.android.net.module.util.BpfUtils.BPF_CGROUP_UDP6_SENDMSG;
 import static com.android.net.module.util.NetworkMonitorUtils.isPrivateDnsValidationRequired;
+import static com.android.net.module.util.NetworkStackConstants.IPV4_LOCAL_PREFIXES;
+import static com.android.net.module.util.NetworkStackConstants.MULTICAST_AND_BROADCAST_PREFIXES;
 import static com.android.net.module.util.PermissionUtils.enforceAnyPermissionOf;
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermission;
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermissionOr;
@@ -214,6 +216,7 @@ import android.net.ISocketKeepaliveCallback;
 import android.net.InetAddresses;
 import android.net.IpMemoryStore;
 import android.net.IpPrefix;
+import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.LocalNetworkConfig;
 import android.net.LocalNetworkInfo;
@@ -420,14 +423,14 @@ import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
  * @hide
  */
-public class ConnectivityService extends IConnectivityManager.Stub
-        implements PendingIntent.OnFinished {
+public class ConnectivityService extends IConnectivityManager.Stub {
     private static final String TAG = ConnectivityService.class.getSimpleName();
 
     private static final String DIAG_ARG = "--diag";
@@ -561,6 +564,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     // The Context is created for UserHandle.ALL.
     private final Context mUserAllContext;
     private final Dependencies mDeps;
+    private final PermissionMonitor.Dependencies mPermissionMonitorDeps;
     private final ConnectivityFlags mFlags;
     // 0 is full bad, 100 is full good
     private int mDefaultInetConditionPublished = 0;
@@ -1019,6 +1023,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final NetworkNotificationManager mNotifier;
     private final LingerMonitor mLingerMonitor;
     private final SatelliteAccessController mSatelliteAccessController;
+
+    private final L2capNetworkProvider mL2capNetworkProvider;
 
     // sequence number of NetworkRequests
     private int mNextNetworkRequestId = NetworkRequest.FIRST_REQUEST_ID;
@@ -1620,6 +1626,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     connectivityServiceInternalHandler);
         }
 
+        /** Creates an L2capNetworkProvider */
+        public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
+            return new L2capNetworkProvider(context);
+        }
+
         /** Returns the data inactivity timeout to be used for cellular networks */
         public int getDefaultCellularDataInactivityTimeout() {
             return DeviceConfigUtils.getDeviceConfigPropertyInt(NAMESPACE_TETHERING_BOOT,
@@ -1798,12 +1809,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
     public ConnectivityService(Context context) {
         this(context, getDnsResolver(context), new IpConnectivityLog(),
                 INetd.Stub.asInterface((IBinder) context.getSystemService(Context.NETD_SERVICE)),
-                new Dependencies());
+                new Dependencies(), new PermissionMonitor.Dependencies());
     }
 
     @VisibleForTesting
     protected ConnectivityService(Context context, IDnsResolver dnsresolver,
-            IpConnectivityLog logger, INetd netd, Dependencies deps) {
+            IpConnectivityLog logger, INetd netd, Dependencies deps,
+            PermissionMonitor.Dependencies mPermDeps) {
         if (DBG) log("ConnectivityService starting up");
 
         mDeps = Objects.requireNonNull(deps, "missing Dependencies");
@@ -1876,8 +1888,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mNetd = netd;
         mBpfNetMaps = mDeps.getBpfNetMaps(mContext, netd);
         mHandlerThread = mDeps.makeHandlerThread("ConnectivityServiceThread");
+        mPermissionMonitorDeps = mPermDeps;
         mPermissionMonitor =
-                new PermissionMonitor(mContext, mNetd, mBpfNetMaps, mHandlerThread);
+                new PermissionMonitor(mContext, mNetd, mBpfNetMaps, mPermissionMonitorDeps,
+                        mHandlerThread);
         mHandlerThread.start();
         mHandler = new InternalHandler(mHandlerThread.getLooper());
         mTrackerHandler = new NetworkStateTrackerHandler(mHandlerThread.getLooper());
@@ -1899,11 +1913,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 && mDeps.isFeatureEnabled(context, REQUEST_RESTRICTED_WIFI);
         mBackgroundFirewallChainEnabled = mDeps.isAtLeastV() && mDeps.isFeatureNotChickenedOut(
                 context, ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN);
-        mUseDeclaredMethodsForCallbacksEnabled = mDeps.isFeatureEnabled(context,
-                ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
+        mUseDeclaredMethodsForCallbacksEnabled =
+                mDeps.isFeatureNotChickenedOut(context,
+                        ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
-                && mDeps.isFeatureEnabled(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
+                && mDeps.isFeatureNotChickenedOut(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
         mCarrierPrivilegeAuthenticator = mDeps.makeCarrierPrivilegeAuthenticator(
                 mContext, mTelephonyManager, mRequestRestrictedWifiEnabled,
                 this::handleUidCarrierPrivilegesLost, mHandler);
@@ -2091,6 +2106,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         mIngressToVpnAddressFiltering = mDeps.isAtLeastT()
                 && mDeps.isFeatureNotChickenedOut(mContext, INGRESS_TO_VPN_ADDRESS_FILTERING);
+
+        mL2capNetworkProvider = mDeps.makeL2capNetworkProvider(mContext);
     }
 
     /**
@@ -4126,6 +4143,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
             mCarrierPrivilegeAuthenticator.start();
         }
 
+        if (mL2capNetworkProvider != null) {
+            mL2capNetworkProvider.start();
+        }
+
         // On T+ devices, register callback for statsd to pull NETWORK_BPF_MAP_INFO atom
         if (mDeps.isAtLeastT()) {
             mBpfNetMaps.setPullAtomCallback(mContext);
@@ -5683,6 +5704,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // destroyed pending replacement they will be sent when it is disconnected.
         maybeDisableForwardRulesForDisconnectingNai(nai, false /* sendCallbacks */);
         updateIngressToVpnAddressFiltering(null, nai.linkProperties, nai);
+        updateLocalNetworkAddresses(null, nai.linkProperties);
         try {
             mNetd.networkDestroy(nai.network.getNetId());
         } catch (RemoteException | ServiceSpecificException e) {
@@ -9583,6 +9605,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         updateIngressToVpnAddressFiltering(newLp, oldLp, networkAgent);
 
+        updateLocalNetworkAddresses(newLp, oldLp);
+
         updateMtu(newLp, oldLp);
         // TODO - figure out what to do for clat
 //        for (LinkProperties lp : newLp.getStackedLinks()) {
@@ -9759,6 +9783,219 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 loge("Exception removing interface: " + e);
             }
         }
+    }
+
+    /**
+     * Update Local Network Addresses to LocalNetAccess BPF map.
+     * @param newLp new link properties
+     * @param oldLp old link properties
+     */
+    private void updateLocalNetworkAddresses(@Nullable final LinkProperties newLp,
+            @NonNull final LinkProperties oldLp) {
+
+        // The maps are available only after 25Q2 release
+        if (!BpfNetMaps.isAtLeast25Q2()) {
+            return;
+        }
+
+        final CompareResult<String> interfaceDiff = new CompareResult<>(
+                oldLp != null ? oldLp.getAllInterfaceNames() : null,
+                newLp != null ? newLp.getAllInterfaceNames() : null);
+
+        for (final String iface : interfaceDiff.added) {
+            addLocalAddressesToBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES, newLp);
+        }
+        for (final String iface : interfaceDiff.removed) {
+            removeLocalAddressesFromBpfMap(iface, MULTICAST_AND_BROADCAST_PREFIXES, oldLp);
+        }
+
+        // The both list contain current link properties + stacked links for new and old LP.
+        final List<LinkProperties> newLinkProperties = new ArrayList<>();
+        final List<LinkProperties> oldLinkProperties = new ArrayList<>();
+
+        if (newLp != null) {
+            newLinkProperties.add(newLp);
+            newLinkProperties.addAll(newLp.getStackedLinks());
+        }
+        if (oldLp != null) {
+            oldLinkProperties.add(oldLp);
+            oldLinkProperties.addAll(oldLp.getStackedLinks());
+        }
+
+        // map contains interface name to list of local network prefixes added because of change
+        // in link properties
+        final Map<String, List<IpPrefix>> prefixesAddedForInterface = new ArrayMap<>();
+
+        final CompareResult<LinkProperties> linkPropertiesDiff = new CompareResult<>(
+                oldLinkProperties, newLinkProperties);
+
+        for (LinkProperties linkProperty : linkPropertiesDiff.added) {
+            final List<IpPrefix> unicastLocalPrefixesToBeAdded = new ArrayList<>();
+            for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
+                unicastLocalPrefixesToBeAdded.addAll(
+                        getLocalNetworkPrefixesForAddress(linkAddress));
+            }
+            addLocalAddressesToBpfMap(linkProperty.getInterfaceName(),
+                    unicastLocalPrefixesToBeAdded, linkProperty);
+
+            // populating interface name -> ip prefixes which were added to local_net_access map.
+            if (!prefixesAddedForInterface.containsKey(linkProperty.getInterfaceName())) {
+                prefixesAddedForInterface.put(linkProperty.getInterfaceName(), new ArrayList<>());
+            }
+            prefixesAddedForInterface.get(linkProperty.getInterfaceName())
+                    .addAll(unicastLocalPrefixesToBeAdded);
+        }
+
+        for (LinkProperties linkProperty : linkPropertiesDiff.removed) {
+            final List<IpPrefix> unicastLocalPrefixesToBeRemoved = new ArrayList<>();
+            final List<IpPrefix> unicastLocalPrefixesAdded = prefixesAddedForInterface.getOrDefault(
+                    linkProperty.getInterfaceName(), Collections.emptyList());
+
+            for (LinkAddress linkAddress : linkProperty.getLinkAddresses()) {
+                unicastLocalPrefixesToBeRemoved.addAll(
+                        getLocalNetworkPrefixesForAddress(linkAddress));
+            }
+
+            // This is to ensure if 10.0.10.0/24 was added and 10.0.11.0/24 was removed both will
+            // still populate the same prefix of 10.0.0.0/8, which mean 10.0.0.0/8 should not be
+            // removed due to removal of 10.0.11.0/24
+            unicastLocalPrefixesToBeRemoved.removeAll(unicastLocalPrefixesAdded);
+
+            removeLocalAddressesFromBpfMap(linkProperty.getInterfaceName(),
+                    new ArrayList<>(unicastLocalPrefixesToBeRemoved), linkProperty);
+        }
+    }
+
+    /**
+     * Filters IpPrefix that are local prefixes and LinkAddress is part of them.
+     * @param linkAddress link address used for filtering
+     * @return list of IpPrefix that are local addresses.
+     */
+    private List<IpPrefix> getLocalNetworkPrefixesForAddress(LinkAddress linkAddress) {
+        List<IpPrefix> localPrefixes = new ArrayList<>();
+        if (linkAddress.isIpv6()) {
+            // For IPv6, if the prefix length is greater than zero then they are part of local
+            // network
+            if (linkAddress.getPrefixLength() != 0) {
+                localPrefixes.add(
+                        new IpPrefix(linkAddress.getAddress(), linkAddress.getPrefixLength()));
+            }
+        } else {
+            // For IPv4, if the linkAddress is part of IpPrefix adding prefix to result.
+            for (IpPrefix ipv4LocalPrefix : IPV4_LOCAL_PREFIXES) {
+                if (ipv4LocalPrefix.containsPrefix(
+                        new IpPrefix(linkAddress.getAddress(), linkAddress.getPrefixLength()))) {
+                    localPrefixes.add(ipv4LocalPrefix);
+                }
+            }
+        }
+        return localPrefixes;
+    }
+
+    /**
+     * Adds list of prefixes(addresses) to local network access map.
+     * @param iface interface name
+     * @param prefixes list of prefixes/addresses
+     * @param lp LinkProperties
+     */
+    private void addLocalAddressesToBpfMap(final String iface, final List<IpPrefix> prefixes,
+                                           @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2()) return;
+
+        for (IpPrefix prefix : prefixes) {
+            // Add local dnses allow rule To BpfMap before adding the block rule for prefix
+            addLocalDnsesToBpfMap(iface, prefix, lp);
+            /*
+            Prefix length is used by LPM trie map(local_net_access_map) for performing longest
+            prefix matching, this length represents the maximum number of bits used for matching.
+            The interface index should always be matched which is 32-bit integer. For IPv6, prefix
+            length is calculated by adding the ip address prefix length along with interface index
+            making it (32 + length). IPv4 addresses are stored as ipv4-mapped-ipv6 which implies
+            first 96 bits are common for all ipv4 addresses. Hence, prefix length is calculated as
+            32(interface index) + 96 (common for ipv4-mapped-ipv6) + length.
+             */
+            final int prefixLengthConstant = (prefix.isIPv4() ? (32 + 96) : 32);
+            mBpfNetMaps.addLocalNetAccess(prefixLengthConstant + prefix.getPrefixLength(),
+                    iface, prefix.getAddress(), 0, 0, false);
+
+        }
+
+    }
+
+    /**
+     * Removes list of prefixes(addresses) from local network access map.
+     * @param iface interface name
+     * @param prefixes list of prefixes/addresses
+     * @param lp LinkProperties
+     */
+    private void removeLocalAddressesFromBpfMap(final String iface, final List<IpPrefix> prefixes,
+                                                @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2()) return;
+
+        for (IpPrefix prefix : prefixes) {
+            // The reasoning for prefix length is explained in addLocalAddressesToBpfMap()
+            final int prefixLengthConstant = (prefix.isIPv4() ? (32 + 96) : 32);
+            mBpfNetMaps.removeLocalNetAccess(prefixLengthConstant
+                    + prefix.getPrefixLength(), iface, prefix.getAddress(), 0, 0);
+
+            // Also remove the allow rule for dnses included in the prefix after removing the block
+            // rule for prefix.
+            removeLocalDnsesFromBpfMap(iface, prefix, lp);
+        }
+    }
+
+    /**
+     * Adds DNS servers to local network access map, if included in the interface prefix
+     * @param iface interface name
+     * @param prefix IpPrefix
+     * @param lp LinkProperties
+     */
+    private void addLocalDnsesToBpfMap(final String iface, IpPrefix prefix,
+            @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2() || lp == null) return;
+
+        for (InetAddress dnsServer : lp.getDnsServers()) {
+            // Adds dns allow rule to LocalNetAccessMap for both TCP and UDP protocol at port 53,
+            // if it is a local dns (ie. it falls in the local prefix range).
+            if (prefix.contains(dnsServer)) {
+                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_UDP, 53, true);
+                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 53, true);
+            }
+        }
+    }
+
+    /**
+     * Removes DNS servers from local network access map, if included in the interface prefix
+     * @param iface interface name
+     * @param prefix IpPrefix
+     * @param lp LinkProperties
+     */
+    private void removeLocalDnsesFromBpfMap(final String iface, IpPrefix prefix,
+            @Nullable final LinkProperties lp) {
+        if (!BpfNetMaps.isAtLeast25Q2() || lp == null) return;
+
+        for (InetAddress dnsServer : lp.getDnsServers()) {
+            // Removes dns allow rule from LocalNetAccessMap for both TCP and UDP protocol
+            // at port 53, if it is a local dns (ie. it falls in the prefix range).
+            if (prefix.contains(dnsServer)) {
+                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_UDP, 53);
+                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 53);
+            }
+        }
+    }
+
+    /**
+     * Returns total bit length of an Ipv4 mapped address.
+     */
+    private int getIpv4MappedAddressBitLen() {
+        final int ifaceLen = 32; // bit length of interface
+        final int inetAddressLen = 32 + 96; // length of ipv4 mapped addresses
+        final int portProtocolLen = 32;  //16 for port + 16 for protocol;
+        return ifaceLen + inetAddressLen + portProtocolLen;
     }
 
     /**
@@ -10699,10 +10936,42 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // else not handled
     }
 
+    /**
+     * A small class to manage releasing a lock exactly once even if releaseLock is called
+     * multiple times. See b/390043283
+     * PendingIntent#send throws CanceledException in various cases. In some of them it will
+     * still call onSendFinished, in others it won't and the client can't know. This class
+     * keeps a ref to the wakelock that it releases exactly once, thanks to Atomics semantics.
+     */
+    private class WakeLockOnFinishedReceiver implements PendingIntent.OnFinished {
+        private final AtomicReference<PowerManager.WakeLock> mLock;
+        WakeLockOnFinishedReceiver(@NonNull final PowerManager.WakeLock lock) {
+            mLock = new AtomicReference<>(lock);
+            lock.acquire();
+        }
+
+        public void releaseLock() {
+            final PowerManager.WakeLock lock = mLock.getAndSet(null);
+            if (null != lock) lock.release();
+        }
+
+        @Override
+        public void onSendFinished(PendingIntent pendingIntent, Intent intent, int resultCode,
+                String resultData, Bundle resultExtras) {
+            if (DBG) log("Finished sending " + pendingIntent);
+            releaseLock();
+            releasePendingNetworkRequestWithDelay(pendingIntent);
+        }
+    }
+
     // TODO(b/193460475): Remove when tooling supports SystemApi to public API.
     @SuppressLint("NewApi")
     private void sendIntent(PendingIntent pendingIntent, Intent intent) {
-        mPendingIntentWakeLock.acquire();
+        // Since the receiver will take the lock exactly once and release it exactly once, it
+        // is safe to pass the same wakelock to all receivers and avoid creating a new lock
+        // every time.
+        final WakeLockOnFinishedReceiver receiver =
+                new WakeLockOnFinishedReceiver(mPendingIntentWakeLock);
         try {
             if (DBG) log("Sending " + pendingIntent);
             final BroadcastOptions options = BroadcastOptions.makeBasic();
@@ -10711,25 +10980,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 // utilizing the PendingIntent as a backdoor to do this.
                 options.setPendingIntentBackgroundActivityLaunchAllowed(false);
             }
-            pendingIntent.send(mContext, 0, intent, this /* onFinished */, null /* Handler */,
+            pendingIntent.send(mContext, 0, intent, receiver, null /* Handler */,
                     null /* requiredPermission */,
                     mDeps.isAtLeastT() ? options.toBundle() : null);
         } catch (PendingIntent.CanceledException e) {
             if (DBG) log(pendingIntent + " was not sent, it had been canceled.");
-            mPendingIntentWakeLock.release();
+            receiver.releaseLock();
             releasePendingNetworkRequest(pendingIntent);
         }
-        // ...otherwise, mPendingIntentWakeLock.release() gets called by onSendFinished()
-    }
-
-    @Override
-    public void onSendFinished(PendingIntent pendingIntent, Intent intent, int resultCode,
-            String resultData, Bundle resultExtras) {
-        if (DBG) log("Finished sending " + pendingIntent);
-        mPendingIntentWakeLock.release();
-        // Release with a delay so the receiving client has an opportunity to put in its
-        // own request.
-        releasePendingNetworkRequestWithDelay(pendingIntent);
     }
 
     @Nullable

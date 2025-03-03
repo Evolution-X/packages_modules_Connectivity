@@ -19,27 +19,29 @@ package com.android.server.connectivity;
 import static android.Manifest.permission.CHANGE_NETWORK_STATE;
 import static android.Manifest.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS;
 import static android.Manifest.permission.INTERNET;
+import static android.Manifest.permission.NEARBY_WIFI_DEVICES;
 import static android.Manifest.permission.NETWORK_STACK;
 import static android.Manifest.permission.UPDATE_DEVICE_STATS;
 import static android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.GET_PERMISSIONS;
 import static android.net.ConnectivitySettingsManager.UIDS_ALLOWED_ON_RESTRICTED_NETWORKS;
-import static android.net.INetd.PERMISSION_INTERNET;
-import static android.net.INetd.PERMISSION_NETWORK;
-import static android.net.INetd.PERMISSION_NONE;
-import static android.net.INetd.PERMISSION_SYSTEM;
-import static android.net.INetd.PERMISSION_UNINSTALLED;
-import static android.net.INetd.PERMISSION_UPDATE_DEVICE_STATS;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.net.connectivity.ConnectivityCompatChanges.RESTRICT_LOCAL_NETWORK;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 
+import static com.android.server.connectivity.NetworkPermissions.PERMISSION_NETWORK;
+import static com.android.server.connectivity.NetworkPermissions.PERMISSION_NONE;
+import static com.android.server.connectivity.NetworkPermissions.PERMISSION_SYSTEM;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_INTERNET;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UNINSTALLED;
+import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS;
 import static com.android.net.module.util.CollectionUtils.toIntArray;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.compat.CompatChanges;
+import android.content.AttributionSource;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -62,6 +64,7 @@ import android.os.ServiceSpecificException;
 import android.os.SystemConfigManager;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.permission.PermissionManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -72,7 +75,6 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.modules.utils.build.SdkLevel;
-import com.android.net.flags.Flags;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.apishim.ProcessShimImpl;
@@ -99,6 +101,8 @@ public class PermissionMonitor {
     private final PackageManager mPackageManager;
     private final UserManager mUserManager;
     private final SystemConfigManager mSystemConfigManager;
+    private final PermissionManager mPermissionManager;
+    private final PermissionChangeListener mPermissionChangeListener;
     private final INetd mNetd;
     private final Dependencies mDeps;
     private final Context mContext;
@@ -230,6 +234,12 @@ public class PermissionMonitor {
             context.getContentResolver().registerContentObserver(
                     uri, notifyForDescendants, observer);
         }
+
+        public boolean shouldEnforceLocalNetRestrictions(int uid) {
+            // TODO(b/394567896): Update compat change checks for enforcement
+            return BpfNetMaps.isAtLeast25Q2() &&
+                    CompatChanges.isChangeEnabled(RESTRICT_LOCAL_NETWORK, uid);
+        }
     }
 
     private static class MultiSet<T> {
@@ -270,13 +280,15 @@ public class PermissionMonitor {
     }
 
     @VisibleForTesting
-    PermissionMonitor(@NonNull final Context context, @NonNull final INetd netd,
+    public PermissionMonitor(@NonNull final Context context, @NonNull final INetd netd,
             @NonNull final BpfNetMaps bpfNetMaps,
             @NonNull final Dependencies deps,
             @NonNull final HandlerThread thread) {
         mPackageManager = context.getPackageManager();
         mUserManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
         mSystemConfigManager = context.getSystemService(SystemConfigManager.class);
+        mPermissionManager = context.getSystemService(PermissionManager.class);
+        mPermissionChangeListener = new PermissionChangeListener();
         mNetd = netd;
         mDeps = deps;
         mContext = context;
@@ -287,7 +299,29 @@ public class PermissionMonitor {
             // This listener should finish registration by the time the system has completed
             // boot setup such that any changes to runtime permissions for local network
             // restrictions can only occur after this registration has completed.
-            mPackageManager.addOnPermissionsChangeListener(new PermissionChangeListener());
+            mPackageManager.addOnPermissionsChangeListener(mPermissionChangeListener);
+        }
+    }
+
+    @VisibleForTesting
+    void setLocalNetworkPermissions(final int uid, @Nullable final String packageName) {
+        if (!mDeps.shouldEnforceLocalNetRestrictions(uid)) return;
+
+        final AttributionSource attributionSource =
+                new AttributionSource.Builder(uid).setPackageName(packageName).build();
+        final int permissionState = mPermissionManager.checkPermissionForPreflight(
+                NEARBY_WIFI_DEVICES, attributionSource);
+        if (permissionState == PermissionManager.PERMISSION_GRANTED) {
+            mBpfNetMaps.removeUidFromLocalNetBlockMap(attributionSource.getUid());
+        } else {
+            mBpfNetMaps.addUidToLocalNetBlockMap(attributionSource.getUid());
+        }
+        if (hasSdkSandbox(uid)){
+            // SDKs in the SDK RT cannot hold runtime permissions
+            final int sdkSandboxUid = sProcessShim.toSdkSandboxUid(uid);
+            if (!mBpfNetMaps.isUidBlockedFromUsingLocalNetwork(sdkSandboxUid)) {
+                mBpfNetMaps.addUidToLocalNetBlockMap(sdkSandboxUid);
+            }
         }
     }
 
@@ -351,6 +385,7 @@ public class PermissionMonitor {
                     uidsPerm.put(sdkSandboxUid, permission);
                 }
             }
+            setLocalNetworkPermissions(uid, app.packageName);
         }
         return uidsPerm;
     }
@@ -405,7 +440,7 @@ public class PermissionMonitor {
         final SparseIntArray appIdsPerm = new SparseIntArray();
         for (final int uid : mSystemConfigManager.getSystemPermissionUids(INTERNET)) {
             final int appId = UserHandle.getAppId(uid);
-            final int permission = appIdsPerm.get(appId) | PERMISSION_INTERNET;
+            final int permission = appIdsPerm.get(appId) | TRAFFIC_PERMISSION_INTERNET;
             appIdsPerm.put(appId, permission);
             if (hasSdkSandbox(appId)) {
                 appIdsPerm.put(sProcessShim.toSdkSandboxUid(appId), permission);
@@ -413,7 +448,7 @@ public class PermissionMonitor {
         }
         for (final int uid : mSystemConfigManager.getSystemPermissionUids(UPDATE_DEVICE_STATS)) {
             final int appId = UserHandle.getAppId(uid);
-            final int permission = appIdsPerm.get(appId) | PERMISSION_UPDATE_DEVICE_STATS;
+            final int permission = appIdsPerm.get(appId) | TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS;
             appIdsPerm.put(appId, permission);
             if (hasSdkSandbox(appId)) {
                 appIdsPerm.put(sProcessShim.toSdkSandboxUid(appId), permission);
@@ -598,7 +633,7 @@ public class PermissionMonitor {
 
         final List<PackageInfo> apps = getInstalledPackagesAsUser(user);
 
-        // Save all apps
+        // Save all apps in mAllApps
         updateAllApps(apps);
 
         // Uids network permissions
@@ -635,6 +670,11 @@ public class PermissionMonitor {
             final int uid = allUids.keyAt(i);
             if (user.equals(UserHandle.getUserHandleForUid(uid))) {
                 mUidToNetworkPerm.delete(uid);
+                if (mDeps.shouldEnforceLocalNetRestrictions(uid)) {
+                    mBpfNetMaps.removeUidFromLocalNetBlockMap(uid);
+                    if (hasSdkSandbox(uid)) mBpfNetMaps.removeUidFromLocalNetBlockMap(
+                            sProcessShim.toSdkSandboxUid(uid));
+                }
                 removedUids.put(uid, allUids.valueAt(i));
             }
         }
@@ -656,7 +696,7 @@ public class PermissionMonitor {
             final int appId = removedUserAppIds.keyAt(i);
             // Need to clear permission if the removed appId is not found in the array.
             if (appIds.indexOfKey(appId) < 0) {
-                appIds.put(appId, PERMISSION_UNINSTALLED);
+                appIds.put(appId, TRAFFIC_PERMISSION_UNINSTALLED);
             }
         }
         sendAppIdsTrafficPermission(appIds);
@@ -708,7 +748,7 @@ public class PermissionMonitor {
             }
         } else {
             // The last package of this uid is removed from device. Clean the package up.
-            permission = PERMISSION_UNINSTALLED;
+            permission = TRAFFIC_PERMISSION_UNINSTALLED;
         }
         return permission;
     }
@@ -751,13 +791,13 @@ public class PermissionMonitor {
                 return "NETWORK";
             case PERMISSION_SYSTEM:
                 return "SYSTEM";
-            case PERMISSION_INTERNET:
+            case TRAFFIC_PERMISSION_INTERNET:
                 return "INTERNET";
-            case PERMISSION_UPDATE_DEVICE_STATS:
+            case TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS:
                 return "UPDATE_DEVICE_STATS";
-            case (PERMISSION_INTERNET | PERMISSION_UPDATE_DEVICE_STATS):
+            case (TRAFFIC_PERMISSION_INTERNET | TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS):
                 return "ALL";
-            case PERMISSION_UNINSTALLED:
+            case TRAFFIC_PERMISSION_UNINSTALLED:
                 return "UNINSTALLED";
             default:
                 return "UNKNOWN";
@@ -776,7 +816,7 @@ public class PermissionMonitor {
         // (PERMISSION_UNINSTALLED), remove the appId from the array. Otherwise, update the latest
         // permission to the appId.
         final int appId = UserHandle.getAppId(uid);
-        if (uidTrafficPerm == PERMISSION_UNINSTALLED) {
+        if (uidTrafficPerm == TRAFFIC_PERMISSION_UNINSTALLED) {
             userTrafficPerms.delete(appId);
         } else {
             userTrafficPerms.put(appId, uidTrafficPerm);
@@ -794,7 +834,7 @@ public class PermissionMonitor {
                 installed = true;
             }
         }
-        return installed ? permission : PERMISSION_UNINSTALLED;
+        return installed ? permission : TRAFFIC_PERMISSION_UNINSTALLED;
     }
 
     /**
@@ -829,6 +869,7 @@ public class PermissionMonitor {
             }
             sendUidsNetworkPermission(apps, true /* add */);
         }
+        setLocalNetworkPermissions(uid, packageName);
 
         // If the newly-installed package falls within some VPN's uid range, update Netd with it.
         // This needs to happen after the mUidToNetworkPerm update above, since
@@ -873,6 +914,11 @@ public class PermissionMonitor {
     synchronized void onPackageRemoved(@NonNull final String packageName, final int uid) {
         // Update uid permission.
         updateAppIdTrafficPermission(uid);
+        if (BpfNetMaps.isAtLeast25Q2()) {
+            mBpfNetMaps.removeUidFromLocalNetBlockMap(uid);
+            if (hasSdkSandbox(uid)) mBpfNetMaps.removeUidFromLocalNetBlockMap(
+                    sProcessShim.toSdkSandboxUid(uid));
+        }
         // Get the appId permission from all users then send the latest permission to netd.
         final int appId = UserHandle.getAppId(uid);
         final int appIdTrafficPerm = getAppIdTrafficPermission(appId);
@@ -931,11 +977,11 @@ public class PermissionMonitor {
         for (int i = 0; i < requestedPermissions.length; i++) {
             if (requestedPermissions[i].equals(INTERNET)
                     && ((requestedPermissionsFlags[i] & REQUESTED_PERMISSION_GRANTED) != 0)) {
-                permissions |= PERMISSION_INTERNET;
+                permissions |= TRAFFIC_PERMISSION_INTERNET;
             }
             if (requestedPermissions[i].equals(UPDATE_DEVICE_STATS)
                     && ((requestedPermissionsFlags[i] & REQUESTED_PERMISSION_GRANTED) != 0)) {
-                permissions |= PERMISSION_UPDATE_DEVICE_STATS;
+                permissions |= TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS;
             }
         }
         return permissions;
@@ -1174,19 +1220,19 @@ public class PermissionMonitor {
         for (int i = 0; i < netdPermissionsAppIds.size(); i++) {
             int permissions = netdPermissionsAppIds.valueAt(i);
             switch(permissions) {
-                case (PERMISSION_INTERNET | PERMISSION_UPDATE_DEVICE_STATS):
+                case (TRAFFIC_PERMISSION_INTERNET | TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS):
                     allPermissionAppIds.add(netdPermissionsAppIds.keyAt(i));
                     break;
-                case PERMISSION_INTERNET:
+                case TRAFFIC_PERMISSION_INTERNET:
                     internetPermissionAppIds.add(netdPermissionsAppIds.keyAt(i));
                     break;
-                case PERMISSION_UPDATE_DEVICE_STATS:
+                case TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS:
                     updateStatsPermissionAppIds.add(netdPermissionsAppIds.keyAt(i));
                     break;
                 case PERMISSION_NONE:
                     noPermissionAppIds.add(netdPermissionsAppIds.keyAt(i));
                     break;
-                case PERMISSION_UNINSTALLED:
+                case TRAFFIC_PERMISSION_UNINSTALLED:
                     uninstalledAppIds.add(netdPermissionsAppIds.keyAt(i));
                     break;
                 default:
@@ -1198,15 +1244,15 @@ public class PermissionMonitor {
             // TODO: add a lock inside netd to protect IPC trafficSetNetPermForUids()
             if (allPermissionAppIds.size() != 0) {
                 mBpfNetMaps.setNetPermForUids(
-                        PERMISSION_INTERNET | PERMISSION_UPDATE_DEVICE_STATS,
+                        TRAFFIC_PERMISSION_INTERNET | TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS,
                         toIntArray(allPermissionAppIds));
             }
             if (internetPermissionAppIds.size() != 0) {
-                mBpfNetMaps.setNetPermForUids(PERMISSION_INTERNET,
+                mBpfNetMaps.setNetPermForUids(TRAFFIC_PERMISSION_INTERNET,
                         toIntArray(internetPermissionAppIds));
             }
             if (updateStatsPermissionAppIds.size() != 0) {
-                mBpfNetMaps.setNetPermForUids(PERMISSION_UPDATE_DEVICE_STATS,
+                mBpfNetMaps.setNetPermForUids(TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS,
                         toIntArray(updateStatsPermissionAppIds));
             }
             if (noPermissionAppIds.size() != 0) {
@@ -1214,7 +1260,7 @@ public class PermissionMonitor {
                         toIntArray(noPermissionAppIds));
             }
             if (uninstalledAppIds.size() != 0) {
-                mBpfNetMaps.setNetPermForUids(PERMISSION_UNINSTALLED,
+                mBpfNetMaps.setNetPermForUids(TRAFFIC_PERMISSION_UNINSTALLED,
                         toIntArray(uninstalledAppIds));
             }
         } catch (RemoteException | ServiceSpecificException e) {
@@ -1325,16 +1371,7 @@ public class PermissionMonitor {
     private class PermissionChangeListener implements PackageManager.OnPermissionsChangedListener {
         @Override
         public void onPermissionsChanged(int uid) {
-            // RESTRICT_LOCAL_NETWORK is a compat change that is enabled when developers manually
-            // opt-in to this change, or when the app's targetSdkVersion is greater than 36.
-            // The RESTRICT_LOCAL_NETWORK compat change is used here instead of the
-            // Flags.restrictLocalNetwork() is used to offer the feature to devices, but it will
-            // only be enforced when develoeprs choose to enable it.
-            // TODO(b/394567896): Update compat change checks
-            if (CompatChanges.isChangeEnabled(RESTRICT_LOCAL_NETWORK, uid)
-                    && BpfNetMaps.isAtLeast25Q2()) {
-                // TODO(b/388803658): Update network permissions and record change
-            }
+            setLocalNetworkPermissions(uid, null);
         }
     }
 }

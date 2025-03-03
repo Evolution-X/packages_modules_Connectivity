@@ -375,6 +375,7 @@ public class IpSecManagerTest extends IpSecBaseTest {
     }
 
     private static boolean isIpv6UdpEncapSupportedByKernel() {
+        if (SdkLevel.isAtLeastB() && isKernelVersionAtLeast("5.10.0")) return true;
         return isKernelVersionAtLeast("5.15.31")
                 || (isKernelVersionAtLeast("5.10.108") && !isKernelVersionAtLeast("5.15.0"));
     }
@@ -390,8 +391,8 @@ public class IpSecManagerTest extends IpSecBaseTest {
         assumeTrue("Not supported by kernel", isIpv6UdpEncapSupportedByKernel());
     }
 
-    // TODO: b/319532485 Figure out whether to support x86_32
     private static boolean isRequestTransformStateSupportedByKernel() {
+        if (SdkLevel.isAtLeastB()) return true;
         return NetworkUtils.isKernel64Bit() || !NetworkUtils.isKernelX86();
     }
 

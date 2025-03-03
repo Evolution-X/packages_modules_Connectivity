@@ -54,9 +54,7 @@ import org.mockito.Mockito.eq
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
 import org.mockito.Mockito.timeout
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoMoreInteractions
 
 private const val TIMEOUT_MS = 200L
 private const val MEDIUM_TIMEOUT_MS = 1_000L

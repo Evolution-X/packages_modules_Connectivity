@@ -14,23 +14,18 @@
  * limitations under the License.
  */
 
-package com.android.server.net;
+package com.android.net.module.util;
 
 import static android.system.OsConstants.NETLINK_INET_DIAG;
 
 import android.os.Handler;
-import android.system.ErrnoException;
 
-import com.android.net.module.util.IBpfMap;
-import com.android.net.module.util.SharedLog;
-import com.android.net.module.util.bpf.CookieTagMapKey;
-import com.android.net.module.util.bpf.CookieTagMapValue;
 import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.InetDiagMessage;
 import com.android.net.module.util.netlink.NetlinkMessage;
-import com.android.net.module.util.netlink.StructInetDiagSockId;
 
 import java.io.PrintWriter;
+import java.util.function.Consumer;
 
 /**
  * Monitor socket destroy and delete entry from cookie tag bpf map.
@@ -48,17 +43,56 @@ public class SkDestroyListener extends NetlinkMonitor {
     // ENOBUFS and leaking mCookieTagMap entries.
     private static final int SOCK_RCV_BUF_SIZE = 512 * 1024;
 
-    private final IBpfMap<CookieTagMapKey, CookieTagMapValue> mCookieTagMap;
+    private final Consumer<InetDiagMessage> mSkDestroyCallback;
 
-    SkDestroyListener(final IBpfMap<CookieTagMapKey, CookieTagMapValue> cookieTagMap,
+    /**
+     * Return SkDestroyListener that monitor both TCP and UDP socket destroy
+     *
+     * @param consumer The consumer that processes InetDiagMessage
+     * @param handler The Handler on which to poll for messages
+     * @param log A SharedLog to log to.
+     * @return SkDestroyListener
+     */
+    public static SkDestroyListener makeSkDestroyListener(final Consumer<InetDiagMessage> consumer,
+            final Handler handler, final SharedLog log) {
+        return makeSkDestroyListener(consumer, true /* monitorTcpSocket */,
+                true /* monitorUdpSocket */, handler, log);
+    }
+
+    /**
+     * Return SkDestroyListener that monitor socket destroy
+     *
+     * @param consumer The consumer that processes InetDiagMessage
+     * @param monitorTcpSocket {@code true} to monitor TCP socket destroy
+     * @param monitorUdpSocket {@code true} to monitor UDP socket destroy
+     * @param handler The Handler on which to poll for messages
+     * @param log A SharedLog to log to.
+     * @return SkDestroyListener
+     */
+    public static SkDestroyListener makeSkDestroyListener(final Consumer<InetDiagMessage> consumer,
+            final boolean monitorTcpSocket, final boolean monitorUdpSocket,
+            final Handler handler, final SharedLog log) {
+        if (!monitorTcpSocket && !monitorUdpSocket) {
+            throw new IllegalArgumentException(
+                    "Both monitorTcpSocket and monitorUdpSocket can not be false");
+        }
+        int bindGroups = 0;
+        if (monitorTcpSocket) {
+            bindGroups |= 1 << (SKNLGRP_INET_TCP_DESTROY - 1)
+                    | 1 << (SKNLGRP_INET6_TCP_DESTROY - 1);
+        }
+        if (monitorUdpSocket) {
+            bindGroups |= 1 << (SKNLGRP_INET_UDP_DESTROY - 1)
+                    | 1 << (SKNLGRP_INET6_UDP_DESTROY - 1);
+        }
+        return new SkDestroyListener(consumer, bindGroups, handler, log);
+    }
+
+    private SkDestroyListener(final Consumer<InetDiagMessage> consumer, final int bindGroups,
             final Handler handler, final SharedLog log) {
         super(handler, log, "SkDestroyListener", NETLINK_INET_DIAG,
-                1 << (SKNLGRP_INET_TCP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET_UDP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET6_TCP_DESTROY - 1)
-                        | 1 << (SKNLGRP_INET6_UDP_DESTROY - 1),
-                SOCK_RCV_BUF_SIZE);
-        mCookieTagMap = cookieTagMap;
+                bindGroups, SOCK_RCV_BUF_SIZE);
+        mSkDestroyCallback = consumer;
     }
 
     @Override
@@ -67,12 +101,7 @@ public class SkDestroyListener extends NetlinkMonitor {
             mLog.e("Received non InetDiagMessage");
             return;
         }
-        final StructInetDiagSockId sockId = ((InetDiagMessage) nlMsg).inetDiagMsg.id;
-        try {
-            mCookieTagMap.deleteEntry(new CookieTagMapKey(sockId.cookie));
-        } catch (ErrnoException e) {
-            mLog.e("Failed to delete CookieTagMap entry for " + sockId.cookie  + ": " + e);
-        }
+        mSkDestroyCallback.accept((InetDiagMessage) nlMsg);
     }
 
     /**

@@ -163,7 +163,7 @@ struct bpf_map_def {
     enum bpf_map_type type;
     unsigned int key_size;
     unsigned int value_size;
-    int max_entries;  // negative means BPF_F_NO_PREALLOC, but *might* not work with S
+    unsigned int max_entries;
     unsigned int map_flags;
 
     // The following are not supported by the Android bpfloader:
