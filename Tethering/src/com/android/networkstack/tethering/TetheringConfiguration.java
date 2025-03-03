@@ -130,9 +130,6 @@ public class TetheringConfiguration {
     public static final String TETHER_ENABLE_WEAR_TETHERING =
             "tether_enable_wear_tethering";
 
-    public static final String TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION =
-            "tether_force_random_prefix_base_selection";
-
     public static final String TETHER_ENABLE_SYNC_SM = "tether_enable_sync_sm";
 
     /**
