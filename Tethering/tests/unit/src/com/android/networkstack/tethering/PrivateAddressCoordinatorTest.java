@@ -26,7 +26,6 @@ import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHERING_WIFI_P2P;
 import static android.net.ip.IpServer.CMD_NOTIFY_PREFIX_CONFLICT;
 
-import static com.android.net.module.util.PrivateAddressCoordinator.TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION;
 import static com.android.networkstack.tethering.util.PrefixUtils.asIpPrefix;
 
 import static org.junit.Assert.assertEquals;
@@ -51,6 +50,7 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.ip.IpServer;
+import android.os.Build;
 import android.os.IBinder;
 
 import androidx.test.filters.SmallTest;
@@ -58,8 +58,10 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.net.module.util.IIpv4PrefixRequest;
 import com.android.net.module.util.PrivateAddressCoordinator;
+import com.android.testutils.DevSdkIgnoreRule;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -71,6 +73,9 @@ import java.util.Arrays;
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 public final class PrivateAddressCoordinatorTest {
+    @Rule
+    public final DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
+
     private static final String TEST_IFNAME = "test0";
 
     @Mock private IpServer mHotspotIpServer;
@@ -231,11 +236,9 @@ public final class PrivateAddressCoordinatorTest {
         assertEquals(usbAddress, newUsbAddress);
 
         final UpstreamNetworkState wifiUpstream = buildUpstreamNetworkState(mWifiNetwork,
-                new LinkAddress("192.168.88.23/16"), null,
-                makeNetworkCapabilities(TRANSPORT_WIFI));
+                hotspotAddress, null, makeNetworkCapabilities(TRANSPORT_WIFI));
         updateUpstreamPrefix(wifiUpstream);
         verify(mHotspotIpServer).sendMessage(IpServer.CMD_NOTIFY_PREFIX_CONFLICT);
-        verify(mUsbIpServer).sendMessage(IpServer.CMD_NOTIFY_PREFIX_CONFLICT);
     }
 
     private UpstreamNetworkState buildUpstreamNetworkState(final Network network,
@@ -323,10 +326,9 @@ public final class PrivateAddressCoordinatorTest {
         assertFalse(localHotspotPrefix.containsPrefix(hotspotPrefix));
     }
 
+    @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     @Test
     public void testStartedPrefixRange() throws Exception {
-        when(mDeps.isFeatureEnabled(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION)).thenReturn(true);
-
         startedPrefixBaseTest("192.168.0.0/16", 0);
 
         startedPrefixBaseTest("192.168.0.0/16", 1);
