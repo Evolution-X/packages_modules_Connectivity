@@ -26,7 +26,7 @@ import android.net.INetworkAgentRegistry;
  * @hide
  */
 oneway interface INetworkAgent {
-    void onRegistered(in INetworkAgentRegistry registry);
+    void onRegistered();
     void onDisconnected();
     void onBandwidthUpdateRequested();
     void onValidationStatusChanged(int validationStatus,
