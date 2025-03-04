@@ -160,11 +160,15 @@ public final class CtsTetheringUtils {
         @Override
         public void onStopTetheringSucceeded() {
             mHistory.add(new CallbackValue.OnStopTetheringSucceeded());
+            // Call the parent method so that the coverage linter sees it: http://b/385014495
+            TetheringManager.StopTetheringCallback.super.onStopTetheringSucceeded();
         }
 
         @Override
         public void onStopTetheringFailed(final int error) {
             mHistory.add(new CallbackValue.OnStopTetheringFailed(error));
+            // Call the parent method so that the coverage linter sees it: http://b/385014495
+            TetheringManager.StopTetheringCallback.super.onStopTetheringFailed(error);
         }
 
         /**
