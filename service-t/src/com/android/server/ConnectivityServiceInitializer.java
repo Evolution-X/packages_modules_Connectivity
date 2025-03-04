@@ -30,6 +30,9 @@ import com.android.server.ethernet.EthernetServiceImpl;
 import com.android.server.nearby.NearbyService;
 import com.android.server.net.ct.CertificateTransparencyService;
 import com.android.server.thread.ThreadNetworkService;
+import com.android.server.vcn.VcnLocation;
+
+import java.lang.reflect.Constructor;
 
 /**
  * Connectivity service initializer for core networking. This is called by system server to create
@@ -37,6 +40,9 @@ import com.android.server.thread.ThreadNetworkService;
  */
 public final class ConnectivityServiceInitializer extends SystemService {
     private static final String TAG = ConnectivityServiceInitializer.class.getSimpleName();
+    private static final String CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS =
+            "com.android.server.ConnectivityServiceInitializerB";
+
     private final ConnectivityNativeService mConnectivityNative;
     private final ConnectivityService mConnectivity;
     private final IpSecService mIpSecService;
@@ -45,6 +51,7 @@ public final class ConnectivityServiceInitializer extends SystemService {
     private final EthernetServiceImpl mEthernetServiceImpl;
     private final ThreadNetworkService mThreadNetworkService;
     private final CertificateTransparencyService mCertificateTransparencyService;
+    private final SystemService mConnectivityServiceInitializerB;
 
     public ConnectivityServiceInitializer(Context context) {
         super(context);
@@ -58,6 +65,7 @@ public final class ConnectivityServiceInitializer extends SystemService {
         mNearbyService = createNearbyService(context);
         mThreadNetworkService = createThreadNetworkService(context);
         mCertificateTransparencyService = createCertificateTransparencyService(context);
+        mConnectivityServiceInitializerB = createConnectivityServiceInitializerB(context);
     }
 
     @Override
@@ -99,6 +107,11 @@ public final class ConnectivityServiceInitializer extends SystemService {
             publishBinderService(ThreadNetworkManager.SERVICE_NAME, mThreadNetworkService,
                     /* allowIsolated= */ false);
         }
+
+        if (mConnectivityServiceInitializerB != null) {
+            Log.i(TAG, "ConnectivityServiceInitializerB#onStart");
+            mConnectivityServiceInitializerB.onStart();
+        }
     }
 
     @Override
@@ -117,6 +130,10 @@ public final class ConnectivityServiceInitializer extends SystemService {
 
         if (SdkLevel.isAtLeastV() && mCertificateTransparencyService != null) {
             mCertificateTransparencyService.onBootPhase(phase);
+        }
+
+        if (mConnectivityServiceInitializerB != null) {
+            mConnectivityServiceInitializerB.onBootPhase(phase);
         }
     }
 
@@ -201,5 +218,29 @@ public final class ConnectivityServiceInitializer extends SystemService {
         return SdkLevel.isAtLeastV() && CertificateTransparencyService.enabled(context)
                 ? new CertificateTransparencyService(context)
                 : null;
+    }
+
+    // TODO: b/374174952 After VCN code is moved to the Connectivity folder, merge
+    // ConnectivityServiceInitializerB into ConnectivityServiceInitializer and directly create and
+    // register VcnManagementService in ConnectivityServiceInitializer
+    /** Return ConnectivityServiceInitializerB instance if enable, otherwise null. */
+    @Nullable
+    private SystemService createConnectivityServiceInitializerB(Context context) {
+        if (!VcnLocation.IS_VCN_IN_MAINLINE || !SdkLevel.isAtLeastB()) {
+            return null;
+        }
+
+        try {
+            final Class<?> connectivityServiceInitializerBClass =
+                    Class.forName(CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS);
+            final Constructor constructor =
+                    connectivityServiceInitializerBClass.getConstructor(Context.class);
+
+            return (SystemService) constructor.newInstance(context);
+        } catch (Exception e) {
+            Log.e(TAG, "Fail to load ConnectivityServiceInitializerB " + e);
+        }
+
+        return null;
     }
 }
