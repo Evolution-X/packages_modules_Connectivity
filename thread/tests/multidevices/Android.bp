@@ -35,9 +35,4 @@ python_test_host {
         "mts-tethering",
         "general-tests",
     ],
-    version: {
-        py3: {
-            embedded_launcher: true,
-        },
-    },
 }
