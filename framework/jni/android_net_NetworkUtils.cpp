@@ -23,9 +23,9 @@
 #include <netinet/in.h>
 #include <string.h>
 
+#include <DnsProxydProtocol.h> // NETID_USE_LOCAL_NAMESERVERS
 #include <bpf/BpfClassic.h>
 #include <bpf/KernelUtils.h>
-#include <DnsProxydProtocol.h> // NETID_USE_LOCAL_NAMESERVERS
 #include <nativehelper/JNIPlatformHelp.h>
 #include <nativehelper/ScopedPrimitiveArray.h>
 #include <utils/Log.h>
@@ -259,6 +259,21 @@ static jboolean android_net_utils_isKernelX86(JNIEnv *env, jclass clazz) {
     return bpf::isX86();
 }
 
+static jlong android_net_utils_getSocketCookie(JNIEnv *env, jclass clazz,
+                                               jobject javaFd) {
+    int sock = AFileDescriptor_getFd(env, javaFd);
+    uint64_t cookie = 0;
+    socklen_t cookie_len = sizeof(cookie);
+    if (getsockopt(sock, SOL_SOCKET, SO_COOKIE, &cookie, &cookie_len)) {
+        // Failure is almost certainly either EBADF or ENOTSOCK
+        jniThrowErrnoException(env, "getSocketCookie", errno);
+    } else if (cookie_len != sizeof(cookie)) {
+        // This probably cannot actually happen, but...
+        jniThrowErrnoException(env, "getSocketCookie", 523); // EBADCOOKIE
+    }
+    return static_cast<jlong>(cookie);
+}
+
 // ----------------------------------------------------------------------------
 
 /*
@@ -283,6 +298,7 @@ static const JNINativeMethod gNetworkUtilMethods[] = {
     (void*) android_net_utils_setsockoptBytes},
     { "isKernel64Bit", "()Z", (void*) android_net_utils_isKernel64Bit },
     { "isKernelX86", "()Z", (void*) android_net_utils_isKernelX86 },
+    { "getSocketCookie", "(Ljava/io/FileDescriptor;)J", (void*) android_net_utils_getSocketCookie },
 };
 // clang-format on
 
