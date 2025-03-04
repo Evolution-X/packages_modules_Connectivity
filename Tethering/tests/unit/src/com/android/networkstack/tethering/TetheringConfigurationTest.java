@@ -160,6 +160,11 @@ public class TetheringConfigurationTest {
         }
 
         @Override
+        boolean isFeatureNotChickenedOut(@NonNull Context context, @NonNull String name) {
+            return isMockFlagEnabled(name, true /* defaultEnabled */);
+        }
+
+        @Override
         boolean getDeviceConfigBoolean(@NonNull String namespace, @NonNull String name,
                 boolean defaultValue) {
             // Flags should use isFeatureEnabled instead of getBoolean; see comments in
@@ -767,9 +772,9 @@ public class TetheringConfigurationTest {
 
     @Test
     public void testEnableSyncSMFlag() throws Exception {
-        // Test default disabled
+        // Test default enabled
         setTetherEnableSyncSMFlagEnabled(null);
-        assertEnableSyncSM(false);
+        assertEnableSyncSM(true);
 
         setTetherEnableSyncSMFlagEnabled(true);
         assertEnableSyncSM(true);
