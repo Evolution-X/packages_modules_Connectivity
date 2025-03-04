@@ -139,7 +139,7 @@ public class TetheringConfiguration {
     public static final int DEFAULT_TETHER_OFFLOAD_POLL_INTERVAL_MS = 5000;
 
     /** A flag for using synchronous or asynchronous state machine. */
-    public static boolean USE_SYNC_SM = false;
+    public static boolean USE_SYNC_SM = true;
 
     /**
      * A feature flag to control whether the active sessions metrics should be enabled.
@@ -190,6 +190,10 @@ public class TetheringConfiguration {
     public static class Dependencies {
         boolean isFeatureEnabled(@NonNull Context context, @NonNull String name) {
             return DeviceConfigUtils.isTetheringFeatureEnabled(context, name);
+        }
+
+        boolean isFeatureNotChickenedOut(@NonNull Context context, @NonNull String name) {
+            return DeviceConfigUtils.isTetheringFeatureNotChickenedOut(context, name);
         }
 
         boolean getDeviceConfigBoolean(@NonNull String namespace, @NonNull String name,
@@ -391,7 +395,7 @@ public class TetheringConfiguration {
      * use the async state machine.
      */
     public void readEnableSyncSM(final Context ctx) {
-        USE_SYNC_SM = mDeps.isFeatureEnabled(ctx, TETHER_ENABLE_SYNC_SM);
+        USE_SYNC_SM = mDeps.isFeatureNotChickenedOut(ctx, TETHER_ENABLE_SYNC_SM);
     }
 
     /** Does the dumping.*/

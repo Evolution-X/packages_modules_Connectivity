@@ -33,6 +33,11 @@ public class FakeTetheringConfiguration extends TetheringConfiguration {
             }
 
             @Override
+            boolean isFeatureNotChickenedOut(@NonNull Context context, @NonNull String name) {
+                return true;
+            }
+
+            @Override
             boolean getDeviceConfigBoolean(@NonNull String namespace, @NonNull String name,
                     boolean defaultValue) {
                 return defaultValue;
