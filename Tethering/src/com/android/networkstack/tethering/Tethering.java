@@ -708,8 +708,7 @@ public class Tethering {
             // If tethering is already enabled with a different request,
             // disable before re-enabling.
             if (unfinishedRequest != null && !unfinishedRequest.equalsIgnoreUidPackage(request)) {
-                enableTetheringInternal(false /* disabled */, unfinishedRequest, null);
-                mEntitlementMgr.stopProvisioningIfNeeded(type);
+                stopTetheringInternal(type);
             }
             mPendingTetheringRequests.put(type, request);
 
@@ -1152,7 +1151,10 @@ public class Tethering {
             } catch (RemoteException e) { }
         }
 
-        final TetheringRequest request = createLegacyGlobalScopeTetheringRequest(type);
+        TetheringRequest request = getPendingTetheringRequest(type);
+        if (request == null) {
+            request = createLegacyGlobalScopeTetheringRequest(type);
+        }
         int result = tetherInternal(request, iface);
         switch (type) {
             case TETHERING_WIFI:
