@@ -66,11 +66,7 @@ public class ThreadNetworkShellCommandTest {
 
     @Before
     public void setUp() throws Exception {
-        // TODO(b/366141754): The current implementation of "thread_network ot-ctl factoryreset"
-        // results in timeout error.
-        // A future fix will provide proper support for factoryreset, allowing us to replace the
-        // legacy "ot-ctl".
-        mOtCtl.factoryReset();
+        mController.leaveAndWait();
 
         mFtd = new FullThreadDevice(10 /* nodeId */);
         ensureThreadEnabled();
