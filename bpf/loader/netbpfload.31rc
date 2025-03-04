@@ -1,6 +1,8 @@
-# This file takes effect only on T and U (on V netbpfload.35rc takes priority).
+# This file takes effect only on S, T and U (on V netbpfload.35rc takes priority).
 #
-# The service is started from netd's libnetd_updatable shared library
+# The service is started from netd's
+#   S: dnsresolver call into ADnsHelper_init
+#   T/U: libnetd_updatable shared library
 # on initial (boot time) startup of netd.
 #
 # However we never start this service on U QPR3.

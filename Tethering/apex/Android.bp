@@ -111,7 +111,7 @@ apex {
     ],
     prebuilts: [
         "current_sdkinfo",
-        "netbpfload.33rc",
+        "netbpfload.31rc",
         "netbpfload.35rc",
         "ot-daemon.34rc",
     ],
