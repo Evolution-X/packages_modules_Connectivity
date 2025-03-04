@@ -46,12 +46,12 @@
 #define BPFLOADER_U_QPR2_VERSION 41u
 #define BPFLOADER_PLATFORM_VERSION BPFLOADER_U_QPR2_VERSION
 
-// Android Mainline - this bpfloader should eventually go back to T (or even S)
+// Android Mainline BpfLoader when running on Android S (sdk=31)
 // Note: this value (and the following +1u's) are hardcoded in NetBpfLoad.cpp
-#define BPFLOADER_MAINLINE_VERSION 42u
+#define BPFLOADER_MAINLINE_S_VERSION 42u
 
 // Android Mainline BpfLoader when running on Android T (sdk=33)
-#define BPFLOADER_MAINLINE_T_VERSION (BPFLOADER_MAINLINE_VERSION + 1u)
+#define BPFLOADER_MAINLINE_T_VERSION (BPFLOADER_MAINLINE_S_VERSION + 1u)
 
 // Android Mainline BpfLoader when running on Android U (sdk=34)
 #define BPFLOADER_MAINLINE_U_VERSION (BPFLOADER_MAINLINE_T_VERSION + 1u)
@@ -112,7 +112,7 @@
     unsigned int _bpfloader_max_ver SECTION("bpfloader_max_ver") = BPFLOADER_MAX_VER;              \
     size_t _size_of_bpf_map_def SECTION("size_of_bpf_map_def") = sizeof(struct bpf_map_def);       \
     size_t _size_of_bpf_prog_def SECTION("size_of_bpf_prog_def") = sizeof(struct bpf_prog_def);    \
-    unsigned _btf_min_bpfloader_ver SECTION("btf_min_bpfloader_ver") = BPFLOADER_MAINLINE_VERSION; \
+    unsigned _btf_min_bpfloader_ver SECTION("btf_min_bpfloader_ver") = BPFLOADER_MAINLINE_S_VERSION; \
     unsigned _btf_user_min_bpfloader_ver SECTION("btf_user_min_bpfloader_ver") = 0xFFFFFFFFu;      \
     char _license[] SECTION("license") = (NAME)
 
