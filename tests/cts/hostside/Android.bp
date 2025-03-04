@@ -27,7 +27,7 @@ java_defaults {
     // Note that some of the test helper apps (e.g., CtsHostsideNetworkCapTestsAppSdk33) override
     // this with older SDK versions.
     // Also note that unlike android_test targets, "current" does not work: the target SDK is set to
-    // something like "VanillaIceCream" instead of 100000. This means that the tests will not run on
+    // something like "VanillaIceCream" instead of 10000. This means that the tests will not run on
     // released devices with errors such as "Requires development platform VanillaIceCream but this
     // is a release platform".
     target_sdk_version: "10000",
