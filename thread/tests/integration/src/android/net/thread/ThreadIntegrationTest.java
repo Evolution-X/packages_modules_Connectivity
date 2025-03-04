@@ -132,10 +132,6 @@ public class ThreadIntegrationTest {
         mOtCtl = new OtDaemonController();
         mController.setEnabledAndWait(true);
         mController.leaveAndWait();
-
-        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
-        mOtCtl.factoryReset();
-
         mFtd = new FullThreadDevice(10 /* nodeId */);
     }
 
@@ -352,7 +348,6 @@ public class ThreadIntegrationTest {
         mOtCtl.executeCommand("netdata register");
 
         mController.leaveAndWait();
-        mOtCtl.factoryReset();
         mController.joinAndWait(DEFAULT_DATASET);
 
         LinkProperties lp = cm.getLinkProperties(getThreadNetwork(CALLBACK_TIMEOUT));
