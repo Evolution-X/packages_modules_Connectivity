@@ -1125,7 +1125,11 @@ public class IpServer extends StateMachineShim {
             }
 
             try {
-                NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, mIfaceName);
+                // Enable IPv6, disable accepting RA, etc. See TetherController::tetherInterface()
+                // for more detail.
+                mNetd.tetherInterfaceAdd(mIfaceName);
+                NetdUtils.networkAddInterface(mNetd, LOCAL_NET_ID, mIfaceName,
+                        20 /* maxAttempts */, 50 /* pollingIntervalMs */);
                 // Activate a route to dest and IPv6 link local.
                 NetdUtils.modifyRoute(mNetd, NetdUtils.ModifyOperation.ADD, LOCAL_NET_ID,
                         new RouteInfo(asIpPrefix(mIpv4Address), null, mIfaceName, RTN_UNICAST));
@@ -1152,8 +1156,13 @@ public class IpServer extends StateMachineShim {
             // all in sequence.
             stopIPv6();
 
+            // Reset interface for tethering.
             try {
-                NetdUtils.untetherInterface(mNetd, LOCAL_NET_ID, mIfaceName);
+                try {
+                    mNetd.tetherInterfaceRemove(mIfaceName);
+                } finally {
+                    mNetd.networkRemoveInterface(LOCAL_NET_ID, mIfaceName);
+                }
             } catch (RemoteException | ServiceSpecificException e) {
                 mLastError = TETHER_ERROR_UNTETHER_IFACE_ERROR;
                 mLog.e("Failed to untether interface: " + e);
