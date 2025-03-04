@@ -39,7 +39,6 @@ import static org.mockito.Mockito.when;
 
 import android.net.INetd;
 import android.net.InterfaceConfigurationParcel;
-import android.net.IpPrefix;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 
@@ -61,7 +60,6 @@ public class NetdUtilsTest {
     @Mock private INetd mNetd;
 
     private static final String IFACE = "TEST_IFACE";
-    private static final IpPrefix TEST_IPPREFIX = new IpPrefix("192.168.42.1/24");
     private static final int TEST_NET_ID = 123;
 
     @Before
@@ -163,7 +161,7 @@ public class NetdUtilsTest {
         setNetworkAddInterfaceOutcome(new ServiceSpecificException(expectedCode), expectedTries);
 
         try {
-            NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE, TEST_IPPREFIX, 20, 0);
+            NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE, 20, 0);
             fail("Expect throw ServiceSpecificException");
         } catch (ServiceSpecificException e) {
             assertEquals(e.errorCode, expectedCode);
@@ -177,7 +175,7 @@ public class NetdUtilsTest {
         setNetworkAddInterfaceOutcome(new RemoteException(), expectedTries);
 
         try {
-            NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE, TEST_IPPREFIX, 20, 0);
+            NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE, 20, 0);
             fail("Expect throw RemoteException");
         } catch (RemoteException e) { }
 
@@ -196,10 +194,9 @@ public class NetdUtilsTest {
     private void verifyTetherInterfaceSucceeds(int expectedTries) throws Exception {
         setNetworkAddInterfaceOutcome(null, expectedTries);
 
-        NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE, TEST_IPPREFIX);
+        NetdUtils.tetherInterface(mNetd, TEST_NET_ID, IFACE);
         verify(mNetd).tetherInterfaceAdd(IFACE);
         verify(mNetd, times(expectedTries)).networkAddInterface(TEST_NET_ID, IFACE);
-        verify(mNetd, times(2)).networkAddRoute(eq(TEST_NET_ID), eq(IFACE), any(), any());
         verifyNoMoreInteractions(mNetd);
         reset(mNetd);
     }

@@ -149,22 +149,17 @@ public class NetdUtils {
     }
 
     /** Setup interface for tethering. */
-    public static void tetherInterface(final INetd netd, int netId, final String iface,
-            final IpPrefix dest) throws RemoteException, ServiceSpecificException {
-        tetherInterface(netd, netId, iface, dest, 20 /* maxAttempts */, 50 /* pollingIntervalMs */);
+    public static void tetherInterface(final INetd netd, int netId, final String iface)
+            throws RemoteException, ServiceSpecificException {
+        tetherInterface(netd, netId, iface, 20 /* maxAttempts */, 50 /* pollingIntervalMs */);
     }
 
     /** Setup interface with configurable retries for tethering. */
     public static void tetherInterface(final INetd netd, int netId, final String iface,
-            final IpPrefix dest, int maxAttempts, int pollingIntervalMs)
+            int maxAttempts, int pollingIntervalMs)
             throws RemoteException, ServiceSpecificException {
         netd.tetherInterfaceAdd(iface);
         networkAddInterface(netd, netId, iface, maxAttempts, pollingIntervalMs);
-        // Activate a route to dest and IPv6 link local.
-        modifyRoute(netd, ModifyOperation.ADD, netId,
-                new RouteInfo(dest, null, iface, RTN_UNICAST));
-        modifyRoute(netd, ModifyOperation.ADD, netId,
-                new RouteInfo(new IpPrefix("fe80::/64"), null, iface, RTN_UNICAST));
     }
 
     /**
