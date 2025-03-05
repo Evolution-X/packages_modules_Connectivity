@@ -41,4 +41,5 @@ android_test {
     ],
 
     sdk_version: "test_current",
+    min_sdk_version: "VanillaIceCream",
 }
