@@ -56,15 +56,15 @@ cc_binary {
     installable: false,
 }
 
-// Versioned netbpfload init rc: init system will process it only on api T/33+ devices
+// Versioned netbpfload init rc: init system will process it only on api S/31+ devices
 // Note: R[30] S[31] Sv2[32] T[33] U[34] V[35])
 //
 // For details of versioned rc files see:
 // https://android.googlesource.com/platform/system/core/+/HEAD/init/README.md#versioned-rc-files-within-apexs
 prebuilt_etc {
-    name: "netbpfload.33rc",
-    src: "netbpfload.33rc",
-    filename: "netbpfload.33rc",
+    name: "netbpfload.31rc",
+    src: "netbpfload.31rc",
+    filename: "netbpfload.31rc",
     installable: false,
 }
 
