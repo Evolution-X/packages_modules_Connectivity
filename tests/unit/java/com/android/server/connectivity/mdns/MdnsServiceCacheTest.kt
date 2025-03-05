@@ -208,7 +208,10 @@ class MdnsServiceCacheTest {
     @Test
     fun testServiceExpiredAndSendCallbacks() {
         val serviceCache = MdnsServiceCache(
-                thread.looper, makeFlags(isExpiredServicesRemovalEnabled = true), clock)
+                thread.looper,
+            makeFlags(isExpiredServicesRemovalEnabled = true),
+            clock
+        )
         // Register service expired callbacks
         val callback1 = ExpiredRecord()
         val callback2 = ExpiredRecord()
@@ -218,12 +221,21 @@ class MdnsServiceCacheTest {
         doReturn(TEST_ELAPSED_REALTIME_MS).`when`(clock).elapsedRealtime()
 
         // Add multiple services with different ttl time.
-        addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_1, SERVICE_TYPE_1,
-                DEFAULT_TTL_TIME_MS))
-        addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_2, SERVICE_TYPE_1,
-                DEFAULT_TTL_TIME_MS + 20L))
-        addOrUpdateService(serviceCache, cacheKey2, createResponse(SERVICE_NAME_3, SERVICE_TYPE_2,
-                DEFAULT_TTL_TIME_MS + 10L))
+        addOrUpdateService(serviceCache, cacheKey1, createResponse(
+            SERVICE_NAME_1,
+            SERVICE_TYPE_1,
+                DEFAULT_TTL_TIME_MS
+        ))
+        addOrUpdateService(serviceCache, cacheKey1, createResponse(
+            SERVICE_NAME_2,
+            SERVICE_TYPE_1,
+                DEFAULT_TTL_TIME_MS + 20L
+        ))
+        addOrUpdateService(serviceCache, cacheKey2, createResponse(
+            SERVICE_NAME_3,
+            SERVICE_TYPE_2,
+                DEFAULT_TTL_TIME_MS + 10L
+        ))
 
         // Check the service expiration immediately. Should be no callback.
         assertEquals(2, getServices(serviceCache, cacheKey1).size)
@@ -252,16 +264,25 @@ class MdnsServiceCacheTest {
     @Test
     fun testRemoveExpiredServiceWhenGetting() {
         val serviceCache = MdnsServiceCache(
-                thread.looper, makeFlags(isExpiredServicesRemovalEnabled = true), clock)
+                thread.looper,
+            makeFlags(isExpiredServicesRemovalEnabled = true),
+            clock
+        )
 
         doReturn(TEST_ELAPSED_REALTIME_MS).`when`(clock).elapsedRealtime()
-        addOrUpdateService(serviceCache, cacheKey1,
-                createResponse(SERVICE_NAME_1, SERVICE_TYPE_1, 1L /* ttlTime */))
+        addOrUpdateService(
+            serviceCache,
+            cacheKey1,
+                createResponse(SERVICE_NAME_1, SERVICE_TYPE_1, 1L /* ttlTime */)
+        )
         doReturn(TEST_ELAPSED_REALTIME_MS + 2L).`when`(clock).elapsedRealtime()
         assertNull(getService(serviceCache, SERVICE_NAME_1, cacheKey1))
 
-        addOrUpdateService(serviceCache, cacheKey2,
-                createResponse(SERVICE_NAME_2, SERVICE_TYPE_2, 3L /* ttlTime */))
+        addOrUpdateService(
+            serviceCache,
+            cacheKey2,
+                createResponse(SERVICE_NAME_2, SERVICE_TYPE_2, 3L /* ttlTime */)
+        )
         doReturn(TEST_ELAPSED_REALTIME_MS + 4L).`when`(clock).elapsedRealtime()
         assertEquals(0, getServices(serviceCache, cacheKey2).size)
     }
@@ -334,8 +355,11 @@ class MdnsServiceCacheTest {
     ): MdnsResponse {
         val serviceName = "$serviceInstanceName.$serviceType".split(".").toTypedArray()
         val response = MdnsResponse(
-                0 /* now */, "$serviceInstanceName.$serviceType".split(".").toTypedArray(),
-                socketKey.interfaceIndex, socketKey.network)
+                0 /* now */,
+            "$serviceInstanceName.$serviceType".split(".").toTypedArray(),
+                socketKey.interfaceIndex,
+            socketKey.network
+        )
 
         // Set PTR record
         val pointerRecord = MdnsPointerRecord(
@@ -343,7 +367,8 @@ class MdnsServiceCacheTest {
                 TEST_ELAPSED_REALTIME_MS /* receiptTimeMillis */,
                 false /* cacheFlush */,
                 ttlTime /* ttlMillis */,
-                serviceName)
+                serviceName
+        )
         response.addPointerRecord(pointerRecord)
 
         // Set SRV record.
@@ -355,7 +380,8 @@ class MdnsServiceCacheTest {
                 0 /* servicePriority */,
                 0 /* serviceWeight */,
                 12345 /* port */,
-                arrayOf("hostname"))
+                arrayOf("hostname")
+        )
         response.serviceRecord = serviceRecord
         return response
     }
