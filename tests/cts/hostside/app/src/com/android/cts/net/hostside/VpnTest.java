@@ -1843,11 +1843,11 @@ public class VpnTest {
         final DetailedBlockedStatusCallback remoteUidCallback = new DetailedBlockedStatusCallback();
 
         // Create a TUN interface
-        final FileDescriptor tunFd = runWithShellPermissionIdentity(() -> {
+        final ParcelFileDescriptor tunFd = runWithShellPermissionIdentity(() -> {
             final TestNetworkManager tnm = mTestContext.getSystemService(TestNetworkManager.class);
             final TestNetworkInterface iface = tnm.createTunInterface(List.of(
                     TEST_IP4_DST_ADDR, TEST_IP6_DST_ADDR));
-            return iface.getFileDescriptor().getFileDescriptor();
+            return iface.getFileDescriptor();
         }, MANAGE_TEST_NETWORKS);
 
         // Create a remote UDP socket
@@ -1861,7 +1861,7 @@ public class VpnTest {
             remoteUidCallback.expectAvailableCallbacksWithBlockedReasonNone(network);
 
             // The remote UDP socket can receive packets coming from the TUN interface
-            checkBlockIncomingPacket(tunFd, remoteUdpFd, EXPECT_PASS);
+            checkBlockIncomingPacket(tunFd.getFileDescriptor(), remoteUdpFd, EXPECT_PASS);
 
             // Lockdown uid that has the remote UDP socket
             runWithShellPermissionIdentity(() -> {
@@ -1877,7 +1877,7 @@ public class VpnTest {
             if (SdkLevel.isAtLeastT()) {
                 // On T and above, lockdown rule drop packets not coming from lo regardless of the
                 // VPN connectivity.
-                checkBlockIncomingPacket(tunFd, remoteUdpFd, EXPECT_BLOCK);
+                checkBlockIncomingPacket(tunFd.getFileDescriptor(), remoteUdpFd, EXPECT_BLOCK);
             }
 
             // Start the VPN that has default routes. This VPN should have interface filtering rule
@@ -1889,9 +1889,9 @@ public class VpnTest {
                     null /* proxyInfo */, null /* underlyingNetworks */,
                     false /* isAlwaysMetered */);
 
-            checkBlockIncomingPacket(tunFd, remoteUdpFd, EXPECT_BLOCK);
+            checkBlockIncomingPacket(tunFd.getFileDescriptor(), remoteUdpFd, EXPECT_BLOCK);
         }, /* cleanup */ () -> {
-                Os.close(tunFd);
+                tunFd.close();
             }, /* cleanup */ () -> {
                 Os.close(remoteUdpFd);
             }, /* cleanup */ () -> {
