@@ -341,8 +341,8 @@ int BpfHandler::tagSocket(int sockFd, uint32_t tag, uid_t chargeUid, uid_t realU
     if (chargeUid == AID_CLAT) return -EPERM;
 
     // The socket destroy listener only monitors on the group {INET_TCP, INET_UDP, INET6_TCP,
-    // INET6_UDP}. Tagging listener unsupported socket causes that the tag can't be removed from
-    // tag map automatically. Eventually, the tag map may run out of space because of dead tag
+    // INET6_UDP}. Tagging listener unsupported sockets (on <5.10) means the tag cannot be
+    // removed from tag map automatically. Eventually, it may run out of space due to dead tag
     // entries. Note that although tagSocket() of net client has already denied the family which
     // is neither AF_INET nor AF_INET6, the family validation is still added here just in case.
     // See tagSocket in system/netd/client/NetdClient.cpp and
@@ -360,15 +360,19 @@ int BpfHandler::tagSocket(int sockFd, uint32_t tag, uid_t chargeUid, uid_t realU
         return -EAFNOSUPPORT;
     }
 
-    int socketProto;
-    socklen_t protoLen = sizeof(socketProto);
-    if (getsockopt(sockFd, SOL_SOCKET, SO_PROTOCOL, &socketProto, &protoLen)) {
-        ALOGE("Failed to getsockopt SO_PROTOCOL: %s, fd: %d", strerror(errno), sockFd);
-        return -errno;
-    }
-    if (socketProto != IPPROTO_UDP && socketProto != IPPROTO_TCP) {
-        ALOGV("Unsupported protocol: %d", socketProto);
-        return -EPROTONOSUPPORT;
+    // On 5.10+ the BPF_CGROUP_INET_SOCK_RELEASE hook takes care of cookie tag map cleanup
+    // during socket destruction. As such the socket destroy listener is superfluous.
+    if (!isAtLeastKernelVersion(5, 10, 0)) {
+        int socketProto;
+        socklen_t protoLen = sizeof(socketProto);
+        if (getsockopt(sockFd, SOL_SOCKET, SO_PROTOCOL, &socketProto, &protoLen)) {
+            ALOGE("Failed to getsockopt SO_PROTOCOL: %s, fd: %d", strerror(errno), sockFd);
+            return -errno;
+        }
+        if (socketProto != IPPROTO_UDP && socketProto != IPPROTO_TCP) {
+            ALOGV("Unsupported protocol: %d", socketProto);
+            return -EPROTONOSUPPORT;
+        }
     }
 
     uint64_t sock_cookie = getSocketCookie(sockFd);
