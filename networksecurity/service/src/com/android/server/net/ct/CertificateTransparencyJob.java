@@ -38,6 +38,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private final DataStore mDataStore;
     private final CertificateTransparencyDownloader mCertificateTransparencyDownloader;
     private final CompatibilityVersion mCompatVersion;
+    private final SignatureVerifier mSignatureVerifier;
     private final AlarmManager mAlarmManager;
     private final PendingIntent mPendingIntent;
 
@@ -49,11 +50,13 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
             Context context,
             DataStore dataStore,
             CertificateTransparencyDownloader certificateTransparencyDownloader,
-            CompatibilityVersion compatVersion) {
+            CompatibilityVersion compatVersion,
+            SignatureVerifier signatureVerifier) {
         mContext = context;
         mDataStore = dataStore;
         mCertificateTransparencyDownloader = certificateTransparencyDownloader;
         mCompatVersion = compatVersion;
+        mSignatureVerifier = signatureVerifier;
 
         mAlarmManager = context.getSystemService(AlarmManager.class);
         mPendingIntent =
@@ -127,6 +130,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
     private void startDependencies() {
         mDataStore.load();
         mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
+        mSignatureVerifier.loadAllowedKeys();
         mContext.registerReceiver(
                 mCertificateTransparencyDownloader,
                 new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
@@ -139,6 +143,7 @@ public class CertificateTransparencyJob extends BroadcastReceiver {
 
     private void stopDependencies() {
         mContext.unregisterReceiver(mCertificateTransparencyDownloader);
+        mSignatureVerifier.clearAllowedKeys();
         mCertificateTransparencyDownloader.clearCompatibilityVersions();
         mDataStore.delete();
 
