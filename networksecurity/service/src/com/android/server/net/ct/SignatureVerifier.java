@@ -30,6 +30,9 @@ import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.connectivity.resources.R;
+import com.android.server.connectivity.ConnectivityResources;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
@@ -39,19 +42,37 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /** Verifier of the log list signature. */
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 public class SignatureVerifier {
 
-    private final Context mContext;
     private static final String TAG = "SignatureVerifier";
+
+    private final Context mContext;
 
     @NonNull private Optional<PublicKey> mPublicKey = Optional.empty();
 
+    private final Set<PublicKey> mAllowedKeys = new HashSet<>();
+
     public SignatureVerifier(Context context) {
         mContext = context;
+    }
+
+    void loadAllowedKeys() {
+        try (InputStream input =
+                new ConnectivityResources(mContext).get().openRawResource(R.raw.ct_public_keys)) {
+            mAllowedKeys.addAll(PemReader.readKeysFrom(input));
+        } catch (GeneralSecurityException | IOException e) {
+            Log.e(TAG, "Error loading public keys", e);
+        }
+    }
+
+    void clearAllowedKeys() {
+        mAllowedKeys.clear();
     }
 
     @VisibleForTesting
@@ -82,7 +103,11 @@ public class SignatureVerifier {
     }
 
     @VisibleForTesting
-    void setPublicKey(PublicKey publicKey) {
+    void setPublicKey(PublicKey publicKey) throws GeneralSecurityException {
+        if (!mAllowedKeys.contains(publicKey)) {
+            // TODO(b/400704086): add logging for this failure.
+            throw new GeneralSecurityException("Public key not in allowlist");
+        }
         mPublicKey = Optional.of(publicKey);
     }
 
@@ -105,21 +130,18 @@ public class SignatureVerifier {
 
             byte[] signatureBytes = signatureStream.readAllBytes();
             statusBuilder.setSignature(new String(signatureBytes));
-            try {
-                byte[] decodedSigBytes = Base64.getDecoder().decode(signatureBytes);
 
-                if (!verifier.verify(decodedSigBytes)) {
-                    // Leave the UpdateState as UNKNOWN_STATE if successful as there are other
-                    // potential failures past the signature verification step
-                    statusBuilder.setState(SIGNATURE_VERIFICATION_FAILED);
-                }
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Invalid signature base64 encoding", e);
-                statusBuilder.setState(SIGNATURE_INVALID);
-                return statusBuilder.build();
+            if (!verifier.verify(Base64.getDecoder().decode(signatureBytes))) {
+                // Leave the UpdateState as UNKNOWN_STATE if successful as there are other
+                // potential failures past the signature verification step
+                statusBuilder.setState(SIGNATURE_VERIFICATION_FAILED);
             }
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Invalid signature base64 encoding", e);
+            statusBuilder.setState(SIGNATURE_INVALID);
+            return statusBuilder.build();
         } catch (InvalidKeyException e) {
-            Log.e(TAG, "Signature invalid for log list verification", e);
+            Log.e(TAG, "Key invalid for log list verification", e);
             statusBuilder.setState(SIGNATURE_INVALID);
             return statusBuilder.build();
         } catch (IOException | GeneralSecurityException e) {
@@ -134,5 +156,10 @@ public class SignatureVerifier {
         }
 
         return statusBuilder.build();
+    }
+
+    @VisibleForTesting
+    boolean addAllowedKey(PublicKey publicKey) {
+        return mAllowedKeys.add(publicKey);
     }
 }

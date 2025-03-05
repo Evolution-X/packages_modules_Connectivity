@@ -52,6 +52,7 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
     public CertificateTransparencyService(Context context) {
         DataStore dataStore = new DataStore(Config.PREFERENCES_FILE);
 
+        SignatureVerifier signatureVerifier = new SignatureVerifier(context);
         mCertificateTransparencyJob =
                 new CertificateTransparencyJob(
                         context,
@@ -60,13 +61,14 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
                                 context,
                                 dataStore,
                                 new DownloadHelper(context),
-                                new SignatureVerifier(context),
+                                signatureVerifier,
                                 new CertificateTransparencyLoggerImpl(dataStore)),
                         new CompatibilityVersion(
                                 Config.COMPATIBILITY_VERSION,
                                 Config.URL_SIGNATURE,
                                 Config.URL_LOG_LIST,
-                                Config.CT_ROOT_DIRECTORY_PATH));
+                                Config.CT_ROOT_DIRECTORY_PATH),
+                        signatureVerifier);
     }
 
     /**
