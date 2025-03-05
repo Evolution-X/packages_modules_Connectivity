@@ -201,6 +201,20 @@ public class MdnsServiceTypeClient {
                                 handler.obtainMessage(EVENT_START_QUERYTASK, args),
                                 timeToNextTaskMs);
                     }
+                    // Update the first query time based on the query result
+                    if (sentResult.queriedBaseType) {
+                        serviceCache.updateFirstQueryTimeForCachedServices(null /* serviceName */,
+                                Collections.emptyList() /* subtypes */, cacheKey, now);
+                    }
+                    if (sentResult.queriedSubtypes.size() != 0) {
+                        serviceCache.updateFirstQueryTimeForCachedServices(null /* serviceName */,
+                                sentResult.queriedSubtypes, cacheKey, now);
+                    }
+                    for (MdnsResponse service : sentResult.resolvedServices) {
+                        serviceCache.updateFirstQueryTimeForCachedServices(
+                                service.getServiceInstanceName(),
+                                Collections.emptyList() /* subtypes */, cacheKey, now);
+                    }
                     break;
                 }
                 default:

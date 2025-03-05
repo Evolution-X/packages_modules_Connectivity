@@ -20,6 +20,7 @@ import static com.android.net.module.util.DnsUtils.equalsIgnoreDnsCase;
 import static com.android.net.module.util.DnsUtils.toDnsUpperCase;
 import static com.android.net.module.util.HandlerUtils.ensureRunningOnHandlerThread;
 import static com.android.server.connectivity.mdns.MdnsResponse.EXPIRATION_NEVER;
+import static com.android.server.connectivity.mdns.util.MdnsUtils.responseMatchesInstanceNameAndSubtypes;
 
 import static java.lang.Math.min;
 
@@ -34,6 +35,7 @@ import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -49,6 +51,9 @@ import java.util.Objects;
  *  to their default value (0, false or null).
  */
 public class MdnsServiceCache {
+    @VisibleForTesting
+    static final long NEVER_SENT_QUERY = -1L;
+
     public static class CacheKey {
         @NonNull final String mUpperCaseServiceType;
         @NonNull final SocketKey mSocketKey;
@@ -82,10 +87,14 @@ public class MdnsServiceCache {
     public static class CachedService {
         @NonNull final MdnsResponse mService;
         boolean mServiceExpired;
+        // The timestamp of the first query sent after the service last received time (from the SRV
+        // record).
+        long mFirstQueryTimeAfterLastUpdate;
 
         CachedService(MdnsResponse service) {
             mService = service;
             mServiceExpired = false;
+            mFirstQueryTimeAfterLastUpdate = NEVER_SENT_QUERY;
         }
     }
 
@@ -394,6 +403,42 @@ public class MdnsServiceCache {
     }
 
     /**
+     * Update the query time for the cached services
+     *
+     * @param serviceName the target service name.
+     * @param cacheKey the target CacheKey.
+     * @param currentTime current time.
+     */
+    public void updateFirstQueryTimeForCachedServices(@Nullable String serviceName,
+            @NonNull Collection<String> subtypes, @NonNull CacheKey cacheKey, long currentTime) {
+        ensureRunningOnHandlerThread(mHandler);
+        final List<CachedService> cachedServices = mCachedServices.get(cacheKey);
+        if (cachedServices == null) {
+            // No such services.
+            return;
+        }
+        for (CachedService cachedService : cachedServices) {
+            if (cachedService.mFirstQueryTimeAfterLastUpdate != NEVER_SENT_QUERY) continue;
+            if (responseMatchesInstanceNameAndSubtypes(
+                    cachedService.mService, serviceName, subtypes)) {
+                cachedService.mFirstQueryTimeAfterLastUpdate = currentTime;
+            }
+        }
+    }
+
+    @VisibleForTesting
+    long getFirstQueryTimeAfterLastUpdate(@NonNull String serviceName, @NonNull CacheKey cacheKey) {
+        ensureRunningOnHandlerThread(mHandler);
+        final List<CachedService> cachedServices = mCachedServices.get(cacheKey);
+        if (cachedServices == null) {
+            return NEVER_SENT_QUERY;
+        }
+        final CachedService cachedService = findMatchedCachedService(cachedServices, serviceName);
+        return cachedService != null
+                ? cachedService.mFirstQueryTimeAfterLastUpdate : NEVER_SENT_QUERY;
+    }
+
+    /**
      * Dump ServiceCache state.
      */
     public void dump(PrintWriter pw, String indent) {
@@ -404,7 +449,9 @@ public class MdnsServiceCache {
             pw.println(indent + key);
             for (CachedService cachedService : mCachedServices.valueAt(i)) {
                 pw.println(indent + "  Response{ " + cachedService.mService
-                        + " } Expired=" + cachedService.mServiceExpired);
+                        + " } Expired=" + cachedService.mServiceExpired
+                        + " FirstQueryTimeAfterLastUpdate="
+                        + cachedService.mFirstQueryTimeAfterLastUpdate);
             }
             pw.println();
         }
