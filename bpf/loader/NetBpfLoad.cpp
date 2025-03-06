@@ -17,6 +17,7 @@
 #define LOG_TAG "NetBpfLoad"
 
 #include <arpa/inet.h>
+#include <bpf/libbpf.h>
 #include <dirent.h>
 #include <elf.h>
 #include <errno.h>
@@ -1438,10 +1439,12 @@ static int doLoad(char** argv, char * const envp[]) {
     if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
     if (isAtLeast25Q2) ++bpfloader_ver;  // [47] BPFLOADER_MAINLINE_25Q2_VERSION
 
-    ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
+    ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) libbpf: v%u.%u "
+          "uid:%d rc:%d%d",
           bpfloader_ver, argv[0], android_get_device_api_level(), api_level,
-          kernelVersion(), describeArch(), getuid(),
-          has_platform_bpfloader_rc, has_platform_netbpfload_rc);
+          kernelVersion(), describeArch(), libbpf_major_version(),
+          libbpf_minor_version(), getuid(), has_platform_bpfloader_rc,
+          has_platform_netbpfload_rc);
 
     if (!has_platform_bpfloader_rc && !has_platform_netbpfload_rc) {
         ALOGE("Unable to find platform's bpfloader & netbpfload init scripts.");
