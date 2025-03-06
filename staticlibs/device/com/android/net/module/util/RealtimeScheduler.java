@@ -227,6 +227,13 @@ public class RealtimeScheduler {
         return enqueueTask(new MessageTask(msg, SystemClock.elapsedRealtime() + delayMs), delayMs);
     }
 
+    private static boolean isMessageTask(Task task, int what) {
+        if (task instanceof MessageTask && ((MessageTask) task).mMessage.what == what) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Remove a scheduled message.
      *
@@ -234,8 +241,24 @@ public class RealtimeScheduler {
      */
     public void removeDelayedMessage(int what) {
         ensureRunningOnCorrectThread();
-        mTaskQueue.removeIf(task -> task instanceof MessageTask
-                && ((MessageTask) task).mMessage.what == what);
+        mTaskQueue.removeIf(task -> isMessageTask(task, what));
+    }
+
+    /**
+     * Check if there is a scheduled message.
+     *
+     * @param what the message to be checked
+     * @return true if there is a target message, false otherwise.
+     */
+    public boolean hasDelayedMessage(int what) {
+        ensureRunningOnCorrectThread();
+
+        for (Task task : mTaskQueue) {
+            if (isMessageTask(task, what)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
