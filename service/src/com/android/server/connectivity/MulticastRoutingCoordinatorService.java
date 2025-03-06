@@ -21,6 +21,7 @@ import static android.net.MulticastRoutingConfig.FORWARD_SELECTED;
 import static android.net.MulticastRoutingConfig.FORWARD_WITH_MIN_SCOPE;
 import static android.system.OsConstants.AF_INET6;
 import static android.system.OsConstants.EADDRINUSE;
+import static android.system.OsConstants.EADDRNOTAVAIL;
 import static android.system.OsConstants.IPPROTO_ICMPV6;
 import static android.system.OsConstants.IPPROTO_IPV6;
 import static android.system.OsConstants.SOCK_CLOEXEC;
@@ -258,6 +259,10 @@ public class MulticastRoutingCoordinatorService {
             mDependencies.setsockoptMrt6DelMif(mMulticastRoutingFd, virtualIndex);
             Log.d(TAG, "Removed mifi " + virtualIndex + " from MIF");
         } catch (ErrnoException e) {
+            if (e.errno == EADDRNOTAVAIL) {
+                Log.w(TAG, "multicast virtual interface " + virtualIndex + " already removed", e);
+                return;
+            }
             Log.e(TAG, "failed to remove multicast virtual interface" + virtualIndex, e);
         }
     }
