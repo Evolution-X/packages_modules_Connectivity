@@ -135,6 +135,15 @@
     <string-array translatable="false" name="config_nsdOffloadServicesPriority">
     </string-array>
 
+    <!-- An array of service types that shouldn't be offloaded via NsdManager#registerOffloadEngine.
+         Format is [service type], for example: "_testservice._tcp"
+         Due to limited RAM in hardware offload, we prioritize user-impacting services.
+         _googlezone._tcp, an internal Googlecast service, was therefore blocked.
+    -->
+    <string-array name="config_nsdOffloadServicesDenyList" translatable="false">
+        <item>_googlezone._tcp</item>
+    </string-array>
+
     <!-- Whether to use an ongoing notification for signing in to captive portals, instead of a
          notification that can be dismissed. -->
     <bool name="config_ongoingSignInNotification">false</bool>
