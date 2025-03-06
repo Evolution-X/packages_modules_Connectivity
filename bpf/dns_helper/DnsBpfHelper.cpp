@@ -32,10 +32,42 @@ namespace net {
     }                                                                                              \
   } while (0)
 
+// copied from BpfHandler.cpp
+static bool mainlineNetBpfLoadDone() {
+  return !access("/sys/fs/bpf/netd_shared/mainline_done", F_OK);
+}
+
+// copied from BpfHandler.cpp
+static inline void waitForNetProgsLoaded() {
+  // infinite loop until success with 5/10/20/40/60/60/60... delay
+  for (int delay = 5;; delay *= 2) {
+    if (delay > 60) delay = 60;
+    if (base::WaitForProperty("init.svc.mdnsd_netbpfload", "stopped", std::chrono::seconds(delay))
+      && mainlineNetBpfLoadDone()) return;
+    LOG(WARNING) << "Waited " << delay << "s for init.svc.mdnsd_netbpfload=stopped, still waiting.";
+  }
+}
+
 base::Result<void> DnsBpfHelper::init() {
-  if (!android::modules::sdklevel::IsAtLeastT()) {
-    LOG(ERROR) << __func__ << ": Unsupported before Android T.";
+  if (!android::modules::sdklevel::IsAtLeastS()) {
+    LOG(ERROR) << __func__ << ": Unsupported before Android S.";
     return base::Error(EOPNOTSUPP);
+  }
+
+  if (!android::modules::sdklevel::IsAtLeastT()) {
+    LOG(INFO) << "performing Android S mainline NetBpfload magic!";
+    if (!mainlineNetBpfLoadDone()) {
+      // We're on S/Sv2 & it's the first time netd is starting up (unless crashlooping)
+      if (!base::SetProperty("ctl.start", "mdnsd_netbpfload")) {
+        LOG(ERROR) << "Failed to set property ctl.start=mdnsd_netbpfload, see dmesg for reason.";
+        return base::Error(ENOEXEC);
+      }
+
+      LOG(INFO) << "Waiting for Networking BPF programs";
+      waitForNetProgsLoaded();
+      LOG(INFO) << "Networking BPF programs are loaded";
+    }
+    return {};
   }
 
   RETURN_IF_RESULT_NOT_OK(mConfigurationMap.init(CONFIGURATION_MAP_PATH));
