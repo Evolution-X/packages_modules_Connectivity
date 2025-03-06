@@ -103,8 +103,12 @@ IpClient.wlan1
       self, mock_adb_shell: MagicMock
   ) -> None:
     mock_adb_shell.return_value = """
+45: rmnet29: <POINTOPOINT,MULTICAST,NOARP> mtu 1500 qdisc ...
+ link/ether 73:01:23:45:df:e3 brd ff:ff:ff:ff:ff:ff
 46: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq ...
  link/ether 72:05:77:82:21:e0 brd ff:ff:ff:ff:ff:ff
+47: wlan1: <BROADCAST,MULTICAST> mtu 1500 qdisc ...
+ link/ether 6a:16:81:ff:82:9b brd ff:ff:ff:ff:ff:ff
 """
     mac_address = get_hardware_address(self.mock_ad, "wlan0")
     asserts.assert_equal(mac_address, "72:05:77:82:21:E0")
