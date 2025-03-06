@@ -1,0 +1,13 @@
+# This file takes effect only on S and Sv2
+# (Note: it does take effect on R as well, but isn't actually used)
+#
+# The service is started from netd's dnsresolver call into ADnsHelper_init()
+# on initial (boot time) startup of netd.
+
+service mdnsd_netbpfload /apex/com.android.tethering/bin/netbpfload
+    capabilities CHOWN SYS_ADMIN NET_ADMIN
+    group system root graphics network_stack net_admin net_bw_acct net_bw_stats net_raw
+    user system
+    rlimit memlock 1073741824 1073741824
+    oneshot
+    reboot_on_failure reboot,netbpfload-failed

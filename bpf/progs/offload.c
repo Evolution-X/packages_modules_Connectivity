@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-#ifdef MAINLINE
-// BTF is incompatible with bpfloaders < v0.10, hence for S (v0.2) we must
-// ship a different file than for later versions, but we need bpfloader v0.25+
-// for obj@ver.o support
-#define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_T_VERSION
-#else /* MAINLINE */
-// The resulting .o needs to load on the Android S bpfloader
-#define BPFLOADER_MIN_VER BPFLOADER_S_VERSION
-#define BPFLOADER_MAX_VER BPFLOADER_T_VERSION
-#endif /* MAINLINE */
+// The resulting .o needs to load on Android S+
+#define BPFLOADER_MIN_VER BPFLOADER_MAINLINE_S_VERSION
 
 #include "bpf_net_helpers.h"
 #include "offload.h"
