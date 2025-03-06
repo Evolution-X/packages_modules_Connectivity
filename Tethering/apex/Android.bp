@@ -102,15 +102,14 @@ apex {
         "dscpPolicy.o",
         "netd.o",
         "offload.o",
-        "offload@mainline.o",
         "test.o",
-        "test@mainline.o",
     ],
     apps: [
         "ServiceConnectivityResources",
     ],
     prebuilts: [
         "current_sdkinfo",
+        "netbpfload.31rc",
         "netbpfload.33rc",
         "netbpfload.35rc",
         "ot-daemon.34rc",
