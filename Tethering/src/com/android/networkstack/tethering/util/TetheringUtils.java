@@ -15,7 +15,11 @@
  */
 package com.android.networkstack.tethering.util;
 
+import static android.net.TetheringManager.CONNECTIVITY_SCOPE_GLOBAL;
+import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
+
 import android.net.TetherStatsParcel;
+import android.net.TetheringManager.TetheringRequest;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -165,5 +169,42 @@ public class TetheringUtils {
                     + Arrays.toString(ALL_NODES) + " and scopedId " + scopeId);
             return null;
         }
+    }
+
+    /**
+     * Create a legacy tethering request for calls to the legacy tether() API, which doesn't take an
+     * explicit request. These are always CONNECTIVITY_SCOPE_GLOBAL, per historical behavior.
+     */
+    @NonNull
+    public static TetheringRequest createLegacyGlobalScopeTetheringRequest(int type) {
+        final TetheringRequest request = new TetheringRequest.Builder(type).build();
+        request.getParcel().requestType = TetheringRequest.REQUEST_TYPE_LEGACY;
+        request.getParcel().connectivityScope = CONNECTIVITY_SCOPE_GLOBAL;
+        return request;
+    }
+
+    /**
+     * Create a local-only implicit tethering request. This is used for Wifi local-only hotspot and
+     * Wifi P2P, which start tethering based on the WIFI_(AP/P2P)_STATE_CHANGED broadcasts.
+     */
+    @NonNull
+    public static TetheringRequest createImplicitLocalOnlyTetheringRequest(int type) {
+        final TetheringRequest request = new TetheringRequest.Builder(type).build();
+        request.getParcel().requestType = TetheringRequest.REQUEST_TYPE_IMPLICIT;
+        request.getParcel().connectivityScope = CONNECTIVITY_SCOPE_LOCAL;
+        return request;
+    }
+
+    /**
+     * Create a placeholder request. This is used in case we try to find a pending request but there
+     * is none (e.g. stopTethering removed a pending request), or for cases where we only have the
+     * tethering type (e.g. stopTethering(int)).
+     */
+    @NonNull
+    public static TetheringRequest createPlaceholderRequest(int type) {
+        final TetheringRequest request = new TetheringRequest.Builder(type).build();
+        request.getParcel().requestType = TetheringRequest.REQUEST_TYPE_PLACEHOLDER;
+        request.getParcel().connectivityScope = CONNECTIVITY_SCOPE_GLOBAL;
+        return request;
     }
 }

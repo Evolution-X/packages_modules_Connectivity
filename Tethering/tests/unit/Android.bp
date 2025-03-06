@@ -57,6 +57,7 @@ java_defaults {
         "mockito-target-extended-minus-junit4",
         "net-tests-utils",
         "testables",
+        "truth",
     ],
     // TODO(b/147200698) change sdk_version to module-current and
     // remove framework-minus-apex, ext, and framework-res
