@@ -162,14 +162,18 @@ def get_hardware_address(
   """
 
   # Run the "ip link" command and get its output.
-  ip_link_output = adb_utils.adb_shell(ad, f"ip link show {iface_name}")
+  ip_link_output = adb_utils.adb_shell(ad, f"ip link")
 
   # Regular expression to extract the MAC address.
   # Parse hardware address from ip link output like below:
+  # 45: rmnet29: <POINTOPOINT,MULTICAST,NOARP> mtu 1500 qdisc ...
+  #    link/ether 73:01:23:45:df:e3 brd ff:ff:ff:ff:ff:ff
   # 46: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq ...
   #    link/ether 72:05:77:82:21:e0 brd ff:ff:ff:ff:ff:ff
-  pattern = r"link/ether (([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})"
-  match = re.search(pattern, ip_link_output)
+  # 47: wlan1: <BROADCAST,MULTICAST> mtu 1500 qdisc ...
+  #    link/ether 6a:16:81:ff:82:9b brd ff:ff:ff:ff:ff:ff"
+  pattern = rf"{iface_name}:.*?link/ether (([0-9a-fA-F]{{2}}:){{5}}[0-9a-fA-F]{{2}})"
+  match = re.search(pattern, ip_link_output, re.DOTALL)
 
   if match:
     return match.group(1).upper()  # Extract the MAC address string.
