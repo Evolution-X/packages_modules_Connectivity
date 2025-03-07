@@ -148,25 +148,6 @@ public class NetdUtils {
         netd.tetherStartWithConfiguration(config);
     }
 
-    /** Setup interface for tethering. */
-    public static void tetherInterface(final INetd netd, int netId, final String iface,
-            final IpPrefix dest) throws RemoteException, ServiceSpecificException {
-        tetherInterface(netd, netId, iface, dest, 20 /* maxAttempts */, 50 /* pollingIntervalMs */);
-    }
-
-    /** Setup interface with configurable retries for tethering. */
-    public static void tetherInterface(final INetd netd, int netId, final String iface,
-            final IpPrefix dest, int maxAttempts, int pollingIntervalMs)
-            throws RemoteException, ServiceSpecificException {
-        netd.tetherInterfaceAdd(iface);
-        networkAddInterface(netd, netId, iface, maxAttempts, pollingIntervalMs);
-        // Activate a route to dest and IPv6 link local.
-        modifyRoute(netd, ModifyOperation.ADD, netId,
-                new RouteInfo(dest, null, iface, RTN_UNICAST));
-        modifyRoute(netd, ModifyOperation.ADD, netId,
-                new RouteInfo(new IpPrefix("fe80::/64"), null, iface, RTN_UNICAST));
-    }
-
     /**
      * Retry Netd#networkAddInterface for EBUSY error code.
      * If the same interface (e.g., wlan0) is in client mode and then switches to tethered mode.
@@ -174,7 +155,7 @@ public class NetdUtils {
      * in use in netd because the ConnectivityService thread hasn't processed the disconnect yet.
      * See b/158269544 for detail.
      */
-    private static void networkAddInterface(final INetd netd, int netId, final String iface,
+    public static void networkAddInterface(final INetd netd, int netId, final String iface,
             int maxAttempts, int pollingIntervalMs)
             throws ServiceSpecificException, RemoteException {
         for (int i = 1; i <= maxAttempts; i++) {
@@ -190,16 +171,6 @@ public class NetdUtils {
                 Log.e(TAG, "Retry Netd#networkAddInterface failure: " + e);
                 throw e;
             }
-        }
-    }
-
-    /** Reset interface for tethering. */
-    public static void untetherInterface(final INetd netd, int netId, String iface)
-            throws RemoteException, ServiceSpecificException {
-        try {
-            netd.tetherInterfaceRemove(iface);
-        } finally {
-            netd.networkRemoveInterface(netId, iface);
         }
     }
 
