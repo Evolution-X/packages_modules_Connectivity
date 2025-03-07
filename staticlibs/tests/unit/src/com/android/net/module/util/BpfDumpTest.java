@@ -17,18 +17,13 @@
 package com.android.net.module.util;
 
 import static android.system.OsConstants.EPERM;
-import static android.system.OsConstants.R_OK;
-
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import android.annotation.Nullable;
 import android.system.ErrnoException;
-import android.system.Os;
 import android.util.Pair;
 
 import androidx.test.filters.SmallTest;
@@ -38,7 +33,6 @@ import com.android.testutils.TestBpfMap;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.MockitoSession;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -129,9 +123,14 @@ public class BpfDumpTest {
         assertTrue(dump.contains("key=789, val=123"));
     }
 
-    private String getDumpMapStatus(final IBpfMap<Struct.S32, Struct.S32> map) {
+    private String getDumpMapStatus(final IBpfMap<Struct.S32, Struct.S32> map,
+            @Nullable final BpfDump.Dependencies deps) {
         final StringWriter sw = new StringWriter();
-        BpfDump.dumpMapStatus(map, new PrintWriter(sw), "mapName", "mapPath");
+        if (deps == null) {
+            BpfDump.dumpMapStatus(map, new PrintWriter(sw), "mapName", "mapPath");
+        } else {
+            BpfDump.dumpMapStatus(map, new PrintWriter(sw), "mapName", "mapPath", deps);
+        }
         return sw.toString();
     }
 
@@ -139,25 +138,34 @@ public class BpfDumpTest {
     public void testGetMapStatus() {
         final IBpfMap<Struct.S32, Struct.S32> map =
                 new TestBpfMap<>(Struct.S32.class, Struct.S32.class);
-        assertEquals("mapName: OK\n", getDumpMapStatus(map));
+        assertEquals("mapName: OK\n", getDumpMapStatus(map, null /* deps */));
     }
 
     @Test
-    public void testGetMapStatusNull() {
-        final MockitoSession session = mockitoSession()
-                .spyStatic(Os.class)
-                .startMocking();
-        try {
-            // Os.access succeeds
-            doReturn(true).when(() -> Os.access("mapPath", R_OK));
-            assertEquals("mapName: NULL(map is pinned to mapPath)\n", getDumpMapStatus(null));
+    public void testGetMapStatusNull_accessSucceed() {
+        // Os.access succeeds
+        assertEquals("mapName: NULL(map is pinned to mapPath)\n",
+                getDumpMapStatus(null /* map */,
+                        new BpfDump.Dependencies() {
+                            @Override
+                            public boolean access(String path, int mode) {
+                                return true;
+                            }
+                        })
+        );
+    }
 
-            // Os.access throws EPERM
-            doThrow(new ErrnoException("", EPERM)).when(() -> Os.access("mapPath", R_OK));
-            assertEquals("mapName: NULL(map is not pinned to mapPath: Operation not permitted)\n",
-                    getDumpMapStatus(null));
-        } finally {
-            session.finishMocking();
-        }
+    @Test
+    public void testGetMapStatusNull_accessThrow() {
+        // Os.access throws EPERM
+        assertEquals("mapName: NULL(map is not pinned to mapPath: Operation not permitted)\n",
+                getDumpMapStatus(null /* map */,
+                        new BpfDump.Dependencies(){
+                            @Override
+                            public boolean access(String path, int mode) throws ErrnoException {
+                                throw new ErrnoException("", EPERM);
+                            }
+                        })
+        );
     }
 }
