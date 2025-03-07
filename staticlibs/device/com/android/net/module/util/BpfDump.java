@@ -23,6 +23,7 @@ import android.util.Base64;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
@@ -132,17 +133,35 @@ public class BpfDump {
         }
     }
 
+    public static class Dependencies {
+        /**
+         * Call {@link Os#access}
+         */
+        public boolean access(String path, int mode) throws ErrnoException {
+            return Os.access(path, mode);
+        }
+    }
+
     /**
      * Dump the BpfMap status
      */
     public static <K extends Struct, V extends Struct> void dumpMapStatus(IBpfMap<K, V> map,
             PrintWriter pw, String mapName, String path) {
+        dumpMapStatus(map, pw, mapName, path, new Dependencies());
+    }
+
+    /**
+     * Dump the BpfMap status. Only test should use this method directly.
+     */
+    @VisibleForTesting
+    public static <K extends Struct, V extends Struct> void dumpMapStatus(IBpfMap<K, V> map,
+            PrintWriter pw, String mapName, String path, Dependencies deps) {
         if (map != null) {
             pw.println(mapName + ": OK");
             return;
         }
         try {
-            Os.access(path, R_OK);
+            deps.access(path, R_OK);
             pw.println(mapName + ": NULL(map is pinned to " + path + ")");
         } catch (ErrnoException e) {
             pw.println(mapName + ": NULL(map is not pinned to " + path + ": "
