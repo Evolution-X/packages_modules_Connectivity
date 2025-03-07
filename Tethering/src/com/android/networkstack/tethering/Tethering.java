@@ -290,7 +290,10 @@ public class Tethering {
     private SettingsObserver mSettingsObserver;
     private BluetoothPan mBluetoothPan;
     private PanServiceListener mBluetoothPanListener;
-    private final ArrayList<IIntResultListener> mPendingPanRequestListeners;
+    // Pending listener for starting Bluetooth tethering before the PAN service is connected. Once
+    // the service is connected, the bluetooth iface will be requested and the listener will be
+    // called.
+    private IIntResultListener mPendingPanRequestListener;
     // AIDL doesn't support Set<Integer>. Maintain a int bitmap here. When the bitmap is passed to
     // TetheringManager, TetheringManager would convert it to a set of Integer types.
     // mSupportedTypeBitmap should always be updated inside tethering internal thread but it may be
@@ -307,11 +310,6 @@ public class Tethering {
         mNotificationUpdater = mDeps.makeNotificationUpdater(mContext, mLooper);
         mTetheringMetrics = mDeps.makeTetheringMetrics(mContext);
         mRequestTracker = new RequestTracker();
-
-        // This is intended to ensrure that if something calls startTethering(bluetooth) just after
-        // bluetooth is enabled. Before onServiceConnected is called, store the calls into this
-        // list and handle them as soon as onServiceConnected is called.
-        mPendingPanRequestListeners = new ArrayList<>();
 
         mTetherStates = new ArrayMap<>();
         mConnectedClientsTracker = new ConnectedClientsTracker();
@@ -862,15 +860,21 @@ public class Tethering {
         if (!enable) {
             // The service is not connected. If disabling tethering, there's no point starting
             // the service just to stop tethering since tethering is not started. Just remove
-            // any pending requests to enable tethering, and notify them that they have failed.
-            for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
-                sendTetherResult(pendingListener, TETHER_ERROR_SERVICE_UNAVAIL,
+            // any pending request to enable tethering, and notify them that they have failed.
+            if (mPendingPanRequestListener != null) {
+                sendTetherResult(mPendingPanRequestListener, TETHER_ERROR_SERVICE_UNAVAIL,
                         TETHERING_BLUETOOTH);
             }
-            mPendingPanRequestListeners.clear();
+            mPendingPanRequestListener = null;
             return TETHER_ERROR_NO_ERROR;
         }
-        mPendingPanRequestListeners.add(listener);
+
+        // Only allow one pending request at a time.
+        if (mPendingPanRequestListener != null) {
+            return TETHER_ERROR_SERVICE_UNAVAIL;
+        }
+
+        mPendingPanRequestListener = listener;
 
         // Bluetooth tethering is not a popular feature. To avoid bind to bluetooth pan service all
         // the time but user never use bluetooth tethering. mBluetoothPanListener is created first
@@ -897,12 +901,12 @@ public class Tethering {
                 mBluetoothPan = (BluetoothPan) proxy;
                 mIsConnected = true;
 
-                for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
+                if (mPendingPanRequestListener != null) {
                     final int result = setBluetoothTetheringSettings(mBluetoothPan,
                             true /* enable */);
-                    sendTetherResult(pendingListener, result, TETHERING_BLUETOOTH);
+                    sendTetherResult(mPendingPanRequestListener, result, TETHERING_BLUETOOTH);
                 }
-                mPendingPanRequestListeners.clear();
+                mPendingPanRequestListener = null;
             });
         }
 
@@ -913,11 +917,11 @@ public class Tethering {
                 // reachable before next onServiceConnected.
                 mIsConnected = false;
 
-                for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
-                    sendTetherResult(pendingListener, TETHER_ERROR_SERVICE_UNAVAIL,
+                if (mPendingPanRequestListener != null) {
+                    sendTetherResult(mPendingPanRequestListener, TETHER_ERROR_SERVICE_UNAVAIL,
                             TETHERING_BLUETOOTH);
                 }
-                mPendingPanRequestListeners.clear();
+                mPendingPanRequestListener = null;
                 mBluetoothIfaceRequest = null;
                 mBluetoothCallback = null;
                 maybeDisableBluetoothIpServing();
