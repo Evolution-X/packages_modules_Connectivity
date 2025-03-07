@@ -25,7 +25,6 @@ java_library {
     ],
     defaults: [
         "framework-connectivity-test-defaults",
-        "lib_mockito_extended",
     ],
     libs: [
         "androidx.annotation_annotation",
@@ -36,6 +35,7 @@ java_library {
         "collector-device-lib",
         "kotlin-reflect",
         "libnanohttpd",
+        "mockito-target-minus-junit4",
         "net-tests-utils-host-device-common",
         "net-utils-device-common",
         "net-utils-device-common-async",
