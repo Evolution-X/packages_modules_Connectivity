@@ -36,6 +36,7 @@ import android.net.apf.ApfConstants.IPV6_HEADER_LEN
 import android.net.apf.ApfConstants.IPV6_NEXT_HEADER_OFFSET
 import android.net.apf.ApfConstants.IPV6_SRC_ADDR_OFFSET
 import android.net.apf.ApfCounterTracker
+import android.net.apf.ApfCounterTracker.Counter.DROPPED_IPV6_NS_INVALID
 import android.net.apf.ApfCounterTracker.Counter.DROPPED_IPV6_NS_REPLIED_NON_DAD
 import android.net.apf.ApfCounterTracker.Counter.FILTER_AGE_16384THS
 import android.net.apf.ApfCounterTracker.Counter.PASSED_IPV6_ICMP
@@ -99,6 +100,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.random.Random
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import org.junit.After
@@ -463,18 +465,18 @@ class ApfIntegrationTest {
         assertThat(readResult).isEqualTo(program)
     }
 
-    fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply() {
+    fun ApfV4GeneratorBase<*>.addPassIfNotIcmpv6EchoReply(skipPacketLabel: Short) {
         // If not IPv6 -> PASS
         addLoad16intoR0(ETH_ETHERTYPE_OFFSET)
-        addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), BaseApfGenerator.PASS_LABEL)
+        addJumpIfR0NotEquals(ETH_P_IPV6.toLong(), skipPacketLabel)
 
         // If not ICMPv6 -> PASS
         addLoad8intoR0(IPV6_NEXT_HEADER_OFFSET)
-        addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), BaseApfGenerator.PASS_LABEL)
+        addJumpIfR0NotEquals(IPPROTO_ICMPV6.toLong(), skipPacketLabel)
 
         // If not echo reply -> PASS
         addLoad8intoR0(ICMP6_TYPE_OFFSET)
-        addJumpIfR0NotEquals(0x81, BaseApfGenerator.PASS_LABEL)
+        addJumpIfR0NotEquals(0x81, skipPacketLabel)
     }
 
     // APF integration is mostly broken before V
@@ -510,21 +512,35 @@ class ApfIntegrationTest {
                 caps.maximumApfProgramSize
         )
 
+        val skipPacketLabel = gen.uniqueLabel
         // If not ICMPv6 Echo Reply -> PASS
-        gen.addPassIfNotIcmpv6EchoReply()
+        gen.addPassIfNotIcmpv6EchoReply(skipPacketLabel)
 
         // if not data matches -> PASS
         gen.addLoadImmediate(R0, ICMP6_TYPE_OFFSET + PING_HEADER_LENGTH)
-        gen.addJumpIfBytesAtR0NotEqual(data, BaseApfGenerator.PASS_LABEL)
+        gen.addJumpIfBytesAtR0NotEqual(data, skipPacketLabel)
 
         // else DROP
-        gen.addJump(BaseApfGenerator.DROP_LABEL)
+        // Warning: the program abuse DROPPED_IPV6_NS_INVALID/PASSED_IPV6_ICMP for debugging purpose
+        gen.addCountAndDrop(DROPPED_IPV6_NS_INVALID)
+            .defineLabel(skipPacketLabel)
+            .addCountAndPass(PASSED_IPV6_ICMP)
+            .addCountTrampoline()
 
         val program = gen.generate()
         installAndVerifyProgram(program)
 
+        val counterBefore = ApfCounterTracker.getCounterValue(
+            readProgram(),
+            DROPPED_IPV6_NS_INVALID
+        )
         packetReader.sendPing(data, payloadSize)
         packetReader.expectPingDropped()
+        val counterAfter = ApfCounterTracker.getCounterValue(
+            readProgram(),
+            DROPPED_IPV6_NS_INVALID
+        )
+        assertEquals(counterBefore + 1, counterAfter)
     }
 
     fun clearApfMemory() = installProgram(ByteArray(caps.maximumApfProgramSize))
@@ -549,7 +565,7 @@ class ApfIntegrationTest {
         )
 
         // If not ICMPv6 Echo Reply -> PASS
-        gen.addPassIfNotIcmpv6EchoReply()
+        gen.addPassIfNotIcmpv6EchoReply(BaseApfGenerator.PASS_LABEL)
 
         // Store all prefilled memory slots in counter region [500, 520)
         val counterRegion = 500
@@ -615,7 +631,7 @@ class ApfIntegrationTest {
         )
 
         // If not ICMPv6 Echo Reply -> PASS
-        gen.addPassIfNotIcmpv6EchoReply()
+        gen.addPassIfNotIcmpv6EchoReply(BaseApfGenerator.PASS_LABEL)
 
         // Store all prefilled memory slots in counter region [500, 520)
         val counterRegion = 500
@@ -658,7 +674,7 @@ class ApfIntegrationTest {
         )
 
         // If not ICMPv6 Echo Reply -> PASS
-        gen.addPassIfNotIcmpv6EchoReply()
+        gen.addPassIfNotIcmpv6EchoReply(BaseApfGenerator.PASS_LABEL)
 
         // Store all prefilled memory slots in counter region [500, 520)
         gen.addLoadFromMemory(R0, MemorySlot.FILTER_AGE_16384THS)
@@ -780,6 +796,10 @@ class ApfIntegrationTest {
         val program = gen.generate()
         installAndVerifyProgram(program)
 
+        val counterBefore = ApfCounterTracker.getCounterValue(
+            readProgram(),
+            DROPPED_IPV6_NS_REPLIED_NON_DAD
+        )
         packetReader.sendPing(payload, payloadSize, expectReplyCount = numOfPacketToTransmit)
         val replyPayloads = try {
             packetReader.expectPingReply(TIMEOUT_MS * 2)
@@ -788,8 +808,15 @@ class ApfIntegrationTest {
         }
 
         val apfCounterTracker = ApfCounterTracker()
-        apfCounterTracker.updateCountersFromData(readProgram())
+        val apfRam = readProgram()
+        apfCounterTracker.updateCountersFromData(apfRam)
         Log.i(TAG, "counter map: ${apfCounterTracker.counters}")
+
+        val counterAfter = ApfCounterTracker.getCounterValue(
+            apfRam,
+            DROPPED_IPV6_NS_REPLIED_NON_DAD
+        )
+        assertEquals(counterBefore + 1, counterAfter)
 
         assertThat(replyPayloads.size).isEqualTo(expectReplyPayloads.size)
 
