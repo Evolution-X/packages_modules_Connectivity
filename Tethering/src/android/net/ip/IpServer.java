@@ -852,16 +852,13 @@ public class IpServer extends StateMachineShim {
         }
     }
 
-    private void removeRoutesFromNetworkAndLinkProperties(int netId,
-            @NonNull final List<RouteInfo> toBeRemoved) {
+    private void removeRoutesFromNetwork(int netId, @NonNull final List<RouteInfo> toBeRemoved) {
         final int removalFailures = NetdUtils.removeRoutesFromNetwork(
                 mNetd, netId, toBeRemoved);
         if (removalFailures > 0) {
             mLog.e("Failed to remove " + removalFailures
                     + " IPv6 routes from network " + netId + ".");
         }
-
-        for (RouteInfo route : toBeRemoved) mLinkProperties.removeRoute(route);
     }
 
     private void addInterfaceToNetwork(final int netId, @NonNull final String ifaceName) {
@@ -888,7 +885,7 @@ public class IpServer extends StateMachineShim {
         }
     }
 
-    private void addRoutesToNetworkAndLinkProperties(int netId,
+    private void addRoutesToNetwork(int netId,
             @NonNull final List<RouteInfo> toBeAdded) {
         // It's safe to call addInterfaceToNetwork() even if
         // the interface is already in the network.
@@ -901,16 +898,16 @@ public class IpServer extends StateMachineShim {
             mLog.e("Failed to add IPv4/v6 routes to local table: " + e);
             return;
         }
-
-        for (RouteInfo route : toBeAdded) mLinkProperties.addRoute(route);
     }
 
     private void configureLocalIPv6Routes(
             ArraySet<IpPrefix> deprecatedPrefixes, ArraySet<IpPrefix> newPrefixes) {
         // [1] Remove the routes that are deprecated.
         if (!deprecatedPrefixes.isEmpty()) {
-            removeRoutesFromNetworkAndLinkProperties(LOCAL_NET_ID,
-                    getLocalRoutesFor(mIfaceName, deprecatedPrefixes));
+            final List<RouteInfo> routesToBeRemoved =
+                    getLocalRoutesFor(mIfaceName, deprecatedPrefixes);
+            removeRoutesFromNetwork(LOCAL_NET_ID, routesToBeRemoved);
+            for (RouteInfo route : routesToBeRemoved) mLinkProperties.removeRoute(route);
         }
 
         // [2] Add only the routes that have not previously been added.
@@ -921,8 +918,10 @@ public class IpServer extends StateMachineShim {
             }
 
             if (!addedPrefixes.isEmpty()) {
-                addRoutesToNetworkAndLinkProperties(LOCAL_NET_ID,
-                        getLocalRoutesFor(mIfaceName, addedPrefixes));
+                final List<RouteInfo> routesToBeAdded =
+                        getLocalRoutesFor(mIfaceName, addedPrefixes);
+                addRoutesToNetwork(LOCAL_NET_ID, routesToBeAdded);
+                for (RouteInfo route : routesToBeAdded) mLinkProperties.addRoute(route);
             }
         }
     }
@@ -1126,8 +1125,17 @@ public class IpServer extends StateMachineShim {
             }
 
             try {
-                NetdUtils.tetherInterface(mNetd, LOCAL_NET_ID, mIfaceName,
-                        asIpPrefix(mIpv4Address));
+                // Enable IPv6, disable accepting RA, etc. See TetherController::tetherInterface()
+                // for more detail.
+                mNetd.tetherInterfaceAdd(mIfaceName);
+                NetdUtils.networkAddInterface(mNetd, LOCAL_NET_ID, mIfaceName,
+                        20 /* maxAttempts */, 50 /* pollingIntervalMs */);
+                // Activate a route to dest and IPv6 link local.
+                NetdUtils.modifyRoute(mNetd, NetdUtils.ModifyOperation.ADD, LOCAL_NET_ID,
+                        new RouteInfo(asIpPrefix(mIpv4Address), null, mIfaceName, RTN_UNICAST));
+                NetdUtils.modifyRoute(mNetd, NetdUtils.ModifyOperation.ADD, LOCAL_NET_ID,
+                        new RouteInfo(new IpPrefix("fe80::/64"), null, mIfaceName,
+                                RTN_UNICAST));
             } catch (RemoteException | ServiceSpecificException | IllegalStateException e) {
                 mLog.e("Error Tethering", e);
                 mLastError = TETHER_ERROR_TETHER_IFACE_ERROR;
@@ -1148,8 +1156,13 @@ public class IpServer extends StateMachineShim {
             // all in sequence.
             stopIPv6();
 
+            // Reset interface for tethering.
             try {
-                NetdUtils.untetherInterface(mNetd, LOCAL_NET_ID, mIfaceName);
+                try {
+                    mNetd.tetherInterfaceRemove(mIfaceName);
+                } finally {
+                    mNetd.networkRemoveInterface(LOCAL_NET_ID, mIfaceName);
+                }
             } catch (RemoteException | ServiceSpecificException e) {
                 mLastError = TETHER_ERROR_UNTETHER_IFACE_ERROR;
                 mLog.e("Failed to untether interface: " + e);
@@ -1227,13 +1240,16 @@ public class IpServer extends StateMachineShim {
             }
 
             // Remove deprecated routes from downstream network.
-            removeRoutesFromNetworkAndLinkProperties(LOCAL_NET_ID,
-                    List.of(getDirectConnectedRoute(deprecatedLinkAddress)));
+            final List<RouteInfo> routesToBeRemoved =
+                    List.of(getDirectConnectedRoute(deprecatedLinkAddress));
+            removeRoutesFromNetwork(LOCAL_NET_ID, routesToBeRemoved);
+            for (RouteInfo route : routesToBeRemoved) mLinkProperties.removeRoute(route);
             mLinkProperties.removeLinkAddress(deprecatedLinkAddress);
 
             // Add new routes to downstream network.
-            addRoutesToNetworkAndLinkProperties(LOCAL_NET_ID,
-                    List.of(getDirectConnectedRoute(mIpv4Address)));
+            final List<RouteInfo> routesToBeAdded = List.of(getDirectConnectedRoute(mIpv4Address));
+            addRoutesToNetwork(LOCAL_NET_ID, routesToBeAdded);
+            for (RouteInfo route : routesToBeAdded) mLinkProperties.addRoute(route);
             mLinkProperties.addLinkAddress(mIpv4Address);
 
             // Update local DNS caching server with new IPv4 address, otherwise, dnsmasq doesn't
