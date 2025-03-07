@@ -16,24 +16,17 @@
 
 package com.android.server.connectivity.mdns;
 
-import static com.android.internal.annotations.VisibleForTesting.Visibility;
-
 import android.Manifest.permission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
 
-import androidx.annotation.GuardedBy;
-
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.DnsUtils;
-import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.SharedLog;
 
 import java.io.IOException;
@@ -41,7 +34,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 
 /**
  * This class keeps tracking the set of registered {@link MdnsServiceBrowserListener} instances, and
@@ -134,98 +126,6 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
         this.perSocketServiceTypeClients = new PerSocketServiceTypeClients();
         this.mdnsFeatureFlags = mdnsFeatureFlags;
         this.discoveryExecutor = new DiscoveryExecutor(socketClient.getLooper());
-    }
-
-    /**
-     * A utility class to generate a handler, optionally with a looper, and to run functions on the
-     * newly created handler.
-     */
-    @VisibleForTesting(visibility = Visibility.PRIVATE)
-    static class DiscoveryExecutor implements Executor {
-        private final HandlerThread handlerThread;
-
-        @GuardedBy("pendingTasks")
-        @Nullable private Handler handler;
-        // Store pending tasks and associated delay time. Each Pair represents a pending task
-        // (first) and its delay time (second).
-        @GuardedBy("pendingTasks")
-        @NonNull private final ArrayList<Pair<Runnable, Long>> pendingTasks = new ArrayList<>();
-
-        DiscoveryExecutor(@Nullable Looper defaultLooper) {
-            if (defaultLooper != null) {
-                this.handlerThread = null;
-                synchronized (pendingTasks) {
-                    this.handler = new Handler(defaultLooper);
-                }
-            } else {
-                this.handlerThread = new HandlerThread(MdnsDiscoveryManager.class.getSimpleName()) {
-                    @Override
-                    protected void onLooperPrepared() {
-                        synchronized (pendingTasks) {
-                            handler = new Handler(getLooper());
-                            for (Pair<Runnable, Long> pendingTask : pendingTasks) {
-                                handler.postDelayed(pendingTask.first, pendingTask.second);
-                            }
-                            pendingTasks.clear();
-                        }
-                    }
-                };
-                this.handlerThread.start();
-            }
-        }
-
-        public void checkAndRunOnHandlerThread(@NonNull Runnable function) {
-            if (this.handlerThread == null) {
-                // Callers are expected to already be running on the handler when a defaultLooper
-                // was provided
-                function.run();
-            } else {
-                execute(function);
-            }
-        }
-
-        @Override
-        public void execute(Runnable function) {
-            executeDelayed(function, 0L /* delayMillis */);
-        }
-
-        public void executeDelayed(Runnable function, long delayMillis) {
-            final Handler handler;
-            synchronized (pendingTasks) {
-                if (this.handler == null) {
-                    pendingTasks.add(Pair.create(function, delayMillis));
-                    return;
-                } else {
-                    handler = this.handler;
-                }
-            }
-            handler.postDelayed(function, delayMillis);
-        }
-
-        void shutDown() {
-            if (this.handlerThread != null) {
-                this.handlerThread.quitSafely();
-            }
-        }
-
-        void ensureRunningOnHandlerThread() {
-            synchronized (pendingTasks) {
-                HandlerUtils.ensureRunningOnHandlerThread(handler);
-            }
-        }
-
-        public void runWithScissorsForDumpIfReady(@NonNull Runnable function) {
-            final Handler handler;
-            synchronized (pendingTasks) {
-                if (this.handler == null) {
-                    Log.d(TAG, "The handler is not ready. Ignore the DiscoveryManager dump");
-                    return;
-                } else {
-                    handler = this.handler;
-                }
-            }
-            HandlerUtils.runWithScissorsForDump(handler, function, 10_000);
-        }
     }
 
     /**
