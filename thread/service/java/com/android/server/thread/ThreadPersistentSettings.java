@@ -82,7 +82,7 @@ public class ThreadPersistentSettings {
      * this config is missing.
      */
     private static final Key<Boolean> CONFIG_BORDER_ROUTER_ENABLED =
-            new Key<>("config_border_router_enabled", true);
+            new Key<>("config_border_router_enabled", false);
 
     /** Stores the Thread NAT64 feature toggle state, true for enabled and false for disabled. */
     private static final Key<Boolean> CONFIG_NAT64_ENABLED =
@@ -123,10 +123,23 @@ public class ThreadPersistentSettings {
         readFromStoreFile();
         synchronized (mLock) {
             if (!mSettings.containsKey(THREAD_ENABLED.key)) {
-                LOG.i("\"thread_enabled\" is missing in settings file, using default value");
-                put(
-                        THREAD_ENABLED.key,
-                        mResources.get().getBoolean(R.bool.config_thread_default_enabled));
+                boolean enabled = mResources.get().getBoolean(R.bool.config_thread_default_enabled);
+                LOG.i(
+                        "\"thread_enabled\" is missing in settings file, using default value: "
+                                + enabled);
+                put(THREAD_ENABLED.key, enabled);
+            }
+
+            if (!mSettings.containsKey(CONFIG_BORDER_ROUTER_ENABLED.key)) {
+                boolean borderRouterEnabled =
+                        mResources
+                                .get()
+                                .getBoolean(R.bool.config_thread_border_router_default_enabled);
+                LOG.i(
+                        "\"thread_border_router_enabled\" is missing in settings file, using"
+                                + " default value: "
+                                + borderRouterEnabled);
+                put(CONFIG_BORDER_ROUTER_ENABLED.key, borderRouterEnabled);
             }
         }
     }
