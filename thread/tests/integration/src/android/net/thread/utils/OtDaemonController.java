@@ -156,6 +156,12 @@ public final class OtDaemonController {
         return executeCommandAndParse("extpanid").get(0);
     }
 
+    public boolean isCountryCodeSupported() {
+        final String result = executeCommand("region");
+
+        return !result.equals("Error 12: NotImplemented\r\n");
+    }
+
     public String executeCommand(String cmd) {
         return SystemUtil.runShellCommand(OT_CTL + " " + cmd);
     }
