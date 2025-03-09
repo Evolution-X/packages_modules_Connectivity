@@ -29,6 +29,7 @@ filegroup {
     name: "service-connectivity-tiramisu-sources",
     srcs: [
         "src/**/*.java",
+        ":vcn-location-sources",
     ],
     visibility: ["//visibility:private"],
 }

@@ -17,6 +17,7 @@
 #define LOG_TAG "NetBpfLoad"
 
 #include <arpa/inet.h>
+#include <bpf/libbpf.h>
 #include <dirent.h>
 #include <elf.h>
 #include <errno.h>
@@ -60,7 +61,7 @@
 #include "bpf_map_def.h"
 
 // The following matches bpf_helpers.h, which is only for inclusion in bpf code
-#define BPFLOADER_MAINLINE_VERSION 42u
+#define BPFLOADER_MAINLINE_S_VERSION 42u
 #define BPFLOADER_MAINLINE_25Q2_VERSION 47u
 
 using android::base::EndsWith;
@@ -122,6 +123,7 @@ static constexpr bool specified(domain d) {
 struct Location {
     const char* const dir = "";
     const char* const prefix = "";
+    const bool t_plus = true;
 };
 
 // Returns the build type string (from ro.build.type).
@@ -1187,7 +1189,7 @@ int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
     ret = readCodeSections(elfFile, cs);
     // BPF .o's with no programs are only supported by mainline netbpfload,
     // make sure .o's targeting non-mainline (ie. S) bpfloader don't show up.
-    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_VERSION)
+    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_S_VERSION)
         return 0;
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
@@ -1216,8 +1218,9 @@ static bool exists(const char* const path) {
 const Location locations[] = {
         // S+ Tethering mainline module (network_stack): tether offload
         {
-                .dir = BPFROOT "/",
+                .dir = BPFROOT "/tethering/",
                 .prefix = "tethering/",
+                .t_plus = false,
         },
         // T+ Tethering mainline module (shared with netd & system server)
         // netutils_wrapper (for iptables xt_bpf) has access to programs
@@ -1412,6 +1415,13 @@ static bool isWear() {
 }
 
 static int doLoad(char** argv, char * const envp[]) {
+    if (!isAtLeastS) {
+        ALOGE("Impossible - not reachable on Android <S.");
+        // for safety, we don't fail, this is a just-in-case workaround
+        // for any possible busted 'optimized' start everything vendor init hacks on R
+        return 0;
+    }
+
     const bool runningAsRoot = !getuid();  // true iff U QPR3 or V+
 
     const int first_api_level = GetIntProperty("ro.board.first_api_level", api_level);
@@ -1422,17 +1432,19 @@ static int doLoad(char** argv, char * const envp[]) {
     const bool has_platform_netbpfload_rc = exists("/system/etc/init/netbpfload.rc");
 
     // Version of Network BpfLoader depends on the Android OS version
-    unsigned int bpfloader_ver = BPFLOADER_MAINLINE_VERSION;  // [42u]
+    unsigned int bpfloader_ver = BPFLOADER_MAINLINE_S_VERSION;  // [42u]
     if (isAtLeastT) ++bpfloader_ver;     // [43] BPFLOADER_MAINLINE_T_VERSION
     if (isAtLeastU) ++bpfloader_ver;     // [44] BPFLOADER_MAINLINE_U_VERSION
     if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
     if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
     if (isAtLeast25Q2) ++bpfloader_ver;  // [47] BPFLOADER_MAINLINE_25Q2_VERSION
 
-    ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) uid:%d rc:%d%d",
+    ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) libbpf: v%u.%u "
+          "uid:%d rc:%d%d",
           bpfloader_ver, argv[0], android_get_device_api_level(), api_level,
-          kernelVersion(), describeArch(), getuid(),
-          has_platform_bpfloader_rc, has_platform_netbpfload_rc);
+          kernelVersion(), describeArch(), libbpf_major_version(),
+          libbpf_minor_version(), getuid(), has_platform_bpfloader_rc,
+          has_platform_netbpfload_rc);
 
     if (!has_platform_bpfloader_rc && !has_platform_netbpfload_rc) {
         ALOGE("Unable to find platform's bpfloader & netbpfload init scripts.");
@@ -1446,14 +1458,9 @@ static int doLoad(char** argv, char * const envp[]) {
 
     logTetheringApexVersion();
 
-    if (!isAtLeastT) {
-        ALOGE("Impossible - not reachable on Android <T.");
-        return 1;
-    }
-
     // both S and T require kernel 4.9 (and eBpf support)
-    if (isAtLeastT && !isAtLeastKernelVersion(4, 9, 0)) {
-        ALOGE("Android T requires kernel 4.9.");
+    if (!isAtLeastKernelVersion(4, 9, 0)) {
+        ALOGE("Android S & T require kernel 4.9.");
         return 1;
     }
 
@@ -1622,18 +1629,22 @@ static int doLoad(char** argv, char * const envp[]) {
     //  which could otherwise fail with ENOENT during object pinning or renaming,
     //  due to ordering issues)
     for (const auto& location : locations) {
+        if (location.t_plus && !isAtLeastT) continue;
         if (createSysFsBpfSubDir(location.prefix)) return 1;
     }
 
-    // Note: there's no actual src dir for fs_bpf_loader .o's,
-    // so it is not listed in 'locations[].prefix'.
-    // This is because this is primarily meant for triggering genfscon rules,
-    // and as such this will likely always be the case.
-    // Thus we need to manually create the /sys/fs/bpf/loader subdirectory.
-    if (createSysFsBpfSubDir("loader")) return 1;
+    if (isAtLeastT) {
+        // Note: there's no actual src dir for fs_bpf_loader .o's,
+        // so it is not listed in 'locations[].prefix'.
+        // This is because this is primarily meant for triggering genfscon rules,
+        // and as such this will likely always be the case.
+        // Thus we need to manually create the /sys/fs/bpf/loader subdirectory.
+        if (createSysFsBpfSubDir("loader")) return 1;
+    }
 
     // Load all ELF objects, create programs and maps, and pin them
     for (const auto& location : locations) {
+        if (location.t_plus && !isAtLeastT) continue;
         if (loadAllElfObjects(bpfloader_ver, location) != 0) {
             ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS FROM %s ===", location.dir);
             ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
@@ -1653,6 +1664,9 @@ static int doLoad(char** argv, char * const envp[]) {
         ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
         return 1;
     }
+
+    // on S we haven't created this subdir yet, but we need it for 'mainline_done' flag below
+    if (!isAtLeastT && createSysFsBpfSubDir("netd_shared")) return 1;
 
     // leave a flag that we're done
     if (createSysFsBpfSubDir("netd_shared/mainline_done")) return 1;
@@ -1688,7 +1702,12 @@ static int doLoad(char** argv, char * const envp[]) {
 }  // namespace android
 
 int main(int argc, char** argv, char * const envp[]) {
-    InitLogging(argv, &KernelLogger);
+    if (android::bpf::isAtLeastT) {
+        InitLogging(argv, &KernelLogger);
+    } else {
+        // S lacks the sepolicy to make non-root uid KernelLogger viable
+        InitLogging(argv);
+    }
 
     if (argc == 2 && !strcmp(argv[1], "done")) {
         // we're being re-exec'ed from platform bpfloader to 'finalize' things

@@ -964,7 +964,7 @@ public class TetheringTest {
         mLooper.dispatchAll();
 
         assertEquals(1, mTethering.getPendingTetheringRequests().size());
-        assertEquals(request, mTethering.getPendingTetheringRequests().get(TETHERING_USB));
+        assertTrue(mTethering.getPendingTetheringRequests().get(0).equals(request));
 
         if (mTethering.getTetheringConfiguration().isUsingNcm()) {
             verify(mUsbManager).setCurrentFunctions(UsbManager.FUNCTION_NCM);
@@ -2869,6 +2869,44 @@ public class TetheringTest {
         verify(mUsbManager, times(1)).setCurrentFunctions(UsbManager.FUNCTION_NCM);
         mTethering.interfaceStatusChanged(TEST_NCM_IFNAME, true);
         sendUsbBroadcast(true, true, TETHER_USB_NCM_FUNCTION);
+        verify(mNetd).interfaceSetCfg(argThat(cfg -> serverAddr.equals(cfg.ipv4Addr)));
+        verify(mIpServerDependencies, times(1)).makeDhcpServer(any(), dhcpParamsCaptor.capture(),
+                any());
+        final DhcpServingParamsParcel params = dhcpParamsCaptor.getValue();
+        assertEquals(serverAddr, intToInet4AddressHTH(params.serverAddr).getHostAddress());
+        assertEquals(24, params.serverAddrPrefixLength);
+        assertEquals(clientAddrParceled, params.singleClientAddr);
+    }
+
+    @Test
+    @IgnoreAfter(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public void testRequestStaticIpLegacyTether() throws Exception {
+        initTetheringOnTestThread();
+
+        // Call startTethering with static ip
+        final LinkAddress serverLinkAddr = new LinkAddress("192.168.0.123/24");
+        final LinkAddress clientLinkAddr = new LinkAddress("192.168.0.42/24");
+        final String serverAddr = "192.168.0.123";
+        final int clientAddrParceled = 0xc0a8002a;
+        final ArgumentCaptor<DhcpServingParamsParcel> dhcpParamsCaptor =
+                ArgumentCaptor.forClass(DhcpServingParamsParcel.class);
+        when(mWifiManager.startTetheredHotspot(any())).thenReturn(true);
+        mTethering.startTethering(createTetheringRequest(TETHERING_WIFI,
+                        serverLinkAddr, clientLinkAddr, false, CONNECTIVITY_SCOPE_GLOBAL, null),
+                TEST_CALLER_PKG, null);
+        mLooper.dispatchAll();
+        verify(mWifiManager, times(1)).startTetheredHotspot(any());
+        mTethering.interfaceStatusChanged(TEST_WLAN_IFNAME, true);
+
+        // Call legacyTether on the interface before the link layer event comes back.
+        // This happens, for example, in pre-T bluetooth tethering: Settings calls startTethering,
+        // and then the bluetooth code calls the tether() API.
+        final ResultListener tetherResult = new ResultListener(TETHER_ERROR_NO_ERROR);
+        mTethering.legacyTether(TEST_WLAN_IFNAME, tetherResult);
+        mLooper.dispatchAll();
+        tetherResult.assertHasResult();
+
+        // Verify that the static ip set in startTethering is used
         verify(mNetd).interfaceSetCfg(argThat(cfg -> serverAddr.equals(cfg.ipv4Addr)));
         verify(mIpServerDependencies, times(1)).makeDhcpServer(any(), dhcpParamsCaptor.capture(),
                 any());

@@ -35,6 +35,7 @@ import android.os.Build;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -93,6 +94,7 @@ public class MdnsAdvertiser {
             new ArrayMap<>();
     private final MdnsFeatureFlags mMdnsFeatureFlags;
     private final Map<String, Integer> mServiceTypeToOffloadPriority;
+    private final ArraySet<String> mOffloadServiceTypeDenyList;
 
     /**
      * Dependencies for {@link MdnsAdvertiser}, useful for testing.
@@ -160,6 +162,16 @@ public class MdnsAdvertiser {
         return mInterfaceOffloadServices.getOrDefault(interfaceName, Collections.emptyList());
     }
 
+    private boolean isInOffloadDenyList(@NonNull String serviceType) {
+        for (int i = 0; i < mOffloadServiceTypeDenyList.size(); ++i) {
+            final String denyListServiceType = mOffloadServiceTypeDenyList.valueAt(i);
+            if (DnsUtils.equalsIgnoreDnsCase(serviceType, denyListServiceType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private final MdnsInterfaceAdvertiser.Callback mInterfaceAdvertiserCb =
             new MdnsInterfaceAdvertiser.Callback() {
         @Override
@@ -173,19 +185,25 @@ public class MdnsAdvertiser {
             if (mMdnsFeatureFlags.mIsMdnsOffloadFeatureEnabled
                     // TODO: Enable offload when the serviceInfo contains a custom host.
                     && TextUtils.isEmpty(registration.getServiceInfo().getHostname())) {
-                final String interfaceName = advertiser.getSocketInterfaceName();
-                final List<OffloadServiceInfoWrapper> existingOffloadServiceInfoWrappers =
-                        mInterfaceOffloadServices.computeIfAbsent(interfaceName,
-                                k -> new ArrayList<>());
-                // Remove existing offload services from cache for update.
-                existingOffloadServiceInfoWrappers.removeIf(item -> item.mServiceId == serviceId);
+                final String serviceType = registration.getServiceInfo().getServiceType();
+                if (isInOffloadDenyList(serviceType)) {
+                    mSharedLog.i("Offload denied for service type: " + serviceType);
+                } else {
+                    final String interfaceName = advertiser.getSocketInterfaceName();
+                    final List<OffloadServiceInfoWrapper> existingOffloadServiceInfoWrappers =
+                            mInterfaceOffloadServices.computeIfAbsent(interfaceName,
+                                    k -> new ArrayList<>());
+                    // Remove existing offload services from cache for update.
+                    existingOffloadServiceInfoWrappers.removeIf(
+                            item -> item.mServiceId == serviceId);
 
-                byte[] rawOffloadPacket = advertiser.getRawOffloadPayload(serviceId);
-                final OffloadServiceInfoWrapper newOffloadServiceInfoWrapper = createOffloadService(
-                        serviceId, registration, rawOffloadPacket);
-                existingOffloadServiceInfoWrappers.add(newOffloadServiceInfoWrapper);
-                mCb.onOffloadStartOrUpdate(interfaceName,
-                        newOffloadServiceInfoWrapper.mOffloadServiceInfo);
+                    byte[] rawOffloadPacket = advertiser.getRawOffloadPayload(serviceId);
+                    final OffloadServiceInfoWrapper newOffloadServiceInfoWrapper =
+                            createOffloadService(serviceId, registration, rawOffloadPacket);
+                    existingOffloadServiceInfoWrappers.add(newOffloadServiceInfoWrapper);
+                    mCb.onOffloadStartOrUpdate(interfaceName,
+                            newOffloadServiceInfoWrapper.mOffloadServiceInfo);
+                }
             }
 
             // Wait for all current interfaces to be done probing before notifying of success.
@@ -846,6 +864,8 @@ public class MdnsAdvertiser {
         final ConnectivityResources res = new ConnectivityResources(context);
         mServiceTypeToOffloadPriority = parseOffloadPriorityList(
                 res.get().getStringArray(R.array.config_nsdOffloadServicesPriority), sharedLog);
+        mOffloadServiceTypeDenyList = new ArraySet<>(
+                res.get().getStringArray(R.array.config_nsdOffloadServicesDenyList));
     }
 
     private static Map<String, Integer> parseOffloadPriorityList(

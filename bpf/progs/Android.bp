@@ -69,32 +69,16 @@ bpf {
     sub_dir: "net_shared",
 }
 
-// Ships to Android S, the bpfloader of which fails to parse BTF enabled .o's.
 bpf {
     name: "offload.o",
     srcs: ["offload.c"],
-    btf: false,
+    sub_dir: "tethering",
 }
 
-// This version ships to Android T+ which uses mainline netbpfload.
-bpf {
-    name: "offload@mainline.o",
-    srcs: ["offload@mainline.c"],
-    cflags: ["-DMAINLINE"],
-}
-
-// Ships to Android S, the bpfloader of which fails to parse BTF enabled .o's.
 bpf {
     name: "test.o",
     srcs: ["test.c"],
-    btf: false,
-}
-
-// This version ships to Android T+ which uses mainline netbpfload.
-bpf {
-    name: "test@mainline.o",
-    srcs: ["test@mainline.c"],
-    cflags: ["-DMAINLINE"],
+    sub_dir: "tethering",
 }
 
 bpf {

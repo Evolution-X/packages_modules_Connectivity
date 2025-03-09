@@ -603,11 +603,12 @@ object IntegrationTestUtils {
     /** Enables Thread and joins the specified Thread network. */
     @JvmStatic
     fun enableThreadAndJoinNetwork(dataset: ActiveOperationalDataset) {
-        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
-        OtDaemonController().factoryReset();
-
         val context: Context = requireNotNull(ApplicationProvider.getApplicationContext());
         val controller = requireNotNull(ThreadNetworkControllerWrapper.newInstance(context));
+
+        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
+        controller.leaveAndWait();
+
         controller.setEnabledAndWait(true);
         controller.joinAndWait(dataset);
     }

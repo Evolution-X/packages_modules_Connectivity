@@ -32,6 +32,7 @@ java_library {
         "framework-connectivity-pre-jarjar",
         "service-connectivity-pre-jarjar",
         "framework-statsd.stubs.module_lib",
+        "ServiceConnectivityResources",
     ],
 
     static_libs: [
