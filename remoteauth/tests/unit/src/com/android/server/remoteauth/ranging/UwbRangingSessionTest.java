@@ -40,7 +40,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -349,8 +349,8 @@ public class UwbRangingSessionTest {
                 new UwbRangingSession(mContext, TEST_SESSION_PARAMETER_INITIATOR, mUwbServiceImpl);
         mUwbRangingSession.stop();
 
-        verifyZeroInteractions(mRangingController);
-        verifyZeroInteractions(mRangingCallback);
+        verifyNoMoreInteractions(mRangingController);
+        verifyNoMoreInteractions(mRangingCallback);
     }
 
     @Test
