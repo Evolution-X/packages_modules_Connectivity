@@ -19,9 +19,9 @@ package com.android.server;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -111,7 +111,7 @@ public class IpSecServiceRefcountedResourceTest {
         assertResourceState(resource, 1, 0, 0, 0, 0);
 
         // Verify linking to binder death
-        verify(binderMock).linkToDeath(anyObject(), anyInt());
+        verify(binderMock).linkToDeath(any(), anyInt());
     }
 
     @Test
@@ -129,14 +129,14 @@ public class IpSecServiceRefcountedResourceTest {
         assertResourceState(childResource, 2, 0, 0, 0, 0);
 
         // Verify linking to binder death
-        verify(binderMockChild).linkToDeath(anyObject(), anyInt());
-        verify(binderMockParent).linkToDeath(anyObject(), anyInt());
+        verify(binderMockChild).linkToDeath(any(), anyInt());
+        verify(binderMockParent).linkToDeath(any(), anyInt());
     }
 
     @Test
     public void testFailLinkToDeath() throws RemoteException {
         IBinder binderMock = mock(IBinder.class);
-        doThrow(new RemoteException()).when(binderMock).linkToDeath(anyObject(), anyInt());
+        doThrow(new RemoteException()).when(binderMock).linkToDeath(any(), anyInt());
 
         try {
             getTestRefcountedResource(binderMock);

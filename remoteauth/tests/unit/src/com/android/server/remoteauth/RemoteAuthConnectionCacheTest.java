@@ -19,7 +19,7 @@ package com.android.server.remoteauth;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -98,7 +98,7 @@ public class RemoteAuthConnectionCacheTest {
     @Test
     public void testGetConnection_failedToConnect() {
         mConnectionCache.setConnectionInfo(mConnectionInfo);
-        doReturn(null).when(mConnectivityManager).connect(eq(mConnectionInfo), anyObject());
+        doReturn(null).when(mConnectivityManager).connect(eq(mConnectionInfo), any());
 
         assertNull(mConnectionCache.getConnection(CONNECTION_ID));
     }
@@ -108,7 +108,7 @@ public class RemoteAuthConnectionCacheTest {
         mConnectionCache.setConnectionInfo(mConnectionInfo);
         doThrow(ConnectionException.class)
                 .when(mConnectivityManager)
-                .connect(eq(mConnectionInfo), anyObject());
+                .connect(eq(mConnectionInfo), any());
 
         assertNull(mConnectionCache.getConnection(CONNECTION_ID));
     }
@@ -116,7 +116,7 @@ public class RemoteAuthConnectionCacheTest {
     @Test
     public void testGetConnection_connectionSucceed() {
         mConnectionCache.setConnectionInfo(mConnectionInfo);
-        doReturn(mConnection).when(mConnectivityManager).connect(eq(mConnectionInfo), anyObject());
+        doReturn(mConnection).when(mConnectivityManager).connect(eq(mConnectionInfo), any());
 
         assertEquals(mConnection, mConnectionCache.getConnection(CONNECTION_ID));
     }
