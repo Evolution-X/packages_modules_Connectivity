@@ -19,7 +19,7 @@ package com.android.server.remoteauth;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
@@ -82,6 +82,6 @@ public class RemoteAuthPlatformTest {
                             @Override
                             public void onFailure(int errorCode) {}
                         }));
-        verify(mConnection, times(1)).sendRequest(eq(REQUEST), anyObject());
+        verify(mConnection, times(1)).sendRequest(eq(REQUEST), any());
     }
 }
