@@ -40,6 +40,8 @@ import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.junit.Assume.assumeTrue;
+
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import android.content.Context;
@@ -213,6 +215,8 @@ public class ThreadIntegrationTest {
 
     @Test
     public void otDaemonRestart_latestCountryCodeIsSetToOtDaemon() throws Exception {
+        assumeTrue(mOtCtl.isCountryCodeSupported());
+
         runThreadCommand("force-country-code enabled CN");
 
         runShellCommand("stop ot-daemon");
