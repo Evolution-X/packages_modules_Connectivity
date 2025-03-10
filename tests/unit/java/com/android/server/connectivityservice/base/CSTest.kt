@@ -168,6 +168,7 @@ open class CSTest {
         it[ConnectivityFlags.DELAY_DESTROY_SOCKETS] = true
         it[ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS] = true
         it[ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS] = true
+        it[ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER] = true
     }
     fun setFeatureEnabled(flag: String, enabled: Boolean) = enabledFeatures.set(flag, enabled)
 
