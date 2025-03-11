@@ -111,6 +111,7 @@ java_defaults {
         "sdk_module-lib_current_framework-wifi",
     ],
     static_libs: [
+        "modules-utils-build",
         "com.android.net.flags-aconfig-java",
     ],
     aidl: {

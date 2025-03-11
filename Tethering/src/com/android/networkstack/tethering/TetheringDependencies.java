@@ -214,7 +214,6 @@ public abstract class TetheringDependencies {
      * Wrapper for tethering_with_soft_ap_config feature flag.
      */
     public boolean isTetheringWithSoftApConfigEnabled() {
-        return Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM
-                && Flags.tetheringWithSoftApConfig();
+        return SdkLevel.isAtLeastB() && Flags.tetheringWithSoftApConfig();
     }
 }

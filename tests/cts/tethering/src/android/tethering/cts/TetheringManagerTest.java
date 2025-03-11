@@ -73,7 +73,6 @@ import android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiSsid;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.os.ResultReceiver;
@@ -391,7 +390,7 @@ public class TetheringManagerTest {
 
             mCtsTetheringUtils.stopWifiTethering(tetherEventCallback);
 
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            if (!SdkLevel.isAtLeastB()) {
                 try {
                     final int ret = runAsShell(TETHER_PRIVILEGED,
                             () -> mTM.tether(wifiTetheringIface));
@@ -480,8 +479,7 @@ public class TetheringManagerTest {
     }
 
     private boolean isTetheringWithSoftApConfigEnabled() {
-        return Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM
-                && Flags.tetheringWithSoftApConfig();
+        return SdkLevel.isAtLeastB() && Flags.tetheringWithSoftApConfig();
     }
 
     @Test
@@ -636,7 +634,7 @@ public class TetheringManagerTest {
 
     @Test
     public void testLegacyTetherApisThrowUnsupportedOperationExceptionAfterV() {
-        assumeTrue(Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM);
+        assumeTrue(SdkLevel.isAtLeastB());
         assertThrows(UnsupportedOperationException.class, () -> mTM.tether("iface"));
         assertThrows(UnsupportedOperationException.class, () -> mTM.untether("iface"));
     }
