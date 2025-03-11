@@ -559,7 +559,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             // The persistent setting keeps the desired enabled state, thus it's set regardless
             // the otDaemon set enabled state operation succeeded or not, so that it can recover
             // to the desired value after reboot.
-            mPersistentSettings.put(ThreadPersistentSettings.THREAD_ENABLED.key, isEnabled);
+            mPersistentSettings.put(ThreadPersistentSettings.KEY_THREAD_ENABLED, isEnabled);
         }
 
         try {
@@ -743,7 +743,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean shouldEnableThread() {
         return !mForceStopOtDaemonEnabled
                 && !mUserRestricted
-                && mPersistentSettings.get(ThreadPersistentSettings.THREAD_ENABLED);
+                && mPersistentSettings.get(ThreadPersistentSettings.KEY_THREAD_ENABLED);
     }
 
     private void requestUpstreamNetwork() {
