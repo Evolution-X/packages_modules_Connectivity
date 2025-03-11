@@ -154,10 +154,10 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.time.Duration
 import java.util.Arrays
-import java.util.Random
 import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.collections.ArrayList
+import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -266,7 +266,7 @@ class NetworkAgentTest {
     private class FakeConnectivityService {
         val mockRegistry = mock(INetworkAgentRegistry::class.java)
         private var agentField: INetworkAgent? = null
-        private val registry = object : INetworkAgentRegistry.Stub(),
+        val registry: INetworkAgentRegistry = object : INetworkAgentRegistry.Stub(),
                 INetworkAgentRegistry by mockRegistry {
             // asBinder has implementations in both INetworkAgentRegistry.Stub and mockRegistry, so
             // it needs to be disambiguated. Just fail the test as it should be unused here.
@@ -283,7 +283,7 @@ class NetworkAgentTest {
 
         fun connect(agent: INetworkAgent) {
             this.agentField = agent
-            agent.onRegistered(registry)
+            agent.onRegistered()
         }
 
         fun disconnect() = agent.onDisconnected()
@@ -412,7 +412,8 @@ class NetworkAgentTest {
     }
 
     private fun createNetworkAgentWithFakeCS() = createNetworkAgent().also {
-        mFakeConnectivityService.connect(it.registerForTest(Network(FAKE_NET_ID)))
+        val binder = it.registerForTest(Network(FAKE_NET_ID), mFakeConnectivityService.registry)
+        mFakeConnectivityService.connect(binder)
     }
 
     private fun TestableNetworkAgent.expectPostConnectionCallbacks(
@@ -1614,7 +1615,7 @@ class NetworkAgentTest {
         val s = Os.socket(AF_INET6, SOCK_DGRAM, 0)
         net.bindSocket(s)
         val content = ByteArray(16)
-        Random().nextBytes(content)
+        Random.nextBytes(content)
         Os.sendto(s, ByteBuffer.wrap(content), 0, REMOTE_ADDRESS, 7 /* port */)
         val match = reader.poll(DEFAULT_TIMEOUT_MS) {
             val udpStart = IPV6_HEADER_LEN + UDP_HEADER_LEN
