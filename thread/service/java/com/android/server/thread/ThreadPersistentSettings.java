@@ -40,6 +40,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Store persistent data for Thread network settings. These are key (string) / value pairs that are
@@ -53,53 +55,54 @@ public class ThreadPersistentSettings {
     /** File name used for storing settings. */
     private static final String FILE_NAME = "ThreadPersistentSettings.xml";
 
-    /** Current config store data version. This will be incremented for any additions. */
+    /** Current config store data version. This MUST be incremented for any incompatible changes. */
     private static final int CURRENT_SETTINGS_STORE_DATA_VERSION = 1;
 
     /**
      * Stores the version of the data. This can be used to handle migration of data if some
      * non-backward compatible change introduced.
      */
-    private static final String VERSION_KEY = "version";
+    private static final String KEY_VERSION = "version";
 
-    /******** Thread persistent setting keys ***************/
-    /** Stores the Thread feature toggle state, true for enabled and false for disabled. */
-    public static final Key<Boolean> THREAD_ENABLED = new Key<>("thread_enabled", true);
+    /**
+     * Saves the boolean flag for Thread being enabled. The value defaults to resource overlay value
+     * {@code R.bool.config_thread_default_enabled}.
+     */
+    public static final Key<Boolean> KEY_THREAD_ENABLED = new Key<>("thread_enabled");
+
+    /**
+     * Saves the boolean flag for border router being enabled. The value defaults to resource
+     * overlay value {@code R.bool.config_thread_border_router_default_enabled}.
+     */
+    private static final Key<Boolean> KEY_CONFIG_BORDER_ROUTER_ENABLED =
+            new Key<>("config_border_router_enabled");
+
+    /** Stores the Thread NAT64 feature toggle state, true for enabled and false for disabled. */
+    private static final Key<Boolean> KEY_CONFIG_NAT64_ENABLED = new Key<>("config_nat64_enabled");
+
+    /**
+     * Stores the Thread DHCPv6-PD feature toggle state, true for enabled and false for disabled.
+     */
+    private static final Key<Boolean> KEY_CONFIG_DHCP6_PD_ENABLED =
+            new Key<>("config_dhcp6_pd_enabled");
 
     /**
      * Indicates that Thread was enabled (i.e. via the setEnabled() API) when the airplane mode is
      * turned on in settings. When this value is {@code true}, the current airplane mode state will
      * be ignored when evaluating the Thread enabled state.
      */
-    public static final Key<Boolean> THREAD_ENABLED_IN_AIRPLANE_MODE =
-            new Key<>("thread_enabled_in_airplane_mode", false);
+    public static final Key<Boolean> KEY_THREAD_ENABLED_IN_AIRPLANE_MODE =
+            new Key<>("thread_enabled_in_airplane_mode");
 
     /** Stores the Thread country code, null if no country code is stored. */
-    public static final Key<String> THREAD_COUNTRY_CODE = new Key<>("thread_country_code", null);
-
-    /**
-     * Saves the boolean flag for border router being enabled. The value defaults to {@code true} if
-     * this config is missing.
-     */
-    private static final Key<Boolean> CONFIG_BORDER_ROUTER_ENABLED =
-            new Key<>("config_border_router_enabled", false);
-
-    /** Stores the Thread NAT64 feature toggle state, true for enabled and false for disabled. */
-    private static final Key<Boolean> CONFIG_NAT64_ENABLED =
-            new Key<>("config_nat64_enabled", false);
-
-    /**
-     * Stores the Thread DHCPv6-PD feature toggle state, true for enabled and false for disabled.
-     */
-    private static final Key<Boolean> CONFIG_DHCP6_PD_ENABLED =
-            new Key<>("config_dhcp6_pd_enabled", false);
-
-    /******** Thread persistent setting keys ***************/
+    public static final Key<String> KEY_COUNTRY_CODE = new Key<>("thread_country_code");
 
     @GuardedBy("mLock")
     private final AtomicFile mAtomicFile;
 
     private final Object mLock = new Object();
+
+    private final Map<String, Object> mDefaultValues = new HashMap<>();
 
     @GuardedBy("mLock")
     private final PersistableBundle mSettings = new PersistableBundle();
@@ -116,32 +119,22 @@ public class ThreadPersistentSettings {
     ThreadPersistentSettings(AtomicFile atomicFile, ConnectivityResources resources) {
         mAtomicFile = atomicFile;
         mResources = resources;
+
+        mDefaultValues.put(
+                KEY_THREAD_ENABLED.key,
+                mResources.get().getBoolean(R.bool.config_thread_default_enabled));
+        mDefaultValues.put(
+                KEY_CONFIG_BORDER_ROUTER_ENABLED.key,
+                mResources.get().getBoolean(R.bool.config_thread_border_router_default_enabled));
+        mDefaultValues.put(KEY_CONFIG_NAT64_ENABLED.key, false);
+        mDefaultValues.put(KEY_CONFIG_DHCP6_PD_ENABLED.key, false);
+        mDefaultValues.put(KEY_THREAD_ENABLED_IN_AIRPLANE_MODE.key, false);
+        mDefaultValues.put(KEY_COUNTRY_CODE.key, null);
     }
 
     /** Initialize the settings by reading from the settings file. */
     public void initialize() {
         readFromStoreFile();
-        synchronized (mLock) {
-            if (!mSettings.containsKey(THREAD_ENABLED.key)) {
-                boolean enabled = mResources.get().getBoolean(R.bool.config_thread_default_enabled);
-                LOG.i(
-                        "\"thread_enabled\" is missing in settings file, using default value: "
-                                + enabled);
-                put(THREAD_ENABLED.key, enabled);
-            }
-
-            if (!mSettings.containsKey(CONFIG_BORDER_ROUTER_ENABLED.key)) {
-                boolean borderRouterEnabled =
-                        mResources
-                                .get()
-                                .getBoolean(R.bool.config_thread_border_router_default_enabled);
-                LOG.i(
-                        "\"thread_border_router_enabled\" is missing in settings file, using"
-                                + " default value: "
-                                + borderRouterEnabled);
-                put(CONFIG_BORDER_ROUTER_ENABLED.key, borderRouterEnabled);
-            }
-        }
     }
 
     private void putObject(String key, @Nullable Object value) {
@@ -186,25 +179,17 @@ public class ThreadPersistentSettings {
         return (T) value;
     }
 
-    /**
-     * Store a value to the stored settings.
-     *
-     * @param key One of the settings keys.
-     * @param value Value to be stored.
-     */
-    public <T> void put(String key, @Nullable T value) {
-        putObject(key, value);
+    /** Stores a value to the stored settings. */
+    public <T> void put(Key<T> key, @Nullable T value) {
+        putObject(key.key, value);
         writeToStoreFile();
     }
 
-    /**
-     * Retrieve a value from the stored settings.
-     *
-     * @param key One of the settings keys.
-     * @return value stored in settings, defValue if the key does not exist.
-     */
+    /** Retrieves a value from the stored settings. */
+    @Nullable
     public <T> T get(Key<T> key) {
-        return getObject(key.key, key.defaultValue);
+        T defaultValue = (T) mDefaultValues.get(key.key);
+        return getObject(key.key, defaultValue);
     }
 
     /**
@@ -217,9 +202,9 @@ public class ThreadPersistentSettings {
         if (getConfiguration().equals(configuration)) {
             return false;
         }
-        putObject(CONFIG_BORDER_ROUTER_ENABLED.key, configuration.isBorderRouterEnabled());
-        putObject(CONFIG_NAT64_ENABLED.key, configuration.isNat64Enabled());
-        putObject(CONFIG_DHCP6_PD_ENABLED.key, configuration.isDhcpv6PdEnabled());
+        put(KEY_CONFIG_BORDER_ROUTER_ENABLED, configuration.isBorderRouterEnabled());
+        put(KEY_CONFIG_NAT64_ENABLED, configuration.isNat64Enabled());
+        put(KEY_CONFIG_DHCP6_PD_ENABLED, configuration.isDhcpv6PdEnabled());
         writeToStoreFile();
         return true;
     }
@@ -227,9 +212,9 @@ public class ThreadPersistentSettings {
     /** Retrieve the {@link ThreadConfiguration} from the persistent settings. */
     public ThreadConfiguration getConfiguration() {
         return new ThreadConfiguration.Builder()
-                .setBorderRouterEnabled(get(CONFIG_BORDER_ROUTER_ENABLED))
-                .setNat64Enabled(get(CONFIG_NAT64_ENABLED))
-                .setDhcpv6PdEnabled(get(CONFIG_DHCP6_PD_ENABLED))
+                .setBorderRouterEnabled(get(KEY_CONFIG_BORDER_ROUTER_ENABLED))
+                .setNat64Enabled(get(KEY_CONFIG_NAT64_ENABLED))
+                .setDhcpv6PdEnabled(get(KEY_CONFIG_DHCP6_PD_ENABLED))
                 .build();
     }
 
@@ -238,18 +223,11 @@ public class ThreadPersistentSettings {
      *
      * @param <T> Type of the value.
      */
-    public static class Key<T> {
-        public final String key;
-        public final T defaultValue;
+    public static final class Key<T> {
+        @VisibleForTesting final String key;
 
-        private Key(String key, T defaultValue) {
+        private Key(String key) {
             this.key = key;
-            this.defaultValue = defaultValue;
-        }
-
-        @Override
-        public String toString() {
-            return "[Key: " + key + ", DefaultValue: " + defaultValue + "]";
         }
     }
 
@@ -260,7 +238,7 @@ public class ThreadPersistentSettings {
             synchronized (mLock) {
                 bundleToWrite = new PersistableBundle(mSettings);
             }
-            bundleToWrite.putInt(VERSION_KEY, CURRENT_SETTINGS_STORE_DATA_VERSION);
+            bundleToWrite.putInt(KEY_VERSION, CURRENT_SETTINGS_STORE_DATA_VERSION);
             bundleToWrite.writeToStream(outputStream);
             synchronized (mLock) {
                 writeToAtomicFile(mAtomicFile, outputStream.toByteArray());
@@ -280,7 +258,7 @@ public class ThreadPersistentSettings {
             final ByteArrayInputStream inputStream = new ByteArrayInputStream(readData);
             final PersistableBundle bundleRead = PersistableBundle.readFromStream(inputStream);
             // Version unused for now. May be needed in the future for handling migrations.
-            bundleRead.remove(VERSION_KEY);
+            bundleRead.remove(KEY_VERSION);
             synchronized (mLock) {
                 mSettings.putAll(bundleRead);
             }

@@ -35,6 +35,7 @@ import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_
 import static android.net.thread.ThreadNetworkManager.PERMISSION_THREAD_NETWORK_TESTING;
 
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
+import static com.android.server.thread.ThreadPersistentSettings.KEY_THREAD_ENABLED;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_INVALID_STATE;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
@@ -580,7 +581,7 @@ public final class ThreadNetworkControllerServiceTest {
         mTestLooper.dispatchAll();
 
         assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-        assertThat(mPersistentSettings.get(ThreadPersistentSettings.THREAD_ENABLED)).isTrue();
+        assertThat(mPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
     }
 
     @Test
