@@ -239,6 +239,12 @@ public final class FullThreadDevice {
         executeCommand("udp send %s %d %s", serverAddr.getHostAddress(), serverPort, message);
     }
 
+    /** Sets `true` to enable SRP server on this device. */
+    public void setSrpServerEnabled(boolean enabled) {
+        String cmd = enabled ? "enable" : "disable";
+        executeCommand("srp server " + cmd);
+    }
+
     /** Enables the SRP client and run in autostart mode. */
     public void autoStartSrpClient() {
         executeCommand("srp client autostart enable");

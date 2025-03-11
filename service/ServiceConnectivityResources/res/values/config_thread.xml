@@ -26,6 +26,10 @@
     -->
     <bool name="config_thread_default_enabled">true</bool>
 
+    <!-- Sets to {@code true} to enable Thread Border Router on the device by default.
+    -->
+    <bool name="config_thread_border_router_default_enabled">false</bool>
+
     <!-- Whether to use location APIs in the algorithm to determine country code or not.
     If disabled, will use other sources (telephony, wifi, etc) to determine device location for
     Thread Network regulatory purposes.

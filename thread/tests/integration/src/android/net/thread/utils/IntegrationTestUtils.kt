@@ -583,6 +583,17 @@ object IntegrationTestUtils {
     }
 
     /**
+     * Let the FTD join the specified Thread network and wait for it becomes a Child or Router.
+     */
+    @JvmStatic
+    @Throws(Exception::class)
+    fun joinNetworkAndWait(ftd: FullThreadDevice, dataset: ActiveOperationalDataset) {
+        ftd.factoryReset()
+        ftd.joinNetwork(dataset)
+        ftd.waitForStateAnyOf(listOf("router", "child"), JOIN_TIMEOUT)
+    }
+
+    /**
      * Let the FTD join the specified Thread network and wait for border routing to be available.
      *
      * @return the OMR address
@@ -610,6 +621,21 @@ object IntegrationTestUtils {
         controller.leaveAndWait();
 
         controller.setEnabledAndWait(true);
+        controller.joinAndWait(dataset);
+    }
+
+    /** Enables Border Router and joins the specified Thread network. */
+    @JvmStatic
+    fun enableBorderRouterAndJoinNetwork(dataset: ActiveOperationalDataset) {
+        val context: Context = requireNotNull(ApplicationProvider.getApplicationContext());
+        val controller = requireNotNull(ThreadNetworkControllerWrapper.newInstance(context));
+
+        // TODO: b/323301831 - This is a workaround to avoid unnecessary delay to re-form a network
+        controller.leaveAndWait();
+
+        controller.setEnabledAndWait(true);
+        val config = ThreadConfiguration.Builder().setBorderRouterEnabled(true).build();
+        controller.setConfigurationAndWait(config);
         controller.joinAndWait(dataset);
     }
 

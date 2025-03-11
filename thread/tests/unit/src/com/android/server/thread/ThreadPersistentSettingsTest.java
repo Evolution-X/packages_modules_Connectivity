@@ -16,8 +16,8 @@
 
 package com.android.server.thread;
 
-import static com.android.server.thread.ThreadPersistentSettings.THREAD_COUNTRY_CODE;
-import static com.android.server.thread.ThreadPersistentSettings.THREAD_ENABLED;
+import static com.android.server.thread.ThreadPersistentSettings.KEY_COUNTRY_CODE;
+import static com.android.server.thread.ThreadPersistentSettings.KEY_THREAD_ENABLED;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -35,6 +35,7 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.connectivity.resources.R;
 import com.android.server.connectivity.ConnectivityResources;
+import com.android.server.thread.ThreadPersistentSettings.Key;
 
 import org.junit.After;
 import org.junit.Before;
@@ -83,68 +84,81 @@ public class ThreadPersistentSettingsTest {
 
     @Test
     public void initialize_readsFromFile() throws Exception {
-        byte[] data = createXmlForParsing(THREAD_ENABLED.key, false);
+        byte[] data = createXmlForParsing(KEY_THREAD_ENABLED, false);
         setupAtomicFileForRead(data);
 
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
     }
 
     @Test
     public void initialize_ThreadDisabledInResources_returnsThreadDisabled() throws Exception {
         when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(false);
-        setupAtomicFileForRead(new byte[0]);
+        mThreadPersistentSettings =
+                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
 
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
+    }
+
+    @Test
+    public void initialize_ThreadEnabledInResources_returnsThreadEnabled() throws Exception {
+        when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(true);
+        mThreadPersistentSettings =
+                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
+
+        mThreadPersistentSettings.initialize();
+
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
     }
 
     @Test
     public void initialize_ThreadDisabledInResourcesButEnabledInXml_returnsThreadEnabled()
             throws Exception {
         when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(false);
-        byte[] data = createXmlForParsing(THREAD_ENABLED.key, true);
-        setupAtomicFileForRead(data);
+        setupAtomicFileForRead(createXmlForParsing(KEY_THREAD_ENABLED, true));
+        mThreadPersistentSettings =
+                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
 
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isTrue();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
     }
 
     @Test
     public void put_ThreadFeatureEnabledTrue_returnsTrue() throws Exception {
-        mThreadPersistentSettings.put(THREAD_ENABLED.key, true);
+        mThreadPersistentSettings.put(KEY_THREAD_ENABLED, true);
 
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isTrue();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
     }
 
     @Test
     public void put_ThreadFeatureEnabledFalse_returnsFalse() throws Exception {
-        mThreadPersistentSettings.put(THREAD_ENABLED.key, false);
+        mThreadPersistentSettings.put(KEY_THREAD_ENABLED, false);
 
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
         mThreadPersistentSettings.initialize();
-        assertThat(mThreadPersistentSettings.get(THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
     }
 
     @Test
     public void put_ThreadCountryCodeString_returnsString() throws Exception {
-        mThreadPersistentSettings.put(THREAD_COUNTRY_CODE.key, TEST_COUNTRY_CODE);
+        mThreadPersistentSettings.put(KEY_COUNTRY_CODE, TEST_COUNTRY_CODE);
 
-        assertThat(mThreadPersistentSettings.get(THREAD_COUNTRY_CODE)).isEqualTo(TEST_COUNTRY_CODE);
+        assertThat(mThreadPersistentSettings.get(KEY_COUNTRY_CODE)).isEqualTo(TEST_COUNTRY_CODE);
         mThreadPersistentSettings.initialize();
-        assertThat(mThreadPersistentSettings.get(THREAD_COUNTRY_CODE)).isEqualTo(TEST_COUNTRY_CODE);
+        assertThat(mThreadPersistentSettings.get(KEY_COUNTRY_CODE)).isEqualTo(TEST_COUNTRY_CODE);
     }
 
     @Test
     public void put_ThreadCountryCodeNull_returnsNull() throws Exception {
-        mThreadPersistentSettings.put(THREAD_COUNTRY_CODE.key, null);
+        mThreadPersistentSettings.put(KEY_COUNTRY_CODE, null);
 
-        assertThat(mThreadPersistentSettings.get(THREAD_COUNTRY_CODE)).isNull();
+        assertThat(mThreadPersistentSettings.get(KEY_COUNTRY_CODE)).isNull();
         mThreadPersistentSettings.initialize();
-        assertThat(mThreadPersistentSettings.get(THREAD_COUNTRY_CODE)).isNull();
+        assertThat(mThreadPersistentSettings.get(KEY_COUNTRY_CODE)).isNull();
     }
 
     @Test
@@ -202,10 +216,10 @@ public class ThreadPersistentSettingsTest {
         return new AtomicFile(mTemporaryFolder.newFile());
     }
 
-    private byte[] createXmlForParsing(String key, Boolean value) throws Exception {
+    private byte[] createXmlForParsing(Key<Boolean> key, Boolean value) throws Exception {
         PersistableBundle bundle = new PersistableBundle();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        bundle.putBoolean(key, value);
+        bundle.putBoolean(key.key, value);
         bundle.writeToStream(outputStream);
         return outputStream.toByteArray();
     }

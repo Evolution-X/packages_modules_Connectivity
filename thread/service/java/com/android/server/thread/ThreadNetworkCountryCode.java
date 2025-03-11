@@ -16,7 +16,7 @@
 
 package com.android.server.thread;
 
-import static com.android.server.thread.ThreadPersistentSettings.THREAD_COUNTRY_CODE;
+import static com.android.server.thread.ThreadPersistentSettings.KEY_COUNTRY_CODE;
 
 import android.annotation.Nullable;
 import android.annotation.StringDef;
@@ -496,7 +496,7 @@ public class ThreadNetworkCountryCode {
             return mLocationCountryCodeInfo;
         }
 
-        String settingsCountryCode = mPersistentSettings.get(THREAD_COUNTRY_CODE);
+        String settingsCountryCode = mPersistentSettings.get(KEY_COUNTRY_CODE);
         if (settingsCountryCode != null) {
             return new CountryCodeInfo(settingsCountryCode, COUNTRY_CODE_SOURCE_SETTINGS);
         }
@@ -514,8 +514,7 @@ public class ThreadNetworkCountryCode {
             public void onSuccess() {
                 synchronized ("ThreadNetworkCountryCode.this") {
                     mCurrentCountryCodeInfo = countryCodeInfo;
-                    mPersistentSettings.put(
-                            THREAD_COUNTRY_CODE.key, countryCodeInfo.getCountryCode());
+                    mPersistentSettings.put(KEY_COUNTRY_CODE, countryCodeInfo.getCountryCode());
                 }
             }
 

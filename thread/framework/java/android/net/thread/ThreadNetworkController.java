@@ -227,8 +227,8 @@ public final class ThreadNetworkController {
      * specific error:
      *
      * <ul>
-     *   <li>{@link ThreadNetworkException#ERROR_FAILED_PRECONDITION} when this device is not
-     *       attached to Thread network
+     *   <li>{@link ThreadNetworkException#ERROR_FAILED_PRECONDITION} when this device is not a
+     *       Border Router or not attached to Thread network
      *   <li>{@link ThreadNetworkException#ERROR_BUSY} when ephemeral key mode is already activated
      *       on the device, caller can recover from this error when the ephemeral key mode gets
      *       deactivated
@@ -267,7 +267,8 @@ public final class ThreadNetworkController {
      * connection will be terminated.
      *
      * <p>On success, {@link OutcomeReceiver#onResult} of {@code receiver} is called. The call will
-     * always succeed if the device is not in ephemeral key mode.
+     * always succeed if the device is not in ephemeral key mode. It returns an error {@link
+     * ThreadNetworkException#ERROR_FAILED_PRECONDITION} if this device is not a Border Router.
      *
      * @param executor the executor to execute {@code receiver}
      * @param receiver the receiver to receive the result of this operation
