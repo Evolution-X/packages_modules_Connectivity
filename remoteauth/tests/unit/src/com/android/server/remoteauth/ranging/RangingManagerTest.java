@@ -36,7 +36,7 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -123,7 +123,7 @@ public class RangingManagerTest {
     @Test
     public void testConstruction() {
         mRangingManager = new RangingManager(mContext);
-        verifyZeroInteractions(mUwbManager);
+        verifyNoMoreInteractions(mUwbManager);
     }
 
     @Test
