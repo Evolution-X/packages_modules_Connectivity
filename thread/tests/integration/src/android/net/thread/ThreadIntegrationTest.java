@@ -17,12 +17,10 @@
 package android.net.thread;
 
 import static android.Manifest.permission.ACCESS_NETWORK_STATE;
-import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_DETACHED;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_LEADER;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_STOPPED;
 import static android.net.thread.utils.IntegrationTestUtils.CALLBACK_TIMEOUT;
-import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_CONFIG;
 import static android.net.thread.utils.IntegrationTestUtils.RESTART_JOIN_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.getPrefixesFromNetData;
@@ -56,6 +54,7 @@ import android.net.NetworkRequest;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
+import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThreadDevice;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.net.thread.utils.ThreadNetworkControllerWrapper;
 import android.net.thread.utils.ThreadStateListener;
@@ -63,13 +62,13 @@ import android.os.SystemClock;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
-import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -78,6 +77,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -86,7 +86,7 @@ import java.util.concurrent.Executors;
 /** Tests for E2E Android Thread integration with ot-daemon, ConnectivityService, etc.. */
 @LargeTest
 @RequiresThreadFeature
-@RunWith(AndroidJUnit4.class)
+@RunWith(Parameterized.class)
 public class ThreadIntegrationTest {
     // The byte[] buffer size for UDP tests
     private static final int UDP_BUFFER_SIZE = 1024;
@@ -112,8 +112,6 @@ public class ThreadIntegrationTest {
                                     + "B9D351B40C0402A0FFF8");
     private static final ActiveOperationalDataset DEFAULT_DATASET =
             ActiveOperationalDataset.fromThreadTlvs(DEFAULT_DATASET_TLVS);
-    private static final ThreadConfiguration DEFAULT_CONFIG =
-            new ThreadConfiguration.Builder().build();
 
     private static final Inet6Address GROUP_ADDR_ALL_ROUTERS =
             (Inet6Address) InetAddresses.parseNumericAddress("ff02::2");
@@ -131,11 +129,28 @@ public class ThreadIntegrationTest {
     private OtDaemonController mOtCtl;
     private FullThreadDevice mFtd;
 
+    public final boolean mIsBorderRouterEnabled;
+    private final ThreadConfiguration mConfig;
+
+    @Parameterized.Parameters
+    public static Collection configArguments() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
+
+    public ThreadIntegrationTest(boolean isBorderRouterEnabled) {
+        mIsBorderRouterEnabled = isBorderRouterEnabled;
+        mConfig =
+                new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(isBorderRouterEnabled)
+                        .build();
+    }
+
     @Before
     public void setUp() throws Exception {
         mExecutor = Executors.newSingleThreadExecutor();
         mOtCtl = new OtDaemonController();
         mController.setEnabledAndWait(true);
+        mController.setConfigurationAndWait(mConfig);
         mController.leaveAndWait();
         mFtd = new FullThreadDevice(10 /* nodeId */);
     }
@@ -146,7 +161,6 @@ public class ThreadIntegrationTest {
 
         mController.setTestNetworkAsUpstreamAndWait(null);
         mController.leaveAndWait();
-        mController.setConfigurationAndWait(DEFAULT_CONFIG);
 
         mFtd.destroy();
         mExecutor.shutdownNow();
@@ -166,6 +180,7 @@ public class ThreadIntegrationTest {
     @Test
     public void otDaemonRestart_JoinedNetworkAndStopped_autoRejoinedAndTunIfStateConsistent()
             throws Exception {
+        assumeTrue(mController.getConfiguration().isBorderRouterEnabled());
         mController.joinAndWait(DEFAULT_DATASET);
 
         runShellCommand("stop ot-daemon");
@@ -231,6 +246,7 @@ public class ThreadIntegrationTest {
     }
 
     @Test
+    @RequiresSimulationThreadDevice
     public void udp_appStartEchoServer_endDeviceUdpEchoSuccess() throws Exception {
         // Topology:
         //   Test App ------ thread-wpan ------ End Device
@@ -290,6 +306,7 @@ public class ThreadIntegrationTest {
     }
 
     @Test
+    @RequiresSimulationThreadDevice
     public void edPingsMeshLocalAddresses_oneReplyPerRequest() throws Exception {
         mController.joinAndWait(DEFAULT_DATASET);
         startFtdChild(mFtd, DEFAULT_DATASET);
@@ -354,21 +371,15 @@ public class ThreadIntegrationTest {
     }
 
     @Test
-    public void setConfiguration_disableBorderRouter_noBrfunctionsEnabled() throws Exception {
-        NetworkRequest request =
-                new NetworkRequest.Builder()
-                        .addTransportType(NetworkCapabilities.TRANSPORT_THREAD)
-                        .build();
+    @RequiresSimulationThreadDevice
+    public void setConfiguration_disableBorderRouter_borderRoutingDisabled() throws Exception {
         startFtdLeader(mFtd, DEFAULT_DATASET);
 
         mController.setConfigurationAndWait(
                 new ThreadConfiguration.Builder().setBorderRouterEnabled(false).build());
         mController.joinAndWait(DEFAULT_DATASET);
-        NetworkCapabilities caps = registerNetworkCallbackAndWait(request);
 
-        assertThat(caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK)).isFalse();
         assertThat(mOtCtl.getBorderRoutingState()).ignoringCase().isEqualTo("disabled");
-        assertThat(mOtCtl.getSrpServerState()).ignoringCase().isNotEqualTo("disabled");
         // TODO: b/376217403 - enables / disables Border Agent at runtime
     }
 

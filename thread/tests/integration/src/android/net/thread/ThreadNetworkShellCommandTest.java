@@ -34,6 +34,7 @@ import android.content.Context;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.OtDaemonController;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
+import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThreadDevice;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.net.thread.utils.ThreadNetworkControllerWrapper;
 
@@ -167,6 +168,7 @@ public class ThreadNetworkShellCommandTest {
     }
 
     @Test
+    @RequiresSimulationThreadDevice
     public void handleOtCtlCommand_pingFtd_getValidResponse() throws Exception {
         mController.joinAndWait(DEFAULT_DATASET);
         startFtdChild(mFtd, DEFAULT_DATASET);
