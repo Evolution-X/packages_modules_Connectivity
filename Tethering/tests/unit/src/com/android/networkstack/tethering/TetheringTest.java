@@ -101,6 +101,7 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -3571,6 +3572,32 @@ public class TetheringTest {
         failedEnable.assertHasResult();
     }
 
+    @Test
+    public void testStartBluetoothTetheringFailsWhenTheresAnExistingRequestWaitingForPanService()
+            throws Exception {
+        initTetheringOnTestThread();
+
+        mockBluetoothSettings(true /* bluetoothOn */, true /* tetheringOn */);
+        final ResultListener firstResult = new ResultListener(TETHER_ERROR_NO_ERROR);
+        mTethering.startTethering(createTetheringRequest(TETHERING_BLUETOOTH),
+                TEST_CALLER_PKG, firstResult);
+        mLooper.dispatchAll();
+        firstResult.assertDoesNotHaveResult();
+
+        // Second request should fail.
+        final ResultListener secondResult = new ResultListener(TETHER_ERROR_SERVICE_UNAVAIL);
+        mTethering.startTethering(createTetheringRequest(TETHERING_BLUETOOTH),
+                TEST_CALLER_PKG, secondResult);
+        mLooper.dispatchAll();
+        secondResult.assertHasResult();
+        firstResult.assertDoesNotHaveResult();
+
+        // Bind to PAN service should succeed for first listener only. If the second result is
+        // called with TETHER_ERROR_NO_ERROR, ResultListener will fail an assertion.
+        verifySetBluetoothTethering(true /* enable */, true /* bindToPanService */);
+        firstResult.assertHasResult();
+    }
+
     private void mockBluetoothSettings(boolean bluetoothOn, boolean tetheringOn) {
         when(mBluetoothAdapter.isEnabled()).thenReturn(bluetoothOn);
         when(mBluetoothPan.isTetheringOn()).thenReturn(tetheringOn);
@@ -3618,7 +3645,7 @@ public class TetheringTest {
     private ServiceListener verifySetBluetoothTethering(final boolean enable,
             final boolean bindToPanService) throws Exception {
         ServiceListener listener = null;
-        verify(mBluetoothAdapter).isEnabled();
+        verify(mBluetoothAdapter, atLeastOnce()).isEnabled();
         if (bindToPanService) {
             final ArgumentCaptor<ServiceListener> listenerCaptor =
                     ArgumentCaptor.forClass(ServiceListener.class);
