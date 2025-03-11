@@ -639,6 +639,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     private final ConnectivityService.Dependencies mConnServiceDeps;
     private final Context mContext;
     private final Handler mHandler;
+    private final NetworkAgentMessageHandler mRegistry;
     private final QosCallbackTracker mQosCallbackTracker;
     private final INetd mNetd;
 
@@ -673,6 +674,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         mNetd = netd;
         mContext = context;
         mHandler = handler;
+        mRegistry = new NetworkAgentMessageHandler(mHandler);
         this.factorySerialNumber = factorySerialNumber;
         this.creatorUid = creatorUid;
         mLingerDurationMs = lingerDurationMs;
@@ -701,7 +703,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     public void notifyRegistered() {
         try {
             networkAgent.asBinder().linkToDeath(mDeathMonitor, 0);
-            networkAgent.onRegistered(new NetworkAgentMessageHandler(mHandler));
+            networkAgent.onRegistered();
         } catch (RemoteException e) {
             Log.e(TAG, "Error registering NetworkAgent", e);
             maybeUnlinkDeathMonitor();
@@ -1115,6 +1117,13 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
      */
     public NetworkMonitorManager networkMonitor() {
         return mNetworkMonitor;
+    }
+
+    /**
+     * Get the registry in this NetworkAgentInfo.
+     */
+    public INetworkAgentRegistry getRegistry() {
+        return mRegistry;
     }
 
     // Functions for manipulating the requests satisfied by this network.

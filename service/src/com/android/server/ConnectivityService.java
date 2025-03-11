@@ -228,6 +228,7 @@ import android.net.NattSocketKeepalive;
 import android.net.Network;
 import android.net.NetworkAgent;
 import android.net.NetworkAgentConfig;
+import android.net.NetworkAndAgentRegistryParcelable;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
@@ -9316,7 +9317,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * @param providerId the ID of the provider owning this NetworkAgent.
      * @return the network created for this agent.
      */
-    public Network registerNetworkAgent(INetworkAgent na,
+    public NetworkAndAgentRegistryParcelable registerNetworkAgent(INetworkAgent na,
             NetworkInfo networkInfo,
             LinkProperties linkProperties,
             NetworkCapabilities networkCapabilities,
@@ -9359,7 +9360,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private Network registerNetworkAgentInternal(INetworkAgent na, NetworkInfo networkInfo,
+    private NetworkAndAgentRegistryParcelable registerNetworkAgentInternal(
+            INetworkAgent na, NetworkInfo networkInfo,
             LinkProperties linkProperties, NetworkCapabilities networkCapabilities,
             NetworkScore currentScore, NetworkAgentConfig networkAgentConfig,
             @Nullable LocalNetworkConfig localNetworkConfig, int providerId,
@@ -9391,8 +9393,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         // NetworkAgentInfo registration will finish when the NetworkMonitor is created.
         // If the network disconnects or sends any other event before that, messages are deferred by
         // NetworkAgent until nai.connect(), which will be called when finalizing the
-        // registration.
-        return nai.network;
+        // registration. TODO : have NetworkAgentInfo defer them instead.
+        final NetworkAndAgentRegistryParcelable result = new NetworkAndAgentRegistryParcelable();
+        result.network = nai.network;
+        result.registry = nai.getRegistry();
+        return result;
     }
 
     private void handleRegisterNetworkAgent(NetworkAgentInfo nai, INetworkMonitor networkMonitor) {
