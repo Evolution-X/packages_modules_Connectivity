@@ -42,6 +42,7 @@ import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -93,7 +94,6 @@ import android.util.AtomicFile;
 
 import androidx.test.annotation.UiThreadTest;
 import androidx.test.core.app.ApplicationProvider;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.connectivity.resources.R;
@@ -112,6 +112,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
@@ -124,6 +125,8 @@ import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -132,7 +135,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** Unit tests for {@link ThreadNetworkControllerService}. */
 @SmallTest
-@RunWith(AndroidJUnit4.class)
+@RunWith(Parameterized.class)
 // This test doesn't really need to run on the UI thread, but @Before and @Test annotated methods
 // need to run in the same thread because there are code in {@code ThreadNetworkControllerService}
 // checking that all its methods are running in the thread of the handler it's using. This is due
@@ -200,6 +203,17 @@ public final class ThreadNetworkControllerServiceTest {
     @Rule(order = 1)
     public final TemporaryFolder tempFolder = new TemporaryFolder();
 
+    private final boolean mIsBorderRouterEnabled;
+
+    @Parameterized.Parameters
+    public static Collection configArguments() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
+
+    public ThreadNetworkControllerServiceTest(boolean isBorderRouterEnabled) {
+        mIsBorderRouterEnabled = isBorderRouterEnabled;
+    }
+
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
@@ -231,6 +245,8 @@ public final class ThreadNetworkControllerServiceTest {
 
         when(mConnectivityResources.get()).thenReturn(mResources);
         when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(true);
+        when(mResources.getBoolean(eq(R.bool.config_thread_border_router_default_enabled)))
+                .thenReturn(mIsBorderRouterEnabled);
         when(mResources.getBoolean(
                         eq(R.bool.config_thread_srp_server_wait_for_border_routing_enabled)))
                 .thenReturn(true);
@@ -920,7 +936,9 @@ public final class ThreadNetworkControllerServiceTest {
     }
 
     @Test
-    public void initialize_upstreamNetworkRequestHasCertainTransportTypesAndCapabilities() {
+    public void initialize_borderRouterEnabled_upstreamNetworkRequestHasExpectedTransportAndCaps() {
+        assumeTrue(mIsBorderRouterEnabled);
+
         mService.initialize();
         mTestLooper.dispatchAll();
 
@@ -999,7 +1017,8 @@ public final class ThreadNetworkControllerServiceTest {
     }
 
     @Test
-    public void activateEphemeralKeyMode_succeed() throws Exception {
+    public void activateEphemeralKeyMode_borderRouterEnabled_succeed() throws Exception {
+        assumeTrue(mIsBorderRouterEnabled);
         mService.initialize();
         final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
 
@@ -1010,7 +1029,8 @@ public final class ThreadNetworkControllerServiceTest {
     }
 
     @Test
-    public void deactivateEphemeralKeyMode_succeed() throws Exception {
+    public void deactivateEphemeralKeyMode_borderRouterEnabled_succeed() throws Exception {
+        assumeTrue(mIsBorderRouterEnabled);
         mService.initialize();
         final IOperationReceiver mockReceiver = mock(IOperationReceiver.class);
 

@@ -233,7 +233,10 @@ public final class ThreadNetworkControllerWrapper {
     public void setNat64EnabledAndWait(boolean enabled) throws Exception {
         final ThreadConfiguration config = getConfiguration();
         final ThreadConfiguration newConfig =
-                new ThreadConfiguration.Builder(config).setNat64Enabled(enabled).build();
+                new ThreadConfiguration.Builder(config)
+                        .setBorderRouterEnabled(true)
+                        .setNat64Enabled(enabled)
+                        .build();
         setConfigurationAndWait(newConfig);
     }
 

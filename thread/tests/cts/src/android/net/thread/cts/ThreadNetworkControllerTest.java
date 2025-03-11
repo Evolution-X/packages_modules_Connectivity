@@ -49,6 +49,8 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -94,12 +96,15 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -118,6 +123,7 @@ import java.util.function.Predicate;
 /** CTS tests for {@link ThreadNetworkController}. */
 @LargeTest
 @RequiresThreadFeature
+@RunWith(Parameterized.class)
 public class ThreadNetworkControllerTest {
     private static final int JOIN_TIMEOUT_MILLIS = 30 * 1000;
     private static final int LEAVE_TIMEOUT_MILLIS = 2_000;
@@ -134,8 +140,6 @@ public class ThreadNetworkControllerTest {
     private static final String MESHCOP_SERVICE_TYPE = "_meshcop._udp";
     private static final String THREAD_NETWORK_PRIVILEGED =
             "android.permission.THREAD_NETWORK_PRIVILEGED";
-    private static final ThreadConfiguration DEFAULT_CONFIG =
-            new ThreadConfiguration.Builder().build();
     private static final SparseIntArray CHANNEL_MAX_POWERS =
             new SparseIntArray() {
                 {
@@ -161,6 +165,22 @@ public class ThreadNetworkControllerTest {
     private final List<Consumer<ThreadConfiguration>> mConfigurationCallbacksToCleanUp =
             new ArrayList<>();
 
+    public final boolean mIsBorderRouterEnabled;
+    private final ThreadConfiguration mDefaultConfig;
+
+    @Parameterized.Parameters
+    public static Collection configArguments() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
+
+    public ThreadNetworkControllerTest(boolean isBorderRouterEnabled) {
+        mIsBorderRouterEnabled = isBorderRouterEnabled;
+        mDefaultConfig =
+                new ThreadConfiguration.Builder()
+                        .setBorderRouterEnabled(isBorderRouterEnabled)
+                        .build();
+    }
+
     @Before
     public void setUp() throws Exception {
         mController =
@@ -175,8 +195,10 @@ public class ThreadNetworkControllerTest {
         mHandlerThread.start();
 
         setEnabledAndWait(mController, true);
-        setConfigurationAndWait(mController, DEFAULT_CONFIG);
-        deactivateEphemeralKeyModeAndWait(mController);
+        setConfigurationAndWait(mController, mDefaultConfig);
+        if (mDefaultConfig.isBorderRouterEnabled()) {
+            deactivateEphemeralKeyModeAndWait(mController);
+        }
     }
 
     @After
@@ -185,7 +207,7 @@ public class ThreadNetworkControllerTest {
         setEnabledAndWait(mController, true);
         leaveAndWait(mController);
         tearDownTestNetwork();
-        setConfigurationAndWait(mController, DEFAULT_CONFIG);
+        setConfigurationAndWait(mController, mDefaultConfig);
         for (Consumer<ThreadConfiguration> configurationCallback :
                 mConfigurationCallbacksToCleanUp) {
             try {
@@ -197,7 +219,9 @@ public class ThreadNetworkControllerTest {
             }
         }
         mConfigurationCallbacksToCleanUp.clear();
-        deactivateEphemeralKeyModeAndWait(mController);
+        if (mDefaultConfig.isBorderRouterEnabled()) {
+            deactivateEphemeralKeyModeAndWait(mController);
+        }
     }
 
     @Test
@@ -573,7 +597,7 @@ public class ThreadNetworkControllerTest {
                     @Override
                     public void onActiveOperationalDatasetChanged(
                             ActiveOperationalDataset activeDataset) {
-                        if (activeDataset.equals(activeDataset2)) {
+                        if (Objects.equals(activeDataset, activeDataset2)) {
                             dataset2IsApplied.complete(true);
                         }
                     }
@@ -843,6 +867,7 @@ public class ThreadNetworkControllerTest {
     @Test
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void activateEphemeralKeyMode_withPrivilegedPermission_succeeds() throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         joinRandomizedDatasetAndWait(mController);
         CompletableFuture<Void> startFuture = new CompletableFuture<>();
 
@@ -861,6 +886,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void activateEphemeralKeyMode_withoutPrivilegedPermission_throwsSecurityException()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         dropAllPermissions();
 
         assertThrows(
@@ -874,6 +900,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void activateEphemeralKeyMode_withZeroLifetime_throwsIllegalArgumentException()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         grantPermissions(THREAD_NETWORK_PRIVILEGED);
 
         assertThrows(
@@ -885,6 +912,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void activateEphemeralKeyMode_withInvalidLargeLifetime_throwsIllegalArgumentException()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         grantPermissions(THREAD_NETWORK_PRIVILEGED);
         Duration lifetime = mController.getMaxEphemeralKeyLifetime().plusMillis(1);
 
@@ -897,6 +925,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void activateEphemeralKeyMode_concurrentRequests_secondOneFailsWithBusyError()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         joinRandomizedDatasetAndWait(mController);
         CompletableFuture<Void> future1 = new CompletableFuture<>();
         CompletableFuture<Void> future2 = new CompletableFuture<>();
@@ -945,6 +974,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void deactivateEphemeralKeyMode_withoutPrivilegedPermission_throwsSecurityException()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         dropAllPermissions();
 
         assertThrows(
@@ -956,9 +986,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void deactivateEphemeralKeyMode_notBorderRouter_failsWithFailedPrecondition()
             throws Exception {
-        setConfigurationAndWait(
-                mController,
-                new ThreadConfiguration.Builder().setBorderRouterEnabled(false).build());
+        assumeFalse(mDefaultConfig.isBorderRouterEnabled());
         grantPermissions(THREAD_NETWORK_PRIVILEGED);
         CompletableFuture<Void> future = new CompletableFuture<>();
 
@@ -975,6 +1003,7 @@ public class ThreadNetworkControllerTest {
     @Test
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void subscribeEpskcState_permissionsGranted_returnsCurrentState() throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         CompletableFuture<Integer> stateFuture = new CompletableFuture<>();
         CompletableFuture<String> ephemeralKeyFuture = new CompletableFuture<>();
         CompletableFuture<Instant> expiryFuture = new CompletableFuture<>();
@@ -1011,6 +1040,7 @@ public class ThreadNetworkControllerTest {
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void subscribeEpskcState_withoutThreadPriviledgedPermission_returnsNullEphemeralKey()
             throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         CompletableFuture<Integer> stateFuture = new CompletableFuture<>();
         CompletableFuture<String> ephemeralKeyFuture = new CompletableFuture<>();
         CompletableFuture<Instant> expiryFuture = new CompletableFuture<>();
@@ -1050,6 +1080,7 @@ public class ThreadNetworkControllerTest {
     @Test
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void subscribeEpskcState_ephemralKeyStateChanged_returnsUpdatedState() throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         EphemeralKeyStateListener listener = new EphemeralKeyStateListener(mController);
         joinRandomizedDatasetAndWait(mController);
 
@@ -1068,6 +1099,7 @@ public class ThreadNetworkControllerTest {
     @Test
     @RequiresFlagsEnabled({Flags.FLAG_EPSKC_ENABLED})
     public void subscribeEpskcState_epskcEnabled_returnsSameExpiry() throws Exception {
+        assumeTrue(mDefaultConfig.isBorderRouterEnabled());
         EphemeralKeyStateListener listener1 = new EphemeralKeyStateListener(mController);
         Triple<Integer, String, Instant> epskc1;
         try {
@@ -1173,7 +1205,7 @@ public class ThreadNetworkControllerTest {
                 THREAD_NETWORK_PRIVILEGED,
                 () -> registerConfigurationCallback(mController, mExecutor, callback));
         assertThat(getConfigFuture.get(CALLBACK_TIMEOUT_MILLIS, MILLISECONDS))
-                .isEqualTo(DEFAULT_CONFIG);
+                .isEqualTo(mDefaultConfig);
     }
 
     @Test
@@ -1216,7 +1248,7 @@ public class ThreadNetworkControllerTest {
             setFuture1.get(ENABLED_TIMEOUT_MILLIS, MILLISECONDS);
             setFuture2.get(ENABLED_TIMEOUT_MILLIS, MILLISECONDS);
 
-            listener.expectConfiguration(DEFAULT_CONFIG);
+            listener.expectConfiguration(mDefaultConfig);
             listener.expectConfiguration(config1);
             listener.expectConfiguration(config2);
             listener.expectNoMoreConfiguration();
