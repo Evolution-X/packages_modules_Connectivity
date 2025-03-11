@@ -139,7 +139,7 @@ public class QuicConnectionCloser {
         public void destroyUdpSocket(final InetSocketAddress src, final InetSocketAddress dst,
                 final long cookie)
                 throws SocketException, InterruptedIOException, ErrnoException {
-            InetDiagMessage.destroyUdpSocket(src, dst, 0 /* ifindex */, cookie);
+            InetDiagMessage.destroyUdpSocket(src, dst, cookie);
         }
 
         /**
