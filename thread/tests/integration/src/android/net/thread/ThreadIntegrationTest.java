@@ -95,6 +95,9 @@ public class ThreadIntegrationTest {
     // The maximum time for changes to be propagated to netdata.
     private static final Duration NET_DATA_UPDATE_TIMEOUT = Duration.ofSeconds(1);
 
+    // The maximum time for changes in netdata to be propagated to link properties.
+    private static final Duration LINK_PROPERTIES_UPDATE_TIMEOUT = Duration.ofSeconds(1);
+
     private static final Duration NETWORK_CALLBACK_TIMEOUT = Duration.ofSeconds(10);
 
     // A valid Thread Active Operational Dataset generated from OpenThread CLI "dataset init new".
@@ -303,7 +306,6 @@ public class ThreadIntegrationTest {
 
     @Test
     public void addPrefixToNetData_routeIsAddedToTunInterface() throws Exception {
-        ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
         mController.joinAndWait(DEFAULT_DATASET);
 
         // Ftd child doesn't have the ability to add a prefix, so let BR itself add a prefix.
@@ -316,15 +318,11 @@ public class ThreadIntegrationTest {
                 },
                 NET_DATA_UPDATE_TIMEOUT);
 
-        LinkProperties lp = cm.getLinkProperties(getThreadNetwork(CALLBACK_TIMEOUT));
-        assertThat(lp).isNotNull();
-        assertThat(lp.getRoutes().stream().anyMatch(r -> r.matches(TEST_NO_SLAAC_PREFIX_ADDRESS)))
-                .isTrue();
+        assertRouteAddedOrRemovedInLinkProperties(true /* isAdded */, TEST_NO_SLAAC_PREFIX_ADDRESS);
     }
 
     @Test
     public void removePrefixFromNetData_routeIsRemovedFromTunInterface() throws Exception {
-        ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
         mController.joinAndWait(DEFAULT_DATASET);
         mOtCtl.executeCommand("prefix add " + TEST_NO_SLAAC_PREFIX + " pros med");
         mOtCtl.executeCommand("netdata register");
@@ -338,15 +336,12 @@ public class ThreadIntegrationTest {
                 },
                 NET_DATA_UPDATE_TIMEOUT);
 
-        LinkProperties lp = cm.getLinkProperties(getThreadNetwork(CALLBACK_TIMEOUT));
-        assertThat(lp).isNotNull();
-        assertThat(lp.getRoutes().stream().anyMatch(r -> r.matches(TEST_NO_SLAAC_PREFIX_ADDRESS)))
-                .isFalse();
+        assertRouteAddedOrRemovedInLinkProperties(
+                false /* isAdded */, TEST_NO_SLAAC_PREFIX_ADDRESS);
     }
 
     @Test
     public void toggleThreadNetwork_routeFromPreviousNetDataIsRemoved() throws Exception {
-        ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
         mController.joinAndWait(DEFAULT_DATASET);
         mOtCtl.executeCommand("prefix add " + TEST_NO_SLAAC_PREFIX + " pros med");
         mOtCtl.executeCommand("netdata register");
@@ -355,10 +350,8 @@ public class ThreadIntegrationTest {
         mOtCtl.factoryReset();
         mController.joinAndWait(DEFAULT_DATASET);
 
-        LinkProperties lp = cm.getLinkProperties(getThreadNetwork(CALLBACK_TIMEOUT));
-        assertThat(lp).isNotNull();
-        assertThat(lp.getRoutes().stream().anyMatch(r -> r.matches(TEST_NO_SLAAC_PREFIX_ADDRESS)))
-                .isFalse();
+        assertRouteAddedOrRemovedInLinkProperties(
+                false /* isAdded */, TEST_NO_SLAAC_PREFIX_ADDRESS);
     }
 
     @Test
@@ -445,5 +438,24 @@ public class ThreadIntegrationTest {
 
     private void assertTunInterfaceMemberOfGroup(Inet6Address address) throws Exception {
         waitFor(() -> isInMulticastGroup(TUN_IF_NAME, address), TUN_ADDR_UPDATE_TIMEOUT);
+    }
+
+    private void assertRouteAddedOrRemovedInLinkProperties(boolean isAdded, InetAddress addr)
+            throws Exception {
+        ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
+
+        waitFor(
+                () -> {
+                    try {
+                        LinkProperties lp =
+                                cm.getLinkProperties(getThreadNetwork(CALLBACK_TIMEOUT));
+                        return lp != null
+                                && isAdded
+                                        == lp.getRoutes().stream().anyMatch(r -> r.matches(addr));
+                    } catch (Exception e) {
+                        return false;
+                    }
+                },
+                LINK_PROPERTIES_UPDATE_TIMEOUT);
     }
 }
