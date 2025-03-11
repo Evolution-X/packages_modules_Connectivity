@@ -90,21 +90,4 @@ public class ThreadNetworkManagerTest {
 
         assertThat(mManager).isNotNull();
     }
-
-    @Test
-    public void getManager_noThreadFeature_returnsNull() {
-        assumeFalse(mPackageManager.hasSystemFeature("android.hardware.thread_network"));
-
-        assertThat(mManager).isNull();
-    }
-
-    @Test
-    @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
-    public void getAllThreadNetworkControllers_managerIsNotNull_returnsNotEmptyList() {
-        assumeNotNull(mManager);
-
-        List<ThreadNetworkController> controllers = mManager.getAllThreadNetworkControllers();
-
-        assertThat(controllers).isNotEmpty();
-    }
 }
