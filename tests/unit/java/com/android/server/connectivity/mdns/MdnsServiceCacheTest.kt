@@ -139,15 +139,19 @@ class MdnsServiceCacheTest {
     private fun getService(
             serviceCache: MdnsServiceCache,
             serviceName: String,
-            cacheKey: CacheKey
+            cacheKey: CacheKey,
+            excludeExpiredService: Boolean = true,
     ): MdnsResponse? = runningOnHandlerAndReturn {
-        serviceCache.getCachedService(serviceName, cacheKey)
+        serviceCache.getCachedService(serviceName, cacheKey, excludeExpiredService)
     }
 
     private fun getServices(
             serviceCache: MdnsServiceCache,
-            cacheKey: CacheKey
-    ): List<MdnsResponse> = runningOnHandlerAndReturn { serviceCache.getCachedServices(cacheKey) }
+            cacheKey: CacheKey,
+            excludeExpiredService: Boolean = true,
+    ): List<MdnsResponse> = runningOnHandlerAndReturn {
+        serviceCache.getCachedServices(cacheKey, excludeExpiredService)
+    }
 
     private fun registerServiceExpiredCallback(
             serviceCache: MdnsServiceCache,
@@ -183,6 +187,14 @@ class MdnsServiceCacheTest {
                 cacheKey,
                 currentTime
         )
+    }
+
+    private fun markExpiredServices(
+            serviceCache: MdnsServiceCache,
+            cacheKey: CacheKey,
+            currentTime: Long
+    ): Int = runningOnHandlerAndReturn {
+        serviceCache.markExpiredServices(cacheKey, currentTime)
     }
 
     @Test
@@ -351,35 +363,42 @@ class MdnsServiceCacheTest {
         assertEquals(service4, services[3])
     }
 
+    private fun verifyGetServices(
+            serviceCache: MdnsServiceCache,
+            cacheKey: CacheKey,
+            excludeExpiredService: Boolean,
+            vararg serviceInstanceNames: String
+    ) {
+        val responses = getServices(serviceCache, cacheKey, excludeExpiredService)
+        assertEquals(serviceInstanceNames.size, responses.size)
+        for (serviceInstanceName: String in serviceInstanceNames) {
+            assertTrue(responses.stream().anyMatch { response ->
+                response.serviceInstanceName == serviceInstanceName
+            })
+        }
+    }
+
     @Test
     fun testRemoveServices() {
         val serviceCache = MdnsServiceCache(thread.looper, makeFlags(), clock)
         addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_1, SERVICE_TYPE_1))
         addOrUpdateService(serviceCache, cacheKey1, createResponse(SERVICE_NAME_2, SERVICE_TYPE_1))
         addOrUpdateService(serviceCache, cacheKey2, createResponse(SERVICE_NAME_1, SERVICE_TYPE_2))
-        val responses1 = getServices(serviceCache, cacheKey1)
-        assertEquals(2, responses1.size)
-        assertTrue(responses1.stream().anyMatch { response ->
-            response.serviceInstanceName == SERVICE_NAME_1
-        })
-        assertTrue(responses1.any { response ->
-            response.serviceInstanceName == SERVICE_NAME_2
-        })
-        val responses2 = getServices(serviceCache, cacheKey2)
-        assertEquals(1, responses2.size)
-        assertTrue(responses2.stream().anyMatch { response ->
-            response.serviceInstanceName == SERVICE_NAME_1
-        })
+        verifyGetServices(
+                serviceCache,
+                cacheKey1,
+                excludeExpiredService = true,
+                SERVICE_NAME_1,
+                SERVICE_NAME_2
+        )
+        verifyGetServices(serviceCache, cacheKey2, excludeExpiredService = true, SERVICE_NAME_1)
 
         removeServices(serviceCache, cacheKey1)
-        val responses3 = getServices(serviceCache, cacheKey1)
-        assertEquals(0, responses3.size)
-        val responses4 = getServices(serviceCache, cacheKey2)
-        assertEquals(1, responses4.size)
+        verifyGetServices(serviceCache, cacheKey1, excludeExpiredService = true)
+        verifyGetServices(serviceCache, cacheKey2, excludeExpiredService = true, SERVICE_NAME_1)
 
         removeServices(serviceCache, cacheKey2)
-        val responses5 = getServices(serviceCache, cacheKey2)
-        assertEquals(0, responses5.size)
+        verifyGetServices(serviceCache, cacheKey2, excludeExpiredService = true)
     }
 
     @Test
@@ -478,6 +497,71 @@ class MdnsServiceCacheTest {
                 NEVER_SENT_QUERY,
                 getFirstQueryTimeAfterLastUpdate(serviceCache, SERVICE_NAME_2, cacheKey1)
         )
+    }
+
+    @Test
+    fun testGetExpiredServices() {
+        val serviceCache = MdnsServiceCache(thread.looper, makeFlags(), clock)
+
+        // Add services
+        doReturn(TEST_ELAPSED_REALTIME_MS).`when`(clock).elapsedRealtime()
+        addOrUpdateService(
+                serviceCache,
+                cacheKey1,
+                createResponse(SERVICE_NAME_1, SERVICE_TYPE_1, 1L /* ttlTime */)
+        )
+        addOrUpdateService(
+                serviceCache,
+                cacheKey1,
+                createResponse(SERVICE_NAME_2, SERVICE_TYPE_1, 11L /* ttlTime */)
+        )
+        verifyGetServices(
+                serviceCache,
+                cacheKey1,
+                excludeExpiredService = true,
+                SERVICE_NAME_1,
+                SERVICE_NAME_2
+        )
+        var response =
+                getService(serviceCache, SERVICE_NAME_1, cacheKey1, excludeExpiredService = true)
+        assertNotNull(response)
+        assertEquals(SERVICE_NAME_1, response.serviceInstanceName)
+
+        // Mark the SERVICE_NAME_1 service expired
+        assertEquals(
+            1,
+            markExpiredServices(
+                serviceCache,
+                cacheKey1,
+                currentTime = TEST_ELAPSED_REALTIME_MS + 5L
+            )
+        )
+        // Verify that expired services have been excluded
+        verifyGetServices(
+                serviceCache,
+                cacheKey1,
+                excludeExpiredService = true,
+                SERVICE_NAME_2
+        )
+        response = getService(serviceCache, SERVICE_NAME_1, cacheKey1, excludeExpiredService = true)
+        assertNull(response)
+
+        // Verify that expired services can still be retrieved.
+        verifyGetServices(
+                serviceCache,
+                cacheKey1,
+                excludeExpiredService = false,
+                SERVICE_NAME_1,
+                SERVICE_NAME_2
+        )
+        response = getService(
+                serviceCache,
+                SERVICE_NAME_1,
+                cacheKey1,
+                excludeExpiredService = false
+        )
+        assertNotNull(response)
+        assertEquals(SERVICE_NAME_1, response.serviceInstanceName)
     }
 
     private fun createResponse(
