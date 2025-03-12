@@ -27,6 +27,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -47,9 +48,16 @@ public class CompatibilityVersionTest {
 
     private final File mTestDir =
             InstrumentationRegistry.getInstrumentation().getContext().getFilesDir();
-    private final CompatibilityVersion mCompatVersion =
-            new CompatibilityVersion(
-                    TEST_VERSION, Config.URL_SIGNATURE, Config.URL_LOG_LIST, mTestDir);
+
+    private CompatibilityVersion mCompatVersion;
+
+    @Before
+    public void setUp() {
+        CompatibilityVersion.setRootDirectoryForTesting(mTestDir);
+        mCompatVersion =
+                new CompatibilityVersion(
+                        TEST_VERSION, Config.URL_SIGNATURE_V1, Config.URL_LOG_LIST_V1);
+    }
 
     @After
     public void tearDown() {
@@ -111,9 +119,7 @@ public class CompatibilityVersionTest {
         JSONObject logList = makeLogList(version, "i_am_content");
 
         try (InputStream inputStream = asStream(logList)) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(getSuccessfulUpdateStatus());
         }
 
@@ -142,9 +148,7 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_deleteSuccessfully() throws Exception {
         try (InputStream inputStream = asStream(makeLogList(/* version= */ "123"))) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(getSuccessfulUpdateStatus());
         }
 
@@ -156,9 +160,7 @@ public class CompatibilityVersionTest {
     @Test
     public void testCompatibilityVersion_invalidLogList() throws Exception {
         try (InputStream inputStream = new ByteArrayInputStream(("not_a_valid_list".getBytes()))) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(LogListUpdateStatus.builder().setState(LOG_LIST_INVALID).build());
         }
 
@@ -179,9 +181,7 @@ public class CompatibilityVersionTest {
 
         JSONObject newLogList = makeLogList(existingVersion, "i_am_the_real_content");
         try (InputStream inputStream = asStream(newLogList)) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(getSuccessfulUpdateStatus());
         }
 
@@ -193,16 +193,12 @@ public class CompatibilityVersionTest {
         String existingVersion = "666";
         JSONObject existingLogList = makeLogList(existingVersion, "i_was_installed_successfully");
         try (InputStream inputStream = asStream(existingLogList)) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(getSuccessfulUpdateStatus());
         }
 
         try (InputStream inputStream = asStream(makeLogList(existingVersion, "i_am_ignored"))) {
-            assertThat(
-                            mCompatVersion.install(
-                                    inputStream, LogListUpdateStatus.builder()))
+            assertThat(mCompatVersion.install(inputStream, LogListUpdateStatus.builder()))
                     .isEqualTo(
                             LogListUpdateStatus.builder()
                                     .setState(VERSION_ALREADY_EXISTS)
