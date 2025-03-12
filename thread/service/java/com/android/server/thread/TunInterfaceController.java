@@ -326,12 +326,13 @@ public class TunInterfaceController {
     private static LinkAddress newLinkAddress(
             Ipv6AddressInfo addressInfo, boolean hasActiveOmrAddress) {
         // Mesh-local addresses and OMR address have the same scope, to distinguish them we set
-        // mesh-local addresses as deprecated when there is an active OMR address.
+        // mesh-local addresses as deprecated when there is an active OMR address. If OMR address
+        // is missing, only ML-EID in mesh-local addresses will be set preferred.
         // For OMR address and link-local address we only use the value isPreferred set by
         // ot-daemon.
         boolean isPreferred = addressInfo.isPreferred;
-        if (addressInfo.isMeshLocal && hasActiveOmrAddress) {
-            isPreferred = false;
+        if (addressInfo.isMeshLocal) {
+            isPreferred = (!hasActiveOmrAddress && addressInfo.isMeshLocalEid);
         }
 
         final long deprecationTimeMillis =
