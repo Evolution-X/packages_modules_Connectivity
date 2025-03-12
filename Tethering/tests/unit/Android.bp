@@ -51,11 +51,13 @@ java_defaults {
         "src/**/*.kt",
     ],
     static_libs: [
+        // Include mockito extended first so it takes precedence, as other libraries like
+        // TetheringCommonTests bundle non-extended mockito.
+        // TODO: use non-extended mockito in tethering tests instead
+        "mockito-target-extended-minus-junit4",
         "TetheringCommonTests",
         "androidx.test.rules",
         "frameworks-base-testutils",
-        "mockito-target-extended-minus-junit4",
-        "net-tests-utils",
         "testables",
         "truth",
     ],
