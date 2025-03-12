@@ -65,7 +65,9 @@ public class MdnsServiceTypeClient {
     @VisibleForTesting
     static final int EVENT_START_QUERYTASK = 1;
     static final int EVENT_QUERY_RESULT = 2;
+    static final int EVENT_REMOVE_EXPIRED_SERVICES = 3;
     static final int INVALID_TRANSACTION_ID = -1;
+    static final long REMOVE_SERVICE_AFTER_QUERY_SENT_TIME = 2000L;
 
     private final String serviceType;
     private final String[] serviceTypeLabels;
@@ -173,7 +175,10 @@ public class MdnsServiceTypeClient {
                         }
                     }
 
-                    tryRemoveServiceAfterTtlExpires();
+                    if (!featureFlags.mIsOptimizedExpiredServiceRemovalEnabled) {
+                        tryRemoveServiceAfterTtlExpires();
+                    }
+
 
                     final long now = clock.elapsedRealtime();
                     lastSentTime = now;
@@ -201,20 +206,42 @@ public class MdnsServiceTypeClient {
                                 handler.obtainMessage(EVENT_START_QUERYTASK, args),
                                 timeToNextTaskMs);
                     }
-                    // Update the first query time based on the query result
-                    if (sentResult.queriedBaseType) {
-                        serviceCache.updateFirstQueryTimeForCachedServices(null /* serviceName */,
-                                Collections.emptyList() /* subtypes */, cacheKey, now);
+                    if (featureFlags.mIsOptimizedExpiredServiceRemovalEnabled) {
+                        // Update the first query time based on the query result
+                        if (sentResult.queriedBaseType) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    null /* serviceName */,
+                                    Collections.emptyList() /* subtypes */, cacheKey, now);
+                        }
+                        if (sentResult.queriedSubtypes.size() != 0) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    null /* serviceName */,
+                                    sentResult.queriedSubtypes, cacheKey, now);
+                        }
+                        for (MdnsResponse service : sentResult.resolvedServices) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    service.getServiceInstanceName(),
+                                    Collections.emptyList() /* subtypes */, cacheKey, now);
+                        }
+
+                        // A query is sent. Schedule a task with a delay to wait for responses, and
+                        // then remove expired services, and notify listeners.
+                        if (scheduler != null) {
+                            scheduler.sendDelayedMessage(
+                                    handler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES),
+                                    REMOVE_SERVICE_AFTER_QUERY_SENT_TIME);
+                        } else {
+                            dependencies.sendMessageDelayed(
+                                    handler,
+                                    handler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES),
+                                    REMOVE_SERVICE_AFTER_QUERY_SENT_TIME);
+                        }
                     }
-                    if (sentResult.queriedSubtypes.size() != 0) {
-                        serviceCache.updateFirstQueryTimeForCachedServices(null /* serviceName */,
-                                sentResult.queriedSubtypes, cacheKey, now);
-                    }
-                    for (MdnsResponse service : sentResult.resolvedServices) {
-                        serviceCache.updateFirstQueryTimeForCachedServices(
-                                service.getServiceInstanceName(),
-                                Collections.emptyList() /* subtypes */, cacheKey, now);
-                    }
+                    break;
+                }
+                case EVENT_REMOVE_EXPIRED_SERVICES: {
+                    serviceCache.removeExpiredServicesAndNotifyListeners(
+                            cacheKey, clock.elapsedRealtime());
                     break;
                 }
                 default:
