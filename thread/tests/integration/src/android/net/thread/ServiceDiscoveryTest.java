@@ -595,7 +595,8 @@ public class ServiceDiscoveryTest {
                 DeviceConfigUtils.getDeviceConfigPropertyBoolean(
                         "thread_network", "TrelFeature__enabled", false));
 
-        NsdServiceInfo discoveredService = discoverService(mNsdManager, "_trel._udp");
+        NsdServiceInfo discoveredService =
+                discoverService(mNsdManager, "_trel._udp", mOtCtl.getExtendedAddr());
         assertThat(discoveredService).isNotNull();
         // Resolve service with the current TREL port, otherwise it may return stale service from
         // a previous infra link setup.
@@ -618,7 +619,9 @@ public class ServiceDiscoveryTest {
                 DeviceConfigUtils.getDeviceConfigPropertyBoolean(
                         "thread_network", "TrelFeature__enabled", false));
 
-        assertThrows(TimeoutException.class, () -> discoverService(mNsdManager, "_trel._udp"));
+        assertThrows(
+                TimeoutException.class,
+                () -> discoverService(mNsdManager, "_trel._udp", mOtCtl.getExtendedAddr()));
     }
 
     private void registerService(NsdServiceInfo serviceInfo, RegistrationListener listener)
