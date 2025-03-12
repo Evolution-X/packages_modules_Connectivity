@@ -479,15 +479,31 @@ object IntegrationTestUtils {
         return addresses
     }
 
-    /** Return the first discovered service of `serviceType`.  */
+    /** Return the first discovered service of `serviceType`. */
     @JvmStatic
     @Throws(Exception::class)
     fun discoverService(nsdManager: NsdManager, serviceType: String): NsdServiceInfo {
+        return discoverService(nsdManager, serviceType, null)
+    }
+
+    /**
+     * Returns the service that matches `serviceType` and `serviceName`.
+     *
+     * If `serviceName` is null, returns the first discovered service. `serviceName` is not case
+     * sensitive.
+     */
+    @JvmStatic
+    @Throws(Exception::class)
+    fun discoverService(nsdManager: NsdManager, serviceType: String, serviceName: String?):
+            NsdServiceInfo {
         val serviceInfoFuture = CompletableFuture<NsdServiceInfo>()
         val listener: NsdManager.DiscoveryListener = object : DefaultDiscoveryListener() {
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 Log.d(TAG, "onServiceFound: $serviceInfo")
-                serviceInfoFuture.complete(serviceInfo)
+                if (serviceName == null ||
+                        serviceInfo.getServiceName().equals(serviceName, true /* ignore case */)) {
+                    serviceInfoFuture.complete(serviceInfo)
+                }
             }
         }
         nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
