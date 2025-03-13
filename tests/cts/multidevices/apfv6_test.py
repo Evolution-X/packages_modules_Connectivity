@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 from mobly import asserts
+from scapy.layers.inet import IP, ICMP
+from scapy.layers.l2 import Ether
 from net_tests_utils.host.python import apf_test_base, apf_utils, adb_utils, assert_utils, packet_utils
 
 APFV6_VERSION = 6000
@@ -81,4 +83,19 @@ class ApfV6Test(apf_test_base.ApfTestBase):
 
         self.send_packet_and_expect_reply_received(
             arp_request, "DROPPED_ARP_REQUEST_REPLIED", arp_reply
+        )
+
+    @apf_utils.at_least_B()
+    def test_ipv4_icmp_echo_request_offload(self):
+        eth = Ether(src=self.server_mac_address, dst=self.client_mac_address)
+        ip = IP(src=self.server_ipv4_addresses[0], dst=self.client_ipv4_addresses[0])
+        icmp = ICMP(id=1, seq=123)
+        echo_request = bytes(eth/ip/icmp/b"hello").hex()
+
+        eth = Ether(src=self.client_mac_address, dst=self.server_mac_address)
+        ip = IP(src=self.client_ipv4_addresses[0], dst=self.server_ipv4_addresses[0])
+        icmp = ICMP(type=0, id=1, seq=123)
+        expected_echo_reply = bytes(eth/ip/icmp/b"hello").hex()
+        self.send_packet_and_expect_reply_received(
+            echo_request, "DROPPED_IPV4_PING_REQUEST_REPLIED", expected_echo_reply
         )
