@@ -172,6 +172,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.argThat
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.doReturn
@@ -1066,7 +1067,20 @@ class NetworkAgentTest {
     fun testAgentStartsInConnecting() {
         val mockContext = mock(Context::class.java)
         val mockCm = mock(ConnectivityManager::class.java)
+        val mockedResult = ConnectivityManager.MockHelpers.registerNetworkAgentResult(
+            mock(Network::class.java),
+            mock(INetworkAgentRegistry::class.java)
+        )
         doReturn(mockCm).`when`(mockContext).getSystemService(Context.CONNECTIVITY_SERVICE)
+        doReturn(mockedResult).`when`(mockCm).registerNetworkAgent(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            anyInt()
+        )
         val agent = createNetworkAgent(mockContext)
         agent.register()
         verify(mockCm).registerNetworkAgent(

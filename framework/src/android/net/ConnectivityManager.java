@@ -1242,6 +1242,22 @@ public class ConnectivityManager {
     @ConnectivityManagerFeature
     private Long mEnabledConnectivityManagerFeatures = null;
 
+    /**
+     * A class to help with mocking ConnectivityManager.
+     * @hide
+     */
+    public static class MockHelpers {
+        /**
+         * Produce an instance of the class returned by
+         * {@link ConnectivityManager#registerNetworkAgent}
+         * @hide
+         */
+        public static Network registerNetworkAgentResult(
+                @Nullable final Network network, @Nullable final INetworkAgentRegistry registry) {
+            return network;
+        }
+    }
+
     private TetheringManager getTetheringManager() {
         synchronized (mTetheringEventCallbacks) {
             if (mTetheringManager == null) {
