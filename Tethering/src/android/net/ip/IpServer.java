@@ -415,6 +415,12 @@ public class IpServer extends StateMachineShim {
         return mIpv4PrefixRequest;
     }
 
+    /** The TetheringRequest the IpServer started with. */
+    @Nullable
+    public TetheringRequest getTetheringRequest() {
+        return mTetheringRequest;
+    }
+
     /**
      * Get the latest list of DHCP leases that was reported. Must be called on the IpServer looper
      * thread.
