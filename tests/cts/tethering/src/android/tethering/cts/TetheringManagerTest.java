@@ -32,7 +32,6 @@ import static android.net.TetheringManager.TETHERING_USB;
 import static android.net.TetheringManager.TETHERING_VIRTUAL;
 import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.TetheringManager.TETHERING_WIFI_P2P;
-import static android.net.TetheringManager.TETHER_ERROR_DUPLICATE_REQUEST;
 import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
 import static android.net.TetheringManager.TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
@@ -235,30 +234,6 @@ public class TetheringManagerTest {
 
     }
 
-    @Test
-    public void testStartTetheringDuplicateRequestRejected() throws Exception {
-        assumeTrue(isTetheringWithSoftApConfigEnabled());
-        final TestTetheringEventCallback tetherEventCallback =
-                mCtsTetheringUtils.registerTetheringEventCallback();
-        try {
-            tetherEventCallback.assumeWifiTetheringSupported(mContext);
-            tetherEventCallback.expectNoTetheringActive();
-
-            final String[] wifiRegexs = mTM.getTetherableWifiRegexs();
-            mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
-            mTetherChangeReceiver.expectTethering(true /* active */, wifiRegexs);
-
-            final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
-            runAsShell(TETHER_PRIVILEGED, () -> {
-                mTM.startTethering(new TetheringRequest.Builder(TETHERING_WIFI).build(),
-                        c -> c.run() /* executor */, startTetheringCallback);
-                startTetheringCallback.expectTetheringFailed(TETHER_ERROR_DUPLICATE_REQUEST);
-            });
-        } finally {
-            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
-        }
-    }
-
     private SoftApConfiguration createSoftApConfiguration(@NonNull String ssid) {
         SoftApConfiguration config;
         if (SdkLevel.isAtLeastT()) {
@@ -405,20 +380,17 @@ public class TetheringManagerTest {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
             tetherEventCallback.expectNoTetheringActive();
 
-            SoftApConfiguration softApConfig = isTetheringWithSoftApConfigEnabled()
-                    ? createSoftApConfiguration("SSID") : null;
+            SoftApConfiguration softApConfig = createSoftApConfiguration("SSID");
             final TetheringInterface tetheredIface =
                     mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
 
             assertNotNull(tetheredIface);
-            if  (isTetheringWithSoftApConfigEnabled()) {
-                assertEquals(softApConfig, tetheredIface.getSoftApConfiguration());
-            }
+            assertEquals(softApConfig, tetheredIface.getSoftApConfiguration());
+            final String wifiTetheringIface = tetheredIface.getInterface();
 
             mCtsTetheringUtils.stopWifiTethering(tetherEventCallback);
 
             if (!SdkLevel.isAtLeastB()) {
-                final String wifiTetheringIface = tetheredIface.getInterface();
                 try {
                     final int ret = runAsShell(TETHER_PRIVILEGED,
                             () -> mTM.tether(wifiTetheringIface));
@@ -483,73 +455,25 @@ public class TetheringManagerTest {
     }
 
     @Test
-    public void testStopTetheringRequestNoMatchFailure() throws Exception {
-        assumeTrue(isTetheringWithSoftApConfigEnabled());
-        final TestTetheringEventCallback tetherEventCallback =
-                mCtsTetheringUtils.registerTetheringEventCallback();
-        try {
-            final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
-            mTM.startTethering(new TetheringRequest.Builder(TETHERING_VIRTUAL).build(),
-                    c -> c.run(), startTetheringCallback);
-
-            // Stopping a non-matching request should have no effect
-            TetheringRequest nonMatchingRequest = new TetheringRequest.Builder(TETHERING_VIRTUAL)
-                    .setInterfaceName("iface")
-                    .build();
-            mCtsTetheringUtils.stopTethering(nonMatchingRequest, false /* success */);
-        } finally {
-            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
-        }
-    }
-
-    @Test
-    public void testStopTetheringRequestMatchSuccess() throws Exception {
+    public void testStopTetheringRequest() throws Exception {
         assumeTrue(isTetheringWithSoftApConfigEnabled());
         final TestTetheringEventCallback tetherEventCallback =
                 mCtsTetheringUtils.registerTetheringEventCallback();
         try {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
 
-            SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes("This is one config"
-                            .getBytes(StandardCharsets.UTF_8))).build();
-            mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
+            // stopTethering without any tethering active should fail.
+            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI).build();
+            mCtsTetheringUtils.stopTethering(request, false /* expectSuccess */);
 
-            // Stopping the active request should stop tethering.
-            TetheringRequest request = new TetheringRequest.Builder(TETHERING_WIFI)
-                    .setSoftApConfiguration(softApConfig)
-                    .build();
-            mCtsTetheringUtils.stopTethering(request, true /* success */);
+            // Start wifi tethering
+            mCtsTetheringUtils.startWifiTethering(tetherEventCallback);
+
+            // stopTethering should succeed now that there's a request.
+            mCtsTetheringUtils.stopTethering(request, true /* expectSuccess */);
             tetherEventCallback.expectNoTetheringActive();
         } finally {
-            mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
-        }
-    }
-
-    @Test
-    public void testStopTetheringRequestFuzzyMatchSuccess() throws Exception {
-        assumeTrue(isTetheringWithSoftApConfigEnabled());
-        final TestTetheringEventCallback tetherEventCallback =
-                mCtsTetheringUtils.registerTetheringEventCallback();
-        try {
-            tetherEventCallback.assumeWifiTetheringSupported(mContext);
-
-            SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
-                    .setWifiSsid(WifiSsid.fromBytes("This is one config"
-                            .getBytes(StandardCharsets.UTF_8))).build();
-            mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
-
-            // Stopping with a fuzzy matching request should stop tethering.
-            final LinkAddress localAddr = new LinkAddress("192.168.24.5/24");
-            final LinkAddress clientAddr = new LinkAddress("192.168.24.100/24");
-            TetheringRequest fuzzyMatchingRequest = new TetheringRequest.Builder(TETHERING_WIFI)
-                    .setSoftApConfiguration(softApConfig)
-                    .setShouldShowEntitlementUi(true)
-                    .setStaticIpv4Addresses(localAddr, clientAddr)
-                    .build();
-            mCtsTetheringUtils.stopTethering(fuzzyMatchingRequest, true /* success */);
-            tetherEventCallback.expectNoTetheringActive();
-        } finally {
+            mCtsTetheringUtils.stopAllTethering();
             mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
         }
     }
