@@ -188,6 +188,17 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  // Apparently some network gear will refuse to perform NS for IPs that aren't DAD'ed,
+  // this would then result in an ipv6-only network with working native ipv6, working
+  // IPv4 via DNS64, but non-functioning IPv4 via CLAT (ie. IPv4 literals + IPv4 only apps).
+  // The kernel itself doesn't do DAD for anycast ips (but does handle IPV6 MLD and handle ND).
+  // So we'll spoof dad here, and yeah, we really should check for a response and in
+  // case of failure pick a different IP.  Seeing as 48-bits of the IP are utterly random
+  // (with the other 16 chosen to guarantee checksum neutrality) this seems like a remote
+  // concern...
+  // TODO: actually perform true DAD
+  send_dad(tunnel.write_fd6, &Global_Clatd_Config.ipv6_local_subnet);
+
   event_loop(&tunnel);
 
   logmsg(ANDROID_LOG_INFO, "Shutting down clat on %s", uplink_interface);
