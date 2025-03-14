@@ -60,6 +60,7 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -94,24 +95,25 @@ public class CertificateTransparencyDownloaderTest {
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
         mDataStore = new DataStore(File.createTempFile("datastore-test", ".properties"));
         mSignatureVerifier = new SignatureVerifier(mContext);
+
+        CompatibilityVersion.setRootDirectoryForTesting(mContext.getFilesDir());
+        mCompatVersion =
+                new CompatibilityVersion(
+                        /* compatVersion= */ "v666",
+                        Config.URL_SIGNATURE_V1,
+                        Config.URL_LOG_LIST_V1);
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
                         mContext,
                         mDataStore,
                         new DownloadHelper(mDownloadManager),
                         mSignatureVerifier,
-                        mLogger);
-        mCompatVersion =
-                new CompatibilityVersion(
-                        /* compatVersion= */ "v666",
-                        Config.URL_SIGNATURE,
-                        Config.URL_LOG_LIST,
-                        mContext.getFilesDir());
+                        mLogger,
+                        Arrays.asList(mCompatVersion));
 
         prepareDownloadManager();
         mSignatureVerifier.addAllowedKey(mPublicKey);
         mDataStore.load();
-        mCertificateTransparencyDownloader.addCompatibilityVersion(mCompatVersion);
     }
 
     @After
