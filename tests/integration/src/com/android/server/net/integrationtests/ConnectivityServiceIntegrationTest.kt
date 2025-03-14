@@ -55,11 +55,11 @@ import com.android.net.module.util.BpfUtils
 import com.android.networkstack.apishim.TelephonyManagerShimImpl
 import com.android.server.BpfNetMaps
 import com.android.server.ConnectivityService
-import com.android.server.L2capNetworkProvider
 import com.android.server.NetworkAgentWrapper
 import com.android.server.TestNetIdManager
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator
 import com.android.server.connectivity.ConnectivityResources
+import com.android.server.connectivity.InterfaceTracker
 import com.android.server.connectivity.MockableSystemProperties
 import com.android.server.connectivity.MultinetworkPolicyTracker
 import com.android.server.connectivity.PermissionMonitor
@@ -114,6 +114,8 @@ class ConnectivityServiceIntegrationTest {
     @Mock
     private lateinit var netd: INetd
     @Mock
+    private lateinit var interfaceTracker: InterfaceTracker
+    @Mock
     private lateinit var dnsResolver: IDnsResolver
     @Mock
     private lateinit var systemConfigManager: SystemConfigManager
@@ -140,11 +142,15 @@ class ConnectivityServiceIntegrationTest {
 
         private val realContext get() = InstrumentationRegistry.getInstrumentation().context
         private val httpProbeUrl get() =
-            realContext.getResources().getString(com.android.server.net.integrationtests.R.string
-                    .config_captive_portal_http_url)
+            realContext.getResources().getString(
+                com.android.server.net.integrationtests.R.string
+                    .config_captive_portal_http_url
+            )
         private val httpsProbeUrl get() =
-            realContext.getResources().getString(com.android.server.net.integrationtests.R.string
-                    .config_captive_portal_https_url)
+            realContext.getResources().getString(
+                com.android.server.net.integrationtests.R.string
+                    .config_captive_portal_https_url
+            )
 
         private class InstrumentationServiceConnection : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -166,12 +172,19 @@ class ConnectivityServiceIntegrationTest {
         fun setUpClass() {
             val intent = Intent(realContext, NetworkStackInstrumentationService::class.java)
             intent.action = INetworkStackInstrumentation::class.qualifiedName
-            assertTrue(realContext.bindService(intent, InstrumentationServiceConnection(),
-                    BIND_AUTO_CREATE or BIND_IMPORTANT),
-                    "Error binding to instrumentation service")
-            assertTrue(bindingCondition.block(SERVICE_BIND_TIMEOUT_MS),
+            assertTrue(
+                realContext.bindService(
+                    intent,
+                    InstrumentationServiceConnection(),
+                    BIND_AUTO_CREATE or BIND_IMPORTANT
+                ),
+                    "Error binding to instrumentation service"
+            )
+            assertTrue(
+                bindingCondition.block(SERVICE_BIND_TIMEOUT_MS),
                     "Timed out binding to instrumentation service " +
-                            "after $SERVICE_BIND_TIMEOUT_MS ms")
+                            "after $SERVICE_BIND_TIMEOUT_MS ms"
+            )
         }
     }
 
@@ -201,7 +214,8 @@ class ConnectivityServiceIntegrationTest {
         // We don't test the actual notification value strings, so just return an empty array.
         // It doesn't matter what the values are as long as it's not null.
         doReturn(emptyArray<String>()).`when`(resources).getStringArray(
-                R.array.network_switch_type_name)
+                R.array.network_switch_type_name
+        )
         doReturn(1).`when`(resources).getInteger(R.integer.config_networkAvoidBadWifi)
         doReturn(R.array.config_networkSupportedKeepaliveCount).`when`(resources)
                 .getIdentifier(eq("config_networkSupportedKeepaliveCount"), eq("array"), any())
@@ -223,7 +237,13 @@ class ConnectivityServiceIntegrationTest {
     }
 
     private inner class TestConnectivityService(deps: Dependencies) : ConnectivityService(
-            context, dnsResolver, log, netd, deps, PermissionMonitorDependencies())
+            context,
+        dnsResolver,
+        log,
+        netd,
+        deps,
+        PermissionMonitorDependencies()
+    )
 
     private inner class TestDependencies : ConnectivityService.Dependencies() {
         override fun getNetworkStack() = networkStackClient
@@ -231,7 +251,11 @@ class ConnectivityServiceIntegrationTest {
             mock(ProxyTracker::class.java)
         override fun getSystemProperties() = mock(MockableSystemProperties::class.java)
         override fun makeNetIdManager() = TestNetIdManager()
-        override fun getBpfNetMaps(context: Context?, netd: INetd?) = mock(BpfNetMaps::class.java)
+        override fun getBpfNetMaps(
+            context: Context?,
+            netd: INetd?,
+                                   interfaceTracker: InterfaceTracker?
+        ) = mock(BpfNetMaps::class.java)
                 .also {
                     doReturn(PERMISSION_INTERNET).`when`(it).getNetPermForUid(anyInt())
                 }
@@ -241,13 +265,17 @@ class ConnectivityServiceIntegrationTest {
             c: Context,
             h: Handler,
             r: Runnable
-        ) = MultinetworkPolicyTracker(c, h, r,
+        ) = MultinetworkPolicyTracker(
+            c,
+            h,
+            r,
             object : MultinetworkPolicyTracker.Dependencies() {
                 override fun getResourcesForActiveSubId(
                     connResources: ConnectivityResources,
                     activeSubId: Int
                 ) = resources
-            })
+            }
+        )
 
         override fun makeHandlerThread(tag: String): HandlerThread =
             super.makeHandlerThread(tag).also { handlerThreads.add(it) }
@@ -259,13 +287,18 @@ class ConnectivityServiceIntegrationTest {
                 listener: BiConsumer<Int, Int>,
                 handler: Handler
         ): CarrierPrivilegeAuthenticator {
-            return CarrierPrivilegeAuthenticator(context,
+            return CarrierPrivilegeAuthenticator(
+                context,
                     object : CarrierPrivilegeAuthenticator.Dependencies() {
                         override fun makeHandlerThread(): HandlerThread =
                                 super.makeHandlerThread().also { handlerThreads.add(it) }
                     },
-                    tm, TelephonyManagerShimImpl.newInstance(tm),
-                    requestRestrictedWifiEnabled, listener, handler)
+                    tm,
+                TelephonyManagerShimImpl.newInstance(tm),
+                    requestRestrictedWifiEnabled,
+                listener,
+                handler
+            )
         }
 
         override fun makeSatelliteAccessController(
@@ -273,7 +306,8 @@ class ConnectivityServiceIntegrationTest {
             updateSatellitePreferredUid: Consumer<MutableSet<Int>>?,
             connectivityServiceInternalHandler: Handler
         ): SatelliteAccessController? = mock(
-            SatelliteAccessController::class.java)
+            SatelliteAccessController::class.java
+        )
 
         override fun makeL2capNetworkProvider(context: Context) = null
     }
@@ -305,8 +339,12 @@ class ConnectivityServiceIntegrationTest {
         nsInstrumentation.addHttpResponse(HttpResponse(httpProbeUrl, responseCode = 204))
         nsInstrumentation.addHttpResponse(HttpResponse(httpsProbeUrl, responseCode = 204))
 
-        val na = NetworkAgentWrapper(TRANSPORT_CELLULAR, LinkProperties(), null /* ncTemplate */,
-                context)
+        val na = NetworkAgentWrapper(
+            TRANSPORT_CELLULAR,
+            LinkProperties(),
+            null /* ncTemplate */,
+                context
+        )
         networkStackClient.verifyNetworkMonitorCreated(na.network, TEST_TIMEOUT_MS)
 
         na.addCapability(NET_CAPABILITY_INTERNET)
@@ -344,7 +382,8 @@ class ConnectivityServiceIntegrationTest {
                     |  "user-portal-url": "https://login.capport.android.com",
                     |  "venue-info-url": "https://venueinfo.capport.android.com"
                     |}
-                """.trimMargin()))
+                """.trimMargin()
+        ))
 
         // Tests will fail if a non-mocked query is received: mock the HTTPS probe, but not the
         // HTTP probe as it should not be sent.
@@ -398,8 +437,10 @@ class ConnectivityServiceIntegrationTest {
                 BpfUtils.BPF_CGROUP_INET_EGRESS,
                 BpfUtils.BPF_CGROUP_INET_SOCK_CREATE
         ).forEach {
-            val ret = SystemUtil.runShellCommand(InstrumentationRegistry.getInstrumentation(),
-                    "cmd connectivity bpf-get-cgroup-program-id $it").trim()
+            val ret = SystemUtil.runShellCommand(
+                InstrumentationRegistry.getInstrumentation(),
+                    "cmd connectivity bpf-get-cgroup-program-id $it"
+            ).trim()
 
             assertTrue(Integer.parseInt(ret) > 0, "Unexpected output $ret for type $it")
         }
