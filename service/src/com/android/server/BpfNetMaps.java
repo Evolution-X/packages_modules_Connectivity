@@ -49,6 +49,8 @@ import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISS
 import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UNINSTALLED;
 import static com.android.server.connectivity.NetworkPermissions.TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.StatsManager;
 import android.content.Context;
 import android.net.BpfNetMapsUtils;
@@ -85,12 +87,14 @@ import com.android.net.module.util.bpf.CookieTagMapValue;
 import com.android.net.module.util.bpf.IngressDiscardKey;
 import com.android.net.module.util.bpf.IngressDiscardValue;
 import com.android.net.module.util.bpf.LocalNetAccessKey;
+import com.android.server.connectivity.InterfaceTracker;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -142,6 +146,7 @@ public class BpfNetMaps {
             Pair.create(TRAFFIC_PERMISSION_INTERNET, "PERMISSION_INTERNET"),
             Pair.create(TRAFFIC_PERMISSION_UPDATE_DEVICE_STATS, "PERMISSION_UPDATE_DEVICE_STATS")
     );
+    private final InterfaceTracker mInterfaceTracker;
 
     /**
      * Set configurationMap for test.
@@ -423,23 +428,27 @@ public class BpfNetMaps {
 
     /** Constructor used after T that doesn't need to use netd anymore. */
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    public BpfNetMaps(final Context context) {
-        this(context, null);
+    public BpfNetMaps(final Context context, @NonNull final InterfaceTracker interfaceTracker) {
+        this(context, null, interfaceTracker);
 
         if (!SdkLevel.isAtLeastT()) throw new IllegalArgumentException("BpfNetMaps need to use netd before T");
     }
 
-    public BpfNetMaps(final Context context, final INetd netd) {
-        this(context, netd, new Dependencies());
+    public BpfNetMaps(final Context context, final INetd netd, @NonNull final InterfaceTracker
+            interfaceTracker) {
+        this(context, netd, new Dependencies(), interfaceTracker);
     }
 
     @VisibleForTesting
-    public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps) {
+    public BpfNetMaps(final Context context, final INetd netd, final Dependencies deps,
+            @NonNull final  InterfaceTracker interfaceTracker) {
+        Objects.requireNonNull(interfaceTracker);
         if (SdkLevel.isAtLeastT()) {
             ensureInitialized(context);
         }
         mNetd = netd;
         mDeps = deps;
+        mInterfaceTracker = interfaceTracker;
     }
 
     private void maybeThrow(final int err, final String msg) {
@@ -902,7 +911,7 @@ public class BpfNetMaps {
      * @param isAllowed is the local network call allowed or blocked.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
-    public void addLocalNetAccess(final int lpmBitlen, final String iface,
+    public void addLocalNetAccess(final int lpmBitlen, @Nullable final String iface,
             final InetAddress address, final int protocol, final int remotePort,
             final boolean isAllowed) {
         throwIfPre25Q2("addLocalNetAccess is not available on pre-B devices");
@@ -910,7 +919,7 @@ public class BpfNetMaps {
         if (iface == null) {
             ifIndex = 0;
         } else {
-            ifIndex = mDeps.getIfIndex(iface);
+            ifIndex = mInterfaceTracker.getInterfaceIndex(iface);
         }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip addLocalNetAccess for " + address
@@ -937,14 +946,14 @@ public class BpfNetMaps {
      * @param remotePort src/dst port for ingress/egress
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
-    public void removeLocalNetAccess(final int lpmBitlen, final String iface,
+    public void removeLocalNetAccess(final int lpmBitlen, @Nullable final String iface,
             final InetAddress address, final int protocol, final int remotePort) {
         throwIfPre25Q2("removeLocalNetAccess is not available on pre-B devices");
         final int ifIndex;
         if (iface == null) {
             ifIndex = 0;
         } else {
-            ifIndex = mDeps.getIfIndex(iface);
+            ifIndex = mInterfaceTracker.getInterfaceIndex(iface);
         }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, skip removeLocalNetAccess for " + address
@@ -973,14 +982,14 @@ public class BpfNetMaps {
      * is not local network or if configuration is allowed like local dns servers.
      */
     @RequiresApi(Build.VERSION_CODES.CUR_DEVELOPMENT)
-    public boolean getLocalNetAccess(final int lpmBitlen, final String iface,
+    public boolean getLocalNetAccess(final int lpmBitlen, @Nullable final String iface,
             final InetAddress address, final int protocol, final int remotePort) {
         throwIfPre25Q2("getLocalNetAccess is not available on pre-B devices");
         final int ifIndex;
         if (iface == null) {
             ifIndex = 0;
         } else {
-            ifIndex = mDeps.getIfIndex(iface);
+            ifIndex = mInterfaceTracker.getInterfaceIndex(iface);
         }
         if (ifIndex == 0) {
             Log.e(TAG, "Failed to get if index, returning default from getLocalNetAccess for "
