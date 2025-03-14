@@ -33,8 +33,7 @@ import com.android.server.net.ct.DownloadHelper.DownloadStatus;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 /** Helper class to download certificate transparency log files. */
@@ -48,28 +47,21 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
     private final DownloadHelper mDownloadHelper;
     private final SignatureVerifier mSignatureVerifier;
     private final CertificateTransparencyLogger mLogger;
-
-    private final List<CompatibilityVersion> mCompatVersions = new ArrayList<>();
+    private final Collection<CompatibilityVersion> mCompatVersions;
 
     CertificateTransparencyDownloader(
             Context context,
             DataStore dataStore,
             DownloadHelper downloadHelper,
             SignatureVerifier signatureVerifier,
-            CertificateTransparencyLogger logger) {
+            CertificateTransparencyLogger logger,
+            Collection<CompatibilityVersion> compatVersions) {
         mContext = context;
         mSignatureVerifier = signatureVerifier;
         mDataStore = dataStore;
         mDownloadHelper = downloadHelper;
         mLogger = logger;
-    }
-
-    void addCompatibilityVersion(CompatibilityVersion compatVersion) {
-        mCompatVersions.add(compatVersion);
-    }
-
-    void clearCompatibilityVersions() {
-        mCompatVersions.clear();
+        mCompatVersions = compatVersions;
     }
 
     long startPublicKeyDownload() {
