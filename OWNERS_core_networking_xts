@@ -10,3 +10,5 @@ maze@google.com #{LAST_RESORT_SUGGESTION}
 # In addition to cherry-picks, flaky test fixes and no-op refactors, also for
 # NsdManager tests
 reminv@google.com #{LAST_RESORT_SUGGESTION}
+# Only for APF firmware tests (to verify correct behaviour of the wifi APF interpreter)
+yuyanghuang@google.com #{LAST_RESORT_SUGGESTION}
