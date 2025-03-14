@@ -290,7 +290,7 @@ public class RtNetlinkLinkMessageTest {
     @Test
     public void testCreateGetLinkMessage() {
         final String expectedHexBytes =
-                "20000000120001006824000000000000"    // struct nlmsghdr
+                "20000000120005006824000000000000"    // struct nlmsghdr
                 + "00000000080000000000000000000000"; // struct ifinfomsg
         final String interfaceName = "wlan0";
         final int interfaceIndex = 8;
