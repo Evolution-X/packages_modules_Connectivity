@@ -21,7 +21,6 @@ import static android.net.NetworkStats.TAG_ALL;
 import static android.net.NetworkStats.UID_ALL;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.content.Context;
 import android.net.NetworkStats;
 import android.net.UnderlyingNetworkInfo;
@@ -31,6 +30,7 @@ import android.os.SystemClock;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.BpfNetMaps;
+import com.android.server.connectivity.InterfaceTracker;
 
 import java.io.IOException;
 import java.net.ProtocolException;
@@ -108,7 +108,7 @@ public class NetworkStatsFactory {
 
         /** Create a new {@link BpfNetMaps}. */
         public BpfNetMaps createBpfNetMaps(@NonNull Context ctx) {
-            return new BpfNetMaps(ctx);
+            return new BpfNetMaps(ctx, new InterfaceTracker(ctx));
         }
     }
 
