@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  logmsg(ANDROID_LOG_INFO, "Starting clat version %s on %s plat=%s v4=%s v6=%s", CLATD_VERSION,
+  logmsg(ANDROID_LOG_INFO, "Starting clat version " CLATD_VERSION " on %s plat=%s v4=%s v6=%s",
          uplink_interface, plat_prefix ? plat_prefix : "(none)", v4_addr ? v4_addr : "(none)",
          v6_addr ? v6_addr : "(none)");
 
