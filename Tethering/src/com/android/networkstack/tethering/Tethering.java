@@ -737,26 +737,13 @@ public class Tethering {
         });
     }
 
-    private boolean isTetheringTypePendingOrServing(final int type) {
-        if (mRequestTracker.getNextPendingRequest(type) != null) return true;
-        for (TetherState state : mTetherStates.values()) {
-            // TODO: isCurrentlyServing only starts returning true once the IpServer has processed
-            // the CMD_TETHER_REQUESTED. Ensure that we consider the request to be serving even when
-            // that has not happened yet. This already works if the sync state machine is enabled
-            // (which includes all B+ devices).
-            if (state.isCurrentlyServing() && state.ipServer.interfaceType() == type) return true;
-        }
-        return false;
-    }
-
     void stopTetheringRequest(@NonNull final TetheringRequest request,
             @NonNull final IIntResultListener listener) {
         if (!isTetheringWithSoftApConfigEnabled()) return;
+        final boolean hasNetworkSettings = hasCallingPermission(NETWORK_SETTINGS);
         mHandler.post(() -> {
-            final int type = request.getTetheringType();
-            // TODO: when fuzzy-matching is enabled, check whether any pending request
-            // fuzzy-matches this request instead of just checking the type.
-            if (isTetheringTypePendingOrServing(type)) {
+            if (mRequestTracker.findFuzzyMatchedRequest(request, !hasNetworkSettings) != null) {
+                final int type = request.getTetheringType();
                 stopTetheringInternal(type);
                 // TODO: We should send the success result after the waiting for tethering to
                 //       actually stop.

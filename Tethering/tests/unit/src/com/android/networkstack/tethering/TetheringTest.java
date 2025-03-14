@@ -56,6 +56,7 @@ import static android.net.TetheringManager.TETHER_ERROR_INTERNAL_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_SERVICE_UNAVAIL;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_IFACE;
+import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_FAILED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STARTED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STOPPED;
@@ -2777,6 +2778,85 @@ public class TetheringTest {
         mTethering.startTethering(tetheringRequest, TEST_CALLER_PKG, successListener2);
         mLooper.dispatchAll();
         successListener2.assertHasResult();
+    }
+
+    @Test
+    public void testStopTetheringWithMatchingRequest() throws Exception {
+        assumeTrue(isTetheringWithSoftApConfigEnabled());
+        when(mContext.checkCallingOrSelfPermission(NETWORK_SETTINGS)).thenReturn(PERMISSION_DENIED);
+        initTetheringOnTestThread();
+        UpstreamNetworkState upstreamState = buildMobileDualStackUpstreamState();
+        initTetheringUpstream(upstreamState);
+        when(mWifiManager.startTetheredHotspot(null)).thenReturn(true);
+
+        // Enable wifi tethering.
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("SoftApConfig")
+                .build();
+        final TetheringRequest tetheringRequest = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfig).build();
+        tetheringRequest.setUid(TEST_CALLER_UID);
+        mTethering.startTethering(tetheringRequest, TEST_CALLER_PKG, null);
+        mLooper.dispatchAll();
+
+        // Stop tethering with non-matching config. Should fail with TETHER_ERROR_UNKNOWN_REQUEST.
+        SoftApConfiguration softApConfig2 = new SoftApConfiguration.Builder()
+                .setSsid("SoftApConfig2")
+                .build();
+        IIntResultListener differentConfigListener = mock(IIntResultListener.class);
+        mTethering.stopTetheringRequest(new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfig2).build(), differentConfigListener);
+        mLooper.dispatchAll();
+        verify(differentConfigListener).onResult(eq(TETHER_ERROR_UNKNOWN_REQUEST));
+        verify(mWifiManager, never()).stopSoftAp();
+
+        // Stop tethering with non-matching UID. Should fail with TETHER_ERROR_UNKNOWN_REQUEST.
+        final TetheringRequest nonMatchingUid = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfig).build();
+        IIntResultListener nonMatchingUidListener = mock(IIntResultListener.class);
+        nonMatchingUid.setUid(TEST_CALLER_UID_2);
+        mTethering.stopTetheringRequest(nonMatchingUid, nonMatchingUidListener);
+        mLooper.dispatchAll();
+        verify(nonMatchingUidListener).onResult(eq(TETHER_ERROR_UNKNOWN_REQUEST));
+        verify(mWifiManager, never()).stopSoftAp();
+
+        // Stop tethering with matching request. Should succeed now.
+        IIntResultListener matchingListener = mock(IIntResultListener.class);
+        mTethering.stopTetheringRequest(tetheringRequest, matchingListener);
+        mLooper.dispatchAll();
+        verify(matchingListener).onResult(eq(TETHER_ERROR_NO_ERROR));
+        verify(mWifiManager).stopSoftAp();
+    }
+
+    @Test
+    public void testStopTetheringWithSettingsPermission() throws Exception {
+        assumeTrue(isTetheringWithSoftApConfigEnabled());
+        initTetheringOnTestThread();
+        UpstreamNetworkState upstreamState = buildMobileDualStackUpstreamState();
+        initTetheringUpstream(upstreamState);
+        when(mWifiManager.startTetheredHotspot(null)).thenReturn(true);
+
+        // Enable wifi tethering.
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("SoftApConfig")
+                .build();
+        final TetheringRequest tetheringRequest = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfig).build();
+        tetheringRequest.setUid(TEST_CALLER_UID);
+        mTethering.startTethering(tetheringRequest, TEST_CALLER_PKG, null);
+        mLooper.dispatchAll();
+
+        // Stop tethering with non-matching UID and Settings permission. Should succeed.
+        final TetheringRequest nonMatchingUid = new TetheringRequest.Builder(TETHERING_WIFI)
+                .setSoftApConfiguration(softApConfig).build();
+        IIntResultListener nonMatchingUidListener = mock(IIntResultListener.class);
+        nonMatchingUid.setUid(TEST_CALLER_UID_2);
+        when(mContext.checkCallingOrSelfPermission(NETWORK_SETTINGS))
+                .thenReturn(PERMISSION_GRANTED);
+        mTethering.stopTetheringRequest(nonMatchingUid, nonMatchingUidListener);
+        mLooper.dispatchAll();
+        verify(nonMatchingUidListener).onResult(eq(TETHER_ERROR_NO_ERROR));
+        verify(mWifiManager).stopSoftAp();
     }
 
     @Test
