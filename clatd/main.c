@@ -18,12 +18,17 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <linux/audit.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
+#include <linux/unistd.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/personality.h>
+#include <sys/prctl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
@@ -51,6 +56,131 @@ void print_help() {
   printf("-t [tun file descriptor number]\n");
   printf("-r [read socket descriptor number]\n");
   printf("-w [write socket descriptor number]\n");
+}
+
+// Load the architecture identifier (AUDIT_ARCH_* constant)
+#define BPF_SECCOMP_LOAD_AUDIT_ARCH \
+	BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch))
+
+// Load the system call number
+#define BPF_SECCOMP_LOAD_SYSCALL_NR \
+	BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr))
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+// Load the system call argument n, where n is [0..5]
+#define BPF_SECCOMP_LOAD_SYSCALL_ARG_LO32(n) \
+	BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[n]))
+#define BPF_SECCOMP_LOAD_SYSCALL_ARG_HI32(n) \
+	BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[n]) + 4)
+#else
+#error "Not a little endian architecture?"
+#endif
+
+// Allow the system call
+#define BPF_SECCOMP_ALLOW BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)
+
+// Allow (but 'audit' log) the system call
+#define BPF_SECCOMP_LOG BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_LOG)
+
+// Reject the system call (kill thread)
+#define BPF_SECCOMP_KILL BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL)
+
+// Note arguments to BPF_JUMP(opcode, operand, true_offset, false_offset)
+
+// If not equal, jump over count instructions
+#define BPF_JUMP_IF_NOT_EQUAL(v, count) \
+	BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (v), 0, (count))
+
+// If equal, jump over count instructions
+#define BPF_JUMP_IF_EQUAL(v, count) \
+	BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (v), (count), 0)
+
+// *TWO* instructions: compare and if not equal jump over the allow statement
+#define BPF2_SECCOMP_ALLOW_IF_EQUAL(v) \
+	BPF_JUMP_IF_NOT_EQUAL((v), 1), \
+	BPF_SECCOMP_ALLOW
+
+// *TWO* instructions: compare and if not equal jump over the log statement
+#define BPF2_SECCOMP_LOG_IF_EQUAL(v) \
+	BPF_JUMP_IF_NOT_EQUAL((v), 1), \
+	BPF_SECCOMP_LOG
+
+// *TWO* instructions: compare and if equal jump over the kill statement
+#define BPF2_SECCOMP_KILL_IF_NOT_EQUAL(v) \
+	BPF_JUMP_IF_EQUAL((v), 1), \
+	BPF_SECCOMP_KILL
+
+// Android only supports the following 5 little endian architectures
+#if defined(__aarch64__) && defined(__LP64__)
+  #define MY_AUDIT_ARCH AUDIT_ARCH_AARCH64
+#elif defined(__arm__) && defined(__ILP32__)
+  #define MY_AUDIT_ARCH AUDIT_ARCH_ARM
+#elif defined(__i386__) && defined(__ILP32__)
+  #define MY_AUDIT_ARCH AUDIT_ARCH_I386
+#elif defined(__x86_64__) && defined(__LP64__)
+  #define MY_AUDIT_ARCH AUDIT_ARCH_X86_64
+#elif defined(__riscv) && defined(__LP64__)
+  #define MY_AUDIT_ARCH AUDIT_ARCH_RISCV64
+#else
+  #error "Unknown AUDIT_ARCH_* architecture."
+#endif
+
+void enable_seccomp(void) {
+  static const struct sock_filter filter[] = {
+    BPF_SECCOMP_LOAD_AUDIT_ARCH,
+    BPF2_SECCOMP_KILL_IF_NOT_EQUAL(MY_AUDIT_ARCH),
+
+    BPF_SECCOMP_LOAD_SYSCALL_NR,                     // aarch64
+
+    // main event loop:
+    //   ppoll ( read sendmsg | recvmsg writev )
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_ppoll),         // 73
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_read),          // 63
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_sendmsg),       // 211
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_recvmsg),       // 212
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_writev),        // 66
+
+    // logging: getuid writev
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_getuid),        // 174
+
+    // inbound signal (SIGTERM) processing
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_rt_sigreturn),  // 139
+
+    // sleep(n)
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_nanosleep),     // 101
+
+    // _exit(0)
+    BPF2_SECCOMP_ALLOW_IF_EQUAL(__NR_exit_group),    // 94
+
+#if defined(__aarch64__)
+    // Pixels are aarch64 - if we break clatd functionality on them,
+    // we *will* notice on GoogleGuest WiFi network (which is ipv6 only)
+    BPF_SECCOMP_KILL,
+#else
+    // All other architectures: generate audit lines visible in dmesg and logcat
+    BPF_SECCOMP_LOG,
+#endif
+  };
+  static const struct sock_fprog prog = {
+    .len = (unsigned short)ARRAY_SIZE(filter),
+    .filter = (struct sock_filter *)filter,
+  };
+
+  // https://man7.org/linux/man-pages/man2/PR_SET_NO_NEW_PRIVS.2const.html
+  // required to allow non-privileged seccomp filter installation
+  int rv = prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L);
+  if (rv) {
+    logmsg(ANDROID_LOG_FATAL, "prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) = %d [%d]", rv, errno);
+    exit(1);
+  }
+
+  // https://man7.org/linux/man-pages/man2/PR_SET_SECCOMP.2const.html
+  // but see also https://man7.org/linux/man-pages/man2/seccomp.2.html
+  rv = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog, 0L, 0L);
+  if (rv) {
+    logmsg(ANDROID_LOG_FATAL, "prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog, 0, 0) = %d [%d]", rv, errno);
+    exit(1);
+  }
 }
 
 /* function: main
@@ -241,6 +371,8 @@ int main(int argc, char **argv) {
   // TODO: actually perform true DAD
   send_dad(tunnel.write_fd6, &Global_Clatd_Config.ipv6_local_subnet);
 
+  enable_seccomp();  // WARNING: from this point forward very limited system calls available.
+
   event_loop(&tunnel);
 
   if (sigterm) {
@@ -255,5 +387,7 @@ int main(int argc, char **argv) {
     logmsg(ANDROID_LOG_INFO, "Clatd on %s %s SIGTERM", uplink_interface,
            sigterm ? "received" : "timed out waiting for");
   }
-  return 0;
+
+  // Using _exit() here avoids 4 mprotect() syscalls triggered via 'exit(0)' or 'return 0'
+  _exit(0);
 }
