@@ -19,12 +19,10 @@ package android.net.thread.cts;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assume.assumeFalse;
-import static org.junit.Assume.assumeNotNull;
 import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkManager;
 import android.os.Build;
 
@@ -40,8 +38,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import java.util.List;
 
 /** Tests for {@link ThreadNetworkManager}. */
 @SmallTest

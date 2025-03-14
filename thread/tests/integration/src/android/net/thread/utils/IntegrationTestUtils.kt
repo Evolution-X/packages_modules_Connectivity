@@ -479,6 +479,12 @@ object IntegrationTestUtils {
         return addresses
     }
 
+    /** Returns the list of [InetAddress] of the given network. */
+    @JvmStatic
+    fun getIpv6Addresses(interfaceName: String): List<InetAddress> {
+        return getIpv6LinkAddresses(interfaceName).map { it.address }
+    }
+
     /** Return the first discovered service of `serviceType`. */
     @JvmStatic
     @Throws(Exception::class)
