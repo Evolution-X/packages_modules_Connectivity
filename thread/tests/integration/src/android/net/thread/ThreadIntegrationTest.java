@@ -22,12 +22,14 @@ import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_LEADER;
 import static android.net.thread.ThreadNetworkController.DEVICE_ROLE_STOPPED;
 import static android.net.thread.utils.IntegrationTestUtils.CALLBACK_TIMEOUT;
 import static android.net.thread.utils.IntegrationTestUtils.RESTART_JOIN_TIMEOUT;
+import static android.net.thread.utils.IntegrationTestUtils.getIpv6Addresses;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.getPrefixesFromNetData;
 import static android.net.thread.utils.IntegrationTestUtils.getThreadNetwork;
 import static android.net.thread.utils.IntegrationTestUtils.isInMulticastGroup;
 import static android.net.thread.utils.IntegrationTestUtils.waitFor;
 import static android.net.thread.utils.ThreadNetworkControllerWrapper.JOIN_TIMEOUT;
+import static android.os.SystemClock.elapsedRealtime;
 
 import static com.android.compatibility.common.util.SystemUtil.runShellCommand;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
@@ -38,6 +40,7 @@ import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -46,22 +49,25 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.InetAddresses;
 import android.net.IpPrefix;
-import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.thread.utils.FullThreadDevice;
 import android.net.thread.utils.OtDaemonController;
+import android.net.thread.utils.TapTestNetworkTracker;
 import android.net.thread.utils.ThreadFeatureCheckerRule;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThreadDevice;
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.net.thread.utils.ThreadNetworkControllerWrapper;
 import android.net.thread.utils.ThreadStateListener;
+import android.os.HandlerThread;
 import android.os.SystemClock;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
+
+import com.google.common.collect.FluentIterable;
 
 import org.junit.After;
 import org.junit.Before;
@@ -102,6 +108,12 @@ public class ThreadIntegrationTest {
 
     private static final Duration NETWORK_CALLBACK_TIMEOUT = Duration.ofSeconds(10);
 
+    // The duration between attached and OMR address shows up on thread-wpan
+    private static final Duration OMR_LINK_ADDR_TIMEOUT = Duration.ofSeconds(30);
+
+    // The duration between attached and addresses show up on thread-wpan
+    private static final Duration LINK_ADDR_TIMEOUT = Duration.ofSeconds(2);
+
     // A valid Thread Active Operational Dataset generated from OpenThread CLI "dataset init new".
     private static final byte[] DEFAULT_DATASET_TLVS =
             base16().decode(
@@ -128,6 +140,8 @@ public class ThreadIntegrationTest {
             ThreadNetworkControllerWrapper.newInstance(mContext);
     private OtDaemonController mOtCtl;
     private FullThreadDevice mFtd;
+    private HandlerThread mHandlerThread;
+    private TapTestNetworkTracker mTestNetworkTracker;
 
     public final boolean mIsBorderRouterEnabled;
     private final ThreadConfiguration mConfig;
@@ -152,6 +166,14 @@ public class ThreadIntegrationTest {
         mController.setEnabledAndWait(true);
         mController.setConfigurationAndWait(mConfig);
         mController.leaveAndWait();
+
+        mHandlerThread = new HandlerThread("ThreadIntegrationTest");
+        mHandlerThread.start();
+
+        mTestNetworkTracker = new TapTestNetworkTracker(mContext, mHandlerThread.getLooper());
+        assertThat(mTestNetworkTracker).isNotNull();
+        mController.setTestNetworkAsUpstreamAndWait(mTestNetworkTracker.getInterfaceName());
+
         mFtd = new FullThreadDevice(10 /* nodeId */);
     }
 
@@ -159,6 +181,13 @@ public class ThreadIntegrationTest {
     public void tearDown() throws Exception {
         ThreadStateListener.stopAllListeners();
 
+        if (mTestNetworkTracker != null) {
+            mTestNetworkTracker.tearDown();
+        }
+        if (mHandlerThread != null) {
+            mHandlerThread.quitSafely();
+            mHandlerThread.join();
+        }
         mController.setTestNetworkAsUpstreamAndWait(null);
         mController.leaveAndWait();
 
@@ -265,23 +294,51 @@ public class ThreadIntegrationTest {
     }
 
     @Test
-    public void joinNetworkWithBrDisabled_meshLocalAddressesArePreferred() throws Exception {
-        // When BR feature is disabled, there is no OMR address, so the mesh-local addresses are
-        // expected to be preferred.
-        mOtCtl.executeCommand("br disable");
+    public void joinNetwork_borderRouterEnabled_allMlAddrAreNotPreferredAndOmrIsPreferred()
+            throws Exception {
+        assumeTrue(mConfig.isBorderRouterEnabled());
+
+        mController.setTestNetworkAsUpstreamAndWait(mTestNetworkTracker.getInterfaceName());
         mController.joinAndWait(DEFAULT_DATASET);
+        waitFor(
+                () -> getIpv6Addresses("thread-wpan").contains(mOtCtl.getOmrAddress()),
+                OMR_LINK_ADDR_TIMEOUT);
 
         IpPrefix meshLocalPrefix = DEFAULT_DATASET.getMeshLocalPrefix();
-        List<LinkAddress> linkAddresses = getIpv6LinkAddresses("thread-wpan");
-        for (LinkAddress address : linkAddresses) {
-            if (meshLocalPrefix.contains(address.getAddress())) {
-                assertThat(address.getDeprecationTime())
-                        .isGreaterThan(SystemClock.elapsedRealtime());
-                assertThat(address.isPreferred()).isTrue();
-            }
-        }
+        var linkAddrs = FluentIterable.from(getIpv6LinkAddresses("thread-wpan"));
+        var meshLocalAddrs = linkAddrs.filter(addr -> meshLocalPrefix.contains(addr.getAddress()));
+        assertThat(meshLocalAddrs).isNotEmpty();
+        assertThat(meshLocalAddrs.allMatch(addr -> !addr.isPreferred())).isTrue();
+        assertThat(meshLocalAddrs.allMatch(addr -> addr.getDeprecationTime() <= elapsedRealtime()))
+                .isTrue();
+        var omrAddrs = linkAddrs.filter(addr -> addr.getAddress().equals(mOtCtl.getOmrAddress()));
+        assertThat(omrAddrs).hasSize(1);
+        assertThat(omrAddrs.get(0).isPreferred()).isTrue();
+        assertThat(omrAddrs.get(0).getDeprecationTime() > elapsedRealtime()).isTrue();
+    }
 
-        mOtCtl.executeCommand("br enable");
+    @Test
+    public void joinNetwork_borderRouterDisabled_onlyMlEidIsPreferred() throws Exception {
+        assumeFalse(mConfig.isBorderRouterEnabled());
+
+        mController.joinAndWait(DEFAULT_DATASET);
+        waitFor(
+                () -> getIpv6Addresses("thread-wpan").contains(mOtCtl.getMlEid()),
+                LINK_ADDR_TIMEOUT);
+
+        IpPrefix meshLocalPrefix = DEFAULT_DATASET.getMeshLocalPrefix();
+        var linkAddrs = FluentIterable.from(getIpv6LinkAddresses("thread-wpan"));
+        var meshLocalAddrs = linkAddrs.filter(addr -> meshLocalPrefix.contains(addr.getAddress()));
+        var mlEidAddrs = meshLocalAddrs.filter(addr -> addr.getAddress().equals(mOtCtl.getMlEid()));
+        var nonMlEidAddrs = meshLocalAddrs.filter(addr -> !mlEidAddrs.contains(addr));
+        assertThat(mlEidAddrs).hasSize(1);
+        assertThat(mlEidAddrs.allMatch(addr -> addr.isPreferred())).isTrue();
+        assertThat(mlEidAddrs.allMatch(addr -> addr.getDeprecationTime() > elapsedRealtime()))
+                .isTrue();
+        assertThat(nonMlEidAddrs).isNotEmpty();
+        assertThat(nonMlEidAddrs.allMatch(addr -> !addr.isPreferred())).isTrue();
+        assertThat(nonMlEidAddrs.allMatch(addr -> addr.getDeprecationTime() <= elapsedRealtime()))
+                .isTrue();
     }
 
     @Test
