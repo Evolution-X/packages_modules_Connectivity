@@ -201,13 +201,11 @@ int main(int argc, char **argv) {
 
   event_loop(&tunnel);
 
-  logmsg(ANDROID_LOG_INFO, "Shutting down clat on %s", uplink_interface);
-
   if (sigterm) {
-    logmsg(ANDROID_LOG_INFO, "Clatd on %s already received SIGTERM", uplink_interface);
+    logmsg(ANDROID_LOG_INFO, "Shutting down clatd on %s, already received SIGTERM", uplink_interface);
   } else {
     // this implies running == false, ie. we received EOF or ENETDOWN error.
-    logmsg(ANDROID_LOG_INFO, "Clatd on %s waiting for SIGTERM", uplink_interface);
+    logmsg(ANDROID_LOG_INFO, "Shutting down clatd on %s, waiting for SIGTERM", uplink_interface);
     // let's give higher level java code 15 seconds to kill us,
     // but eventually terminate anyway, in case system server forgets about us...
     // sleep() should be interrupted by SIGTERM, the handler should set 'sigterm'
