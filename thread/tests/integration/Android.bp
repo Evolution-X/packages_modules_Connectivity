@@ -64,6 +64,26 @@ android_test {
 }
 
 android_test {
+    name: "ThreadBorderRouterIntegrationTests",
+    platform_apis: true,
+    manifest: "AndroidManifest.xml",
+    test_config: "AndroidTestBorderRouter.xml",
+    defaults: [
+        "framework-connectivity-test-defaults",
+        "ThreadNetworkIntegrationTestsDefaults",
+    ],
+    test_suites: [
+        "mts-tethering",
+        "general-tests",
+    ],
+    srcs: [
+        "borderrouter/**/*.java",
+        "borderrouter/**/*.kt",
+    ],
+    compile_multilib: "both",
+}
+
+android_test {
     name: "ThreadNetworkTrelDisabledTests",
     platform_apis: true,
     manifest: "AndroidManifest.xml",

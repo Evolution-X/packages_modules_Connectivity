@@ -31,6 +31,7 @@ java_library {
     ],
     srcs: [
         "src/**/*.java",
+        "src/**/*.kt",
     ],
     defaults: [
         "framework-connectivity-test-defaults",
