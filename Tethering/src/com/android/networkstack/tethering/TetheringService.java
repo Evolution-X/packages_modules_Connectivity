@@ -173,7 +173,21 @@ public class TetheringService extends Service {
         @Override
         public void requestLatestTetheringEntitlementResult(int type, ResultReceiver receiver,
                 boolean showEntitlementUi, String callerPkg, String callingAttributionTag) {
-            if (checkAndNotifyCommonError(callerPkg, callingAttributionTag, receiver)) return;
+            // Wrap the app-provided ResultReceiver in an IIntResultListener in order to call
+            // checkAndNotifyCommonError with it.
+            IIntResultListener listener = new IIntResultListener() {
+                @Override
+                public void onResult(int i) {
+                    receiver.send(i, null);
+                }
+
+                @Override
+                public IBinder asBinder() {
+                    throw new UnsupportedOperationException("asBinder unexpectedly called on"
+                            + " internal-only listener");
+                }
+            };
+            if (checkAndNotifyCommonError(callerPkg, callingAttributionTag, listener)) return;
 
             mTethering.requestLatestTetheringEntitlementResult(type, receiver, showEntitlementUi);
         }
@@ -271,27 +285,6 @@ public class TetheringService extends Service {
                     return true;
                 }
             } catch (RemoteException e) {
-                return true;
-            }
-
-            return false;
-        }
-
-        private boolean checkAndNotifyCommonError(final String callerPkg,
-                final String callingAttributionTag, final ResultReceiver receiver) {
-            if (!checkPackageNameMatchesUid(getBinderCallingUid(), callerPkg)) {
-                Log.e(TAG, "Package name " + callerPkg + " does not match UID "
-                        + getBinderCallingUid());
-                receiver.send(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION, null);
-                return true;
-            }
-            if (!hasTetherChangePermission(callerPkg, callingAttributionTag,
-                    false /* onlyAllowPrivileged */)) {
-                receiver.send(TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION, null);
-                return true;
-            }
-            if (!mTethering.isTetheringSupported() || !mTethering.isTetheringAllowed()) {
-                receiver.send(TETHER_ERROR_UNSUPPORTED, null);
                 return true;
             }
 
