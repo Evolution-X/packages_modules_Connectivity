@@ -49,7 +49,13 @@ public class DiscoveryExecutor implements Executor {
     @NonNull
     private final ArrayList<Pair<Runnable, Long>> mPendingTasks = new ArrayList<>();
 
-    DiscoveryExecutor(@Nullable Looper defaultLooper) {
+    @GuardedBy("mPendingTasks")
+    @Nullable
+    Scheduler mScheduler;
+    @NonNull private final MdnsFeatureFlags mMdnsFeatureFlags;
+
+    DiscoveryExecutor(@Nullable Looper defaultLooper, @NonNull MdnsFeatureFlags mdnsFeatureFlags) {
+        mMdnsFeatureFlags = mdnsFeatureFlags;
         if (defaultLooper != null) {
             this.mHandlerThread = null;
             synchronized (mPendingTasks) {
@@ -62,7 +68,7 @@ public class DiscoveryExecutor implements Executor {
                     synchronized (mPendingTasks) {
                         mHandler = new Handler(getLooper());
                         for (Pair<Runnable, Long> pendingTask : mPendingTasks) {
-                            mHandler.postDelayed(pendingTask.first, pendingTask.second);
+                            executeDelayed(pendingTask.first, pendingTask.second);
                         }
                         mPendingTasks.clear();
                     }
@@ -95,21 +101,44 @@ public class DiscoveryExecutor implements Executor {
     /** Execute the given function after the specified amount of time elapses. */
     public void executeDelayed(Runnable function, long delayMillis) {
         final Handler handler;
+        final Scheduler scheduler;
         synchronized (mPendingTasks) {
             if (this.mHandler == null) {
                 mPendingTasks.add(Pair.create(function, delayMillis));
                 return;
             } else {
                 handler = this.mHandler;
+                if (mMdnsFeatureFlags.mIsAccurateDelayCallbackEnabled
+                        && this.mScheduler == null) {
+                    this.mScheduler = SchedulerFactory.createScheduler(mHandler);
+                }
+                scheduler = this.mScheduler;
             }
         }
-        handler.postDelayed(function, delayMillis);
+        if (scheduler != null) {
+            if (delayMillis == 0L) {
+                handler.post(function);
+                return;
+            }
+            if (HandlerUtils.isRunningOnHandlerThread(handler)) {
+                scheduler.postDelayed(function, delayMillis);
+            } else {
+                handler.post(() -> scheduler.postDelayed(function, delayMillis));
+            }
+        } else {
+            handler.postDelayed(function, delayMillis);
+        }
     }
 
     /** Shutdown the thread if necessary. */
     public void shutDown() {
         if (this.mHandlerThread != null) {
             this.mHandlerThread.quitSafely();
+        }
+        synchronized (mPendingTasks) {
+            if (mScheduler != null) {
+                mScheduler.close();
+            }
         }
     }
 
