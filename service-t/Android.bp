@@ -109,13 +109,15 @@ java_library {
         ":service-mdns-droidstubs",
     ],
     exclude_srcs: [
+        "src/com/android/server/connectivity/mdns/internal/MdnsRealtimeScheduler.java",
         "src/com/android/server/connectivity/mdns/internal/SocketNetlinkMonitor.java",
-        "src/com/android/server/connectivity/mdns/SocketNetLinkMonitorFactory.java",
         "src/com/android/server/connectivity/mdns/MdnsAdvertiser.java",
         "src/com/android/server/connectivity/mdns/MdnsAnnouncer.java",
         "src/com/android/server/connectivity/mdns/MdnsInterfaceAdvertiser.java",
         "src/com/android/server/connectivity/mdns/MdnsProber.java",
         "src/com/android/server/connectivity/mdns/MdnsRecordRepository.java",
+        "src/com/android/server/connectivity/mdns/SchedulerFactory.java",
+        "src/com/android/server/connectivity/mdns/SocketNetLinkMonitorFactory.java",
     ],
     static_libs: [
         "net-utils-device-common-mdns-standalone-build-test",
@@ -132,7 +134,10 @@ java_library {
 
 droidstubs {
     name: "service-mdns-droidstubs",
-    srcs: ["src/com/android/server/connectivity/mdns/SocketNetLinkMonitorFactory.java"],
+    srcs: [
+        "src/com/android/server/connectivity/mdns/SchedulerFactory.java",
+        "src/com/android/server/connectivity/mdns/SocketNetLinkMonitorFactory.java",
+    ],
     libs: [
         "net-utils-device-common-mdns-standalone-build-test",
         "service-connectivity-tiramisu-pre-jarjar",
