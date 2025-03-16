@@ -1252,9 +1252,13 @@ public class ConnectivityManager {
          * {@link ConnectivityManager#registerNetworkAgent}
          * @hide
          */
-        public static Network registerNetworkAgentResult(
+        public static NetworkAndAgentRegistryParcelable registerNetworkAgentResult(
                 @Nullable final Network network, @Nullable final INetworkAgentRegistry registry) {
-            return network;
+            final NetworkAndAgentRegistryParcelable result =
+                    new NetworkAndAgentRegistryParcelable();
+            result.network = network;
+            result.registry = registry;
+            return result;
         }
     }
 
@@ -3968,7 +3972,8 @@ public class ConnectivityManager {
     @RequiresPermission(anyOf = {
             NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK,
             android.Manifest.permission.NETWORK_FACTORY})
-    public Network registerNetworkAgent(@NonNull INetworkAgent na, @NonNull NetworkInfo ni,
+    public NetworkAndAgentRegistryParcelable registerNetworkAgent(
+            @NonNull INetworkAgent na, @NonNull NetworkInfo ni,
             @NonNull LinkProperties lp, @NonNull NetworkCapabilities nc,
             @NonNull NetworkScore score, @NonNull NetworkAgentConfig config, int providerId) {
         return registerNetworkAgent(na, ni, lp, nc, null /* localNetworkConfig */, score, config,
@@ -3983,7 +3988,8 @@ public class ConnectivityManager {
     @RequiresPermission(anyOf = {
             NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK,
             android.Manifest.permission.NETWORK_FACTORY})
-    public Network registerNetworkAgent(@NonNull INetworkAgent na, @NonNull NetworkInfo ni,
+    public NetworkAndAgentRegistryParcelable registerNetworkAgent(
+            @NonNull INetworkAgent na, @NonNull NetworkInfo ni,
             @NonNull LinkProperties lp, @NonNull NetworkCapabilities nc,
             @Nullable LocalNetworkConfig localNetworkConfig, @NonNull NetworkScore score,
             @NonNull NetworkAgentConfig config, int providerId) {
