@@ -125,7 +125,7 @@ public class MdnsDiscoveryManager implements MdnsSocketClientBase.Callback {
         this.sharedLog = sharedLog;
         this.perSocketServiceTypeClients = new PerSocketServiceTypeClients();
         this.mdnsFeatureFlags = mdnsFeatureFlags;
-        this.discoveryExecutor = new DiscoveryExecutor(socketClient.getLooper());
+        this.discoveryExecutor = new DiscoveryExecutor(socketClient.getLooper(), mdnsFeatureFlags);
     }
 
     /**
