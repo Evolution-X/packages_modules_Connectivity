@@ -559,7 +559,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             // The persistent setting keeps the desired enabled state, thus it's set regardless
             // the otDaemon set enabled state operation succeeded or not, so that it can recover
             // to the desired value after reboot.
-            mPersistentSettings.put(ThreadPersistentSettings.THREAD_ENABLED.key, isEnabled);
+            mPersistentSettings.put(ThreadPersistentSettings.KEY_THREAD_ENABLED, isEnabled);
         }
 
         try {
@@ -743,7 +743,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean shouldEnableThread() {
         return !mForceStopOtDaemonEnabled
                 && !mUserRestricted
-                && mPersistentSettings.get(ThreadPersistentSettings.THREAD_ENABLED);
+                && mPersistentSettings.get(ThreadPersistentSettings.KEY_THREAD_ENABLED);
     }
 
     private void requestUpstreamNetwork() {
@@ -879,10 +879,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED);
         final var scoreBuilder = new NetworkScore.Builder();
 
-        if (isBorderRouterMode()) {
-            netCapsBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK);
-            scoreBuilder.setKeepConnectedReason(NetworkScore.KEEP_CONNECTED_LOCAL_NETWORK);
-        }
+        netCapsBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK);
+        scoreBuilder.setKeepConnectedReason(NetworkScore.KEEP_CONNECTED_LOCAL_NETWORK);
 
         return new NetworkAgent(
                 mContext,
@@ -890,7 +888,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 LOG.getTag(),
                 netCapsBuilder.build(),
                 getTunIfLinkProperties(),
-                isBorderRouterMode() ? newLocalNetworkConfig() : null,
+                newLocalNetworkConfig(),
                 scoreBuilder.build(),
                 new NetworkAgentConfig.Builder().build(),
                 mNetworkProvider) {
@@ -899,9 +897,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             @Override
             public void onNetworkUnwanted() {
                 LOG.i("Thread network is unwanted by ConnectivityService");
-                if (!isBorderRouterMode()) {
-                    leave(false /* eraseDataset */, new LoggingOperationReceiver("leave"));
-                }
+                // TODO(b/374037595): leave() the current network when the new APIs for mobile
+                // is available
             }
         };
     }

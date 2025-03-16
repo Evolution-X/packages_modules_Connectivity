@@ -24,9 +24,11 @@ import android.os.SystemClock;
 import com.android.compatibility.common.util.SystemUtil;
 
 import java.net.Inet6Address;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Wrapper of the "/system/bin/ot-ctl" which can be used to send CLI commands to ot-daemon to
@@ -70,6 +72,25 @@ public final class OtDaemonController {
                 .map(addr -> InetAddresses.parseNumericAddress(addr))
                 .map(inetAddr -> (Inet6Address) inetAddr)
                 .toList();
+    }
+
+    /** Returns the OMR address of this device or {@code null} if it doesn't exist. */
+    @Nullable
+    public Inet6Address getOmrAddress() {
+        List<Inet6Address> allAddresses = new ArrayList<>(getAddresses());
+        allAddresses.removeAll(getMeshLocalAddresses());
+
+        List<Inet6Address> omrAddresses =
+                allAddresses.stream()
+                        .filter(addr -> !addr.isLinkLocalAddress())
+                        .collect(Collectors.toList());
+        if (omrAddresses.isEmpty()) {
+            return null;
+        } else if (omrAddresses.size() > 1) {
+            throw new IllegalStateException();
+        }
+
+        return omrAddresses.getFirst();
     }
 
     /** Returns {@code true} if the Thread interface is up. */
@@ -154,6 +175,12 @@ public final class OtDaemonController {
 
     public String getExtendedPanId() {
         return executeCommandAndParse("extpanid").get(0);
+    }
+
+    public boolean isCountryCodeSupported() {
+        final String result = executeCommand("region");
+
+        return !result.equals("Error 12: NotImplemented\r\n");
     }
 
     public String executeCommand(String cmd) {

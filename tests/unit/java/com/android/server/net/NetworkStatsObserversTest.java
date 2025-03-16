@@ -35,8 +35,8 @@ import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 import android.content.Context;
 import android.net.DataUsageRequest;
@@ -288,7 +288,7 @@ public class NetworkStatsObserversTest {
 
         mStatsObservers.unregister(request, UID_BLUE);
         waitForObserverToIdle();
-        Mockito.verifyZeroInteractions(mUsageCallbackBinder);
+        Mockito.verifyNoMoreInteractions(mUsageCallbackBinder);
 
         // Verify that system uid can unregister for other uids.
         mStatsObservers.unregister(request, Process.SYSTEM_UID);

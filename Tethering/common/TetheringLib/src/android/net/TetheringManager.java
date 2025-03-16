@@ -42,6 +42,7 @@ import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.modules.utils.build.SdkLevel;
 import com.android.net.flags.Flags;
 
 import java.lang.annotation.Retention;
@@ -664,7 +665,7 @@ public class TetheringManager {
     }
 
     private void unsupportedAfterV() {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.isAtLeastB()) {
             throw new UnsupportedOperationException("Not supported after SDK version "
                     + Build.VERSION_CODES.VANILLA_ICE_CREAM);
         }

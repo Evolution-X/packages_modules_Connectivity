@@ -23,6 +23,8 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState;
 
 import org.json.JSONException;
@@ -40,6 +42,8 @@ class CompatibilityVersion {
 
     private static final String TAG = "CompatibilityVersion";
 
+    private static File sRootDirectory = new File(Config.CT_ROOT_DIRECTORY_PATH);
+
     static final String LOGS_DIR_PREFIX = "logs-";
     static final String LOGS_LIST_FILE_NAME = "log_list.json";
     static final String CURRENT_LOGS_DIR_SYMLINK_NAME = "current";
@@ -48,23 +52,21 @@ class CompatibilityVersion {
 
     private final String mMetadataUrl;
     private final String mContentUrl;
-    private final File mRootDirectory;
     private final File mVersionDirectory;
     private final File mCurrentLogsDirSymlink;
 
     CompatibilityVersion(
-            String compatVersion, String metadataUrl, String contentUrl, File rootDirectory) {
+            String compatVersion, String metadataUrl, String contentUrl) {
         mCompatVersion = compatVersion;
         mMetadataUrl = metadataUrl;
         mContentUrl = contentUrl;
-        mRootDirectory = rootDirectory;
-        mVersionDirectory = new File(rootDirectory, compatVersion);
+        mVersionDirectory = new File(sRootDirectory, compatVersion);
         mCurrentLogsDirSymlink = new File(mVersionDirectory, CURRENT_LOGS_DIR_SYMLINK_NAME);
     }
 
-    CompatibilityVersion(
-            String compatVersion, String metadataUrl, String contentUrl, String rootDirectoryPath) {
-        this(compatVersion, metadataUrl, contentUrl, new File(rootDirectoryPath));
+    @VisibleForTesting
+    static void setRootDirectoryForTesting(File rootDirectory) {
+        sRootDirectory = rootDirectory;
     }
 
     /**
@@ -75,8 +77,8 @@ class CompatibilityVersion {
      * @return true if the log list was installed successfully, false otherwise.
      * @throws IOException if the list cannot be saved in the CT directory.
      */
-    LogListUpdateStatus install(
-            InputStream newContent, LogListUpdateStatus.Builder statusBuilder) throws IOException {
+    LogListUpdateStatus install(InputStream newContent, LogListUpdateStatus.Builder statusBuilder)
+            throws IOException {
         String content = new String(newContent.readAllBytes(), UTF_8);
         try {
             JSONObject contentJson = new JSONObject(content);
@@ -98,7 +100,7 @@ class CompatibilityVersion {
         // there's a bunch of steps. We create a new directory with the logs and then do
         // an atomic update of the current symlink to point to the new directory.
         // 1. Ensure the path to the root and version directories exist and are readable.
-        DirectoryUtils.makeDir(mRootDirectory);
+        DirectoryUtils.makeDir(sRootDirectory);
         DirectoryUtils.makeDir(mVersionDirectory);
 
         File newLogsDir = new File(mVersionDirectory, LOGS_DIR_PREFIX + version);

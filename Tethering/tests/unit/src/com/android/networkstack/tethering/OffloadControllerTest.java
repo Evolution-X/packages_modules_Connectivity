@@ -42,11 +42,10 @@ import static junit.framework.Assert.assertNotNull;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -282,7 +281,7 @@ public class OffloadControllerTest {
         // This LinkProperties value does not differ from the default upstream.
         // There should be no extraneous call to setUpstreamParameters().
         inOrder.verify(mHardware, never()).setUpstreamParameters(
-                anyObject(), anyObject(), anyObject(), anyObject());
+                any(), any(), any(), any());
         inOrder.verifyNoMoreInteractions();
 
         final LinkProperties lp = new LinkProperties();
@@ -410,7 +409,7 @@ public class OffloadControllerTest {
         // This LinkProperties value does not differ from the default upstream.
         // There should be no extraneous call to setUpstreamParameters().
         inOrder.verify(mHardware, never()).setUpstreamParameters(
-                anyObject(), anyObject(), anyObject(), anyObject());
+                any(), any(), any(), any());
         inOrder.verifyNoMoreInteractions();
     }
 

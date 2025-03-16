@@ -365,6 +365,7 @@ import com.android.server.connectivity.DnsManager;
 import com.android.server.connectivity.DnsManager.PrivateDnsValidationUpdate;
 import com.android.server.connectivity.DscpPolicyTracker;
 import com.android.server.connectivity.FullScore;
+import com.android.server.connectivity.InterfaceTracker;
 import com.android.server.connectivity.InvalidTagException;
 import com.android.server.connectivity.KeepaliveResourceUtil;
 import com.android.server.connectivity.KeepaliveTracker;
@@ -577,6 +578,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private final NetworkStatsManager mStatsManager;
     private final NetworkPolicyManager mPolicyManager;
     private final BpfNetMaps mBpfNetMaps;
+    private final InterfaceTracker mInterfaceTracker;
 
     /**
      * TestNetworkService (lazily) created upon first usage. Locked to prevent creation of multiple
@@ -1662,8 +1664,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
          * @param netd a netd binder
          * @return BpfNetMaps implementation.
          */
-        public BpfNetMaps getBpfNetMaps(Context context, INetd netd) {
-            return new BpfNetMaps(context, netd);
+        public BpfNetMaps getBpfNetMaps(Context context, INetd netd,
+                InterfaceTracker interfaceTracker) {
+            return new BpfNetMaps(context, netd, interfaceTracker);
+        }
+
+        /**
+         * Get the InterfaceTracker implementation to use in ConnectivityService.
+         * @return InterfaceTracker implementation.
+         */
+        public InterfaceTracker getInterfaceTracker(Context context) {
+            return new InterfaceTracker(context);
         }
 
         /**
@@ -1886,7 +1897,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mWakeUpMask = mask;
 
         mNetd = netd;
-        mBpfNetMaps = mDeps.getBpfNetMaps(mContext, netd);
+        mInterfaceTracker = mDeps.getInterfaceTracker(mContext);
+        mBpfNetMaps = mDeps.getBpfNetMaps(mContext, netd, mInterfaceTracker);
         mHandlerThread = mDeps.makeHandlerThread("ConnectivityServiceThread");
         mPermissionMonitorDeps = mPermDeps;
         mPermissionMonitor =
@@ -5405,12 +5417,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     @VisibleForTesting
-    protected static boolean shouldCreateNetworksImmediately() {
+    protected static boolean shouldCreateNetworksImmediately(@NonNull NetworkCapabilities caps) {
         // The feature of creating the networks immediately was slated for U, but race conditions
         // detected late required this was flagged off.
         // TODO : enable this in a Mainline update or in V, and re-enable the test for this
         // in NetworkAgentTest.
-        return false;
+        return caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK);
     }
 
     private static boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
@@ -5419,12 +5431,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (state == NetworkInfo.State.CONNECTED) return true;
         if (state != NetworkInfo.State.CONNECTING) {
             // TODO: throw if no WTFs are observed in the field.
-            if (shouldCreateNetworksImmediately()) {
+            if (shouldCreateNetworksImmediately(nai.getCapsNoCopy())) {
                 Log.wtf(TAG, "Uncreated network in invalid state: " + state);
             }
             return false;
         }
-        return nai.isVPN() || shouldCreateNetworksImmediately();
+        return nai.isVPN() || shouldCreateNetworksImmediately(nai.getCapsNoCopy());
     }
 
     private static boolean shouldDestroyNativeNetwork(@NonNull NetworkAgentInfo nai) {
@@ -5823,7 +5835,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
 
             if (shouldTrackUidsForBlockedStatusCallbacks()
-                    && isAppRequest(nri)
+                    && nri.mMessenger != null
                     && !nri.mUidTrackedForBlockedStatus) {
                 Log.wtf(TAG, "Registered nri is not tracked for sending blocked status: " + nri);
             }
@@ -9605,8 +9617,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         updateIngressToVpnAddressFiltering(newLp, oldLp, networkAgent);
 
-        updateLocalNetworkAddresses(newLp, oldLp);
-
         updateMtu(newLp, oldLp);
         // TODO - figure out what to do for clat
 //        for (LinkProperties lp : newLp.getStackedLinks()) {
@@ -9769,16 +9779,23 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                     wakeupModifyInterface(iface, nai, true);
                     mDeps.reportNetworkInterfaceForTransports(mContext, iface,
                             nai.networkCapabilities.getTransportTypes());
+                    mInterfaceTracker.addInterface(iface);
                 } catch (Exception e) {
                     logw("Exception adding interface: " + e);
                 }
             }
         }
+
+        // The local network addresses needs to be updated before interfaces are removed because
+        // modifying bpf map local_net_access requires mapping interface name to index.
+        updateLocalNetworkAddresses(newLp, oldLp);
+
         for (final String iface : interfaceDiff.removed) {
             try {
                 if (DBG) log("Removing iface " + iface + " from network " + netId);
                 wakeupModifyInterface(iface, nai, false);
                 mRoutingCoordinatorService.removeInterfaceFromNetwork(netId, iface);
+                mInterfaceTracker.removeInterface(iface);
             } catch (Exception e) {
                 loge("Exception removing interface: " + e);
             }
@@ -12048,7 +12065,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // interfaces and routing rules have been added, DNS servers programmed, etc.
             // For VPNs, this must be done before the capabilities are updated, because as soon as
             // that happens, UIDs are routed to the network.
-            if (shouldCreateNetworksImmediately()) {
+            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
                 applyInitialLinkProperties(networkAgent);
             }
 
@@ -12073,7 +12090,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             networkAgent.getAndSetNetworkCapabilities(networkAgent.networkCapabilities);
 
             handlePerNetworkPrivateDnsConfig(networkAgent, mDnsManager.getPrivateDnsConfig());
-            if (!shouldCreateNetworksImmediately()) {
+            if (!shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
                 applyInitialLinkProperties(networkAgent);
             } else {
                 // The network was created when the agent registered, and the LinkProperties are

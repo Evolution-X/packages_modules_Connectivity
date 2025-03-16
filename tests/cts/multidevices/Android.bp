@@ -29,6 +29,7 @@ python_test_host {
     libs: [
         "absl-py",
         "mobly",
+        "scapy",
         "net-tests-utils-host-python-common",
     ],
     test_suites: [

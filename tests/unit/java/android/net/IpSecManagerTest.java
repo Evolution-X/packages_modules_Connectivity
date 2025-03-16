@@ -23,10 +23,10 @@ import static android.system.OsConstants.SOCK_DGRAM;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -100,7 +100,7 @@ public class IpSecManagerTest {
         when(mMockIpSecService.allocateSecurityParameterIndex(
                         eq(GOOGLE_DNS_4.getHostAddress()),
                         eq(DROID_SPI),
-                        anyObject()))
+                        any()))
                 .thenReturn(spiResp);
 
         IpSecManager.SecurityParameterIndex droidSpi =
@@ -119,7 +119,7 @@ public class IpSecManagerTest {
         when(mMockIpSecService.allocateSecurityParameterIndex(
                         eq(GOOGLE_DNS_4.getHostAddress()),
                         eq(IpSecManager.INVALID_SECURITY_PARAMETER_INDEX),
-                        anyObject()))
+                        any()))
                 .thenReturn(spiResp);
 
         IpSecManager.SecurityParameterIndex randomSpi =
@@ -140,7 +140,7 @@ public class IpSecManagerTest {
         IpSecSpiResponse spiResp =
                 new IpSecSpiResponse(IpSecManager.Status.RESOURCE_UNAVAILABLE, 0, 0);
         when(mMockIpSecService.allocateSecurityParameterIndex(
-                        anyString(), anyInt(), anyObject()))
+                        anyString(), anyInt(), any()))
                 .thenReturn(spiResp);
 
         try {
@@ -157,7 +157,7 @@ public class IpSecManagerTest {
     public void testAllocSpiSpiUnavailableException() throws Exception {
         IpSecSpiResponse spiResp = new IpSecSpiResponse(IpSecManager.Status.SPI_UNAVAILABLE, 0, 0);
         when(mMockIpSecService.allocateSecurityParameterIndex(
-                        anyString(), anyInt(), anyObject()))
+                        anyString(), anyInt(), any()))
                 .thenReturn(spiResp);
 
         try {
@@ -187,7 +187,7 @@ public class IpSecManagerTest {
                         DUMMY_RESOURCE_ID,
                         TEST_UDP_ENCAP_PORT,
                         Os.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-        when(mMockIpSecService.openUdpEncapsulationSocket(eq(TEST_UDP_ENCAP_PORT), anyObject()))
+        when(mMockIpSecService.openUdpEncapsulationSocket(eq(TEST_UDP_ENCAP_PORT), any()))
                 .thenReturn(udpEncapResp);
 
         IpSecManager.UdpEncapsulationSocket encapSocket =
@@ -236,7 +236,7 @@ public class IpSecManagerTest {
                         TEST_UDP_ENCAP_PORT,
                         Os.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
 
-        when(mMockIpSecService.openUdpEncapsulationSocket(eq(0), anyObject()))
+        when(mMockIpSecService.openUdpEncapsulationSocket(eq(0), any()))
                 .thenReturn(udpEncapResp);
 
         IpSecManager.UdpEncapsulationSocket encapSocket =
@@ -267,7 +267,7 @@ public class IpSecManagerTest {
                 new IpSecTunnelInterfaceResponse(IpSecManager.Status.OK, resourceId, intfName);
         when(mMockIpSecService.createTunnelInterface(
                 eq(VTI_LOCAL_ADDRESS.getHostAddress()), eq(GOOGLE_DNS_4.getHostAddress()),
-                anyObject(), anyObject(), anyString()))
+                any(), any(), anyString()))
                         .thenReturn(dummyResponse);
 
         IpSecManager.IpSecTunnelInterface tunnelIntf = mIpSecManager.createIpSecTunnelInterface(

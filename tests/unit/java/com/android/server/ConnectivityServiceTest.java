@@ -220,7 +220,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
@@ -413,6 +413,7 @@ import com.android.server.connectivity.CarrierPrivilegeAuthenticator;
 import com.android.server.connectivity.ClatCoordinator;
 import com.android.server.connectivity.ConnectivityFlags;
 import com.android.server.connectivity.ConnectivityResources;
+import com.android.server.connectivity.InterfaceTracker;
 import com.android.server.connectivity.KeepaliveTracker;
 import com.android.server.connectivity.MultinetworkPolicyTracker;
 import com.android.server.connectivity.MultinetworkPolicyTrackerTestDependencies;
@@ -2262,7 +2263,8 @@ public class ConnectivityServiceTest {
         }
 
         @Override
-        public BpfNetMaps getBpfNetMaps(Context context, INetd netd) {
+        public BpfNetMaps getBpfNetMaps(Context context, INetd netd,
+                InterfaceTracker interfaceTracker) {
             return mBpfNetMaps;
         }
 
@@ -4040,7 +4042,7 @@ public class ConnectivityServiceTest {
 
         mWiFiAgent = new TestNetworkAgentWrapper(TRANSPORT_WIFI, callbacks);
 
-        if (mService.shouldCreateNetworksImmediately()) {
+        if (mService.shouldCreateNetworksImmediately(mWiFiAgent.getNetworkCapabilities())) {
             assertEquals("onNetworkCreated", eventOrder.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS));
         } else {
             assertNull(eventOrder.poll());
@@ -4053,7 +4055,7 @@ public class ConnectivityServiceTest {
         // connected.
         // TODO: fix this bug, file the request before connecting, and remove the waitForIdle.
         mWiFiAgent.connectWithoutInternet();
-        if (!mService.shouldCreateNetworksImmediately()) {
+        if (!mService.shouldCreateNetworksImmediately(mWiFiAgent.getNetworkCapabilities())) {
             assertEquals("onNetworkCreated", eventOrder.poll(TIMEOUT_MS, TimeUnit.MILLISECONDS));
         } else {
             waitForIdle();
@@ -7941,8 +7943,8 @@ public class ConnectivityServiceTest {
         // Simple connection with initial LP should have updated ifaces.
         mCellAgent.connect(false);
         waitForIdle();
-        List<Network> allNetworks = mService.shouldCreateNetworksImmediately()
-                ? cellAndWifi() : onlyCell();
+        List<Network> allNetworks = mService.shouldCreateNetworksImmediately(
+                mCellAgent.getNetworkCapabilities()) ? cellAndWifi() : onlyCell();
         expectNotifyNetworkStatus(allNetworks, onlyCell(), MOBILE_IFNAME);
         reset(mStatsManager);
 
@@ -8254,7 +8256,7 @@ public class ConnectivityServiceTest {
         mCellAgent = new TestNetworkAgentWrapper(TRANSPORT_CELLULAR);
         final int netId = mCellAgent.getNetwork().netId;
         waitForIdle();
-        if (mService.shouldCreateNetworksImmediately()) {
+        if (mService.shouldCreateNetworksImmediately(mCellAgent.getNetworkCapabilities())) {
             verify(mMockDnsResolver, times(1)).createNetworkCache(netId);
         } else {
             verify(mMockDnsResolver, never()).setResolverConfiguration(any());
@@ -8274,7 +8276,7 @@ public class ConnectivityServiceTest {
         mCellAgent.sendLinkProperties(cellLp);
         mCellAgent.connect(false);
         waitForIdle();
-        if (!mService.shouldCreateNetworksImmediately()) {
+        if (!mService.shouldCreateNetworksImmediately(mCellAgent.getNetworkCapabilities())) {
             // CS tells dnsresolver about the empty DNS config for this network.
             verify(mMockDnsResolver, times(1)).createNetworkCache(netId);
         }
@@ -8397,7 +8399,7 @@ public class ConnectivityServiceTest {
         mCellAgent = new TestNetworkAgentWrapper(TRANSPORT_CELLULAR);
         final int netId = mCellAgent.getNetwork().netId;
         waitForIdle();
-        if (mService.shouldCreateNetworksImmediately()) {
+        if (mService.shouldCreateNetworksImmediately(mCellAgent.getNetworkCapabilities())) {
             verify(mMockDnsResolver, times(1)).createNetworkCache(netId);
         } else {
             verify(mMockDnsResolver, never()).setResolverConfiguration(any());
@@ -8420,7 +8422,7 @@ public class ConnectivityServiceTest {
         mCellAgent.sendLinkProperties(cellLp);
         mCellAgent.connect(false);
         waitForIdle();
-        if (!mService.shouldCreateNetworksImmediately()) {
+        if (!mService.shouldCreateNetworksImmediately(mCellAgent.getNetworkCapabilities())) {
             verify(mMockDnsResolver, times(1)).createNetworkCache(netId);
         }
         verify(mMockDnsResolver, atLeastOnce()).setResolverConfiguration(
@@ -16065,13 +16067,13 @@ public class ConnectivityServiceTest {
 
         final TestNetworkAgentWrapper workAgent =
                 makeEnterpriseNetworkAgent(profileNetworkPreference.getPreferenceEnterpriseId());
-        if (mService.shouldCreateNetworksImmediately()) {
+        if (mService.shouldCreateNetworksImmediately(workAgent.getNetworkCapabilities())) {
             expectNativeNetworkCreated(workAgent.getNetwork().netId, INetd.PERMISSION_SYSTEM,
                     null /* iface */, inOrder);
         }
         if (connectWorkProfileAgentAhead) {
             workAgent.connect(false);
-            if (!mService.shouldCreateNetworksImmediately()) {
+            if (!mService.shouldCreateNetworksImmediately(workAgent.getNetworkCapabilities())) {
                 expectNativeNetworkCreated(workAgent.getNetwork().netId, INetd.PERMISSION_SYSTEM,
                         null /* iface */, inOrder);
             }
@@ -16114,7 +16116,7 @@ public class ConnectivityServiceTest {
 
         if (!connectWorkProfileAgentAhead) {
             workAgent.connect(false);
-            if (!mService.shouldCreateNetworksImmediately()) {
+            if (!mService.shouldCreateNetworksImmediately(workAgent.getNetworkCapabilities())) {
                 inOrder.verify(mMockNetd).networkCreate(
                         nativeNetworkConfigPhysical(workAgent.getNetwork().netId,
                                 INetd.PERMISSION_SYSTEM));
@@ -18825,7 +18827,7 @@ public class ConnectivityServiceTest {
     }
 
     private void verifyMtuSetOnWifiInterfaceOnlyUpToT(int mtu) throws Exception {
-        if (!mService.shouldCreateNetworksImmediately()) {
+        if (!mService.shouldCreateNetworksImmediately(mWiFiAgent.getNetworkCapabilities())) {
             verify(mMockNetd, times(1)).interfaceSetMtu(WIFI_IFNAME, mtu);
         } else {
             verify(mMockNetd, never()).interfaceSetMtu(eq(WIFI_IFNAME), anyInt());
@@ -18833,7 +18835,7 @@ public class ConnectivityServiceTest {
     }
 
     private void verifyMtuSetOnWifiInterfaceOnlyStartingFromU(int mtu) throws Exception {
-        if (mService.shouldCreateNetworksImmediately()) {
+        if (mService.shouldCreateNetworksImmediately(mWiFiAgent.getNetworkCapabilities())) {
             verify(mMockNetd, times(1)).interfaceSetMtu(WIFI_IFNAME, mtu);
         } else {
             verify(mMockNetd, never()).interfaceSetMtu(eq(WIFI_IFNAME), anyInt());

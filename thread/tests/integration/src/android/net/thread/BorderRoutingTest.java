@@ -19,7 +19,7 @@ package android.net.thread;
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
 import static android.net.thread.utils.IntegrationTestUtils.buildIcmpv4EchoReply;
-import static android.net.thread.utils.IntegrationTestUtils.enableThreadAndJoinNetwork;
+import static android.net.thread.utils.IntegrationTestUtils.enableBorderRouterAndJoinNetwork;
 import static android.net.thread.utils.IntegrationTestUtils.getIpv6LinkAddresses;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv4Packet;
 import static android.net.thread.utils.IntegrationTestUtils.isExpectedIcmpv6Packet;
@@ -128,7 +128,7 @@ public class BorderRoutingTest {
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        enableThreadAndJoinNetwork(DEFAULT_DATASET);
+        enableBorderRouterAndJoinNetwork(DEFAULT_DATASET);
     }
 
     @AfterClass

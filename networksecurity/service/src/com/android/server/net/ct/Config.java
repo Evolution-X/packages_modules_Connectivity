@@ -33,18 +33,14 @@ final class Config {
     private static final String PREFERENCES_FILE_NAME = "ct.preferences";
     static final File PREFERENCES_FILE = new File(DEVICE_PROTECTED_DATA_DIR, PREFERENCES_FILE_NAME);
 
-    // CT directory
+    // CT paths
     static final String CT_ROOT_DIRECTORY_PATH = "/data/misc/keychain/ct/";
-    static final String COMPATIBILITY_VERSION = "v1";
+    static final String URL_PREFIX = "https://www.gstatic.com/android/certificate_transparency/";
 
     // Phenotype flags
     static final String NAMESPACE_NETWORK_SECURITY = "network_security";
     private static final String FLAGS_PREFIX = "CertificateTransparencyLogList__";
     static final String FLAG_SERVICE_ENABLED = FLAGS_PREFIX + "service_enabled";
-    static final String FLAG_CONTENT_URL = FLAGS_PREFIX + "content_url";
-    static final String FLAG_METADATA_URL = FLAGS_PREFIX + "metadata_url";
-    static final String FLAG_VERSION = FLAGS_PREFIX + "version";
-    static final String FLAG_PUBLIC_KEY = FLAGS_PREFIX + "public_key";
 
     // properties
     static final String VERSION = "version";
@@ -53,9 +49,18 @@ final class Config {
     static final String PUBLIC_KEY_DOWNLOAD_ID = "public_key_download_id";
     static final String LOG_LIST_UPDATE_FAILURE_COUNT = "log_list_update_failure_count";
 
-    // URLs
-    static final String URL_PREFIX = "https://www.gstatic.com/android/certificate_transparency/";
-    static final String URL_LOG_LIST = URL_PREFIX + "log_list.json";
-    static final String URL_SIGNATURE = URL_PREFIX + "log_list.sig";
+    // Public Key URLs
     static final String URL_PUBLIC_KEY = URL_PREFIX + "log_list.pub";
+
+    // Compatibility Version v1
+    static final String COMPATIBILITY_VERSION_V1 = "v1";
+    static final String URL_PREFIX_V1 = URL_PREFIX;
+    static final String URL_LOG_LIST_V1 = URL_PREFIX_V1 + "log_list.json";
+    static final String URL_SIGNATURE_V1 = URL_PREFIX_V1 + "log_list.sig";
+
+    // Compatibility Version v2
+    static final String COMPATIBILITY_VERSION_V2 = "v2";
+    static final String URL_PREFIX_V2 = URL_PREFIX + COMPATIBILITY_VERSION_V2 + "/";
+    static final String URL_LOG_LIST_V2 = URL_PREFIX_V2 + "log_list.json";
+    static final String URL_SIGNATURE_V2 = URL_PREFIX_V2 + "log_list.sig";
 }

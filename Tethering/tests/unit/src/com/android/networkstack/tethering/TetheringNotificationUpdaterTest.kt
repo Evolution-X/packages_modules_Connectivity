@@ -67,7 +67,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyZeroInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.MockitoAnnotations
 
 const val TEST_SUBID = 1
@@ -246,7 +246,7 @@ class TetheringNotificationUpdaterTest {
 
         // No downstream.
         notificationUpdater.onDownstreamChanged(DOWNSTREAM_NONE)
-        verifyZeroInteractions(notificationManager)
+        verifyNoMoreInteractions(notificationManager)
 
         // User restrictions on again. Show restricted notification.
         notificationUpdater.notifyTetheringDisabledByRestriction()
@@ -308,7 +308,7 @@ class TetheringNotificationUpdaterTest {
 
         // Same capabilities changed. Nothing happened.
         notificationUpdater.onUpstreamCapabilitiesChanged(null)
-        verifyZeroInteractions(notificationManager)
+        verifyNoMoreInteractions(notificationManager)
 
         // Upstream come back. Clear no upstream notification.
         notificationUpdater.onUpstreamCapabilitiesChanged(HOME_CAPABILITIES)
@@ -384,7 +384,7 @@ class TetheringNotificationUpdaterTest {
 
         // Same capabilities change. Nothing happened.
         notificationUpdater.onUpstreamCapabilitiesChanged(ROAMING_CAPABILITIES)
-        verifyZeroInteractions(notificationManager)
+        verifyNoMoreInteractions(notificationManager)
 
         // Upstream capabilities changed to home state. Clear roaming notification.
         notificationUpdater.onUpstreamCapabilitiesChanged(HOME_CAPABILITIES)

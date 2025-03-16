@@ -30,6 +30,8 @@ import android.util.Log;
 
 import com.android.server.SystemService;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.concurrent.Executors;
 
 /** Implementation of the Certificate Transparency service. */
@@ -51,8 +53,18 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
     /** Creates a new {@link CertificateTransparencyService} object. */
     public CertificateTransparencyService(Context context) {
         DataStore dataStore = new DataStore(Config.PREFERENCES_FILE);
-
         SignatureVerifier signatureVerifier = new SignatureVerifier(context);
+        Collection<CompatibilityVersion> compatVersions =
+                Arrays.asList(
+                        new CompatibilityVersion(
+                                Config.COMPATIBILITY_VERSION_V1,
+                                Config.URL_SIGNATURE_V1,
+                                Config.URL_LOG_LIST_V1),
+                        new CompatibilityVersion(
+                                Config.COMPATIBILITY_VERSION_V2,
+                                Config.URL_SIGNATURE_V2,
+                                Config.URL_LOG_LIST_V2));
+
         mCertificateTransparencyJob =
                 new CertificateTransparencyJob(
                         context,
@@ -62,13 +74,10 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
                                 dataStore,
                                 new DownloadHelper(context),
                                 signatureVerifier,
-                                new CertificateTransparencyLoggerImpl(dataStore)),
-                        new CompatibilityVersion(
-                                Config.COMPATIBILITY_VERSION,
-                                Config.URL_SIGNATURE,
-                                Config.URL_LOG_LIST,
-                                Config.CT_ROOT_DIRECTORY_PATH),
-                        signatureVerifier);
+                                new CertificateTransparencyLoggerImpl(dataStore),
+                                compatVersions),
+                        signatureVerifier,
+                        compatVersions);
     }
 
     /**

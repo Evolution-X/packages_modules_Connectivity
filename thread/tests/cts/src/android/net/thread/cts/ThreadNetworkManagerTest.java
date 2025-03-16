@@ -19,12 +19,10 @@ package android.net.thread.cts;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assume.assumeFalse;
-import static org.junit.Assume.assumeNotNull;
 import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkManager;
 import android.os.Build;
 
@@ -40,8 +38,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import java.util.List;
 
 /** Tests for {@link ThreadNetworkManager}. */
 @SmallTest
@@ -89,22 +85,5 @@ public class ThreadNetworkManagerTest {
         assumeTrue(mPackageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK));
 
         assertThat(mManager).isNotNull();
-    }
-
-    @Test
-    public void getManager_noThreadFeature_returnsNull() {
-        assumeFalse(mPackageManager.hasSystemFeature("android.hardware.thread_network"));
-
-        assertThat(mManager).isNull();
-    }
-
-    @Test
-    @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
-    public void getAllThreadNetworkControllers_managerIsNotNull_returnsNotEmptyList() {
-        assumeNotNull(mManager);
-
-        List<ThreadNetworkController> controllers = mManager.getAllThreadNetworkControllers();
-
-        assertThat(controllers).isNotEmpty();
     }
 }

@@ -117,7 +117,6 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -146,6 +145,7 @@ import com.android.internal.util.MessageUtils;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.flags.Flags;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.HandlerUtils;
@@ -290,7 +290,10 @@ public class Tethering {
     private SettingsObserver mSettingsObserver;
     private BluetoothPan mBluetoothPan;
     private PanServiceListener mBluetoothPanListener;
-    private final ArrayList<IIntResultListener> mPendingPanRequestListeners;
+    // Pending listener for starting Bluetooth tethering before the PAN service is connected. Once
+    // the service is connected, the bluetooth iface will be requested and the listener will be
+    // called.
+    private IIntResultListener mPendingPanRequestListener;
     // AIDL doesn't support Set<Integer>. Maintain a int bitmap here. When the bitmap is passed to
     // TetheringManager, TetheringManager would convert it to a set of Integer types.
     // mSupportedTypeBitmap should always be updated inside tethering internal thread but it may be
@@ -307,11 +310,6 @@ public class Tethering {
         mNotificationUpdater = mDeps.makeNotificationUpdater(mContext, mLooper);
         mTetheringMetrics = mDeps.makeTetheringMetrics(mContext);
         mRequestTracker = new RequestTracker();
-
-        // This is intended to ensrure that if something calls startTethering(bluetooth) just after
-        // bluetooth is enabled. Before onServiceConnected is called, store the calls into this
-        // list and handle them as soon as onServiceConnected is called.
-        mPendingPanRequestListeners = new ArrayList<>();
 
         mTetherStates = new ArrayMap<>();
         mConnectedClientsTracker = new ConnectedClientsTracker();
@@ -463,7 +461,7 @@ public class Tethering {
     }
 
     boolean isTetheringWithSoftApConfigEnabled() {
-        return mDeps.isTetheringWithSoftApConfigEnabled();
+        return SdkLevel.isAtLeastB() && Flags.tetheringWithSoftApConfig();
     }
 
     /**
@@ -637,7 +635,7 @@ public class Tethering {
         // TODO: fix the teardown path to stop depending on interface state notifications.
         // These are not necessary since most/all link layers have their own teardown
         // notifications, and can race with those notifications.
-        if (enabled && Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (enabled && SdkLevel.isAtLeastB()) {
             return;
         }
 
@@ -862,15 +860,21 @@ public class Tethering {
         if (!enable) {
             // The service is not connected. If disabling tethering, there's no point starting
             // the service just to stop tethering since tethering is not started. Just remove
-            // any pending requests to enable tethering, and notify them that they have failed.
-            for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
-                sendTetherResult(pendingListener, TETHER_ERROR_SERVICE_UNAVAIL,
+            // any pending request to enable tethering, and notify them that they have failed.
+            if (mPendingPanRequestListener != null) {
+                sendTetherResult(mPendingPanRequestListener, TETHER_ERROR_SERVICE_UNAVAIL,
                         TETHERING_BLUETOOTH);
             }
-            mPendingPanRequestListeners.clear();
+            mPendingPanRequestListener = null;
             return TETHER_ERROR_NO_ERROR;
         }
-        mPendingPanRequestListeners.add(listener);
+
+        // Only allow one pending request at a time.
+        if (mPendingPanRequestListener != null) {
+            return TETHER_ERROR_SERVICE_UNAVAIL;
+        }
+
+        mPendingPanRequestListener = listener;
 
         // Bluetooth tethering is not a popular feature. To avoid bind to bluetooth pan service all
         // the time but user never use bluetooth tethering. mBluetoothPanListener is created first
@@ -897,12 +901,12 @@ public class Tethering {
                 mBluetoothPan = (BluetoothPan) proxy;
                 mIsConnected = true;
 
-                for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
+                if (mPendingPanRequestListener != null) {
                     final int result = setBluetoothTetheringSettings(mBluetoothPan,
                             true /* enable */);
-                    sendTetherResult(pendingListener, result, TETHERING_BLUETOOTH);
+                    sendTetherResult(mPendingPanRequestListener, result, TETHERING_BLUETOOTH);
                 }
-                mPendingPanRequestListeners.clear();
+                mPendingPanRequestListener = null;
             });
         }
 
@@ -913,11 +917,11 @@ public class Tethering {
                 // reachable before next onServiceConnected.
                 mIsConnected = false;
 
-                for (IIntResultListener pendingListener : mPendingPanRequestListeners) {
-                    sendTetherResult(pendingListener, TETHER_ERROR_SERVICE_UNAVAIL,
+                if (mPendingPanRequestListener != null) {
+                    sendTetherResult(mPendingPanRequestListener, TETHER_ERROR_SERVICE_UNAVAIL,
                             TETHERING_BLUETOOTH);
                 }
-                mPendingPanRequestListeners.clear();
+                mPendingPanRequestListener = null;
                 mBluetoothIfaceRequest = null;
                 mBluetoothCallback = null;
                 maybeDisableBluetoothIpServing();
@@ -1078,7 +1082,7 @@ public class Tethering {
     }
 
     private void handleLegacyTether(String iface, final IIntResultListener listener) {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.isAtLeastB()) {
             // After V, the TetheringManager and ConnectivityManager tether and untether methods
             // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
             // that this code cannot run even if callers use raw binder calls or other
@@ -1179,7 +1183,7 @@ public class Tethering {
     }
 
     void legacyUntether(String iface, final IIntResultListener listener) {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.isAtLeastB()) {
             // After V, the TetheringManager and ConnectivityManager tether and untether methods
             // throw UnsupportedOperationException, so this cannot happen in normal use. Ensure
             // that this code cannot run even if callers use raw binder calls or other
