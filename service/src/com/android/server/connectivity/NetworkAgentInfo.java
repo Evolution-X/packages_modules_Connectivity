@@ -62,6 +62,7 @@ import android.net.QosSession;
 import android.net.TcpKeepalivePacketData;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
@@ -630,6 +631,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     // Used by ConnectivityService to keep track of 464xlat.
     public final Nat464Xlat clatd;
 
+    private final ArrayList<Message> mMessagesPendingRegistration = new ArrayList<>();
     // Set after asynchronous creation of the NetworkMonitor.
     private volatile NetworkMonitorManager mNetworkMonitor;
 
@@ -639,6 +641,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     private final ConnectivityService.Dependencies mConnServiceDeps;
     private final Context mContext;
     private final Handler mHandler;
+    private final NetworkAgentMessageHandler mRegistry;
     private final QosCallbackTracker mQosCallbackTracker;
     private final INetd mNetd;
 
@@ -673,6 +676,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         mNetd = netd;
         mContext = context;
         mHandler = handler;
+        mRegistry = new NetworkAgentMessageHandler(mHandler);
         this.factorySerialNumber = factorySerialNumber;
         this.creatorUid = creatorUid;
         mLingerDurationMs = lingerDurationMs;
@@ -698,10 +702,12 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
      * Must be called from the ConnectivityService handler thread. A NetworkAgent can only be
      * registered once.
      */
-    public void notifyRegistered() {
+    public void notifyRegistered(final INetworkMonitor nm) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        mNetworkMonitor = new NetworkMonitorManager(nm);
         try {
             networkAgent.asBinder().linkToDeath(mDeathMonitor, 0);
-            networkAgent.onRegistered(new NetworkAgentMessageHandler(mHandler));
+            networkAgent.onRegistered();
         } catch (RemoteException e) {
             Log.e(TAG, "Error registering NetworkAgent", e);
             maybeUnlinkDeathMonitor();
@@ -711,6 +717,29 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         }
 
         mHandler.obtainMessage(EVENT_AGENT_REGISTERED, ARG_AGENT_SUCCESS, 0, this).sendToTarget();
+        for (final Message enqueued : mMessagesPendingRegistration) {
+            mHandler.sendMessage(enqueued);
+        }
+        mMessagesPendingRegistration.clear();
+    }
+
+    /**
+     * Enqueues a message if it needs to be enqueued, and returns whether it was enqueued.
+     *
+     * The message is enqueued iff it can't be sent just yet. If it can be sent
+     * immediately, this method returns false and doesn't enqueue.
+     *
+     * If it enqueues, this method will make a copy of the message for enqueuing since
+     * messages can't be reused or recycled before the end of their processing by the
+     * handler.
+     */
+    public boolean maybeEnqueueMessage(final Message msg) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        if (null != mNetworkMonitor) return false;
+        final Message m = mHandler.obtainMessage();
+        m.copyFrom(msg);
+        mMessagesPendingRegistration.add(m);
+        return true;
     }
 
     /**
@@ -1036,13 +1065,6 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     }
 
     /**
-     * Inform NetworkAgentInfo that a new NetworkMonitor was created.
-     */
-    public void onNetworkMonitorCreated(INetworkMonitor networkMonitor) {
-        mNetworkMonitor = new NetworkMonitorManager(networkMonitor);
-    }
-
-    /**
      * Set the NetworkCapabilities on this NetworkAgentInfo. Also attempts to notify NetworkMonitor
      * of the new capabilities, if NetworkMonitor has been created.
      *
@@ -1115,6 +1137,13 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
      */
     public NetworkMonitorManager networkMonitor() {
         return mNetworkMonitor;
+    }
+
+    /**
+     * Get the registry in this NetworkAgentInfo.
+     */
+    public INetworkAgentRegistry getRegistry() {
+        return mRegistry;
     }
 
     // Functions for manipulating the requests satisfied by this network.
