@@ -2199,7 +2199,6 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.DELAY_DESTROY_SOCKETS:
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
-                case ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
                     return true;
                 default:
                     throw new UnsupportedOperationException("Unknown flag " + name

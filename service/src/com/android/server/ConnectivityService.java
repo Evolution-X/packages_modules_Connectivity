@@ -526,7 +526,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private final boolean mBackgroundFirewallChainEnabled;
 
     private final boolean mUseDeclaredMethodsForCallbacksEnabled;
-    private final boolean mQueueNetworkAgentEventsInSystemServer;
 
     // Flag to delay callbacks for frozen apps, suppressing duplicate and stale callbacks.
     private final boolean mQueueCallbacksForFrozenApps;
@@ -1918,9 +1917,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mUseDeclaredMethodsForCallbacksEnabled =
                 mDeps.isFeatureNotChickenedOut(context,
                         ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
-        mQueueNetworkAgentEventsInSystemServer =
-                mDeps.isFeatureNotChickenedOut(context,
-                        ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
                 && mDeps.isFeatureNotChickenedOut(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
@@ -4681,27 +4677,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         private void maybeHandleNetworkAgentMessage(Message msg) {
             final Pair<NetworkAgentInfo, Object> arg = (Pair<NetworkAgentInfo, Object>) msg.obj;
             final NetworkAgentInfo nai = arg.first;
-
-            // If the network has been destroyed, the only thing that it can do is disconnect.
-            if (nai.isDestroyed() && !isDisconnectRequest(msg)) {
-                return;
-            }
-
-            if (mQueueNetworkAgentEventsInSystemServer && nai.maybeEnqueueMessage(msg)) {
-                // If the message is enqueued, the NAI will replay it immediately
-                // when registration is complete. It does this by sending all the
-                // messages in the order received immediately after the
-                // EVENT_AGENT_REGISTERED message.
-                return;
-            }
-
-            // If the nai has been registered (and doesn't enqueue), it should now be
-            // in the list of NAIs.
             if (!mNetworkAgentInfos.contains(nai)) {
-                // TODO : this is supposed to be impossible
                 if (VDBG) {
                     log(String.format("%s from unknown NetworkAgent", eventName(msg.what)));
                 }
+                return;
+            }
+
+            // If the network has been destroyed, the only thing that it can do is disconnect.
+            if (nai.isDestroyed() && !isDisconnectRequest(msg)) {
                 return;
             }
 
