@@ -240,6 +240,11 @@ public class RequestTracker {
         mServingRequests.entrySet().removeIf(e -> e.getValue().getTetheringType() == type);
     }
 
+    @VisibleForTesting
+    List<TetheringRequest> getServingTetheringRequests() {
+        return new ArrayList<>(mServingRequests.values());
+    }
+
     /**
      * Returns an existing (pending or serving) request that fuzzy matches the given request.
      * Optionally specify matchUid to only return requests with the same uid.

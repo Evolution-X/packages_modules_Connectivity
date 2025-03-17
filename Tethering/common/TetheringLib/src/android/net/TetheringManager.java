@@ -340,6 +340,11 @@ public class TetheringManager {
      * @hide
      */
     public static final int TETHER_ERROR_BLUETOOTH_SERVICE_PENDING = 19;
+    /**
+     * Never used outside Tethering.java.
+     * @hide
+     */
+    public static final int TETHER_ERROR_SOFT_AP_CALLBACK_PENDING = 20;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
