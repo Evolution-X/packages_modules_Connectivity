@@ -475,6 +475,23 @@ public class ThreadNetworkCountryCodeTest {
     }
 
     @Test
+    public void setCountryCodeNotSupported_returnUnsupportedFeatureError_unregisterAllCallbacks() {
+        mThreadNetworkCountryCode.initialize();
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
+
+        mErrorUnsupportedFeatureSetCountryCode = true;
+        mThreadNetworkCountryCode.setOverrideCountryCode(TEST_COUNTRY_CODE_CN);
+        verify(mThreadNetworkControllerService)
+                .setCountryCode(eq(TEST_COUNTRY_CODE_CN), mOperationReceiverCaptor.capture());
+
+        verify(mLocationManager).removeUpdates(mLocationListenerCaptor.capture());
+        verify(mWifiManager)
+                .unregisterActiveCountryCodeChangedCallback(
+                        mWifiCountryCodeReceiverCaptor.capture());
+        verify(mContext).unregisterReceiver(mTelephonyCountryCodeReceiverCaptor.capture());
+    }
+
+    @Test
     public void settingsCountryCode_settingsCountryCodeIsActive_settingsCountryCodeIsUsed() {
         when(mPersistentSettings.get(KEY_COUNTRY_CODE)).thenReturn(TEST_COUNTRY_CODE_CN);
         mThreadNetworkCountryCode.initialize();
