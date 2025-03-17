@@ -179,6 +179,10 @@ private const val TAG = "NetworkAgentTest"
 // without affecting the run time of successful runs. Thus, set a very high timeout.
 private const val DEFAULT_TIMEOUT_MS = 5000L
 
+private const val QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER =
+    "queue_network_agent_events_in_system_server"
+
+
 // When waiting for a NetworkCallback to determine there was no timeout, waiting is the
 // only possible thing (the relevant handler is the one in the real ConnectivityService,
 // and then there is the Binder call), so have a short timeout for this as it will be
@@ -202,12 +206,6 @@ private val LINK_ADDRESS = LinkAddress("2001:db8::1/64")
 private val REMOTE_ADDRESS = InetAddresses.parseNumericAddress("2001:db8::123")
 private val PREFIX = IpPrefix("2001:db8::/64")
 private val NEXTHOP = InetAddresses.parseNumericAddress("fe80::abcd")
-
-// On T and below, the native network is only created when the agent connects.
-// Starting in U, the native network was to be created as soon as the agent is registered,
-// but this has been flagged off for now pending resolution of race conditions.
-// TODO : enable this in a Mainline update or in V.
-private const val SHOULD_CREATE_NETWORKS_IMMEDIATELY = false
 
 @AppModeFull(reason = "Instant apps can't use NetworkAgent because it needs NETWORK_FACTORY'.")
 // NetworkAgent is updated as part of the connectivity module, and running NetworkAgent tests in MTS
@@ -233,6 +231,18 @@ class NetworkAgentTest {
     private val callbacksToCleanUp = mutableListOf<TestableNetworkCallback>()
     private var qosTestSocket: Closeable? = null // either Socket or DatagramSocket
     private val ifacesToCleanUp = mutableListOf<TestNetworkInterface>()
+
+    // Unless the queuing in system server feature is chickened out, native networks are created
+    // immediately. Historically they would only created as they'd connect, which would force
+    // the code to apply link properties multiple times and suffer errors early on. Creating
+    // them early required that ordering between the client and the system server is guaranteed
+    // (at least to some extent), which has been done by moving the event queue from the client
+    // to the system server. When that feature is not chickened out, create networks immediately.
+    private val SHOULD_CREATE_NETWORKS_IMMEDIATELY
+        get() = mCM.isConnectivityServiceFeatureEnabledForTesting(
+            QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER
+        )
+
 
     @Before
     fun setUp() {

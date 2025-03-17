@@ -113,6 +113,7 @@ import static android.net.NetworkCapabilities.RES_ID_MATCH_ALL_RESERVATIONS;
 import static android.net.NetworkCapabilities.RES_ID_UNSET;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
+import static android.net.NetworkCapabilities.TRANSPORT_THREAD;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkRequest.Type.LISTEN_FOR_BEST;
@@ -5448,15 +5449,18 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     @VisibleForTesting
-    protected static boolean shouldCreateNetworksImmediately(@NonNull NetworkCapabilities caps) {
+    protected boolean shouldCreateNetworksImmediately(@NonNull NetworkCapabilities caps) {
         // The feature of creating the networks immediately was slated for U, but race conditions
         // detected late required this was flagged off.
-        // TODO : enable this in a Mainline update or in V, and re-enable the test for this
-        // in NetworkAgentTest.
-        return caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK);
+        // TODO : remove when it's determined that the code is stable
+        return mQueueNetworkAgentEventsInSystemServer
+                // Local network agents for Thread used to not create networks immediately,
+                // but other local agents (tethering, P2P) require this to function.
+                || (caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                && !caps.hasTransport(TRANSPORT_THREAD));
     }
 
-    private static boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
+    private boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
             @NonNull NetworkInfo.State state) {
         if (nai.isCreated()) return false;
         if (state == NetworkInfo.State.CONNECTED) return true;
