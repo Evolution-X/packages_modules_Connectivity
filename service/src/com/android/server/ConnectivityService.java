@@ -4697,6 +4697,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
             // If the network has been destroyed, the only thing that it can do is disconnect.
             if (nai.isDestroyed() && !isDisconnectRequest(msg)) {
+                if (DBG) {
+                    log("Message " + eventName(msg.what) + " from destroyed agent with netId "
+                            + nai.network.netId);
+                }
                 return;
             }
 
@@ -4705,6 +4709,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 // when registration is complete. It does this by sending all the
                 // messages in the order received immediately after the
                 // EVENT_AGENT_REGISTERED message.
+                if (DBG) {
+                    log("Message " + eventName(msg.what) + " enqueued for agent with netId "
+                            + nai.network.netId);
+                }
                 return;
             }
 
@@ -9457,6 +9465,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
         updateVpnUids(nai, null, nai.networkCapabilities);
+        nai.processEnqueuedMessages(mTrackerHandler::handleMessage);
     }
 
     private class NetworkOfferInfo implements IBinder.DeathRecipient {
