@@ -1942,7 +1942,7 @@ public class NsdService extends INsdManager.Stub {
                         mContext, MdnsFeatureFlags.NSD_QUERY_WITH_KNOWN_ANSWER))
                 .setAvoidAdvertisingEmptyTxtRecords(mDeps.isTetheringFeatureNotChickenedOut(
                         mContext, MdnsFeatureFlags.NSD_AVOID_ADVERTISING_EMPTY_TXT_RECORDS))
-                .setIsCachedServicesRemovalEnabled(mDeps.isFeatureEnabled(
+                .setIsCachedServicesRemovalEnabled(mDeps.isTetheringFeatureNotChickenedOut(
                         mContext, MdnsFeatureFlags.NSD_CACHED_SERVICES_REMOVAL))
                 .setCachedServicesRetentionTime(mDeps.getDeviceConfigPropertyInt(
                         MdnsFeatureFlags.NSD_CACHED_SERVICES_RETENTION_TIME,
