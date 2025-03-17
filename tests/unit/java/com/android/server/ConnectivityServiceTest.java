@@ -12312,7 +12312,7 @@ public class ConnectivityServiceTest {
         final NetworkAgent naNoExtraInfo = new TestNetworkAgent(
                 mServiceContext, mCsHandlerThread.getLooper(), new NetworkAgentConfig());
         naNoExtraInfo.register();
-        verify(mNetworkStack).makeNetworkMonitor(any(), isNull(String.class), any());
+        verify(mNetworkStack).makeNetworkMonitor(any(), isNull(), any());
         naNoExtraInfo.unregister();
 
         reset(mNetworkStack);
