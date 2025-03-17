@@ -26,7 +26,7 @@ from net_tests_utils.host.python.apf_utils import (
     get_apf_counter,
     get_apf_counters_from_dumpsys,
     get_ipv4_addresses,
-    get_ipv6_addresses,
+    get_non_tentative_ipv6_addresses,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
     is_packet_capture_supported,

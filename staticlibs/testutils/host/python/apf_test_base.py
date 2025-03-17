@@ -60,10 +60,10 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     self.client_ipv4_addresses = apf_utils.get_ipv4_addresses(
         self.clientDevice, self.client_iface_name
     )
-    self.server_ipv6_addresses = apf_utils.get_ipv6_addresses(
+    self.server_ipv6_addresses = apf_utils.get_non_tentative_ipv6_addresses(
         self.serverDevice, self.server_iface_name
     )
-    self.client_ipv6_addresses = apf_utils.get_ipv6_addresses(
+    self.client_ipv6_addresses = apf_utils.get_non_tentative_ipv6_addresses(
         self.clientDevice, self.client_iface_name
     )
 
