@@ -100,27 +100,17 @@ public final class TapTestNetworkTracker {
     private void setUpTestNetwork() throws Exception {
         mInterface = mContext.getSystemService(TestNetworkManager.class).createTapInterface();
 
-        mConnectivityManager.requestNetwork(newNetworkRequest(), mNetworkCallback);
+        mConnectivityManager.requestNetwork(
+                TestableNetworkAgent.Companion.makeNetworkRequestForInterface(
+                        mInterface.getInterfaceName()),
+                mNetworkCallback);
 
         LinkProperties lp = new LinkProperties();
         lp.setInterfaceName(getInterfaceName());
         mAgent =
-                new TestableNetworkAgent(
-                        mContext,
-                        mLooper,
-                        newNetworkCapabilities(),
-                        lp,
-                        new NetworkAgentConfig.Builder().build());
-        mNetwork = mAgent.register();
-        mAgent.markConnected();
+                TestableNetworkAgent.Companion.createOnInterface(
+                        mContext, mLooper, mInterface.getInterfaceName(), TIMEOUT.toMillis());
 
-        PollingCheck.check(
-                "No usable address on interface",
-                TIMEOUT.toMillis(),
-                () -> hasUsableAddress(mNetwork, getInterfaceName()));
-
-        lp.setLinkAddresses(makeLinkAddresses());
-        mAgent.sendLinkProperties(lp);
         mNetworkCallback.eventuallyExpect(
                 LINK_PROPERTIES_CHANGED,
                 TIMEOUT.toMillis(),
@@ -132,60 +122,5 @@ public final class TapTestNetworkTracker {
         mAgent.unregister();
         mInterface.getFileDescriptor().close();
         mAgent.waitForIdle(TIMEOUT.toMillis());
-    }
-
-    private NetworkRequest newNetworkRequest() {
-        return new NetworkRequest.Builder()
-                .removeCapability(NET_CAPABILITY_TRUSTED)
-                .addTransportType(TRANSPORT_TEST)
-                .setNetworkSpecifier(new TestNetworkSpecifier(getInterfaceName()))
-                .build();
-    }
-
-    private NetworkCapabilities newNetworkCapabilities() {
-        return new NetworkCapabilities()
-                .removeCapability(NET_CAPABILITY_TRUSTED)
-                .addTransportType(TRANSPORT_TEST)
-                .setNetworkSpecifier(new TestNetworkSpecifier(getInterfaceName()));
-    }
-
-    private List<LinkAddress> makeLinkAddresses() {
-        List<LinkAddress> linkAddresses = new ArrayList<>();
-        List<InterfaceAddress> interfaceAddresses = Collections.emptyList();
-
-        try {
-            interfaceAddresses =
-                    NetworkInterface.getByName(getInterfaceName()).getInterfaceAddresses();
-        } catch (SocketException ignored) {
-            // Ignore failures when getting the addresses.
-        }
-
-        for (InterfaceAddress address : interfaceAddresses) {
-            linkAddresses.add(
-                    new LinkAddress(address.getAddress(), address.getNetworkPrefixLength()));
-        }
-
-        return linkAddresses;
-    }
-
-    private static boolean hasUsableAddress(Network network, String interfaceName) {
-        try {
-            if (NetworkInterface.getByName(interfaceName).getInterfaceAddresses().isEmpty()) {
-                return false;
-            }
-        } catch (SocketException e) {
-            return false;
-        }
-        // Check if the link-local address can be used. Address flags are not available without
-        // elevated permissions, so check that bindSocket works.
-        try {
-            FileDescriptor sock = Os.socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-            network.bindSocket(sock);
-            Os.connect(sock, parseNumericAddress("ff02::fb%" + interfaceName), 12345);
-            Os.close(sock);
-        } catch (ErrnoException | IOException e) {
-            return false;
-        }
-        return true;
     }
 }
