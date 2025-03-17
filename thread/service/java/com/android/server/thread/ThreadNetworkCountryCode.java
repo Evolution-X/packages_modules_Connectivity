@@ -17,6 +17,7 @@
 package com.android.server.thread;
 
 import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
+
 import static com.android.server.thread.ThreadPersistentSettings.KEY_COUNTRY_CODE;
 
 import android.annotation.Nullable;
@@ -223,6 +224,10 @@ public class ThreadNetworkCountryCode {
                 .getBoolean(R.bool.config_thread_location_use_for_country_code_enabled);
     }
 
+    private boolean isCountryCodeEnabled() {
+        return mResources.get().getBoolean(R.bool.config_thread_country_code_enabled);
+    }
+
     public ThreadNetworkCountryCode(
             LocationManager locationManager,
             ThreadNetworkControllerService threadNetworkControllerService,
@@ -270,6 +275,11 @@ public class ThreadNetworkCountryCode {
 
     /** Sets up this country code module to listen to location country code changes. */
     public synchronized void initialize() {
+        if (!isCountryCodeEnabled()) {
+            LOG.i("Thread country code is disabled");
+            return;
+        }
+
         registerGeocoderCountryCodeCallback();
         registerWifiCountryCodeCallback();
         registerTelephonyCountryCodeCallback();
@@ -654,6 +664,7 @@ public class ThreadNetworkCountryCode {
     /** Dumps the current state of this ThreadNetworkCountryCode object. */
     public synchronized void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("---- Dump of ThreadNetworkCountryCode begin ----");
+        pw.println("isCountryCodeEnabled            : " + isCountryCodeEnabled());
         pw.println("mIsCpSettingCountryCodeSupported: " + mIsCpSettingCountryCodeSupported);
         pw.println("mOverrideCountryCodeInfo        : " + mOverrideCountryCodeInfo);
         pw.println("mTelephonyCountryCodeSlotInfoMap: " + mTelephonyCountryCodeSlotInfoMap);
