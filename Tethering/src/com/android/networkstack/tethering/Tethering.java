@@ -148,7 +148,6 @@ import com.android.internal.util.MessageUtils;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 import com.android.modules.utils.build.SdkLevel;
-import com.android.net.flags.Flags;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.HandlerUtils;
@@ -463,9 +462,8 @@ public class Tethering {
         return mSettingsObserver;
     }
 
-    // TODO: Replace with SdkLevel.isAtLeastB() once the feature is fully implemented.
     boolean isTetheringWithSoftApConfigEnabled() {
-        return SdkLevel.isAtLeastB() && Flags.tetheringWithSoftApConfig();
+        return mDeps.isTetheringWithSoftApConfigEnabled();
     }
 
     /**
