@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package android.net.thread
+package android.net.thread.borderrouter
 
 import android.content.Context
 import android.net.DnsResolver.CLASS_IN
@@ -60,10 +60,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Integration test cases for Thread Internet Access features. */
+@LargeTest
 @RunWith(AndroidJUnit4::class)
 @RequiresThreadFeature
 @RequiresSimulationThreadDevice
-@LargeTest
 class InternetAccessTest {
     companion object {
         private val TAG = BorderRoutingTest::class.java.simpleName

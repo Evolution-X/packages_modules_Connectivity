@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package android.net.thread;
+package android.net.thread.borderrouter;
 
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.thread.utils.IntegrationTestUtils.DEFAULT_DATASET;
@@ -92,10 +92,10 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /** Integration test cases for Thread Border Routing feature. */
-@RunWith(AndroidJUnit4.class)
+@LargeTest
 @RequiresThreadFeature
 @RequiresSimulationThreadDevice
-@LargeTest
+@RunWith(AndroidJUnit4.class)
 public class BorderRoutingTest {
     private static final String TAG = BorderRoutingTest.class.getSimpleName();
     private static final int NUM_FTD = 2;
