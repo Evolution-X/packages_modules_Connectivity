@@ -54,6 +54,8 @@ struct tun_data;
 
 extern volatile sig_atomic_t running;
 
+void send_dad(int fd, const struct in6_addr* tgt);
+
 void event_loop(struct tun_data *tunnel);
 
 /* function: parse_int
