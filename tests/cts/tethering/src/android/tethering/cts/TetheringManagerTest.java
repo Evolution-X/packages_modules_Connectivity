@@ -487,6 +487,9 @@ public class TetheringManagerTest {
         final TestTetheringEventCallback tetherEventCallback =
                 mCtsTetheringUtils.registerTetheringEventCallback();
         try {
+            tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
+
             final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
             mTM.startTethering(new TetheringRequest.Builder(TETHERING_VIRTUAL).build(),
                     c -> c.run(), startTetheringCallback);
@@ -508,6 +511,7 @@ public class TetheringManagerTest {
                 mCtsTetheringUtils.registerTetheringEventCallback();
         try {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
 
             SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
                     .setWifiSsid(WifiSsid.fromBytes("This is one config"
@@ -532,6 +536,7 @@ public class TetheringManagerTest {
                 mCtsTetheringUtils.registerTetheringEventCallback();
         try {
             tetherEventCallback.assumeWifiTetheringSupported(mContext);
+            tetherEventCallback.expectNoTetheringActive();
 
             SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
                     .setWifiSsid(WifiSsid.fromBytes("This is one config"
