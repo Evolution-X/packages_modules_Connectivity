@@ -723,6 +723,43 @@ static int setBtfVarOffset(ifstream &elfFile, struct btf *btf,
     return 0;
 }
 
+static int loadBtf(ifstream &elfFile, struct btf *btf) {
+    int ret;
+    for (unsigned int i = 1; i < btf__type_cnt(btf); ++i) {
+        struct btf_type *bt = (struct btf_type *)btf__type_by_id(btf, i);
+        if (!btf_is_datasec(bt)) continue;
+        ret = setBtfDatasecSize(elfFile, btf, bt);
+        if (ret) return ret;
+        ret = setBtfVarOffset(elfFile, btf, bt);
+        if (ret) return ret;
+    }
+
+    ret = btf__load_into_kernel(btf);
+    if (ret) {
+        if (errno != EINVAL) {
+            ALOGE("btf__load_into_kernel failed, errno: %d", errno);
+            return ret;
+        };
+        // For BTF_KIND_FUNC, newer kernels can read the BTF_INFO_VLEN bits of
+        // struct btf_type to distinguish static vs. global vs. extern
+        // functions, but older kernels enforce that only the BTF_INFO_KIND bits
+        // can be set. Retry with non-BTF_INFO_KIND bits zeroed out to handle
+        // this case.
+        for (unsigned int i = 1; i < btf__type_cnt(btf); ++i) {
+            struct btf_type *bt = (struct btf_type *)btf__type_by_id(btf, i);
+            if (btf_is_func(bt)) {
+                bt->info = (BTF_INFO_KIND(bt->info)) << 24;
+            }
+        }
+        ret = btf__load_into_kernel(btf);
+        if (ret) {
+            ALOGE("btf__load_into_kernel retry failed, errno: %d", errno);
+            return ret;
+        };
+    }
+    return 0;
+}
+
 static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>& mapFds,
                       const char* prefix, const unsigned int bpfloader_ver) {
     int ret;
