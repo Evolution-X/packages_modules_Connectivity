@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,12 +32,8 @@
 // later when a module using the interface is updated, e.g., Mainline modules.
 
 package android.net;
-@Backing(type="int")
-enum NativeVpnType {
-  SERVICE = 1,
-  PLATFORM = 2,
-  LEGACY = 3,
-  OEM = 4,
-  OEM_SERVICE = 5,
-  OEM_LEGACY = 6,
+/* @hide */
+parcelable MarkMaskParcel {
+  int mark;
+  int mask;
 }

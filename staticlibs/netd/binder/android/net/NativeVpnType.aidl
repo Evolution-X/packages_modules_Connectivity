@@ -34,7 +34,20 @@ enum NativeVpnType {
   LEGACY = 3,
 
   /**
-   * An VPN created by OEM code through other means than VpnService or VpnManager.
+   * A VPN created by OEM code through other means than VpnService or VpnManager.
    */
   OEM = 4,
+
+  /**
+   * A VPN created by OEM code using VpnService, and which OEM code desires to differentiate from
+   * other VPN types. The core networking stack will treat this VPN type similarly to SERVICE.
+   */
+  OEM_SERVICE = 5,
+
+  /**
+   * A VPN created by OEM code using the legacy VPN mechanisms, and which OEM code desires to
+   * differentiate from other VPN types. The core networking stack will treat this VPN type
+   * similarly to LEGACY.
+   */
+  OEM_LEGACY = 6,
 }
