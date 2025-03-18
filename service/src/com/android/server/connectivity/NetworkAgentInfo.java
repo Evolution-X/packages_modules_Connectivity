@@ -700,7 +700,9 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
      * Must be called from the ConnectivityService handler thread. A NetworkAgent can only be
      * registered once.
      */
-    public void notifyRegistered() {
+    public void notifyRegistered(final INetworkMonitor nm) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        mNetworkMonitor = new NetworkMonitorManager(nm);
         try {
             networkAgent.asBinder().linkToDeath(mDeathMonitor, 0);
             networkAgent.onRegistered();
@@ -1035,13 +1037,6 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
             mHandler.obtainMessage(NetworkAgent.EVENT_UNREGISTER_AFTER_REPLACEMENT,
                     new Pair<>(NetworkAgentInfo.this, timeoutMillis)).sendToTarget();
         }
-    }
-
-    /**
-     * Inform NetworkAgentInfo that a new NetworkMonitor was created.
-     */
-    public void onNetworkMonitorCreated(INetworkMonitor networkMonitor) {
-        mNetworkMonitor = new NetworkMonitorManager(networkMonitor);
     }
 
     /**

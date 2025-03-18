@@ -9421,8 +9421,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 nai.getDeclaredCapabilitiesSanitized(mCarrierPrivilegeAuthenticator)));
         processLinkPropertiesFromAgent(nai, nai.linkProperties);
 
-        nai.onNetworkMonitorCreated(networkMonitor);
-
         mNetworkAgentInfos.add(nai);
         synchronized (mNetworkForNetId) {
             mNetworkForNetId.put(nai.network.getNetId(), nai);
@@ -9437,7 +9435,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (nai.isLocalNetwork()) {
             handleUpdateLocalNetworkConfig(nai, null /* oldConfig */, nai.localNetworkConfig);
         }
-        nai.notifyRegistered();
+        nai.notifyRegistered(networkMonitor);
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
         updateVpnUids(nai, null, nai.networkCapabilities);
