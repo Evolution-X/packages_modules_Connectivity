@@ -948,6 +948,47 @@ class NetworkAgentTest {
         callback.expect<Lost>(agent.network!!)
     }
 
+    fun doTestOemVpnType(type: Int) {
+        val mySessionId = "MySession12345"
+        val nc = NetworkCapabilities().apply {
+            addTransportType(TRANSPORT_TEST)
+            addTransportType(TRANSPORT_VPN)
+            addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+            removeCapability(NET_CAPABILITY_NOT_VPN)
+            setTransportInfo(VpnTransportInfo(type, mySessionId))
+        }
+
+        val agent = createNetworkAgent(initialNc = nc)
+        agent.register()
+        agent.markConnected()
+
+        val request = NetworkRequest.Builder()
+            .clearCapabilities()
+            .addTransportType(TRANSPORT_VPN)
+            .removeCapability(NET_CAPABILITY_NOT_VPN)
+            .build()
+        val callback = TestableNetworkCallback()
+        registerNetworkCallback(request, callback)
+
+        callback.expectAvailableThenValidatedCallbacks(agent.network!!)
+
+        var vpnNc = mCM.getNetworkCapabilities(agent.network!!)
+        assertNotNull(vpnNc)
+        assertEquals(type, (vpnNc!!.transportInfo as VpnTransportInfo).type)
+
+        agent.unregister()
+        callback.expect<Lost>(agent.network!!)
+    }
+
+    @Test
+    @IgnoreUpTo(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    fun testOemVpnTypes() {
+        // TODO: why is this necessary given the @IgnoreUpTo above?
+        assumeTrue(SdkLevel.isAtLeastB())
+        doTestOemVpnType(VpnManager.TYPE_VPN_OEM_SERVICE)
+        doTestOemVpnType(VpnManager.TYPE_VPN_OEM_LEGACY)
+    }
+
     private fun unregister(agent: TestableNetworkAgent) {
         agent.unregister()
         agent.eventuallyExpect<OnNetworkUnwanted>()
