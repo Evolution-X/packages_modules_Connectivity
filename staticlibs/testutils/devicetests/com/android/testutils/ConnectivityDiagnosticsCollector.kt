@@ -45,7 +45,6 @@ import com.android.modules.utils.build.SdkLevel.isAtLeastS
 import java.io.ByteArrayOutputStream
 import java.io.CharArrayWriter
 import java.io.File
-import java.io.FileOutputStream
 import java.io.FileReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
@@ -280,7 +279,7 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
         }
         val outFile = File(collectorDir, filename + FILENAME_SUFFIX)
         outputFiles.add(filename)
-        FileOutputStream(outFile).use { fos ->
+        getOutputStreamViaShell(outFile).use { fos ->
             failureHeader?.let {
                 fos.write(it.toByteArray())
                 fos.write("\n".toByteArray())
