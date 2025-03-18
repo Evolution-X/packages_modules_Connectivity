@@ -32,12 +32,13 @@
 // later when a module using the interface is updated, e.g., Mainline modules.
 
 package android.net;
-@Backing(type="int")
-enum NativeVpnType {
-  SERVICE = 1,
-  PLATFORM = 2,
-  LEGACY = 3,
-  OEM = 4,
-  OEM_SERVICE = 5,
-  OEM_LEGACY = 6,
+/* @hide */
+@JavaDerive(equals=true, toString=true) @JavaOnlyImmutable
+parcelable NativeNetworkConfig {
+  int netId;
+  android.net.NativeNetworkType networkType = android.net.NativeNetworkType.PHYSICAL;
+  int permission;
+  boolean secure;
+  android.net.NativeVpnType vpnType = android.net.NativeVpnType.PLATFORM;
+  boolean excludeLocalRoutes = false;
 }
