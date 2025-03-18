@@ -13,8 +13,9 @@
 #  limitations under the License.
 
 from mobly import asserts
-from scapy.layers.inet import IP, ICMP
+from scapy.layers.inet import IP, ICMP, IPOption_Router_Alert
 from scapy.layers.l2 import Ether
+from scapy.contrib.igmpv3 import IGMPv3, IGMPv3mq, IGMPv3mr, IGMPv3gr
 from net_tests_utils.host.python import apf_test_base, apf_utils, adb_utils, assert_utils, packet_utils
 
 APFV6_VERSION = 6000
@@ -99,3 +100,47 @@ class ApfV6Test(apf_test_base.ApfTestBase):
         self.send_packet_and_expect_reply_received(
             echo_request, "DROPPED_IPV4_PING_REQUEST_REPLIED", expected_echo_reply
         )
+
+    @apf_utils.at_least_B()
+    def test_igmpv3_general_query_offload(self):
+        ether = Ether(src=self.server_mac_address, dst='01:00:5e:00:00:01')
+        ip = IP(
+            src=self.server_ipv4_addresses[0],
+            dst='224.0.0.1',
+            options=[IPOption_Router_Alert()]
+        )
+        igmp = IGMPv3(type=0x11)/IGMPv3mq()
+        igmpv3_general_query = bytes(ether/ip/igmp).hex()
+
+        mcast_addrs = ['239.0.0.1', '239.0.0.2', '239.0.0.3']
+
+        for addr in mcast_addrs:
+            adb_utils.adb_shell(
+                self.clientDevice,
+                f'ip addr add {addr}/32 dev {self.client_iface_name} autojoin'
+            )
+
+        ether = Ether(src=self.client_mac_address, dst='01:00:5e:00:00:16')
+        ip = IP(
+            src=self.client_ipv4_addresses[0],
+            dst='224.0.0.22',
+            options=[IPOption_Router_Alert()],
+            id=0,
+            flags="DF"
+        )
+        igmpv3_hdr = IGMPv3(type=0x22)
+        mcast_records = []
+        for addr in mcast_addrs:
+            mcast_records.append(IGMPv3gr(rtype=2, maddr=addr))
+
+        igmp = IGMPv3mr(records=mcast_records)
+        expected_igmpv3_report = bytes(ether/ip/igmpv3_hdr/igmp).hex()
+        self.send_packet_and_expect_reply_received(
+            igmpv3_general_query, "DROPPED_IGMP_V3_GENERAL_QUERY_REPLIED", expected_igmpv3_report
+        )
+
+        for addr in mcast_addrs:
+            adb_utils.adb_shell(
+                self.clientDevice,
+                f'ip addr del {addr}/32 dev {self.client_iface_name}'
+            )
