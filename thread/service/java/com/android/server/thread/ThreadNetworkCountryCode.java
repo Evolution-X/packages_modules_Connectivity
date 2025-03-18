@@ -16,6 +16,7 @@
 
 package com.android.server.thread;
 
+import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 import static com.android.server.thread.ThreadPersistentSettings.KEY_COUNTRY_CODE;
 
 import android.annotation.Nullable;
@@ -28,11 +29,13 @@ import android.content.IntentFilter;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.thread.IOperationReceiver;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.ActiveCountryCodeChangedCallback;
 import android.os.Build;
+import android.os.Bundle;
 import android.sysprop.ThreadNetworkProperties;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -114,6 +117,13 @@ public class ThreadNetworkCountryCode {
     private final Map<Integer, TelephonyCountryCodeSlotInfo> mTelephonyCountryCodeSlotInfoMap =
             new ArrayMap();
     private final ThreadPersistentSettings mPersistentSettings;
+
+    @Nullable private LocationListener mLocationListener;
+    @Nullable private WifiCountryCodeCallback mWifiCountryCodeCallback;
+    @Nullable private BroadcastReceiver mTelephonyBroadcastReceiver;
+
+    /** Indicates whether the Thread co-processor supports setting the country code. */
+    private boolean mIsCpSettingCountryCodeSupported = true;
 
     @Nullable private CountryCodeInfo mCurrentCountryCodeInfo;
     @Nullable private CountryCodeInfo mLocationCountryCodeInfo;
@@ -267,13 +277,40 @@ public class ThreadNetworkCountryCode {
         updateCountryCode(false /* forceUpdate */);
     }
 
+    private synchronized void unregisterAllCountryCodeCallbacks() {
+        unregisterGeocoderCountryCodeCallback();
+        unregisterWifiCountryCodeCallback();
+        unregisterTelephonyCountryCodeCallback();
+    }
+
     private synchronized void registerGeocoderCountryCodeCallback() {
         if ((mGeocoder != null) && isLocationUseForCountryCodeEnabled()) {
+            mLocationListener =
+                    new LocationListener() {
+                        public void onLocationChanged(Location location) {
+                            setCountryCodeFromGeocodingLocation(location);
+                        }
+
+                        // not used yet
+                        public void onProviderDisabled(String provider) {}
+
+                        public void onProviderEnabled(String provider) {}
+
+                        public void onStatusChanged(String provider, int status, Bundle extras) {}
+                    };
+
             mLocationManager.requestLocationUpdates(
                     LocationManager.PASSIVE_PROVIDER,
                     TIME_BETWEEN_LOCATION_UPDATES_MS,
                     DISTANCE_BETWEEN_LOCALTION_UPDATES_METERS,
-                    location -> setCountryCodeFromGeocodingLocation(location));
+                    mLocationListener);
+        }
+    }
+
+    private synchronized void unregisterGeocoderCountryCodeCallback() {
+        if (mLocationListener != null) {
+            mLocationManager.removeUpdates(mLocationListener);
+            mLocationListener = null;
         }
     }
 
@@ -313,8 +350,16 @@ public class ThreadNetworkCountryCode {
 
     private synchronized void registerWifiCountryCodeCallback() {
         if (mWifiManager != null) {
+            mWifiCountryCodeCallback = new WifiCountryCodeCallback();
             mWifiManager.registerActiveCountryCodeChangedCallback(
-                    r -> r.run(), new WifiCountryCodeCallback());
+                    r -> r.run(), mWifiCountryCodeCallback);
+        }
+    }
+
+    private synchronized void unregisterWifiCountryCodeCallback() {
+        if ((mWifiManager != null) && (mWifiCountryCodeCallback != null)) {
+            mWifiManager.unregisterActiveCountryCodeChangedCallback(mWifiCountryCodeCallback);
+            mWifiCountryCodeCallback = null;
         }
     }
 
@@ -353,7 +398,7 @@ public class ThreadNetworkCountryCode {
             return;
         }
 
-        BroadcastReceiver broadcastReceiver =
+        mTelephonyBroadcastReceiver =
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -377,9 +422,16 @@ public class ThreadNetworkCountryCode {
                 };
 
         mContext.registerReceiver(
-                broadcastReceiver,
+                mTelephonyBroadcastReceiver,
                 new IntentFilter(TelephonyManager.ACTION_NETWORK_COUNTRY_CHANGED),
                 Context.RECEIVER_EXPORTED);
+    }
+
+    private synchronized void unregisterTelephonyCountryCodeCallback() {
+        if (mTelephonyBroadcastReceiver != null) {
+            mContext.unregisterReceiver(mTelephonyBroadcastReceiver);
+            mTelephonyBroadcastReceiver = null;
+        }
     }
 
     private synchronized void updateTelephonyCountryCodeFromSimCard() {
@@ -520,6 +572,11 @@ public class ThreadNetworkCountryCode {
 
             @Override
             public void onError(int otError, String message) {
+                if (otError == ERROR_UNSUPPORTED_FEATURE) {
+                    mIsCpSettingCountryCodeSupported = false;
+                    unregisterAllCountryCodeCallbacks();
+                }
+
                 LOG.e(
                         "Error "
                                 + otError
@@ -543,6 +600,11 @@ public class ThreadNetworkCountryCode {
 
         if (!forceUpdate && countryCodeInfo.isCountryCodeMatch(mCurrentCountryCodeInfo)) {
             LOG.i("Ignoring already set country code " + countryCodeInfo.getCountryCode());
+            return;
+        }
+
+        if (!mIsCpSettingCountryCodeSupported) {
+            LOG.i("Thread co-processor doesn't support setting the country code");
             return;
         }
 
@@ -592,6 +654,7 @@ public class ThreadNetworkCountryCode {
     /** Dumps the current state of this ThreadNetworkCountryCode object. */
     public synchronized void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("---- Dump of ThreadNetworkCountryCode begin ----");
+        pw.println("mIsCpSettingCountryCodeSupported: " + mIsCpSettingCountryCodeSupported);
         pw.println("mOverrideCountryCodeInfo        : " + mOverrideCountryCodeInfo);
         pw.println("mTelephonyCountryCodeSlotInfoMap: " + mTelephonyCountryCodeSlotInfoMap);
         pw.println("mTelephonyCountryCodeInfo       : " + mTelephonyCountryCodeInfo);
