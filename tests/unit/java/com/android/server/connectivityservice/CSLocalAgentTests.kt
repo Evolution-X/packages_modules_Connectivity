@@ -39,6 +39,7 @@ import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.NetworkScore.KEEP_CONNECTED_LOCAL_NETWORK
 import android.net.RouteInfo
 import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_LOCAL_NETWORK
+import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS
 import android.os.Build
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
@@ -129,6 +130,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testStructuralConstraintViolation() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
 
         val cb = TestableNetworkCallback()
         cm.requestNetwork(
@@ -162,6 +164,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testUpdateLocalAgentConfig() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
 
         val cb = TestableNetworkCallback()
         cm.requestNetwork(
@@ -428,6 +431,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testMulticastRoutingConfig_UpstreamSelectorCellToWifi() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(
                 NetworkRequest.Builder().clearCapabilities()
@@ -500,6 +504,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testMulticastRoutingConfig_UpstreamSelectorWifiToNull() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(
                 NetworkRequest.Builder().clearCapabilities()
@@ -577,6 +582,7 @@ class CSLocalAgentTests : CSTest() {
 
     fun doTestUnregisterUpstreamAfterReplacement(sameIfaceName: Boolean) {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
@@ -657,6 +663,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testUnregisterUpstreamAfterReplacement_neverReplaced() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
@@ -710,6 +717,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testUnregisterLocalAgentAfterReplacement() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
 
         val localCb = TestableNetworkCallback()
         cm.requestNetwork(
@@ -775,6 +783,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testDestroyedNetworkAsSelectedUpstream() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
@@ -827,6 +836,7 @@ class CSLocalAgentTests : CSTest() {
     @Test
     fun testForwardingRules() {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
         // Set up a local agent that should forward its traffic to the best DUN upstream.
         val lnc = FromS(
                 LocalNetworkConfig.Builder()
@@ -965,6 +975,7 @@ class CSLocalAgentTests : CSTest() {
 
     fun doTestLocalNetworkUnwanted(haveUpstream: Boolean) {
         deps.setBuildSdk(VERSION_V)
+        deps.setChangeIdEnabled(true, ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS)
 
         val nr = NetworkRequest.Builder().addCapability(NET_CAPABILITY_LOCAL_NETWORK).build()
         val requestCb = TestableNetworkCallback()
@@ -1074,5 +1085,87 @@ class CSLocalAgentTests : CSTest() {
                 enableMatchLocalNetwork = true,
                 expectCallback = true
         )
+    }
+
+    @Test
+    fun testNonThreadLocalAgentMatches_disabled() {
+        doTestNonThreadLocalAgentMatches(
+                VERSION_V,
+                enableMatchNonThreadLocalNetworks = false,
+                TRANSPORT_WIFI,
+                expectAvailable = false
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_V,
+                enableMatchNonThreadLocalNetworks = false,
+                TRANSPORT_THREAD,
+                expectAvailable = true
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_B,
+                enableMatchNonThreadLocalNetworks = false,
+                TRANSPORT_WIFI,
+                expectAvailable = false
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_B,
+                enableMatchNonThreadLocalNetworks = false,
+                TRANSPORT_THREAD,
+                expectAvailable = true
+        )
+    }
+
+    @Test
+    fun testNonThreadLocalAgentMatches_enabled() {
+        doTestNonThreadLocalAgentMatches(
+                VERSION_V,
+                enableMatchNonThreadLocalNetworks = true,
+                TRANSPORT_WIFI,
+                expectAvailable = true
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_V,
+                enableMatchNonThreadLocalNetworks = true,
+                TRANSPORT_THREAD,
+                expectAvailable = true
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_B,
+                enableMatchNonThreadLocalNetworks = true,
+                TRANSPORT_WIFI,
+                expectAvailable = true
+        )
+        doTestNonThreadLocalAgentMatches(
+                VERSION_B,
+                enableMatchNonThreadLocalNetworks = true,
+                TRANSPORT_THREAD,
+                expectAvailable = true
+        )
+    }
+
+    private fun doTestNonThreadLocalAgentMatches(
+            sdkLevel: Int,
+            enableMatchNonThreadLocalNetworks: Boolean,
+            transport: Int,
+            expectAvailable: Boolean
+    ) {
+        deps.setBuildSdk(sdkLevel)
+        deps.setChangeIdEnabled(
+                enableMatchNonThreadLocalNetworks,
+                ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS
+        )
+
+        val localNcTemplate = NetworkCapabilities.Builder().run {
+            addTransportType(transport)
+            addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+        }.build()
+        val localAgent = Agent(
+                nc = localNcTemplate,
+                score = keepConnectedScore(),
+                lnc = defaultLnc()
+        )
+        // The implementation inside connect() will expect the OnAvailable.
+        localAgent.connect(expectAvailable)
+        localAgent.disconnect(expectAvailable)
     }
 }

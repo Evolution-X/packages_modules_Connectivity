@@ -18,14 +18,11 @@ package com.android.server
 
 import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.net.INetd
-import android.net.LocalNetworkConfig
 import android.net.NativeNetworkConfig
 import android.net.NativeNetworkType
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK
 import android.net.NetworkRequest
-import android.net.NetworkScore
-import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.VpnManager
 import android.os.Build
 import androidx.test.filters.SmallTest
@@ -45,11 +42,6 @@ import org.mockito.Mockito.timeout
 
 private const val TIMEOUT_MS = 2_000L
 private const val NO_CALLBACK_TIMEOUT_MS = 200L
-
-private fun keepConnectedScore() =
-        FromS(NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build())
-
-private fun defaultLnc() = FromS(LocalNetworkConfig.Builder().build())
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
@@ -103,7 +95,7 @@ class CSLocalAgentCreationTests : CSTest() {
         }
         cm.registerNetworkCallback(request.build(), allNetworksCb)
         val ncTemplate = NetworkCapabilities.Builder().run {
-            addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            addTransportType(NetworkCapabilities.TRANSPORT_THREAD)
             addCapability(NET_CAPABILITY_LOCAL_NETWORK)
         }.build()
         val localAgent = if (params.sdkLevel >= VERSION_V ||

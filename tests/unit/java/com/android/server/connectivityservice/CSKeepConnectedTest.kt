@@ -19,7 +19,7 @@ package com.android.server
 import android.net.LocalNetworkConfig
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK
-import android.net.NetworkCapabilities.TRANSPORT_WIFI
+import android.net.NetworkCapabilities.TRANSPORT_THREAD
 import android.net.NetworkRequest
 import android.net.NetworkScore
 import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
@@ -42,7 +42,7 @@ class CSKeepConnectedTest : CSTest() {
     fun testKeepConnectedLocalAgent() {
         deps.setBuildSdk(VERSION_V)
         val nc = NetworkCapabilities.Builder()
-                .addTransportType(TRANSPORT_WIFI)
+                .addTransportType(TRANSPORT_THREAD)
                 .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
                 .build()
         val keepConnectedAgent = Agent(

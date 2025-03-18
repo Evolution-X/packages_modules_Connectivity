@@ -148,6 +148,17 @@ public final class ConnectivityCompatChanges {
     @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT)
     public static final long RESTRICT_LOCAL_NETWORK = 365139289L;
 
+    /**
+     * Enable match non-threads local networks.
+     *
+     * Apps targeting a release after V can have NetworkRequests matches non-thread local networks.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public static final long ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS = 349487600L;
+
     private ConnectivityCompatChanges() {
     }
 }
