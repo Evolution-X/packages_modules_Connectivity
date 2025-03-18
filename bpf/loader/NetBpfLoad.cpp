@@ -17,6 +17,7 @@
 #define LOG_TAG "NetBpfLoad"
 
 #include <arpa/inet.h>
+#include <bpf/btf.h>
 #include <bpf/libbpf.h>
 #include <dirent.h>
 #include <elf.h>
@@ -647,6 +648,24 @@ static bool mapMatchesExpectations(const unique_fd& fd, const string& mapName,
           mapName.c_str(), type, fd_type, mapDef.key_size, fd_key_size, mapDef.value_size,
           fd_value_size, mapDef.max_entries, fd_max_entries, desired_map_flags, fd_map_flags);
     return false;
+}
+
+static int setBtfDatasecSize(ifstream &elfFile, struct btf *btf,
+                             struct btf_type *bt) {
+    const char *name = btf__name_by_offset(btf, bt->name_off);
+    if (!name) {
+        ALOGE("Couldn't resolve section name, errno: %d", errno);
+        return -errno;
+    }
+
+    vector<char> data;
+    int ret = readSectionByName(name, elfFile, data);
+    if (ret) {
+        ALOGE("Couldn't read section %s, ret: %d", name, ret);
+        return ret;
+    }
+    bt->size = data.size();
+    return 0;
 }
 
 static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>& mapFds,
