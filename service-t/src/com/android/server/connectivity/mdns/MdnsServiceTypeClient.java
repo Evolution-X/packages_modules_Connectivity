@@ -23,6 +23,7 @@ import static com.android.server.connectivity.mdns.MdnsServiceCache.findMatchedR
 import static com.android.server.connectivity.mdns.MdnsQueryScheduler.ScheduledQueryTaskArgs;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.Clock;
 import static com.android.server.connectivity.mdns.util.MdnsUtils.buildMdnsServiceInfoFromResponse;
+import static com.android.server.connectivity.mdns.util.MdnsUtils.responseMatchesInstanceNameAndSubtypes;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -363,7 +364,10 @@ public class MdnsServiceTypeClient {
         listeners.put(listener, listenerInfo);
         if (existingInfo == null) {
             for (MdnsResponse existingResponse : serviceCache.getCachedServices(cacheKey)) {
-                if (!responseMatchesOptions(existingResponse, searchOptions)) continue;
+                if (!responseMatchesInstanceNameAndSubtypes(existingResponse,
+                        searchOptions.getResolveInstanceName(), searchOptions.getSubtypes())) {
+                    continue;
+                }
                 final MdnsServiceInfo info = buildMdnsServiceInfoFromResponse(
                         existingResponse, serviceTypeLabels, clock.elapsedRealtime());
                 listener.onServiceNameDiscovered(info, true /* isServiceFromCache */);
@@ -458,26 +462,6 @@ public class MdnsServiceTypeClient {
         sharedLog.log("Remove EVENT_START_QUERYTASK"
                 + ", current session: " + currentSessionId);
         ++currentSessionId;
-    }
-
-    private boolean responseMatchesOptions(@NonNull MdnsResponse response,
-            @NonNull MdnsSearchOptions options) {
-        final boolean matchesInstanceName = options.getResolveInstanceName() == null
-                // DNS is case-insensitive, so ignore case in the comparison
-                || DnsUtils.equalsIgnoreDnsCase(options.getResolveInstanceName(),
-                response.getServiceInstanceName());
-
-        // If discovery is requiring some subtypes, the response must have one that matches a
-        // requested one.
-        final List<String> responseSubtypes = response.getSubtypes() == null
-                ? Collections.emptyList() : response.getSubtypes();
-        final boolean matchesSubtype = options.getSubtypes().size() == 0
-                || CollectionUtils.any(options.getSubtypes(), requiredSub ->
-                CollectionUtils.any(responseSubtypes, actualSub ->
-                        DnsUtils.equalsIgnoreDnsCase(
-                                MdnsConstants.SUBTYPE_PREFIX + requiredSub, actualSub)));
-
-        return matchesInstanceName && matchesSubtype;
     }
 
     /**
@@ -577,7 +561,11 @@ public class MdnsServiceTypeClient {
     private void notifyRemovedServiceToListeners(@NonNull MdnsResponse response,
             @NonNull String message) {
         for (int i = 0; i < listeners.size(); i++) {
-            if (!responseMatchesOptions(response, listeners.valueAt(i).searchOptions)) continue;
+            if (!responseMatchesInstanceNameAndSubtypes(response,
+                    listeners.valueAt(i).searchOptions.getResolveInstanceName(),
+                    listeners.valueAt(i).searchOptions.getSubtypes())) {
+                continue;
+            }
             final MdnsServiceBrowserListener listener = listeners.keyAt(i);
             if (response.getServiceInstanceName() != null) {
                 listeners.valueAt(i).unsetServiceDiscovered(response.getServiceInstanceName());
@@ -634,7 +622,11 @@ public class MdnsServiceTypeClient {
             // subtype), service lost callbacks should also be sent; this is not done today as
             // only expiration of SRV records is used, not PTR records used for subtypes, so
             // services never lose PTR record subtypes.
-            if (!responseMatchesOptions(response, listeners.valueAt(i).searchOptions)) continue;
+            if (!responseMatchesInstanceNameAndSubtypes(response,
+                    listeners.valueAt(i).searchOptions.getResolveInstanceName(),
+                    listeners.valueAt(i).searchOptions.getSubtypes())) {
+                continue;
+            }
             final MdnsServiceBrowserListener listener = listeners.keyAt(i);
             final ListenerInfo listenerInfo = listeners.valueAt(i);
             final boolean newServiceFound = listenerInfo.setServiceDiscovered(serviceInstanceName);
