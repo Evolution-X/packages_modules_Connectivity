@@ -668,6 +668,61 @@ static int setBtfDatasecSize(ifstream &elfFile, struct btf *btf,
     return 0;
 }
 
+static int getSymOffsetByName(ifstream &elfFile, const char *name, int *off) {
+    vector<Elf64_Sym> symtab;
+    int ret = readSymTab(elfFile, 1 /* sort */, symtab);
+    if (ret) return ret;
+    for (int i = 0; i < (int)symtab.size(); i++) {
+        string s;
+        ret = getSymName(elfFile, symtab[i].st_name, s);
+        if (ret) continue;
+        if (!strcmp(s.c_str(), name)) {
+            *off = symtab[i].st_value;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+static int setBtfVarOffset(ifstream &elfFile, struct btf *btf,
+                           struct btf_type *datasecBt) {
+    int i, vars = btf_vlen(datasecBt);
+    struct btf_var_secinfo *vsi;
+    const char *datasecName = btf__name_by_offset(btf, datasecBt->name_off);
+    if (!datasecName) {
+        ALOGE("Couldn't resolve section name, errno: %d", errno);
+        return -errno;
+    }
+
+    for (i = 0, vsi = btf_var_secinfos(datasecBt); i < vars; i++, vsi++) {
+        const struct btf_type *varBt = btf__type_by_id(btf, vsi->type);
+        if (!varBt || !btf_is_var(varBt)) {
+            ALOGE("Found non VAR kind btf_type, section: %s id: %d", datasecName,
+                  vsi->type);
+            return -1;
+        }
+
+        const struct btf_var *var = btf_var(varBt);
+        if (var->linkage == BTF_VAR_STATIC) continue;
+
+        const char *varName = btf__name_by_offset(btf, varBt->name_off);
+        if (!varName) {
+            ALOGE("Failed to resolve var name, section: %s", datasecName);
+            return -1;
+        }
+
+        int off;
+        int ret = getSymOffsetByName(elfFile, varName, &off);
+        if (ret) {
+            ALOGE("No offset found in symbol table, section: %s, var: %s, ret: %d",
+                  datasecName, varName, ret);
+            return ret;
+        }
+        vsi->offset = off;
+    }
+    return 0;
+}
+
 static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>& mapFds,
                       const char* prefix, const unsigned int bpfloader_ver) {
     int ret;
