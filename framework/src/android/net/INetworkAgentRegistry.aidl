@@ -30,7 +30,7 @@ import android.telephony.data.NrQosSessionAttributes;
  * Interface for NetworkAgents to send network properties.
  * @hide
  */
-oneway interface INetworkAgentRegistry {
+interface INetworkAgentRegistry {
     void sendNetworkCapabilities(in NetworkCapabilities nc);
     void sendLinkProperties(in LinkProperties lp);
     // TODO: consider replacing this by "markConnected()" and removing

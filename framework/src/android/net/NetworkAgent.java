@@ -98,6 +98,7 @@ public abstract class NetworkAgent {
     @Nullable
     private volatile Network mNetwork;
 
+    // Null before the agent is registered
     @Nullable
     private volatile INetworkAgentRegistry mRegistry;
 
@@ -121,6 +122,8 @@ public abstract class NetworkAgent {
     private NetworkInfo mNetworkInfo;
     @NonNull
     private final Object mRegisterLock = new Object();
+    // TODO : move the preconnected queue to the system server and remove this
+    private boolean mConnected = false;
 
     /**
      * The ID of the {@link NetworkProvider} that created this object, or
@@ -606,16 +609,16 @@ public abstract class NetworkAgent {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case EVENT_AGENT_CONNECTED: {
-                    if (mRegistry != null) {
-                        log("Received new connection while already connected!");
-                    } else {
-                        if (VDBG) log("NetworkAgent fully connected");
-                        synchronized (mPreConnectedQueue) {
-                            final INetworkAgentRegistry registry = (INetworkAgentRegistry) msg.obj;
-                            mRegistry = registry;
+                    // TODO : move the pre-connected queue to the system server, and remove
+                    // handling this EVENT_AGENT_CONNECTED message.
+                    synchronized (mPreConnectedQueue) {
+                        if (mConnected) {
+                            log("Received new connection while already connected!");
+                        } else {
+                            if (VDBG) log("NetworkAgent fully connected");
                             for (RegistryAction a : mPreConnectedQueue) {
                                 try {
-                                    a.execute(registry);
+                                    a.execute(mRegistry);
                                 } catch (RemoteException e) {
                                     Log.wtf(LOG_TAG, "Communication error with registry", e);
                                     // Fall through
@@ -623,6 +626,7 @@ public abstract class NetworkAgent {
                             }
                             mPreConnectedQueue.clear();
                         }
+                        mConnected = true;
                     }
                     break;
                 }
@@ -631,7 +635,7 @@ public abstract class NetworkAgent {
                     // let the client know CS is done with us.
                     onNetworkUnwanted();
                     synchronized (mPreConnectedQueue) {
-                        mRegistry = null;
+                        mConnected = false;
                     }
                     break;
                 }
@@ -758,19 +762,31 @@ public abstract class NetworkAgent {
             }
             final ConnectivityManager cm = (ConnectivityManager) mInitialConfiguration.context
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
+            final NetworkAndAgentRegistryParcelable result;
             if (mInitialConfiguration.localNetworkConfig == null) {
                 // Call registerNetworkAgent without localNetworkConfig argument to pass
                 // android.net.cts.NetworkAgentTest#testAgentStartsInConnecting in old cts
-                mNetwork = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
+                result = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
                         new NetworkInfo(mInitialConfiguration.info),
                         mInitialConfiguration.properties, mInitialConfiguration.capabilities,
                         mInitialConfiguration.score, mInitialConfiguration.config, providerId);
             } else {
-                mNetwork = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
+                result = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
                         new NetworkInfo(mInitialConfiguration.info),
                         mInitialConfiguration.properties, mInitialConfiguration.capabilities,
                         mInitialConfiguration.localNetworkConfig, mInitialConfiguration.score,
                         mInitialConfiguration.config, providerId);
+            }
+            if (null == result && Process.isApplicationUid(Process.myUid())) {
+                // Let it slide in tests to allow mocking, since NetworkAndAgentRegistryParcelable
+                // is not public and can't be instantiated by CTS. The danger here is that if
+                // this happens in production for some reason the code will crash later instead
+                // of here. If this is a system app, it will still crash as expected.
+                Log.e(LOG_TAG, "registerNetworkAgent returned null. This agent will not work. "
+                        + "Is ConnectivityManager a mock ?");
+            } else {
+                mNetwork = result.network;
+                mRegistry = result.registry;
             }
             mInitialConfiguration = null; // All this memory can now be GC'd
         }
@@ -787,8 +803,8 @@ public abstract class NetworkAgent {
         }
 
         @Override
-        public void onRegistered(@NonNull INetworkAgentRegistry registry) {
-            mHandler.sendMessage(mHandler.obtainMessage(EVENT_AGENT_CONNECTED, registry));
+        public void onRegistered() {
+            mHandler.sendMessage(mHandler.obtainMessage(EVENT_AGENT_CONNECTED));
         }
 
         @Override
@@ -913,11 +929,13 @@ public abstract class NetworkAgent {
      *
      * @hide
      */
-    public INetworkAgent registerForTest(final Network network) {
+    public INetworkAgent registerForTest(final Network network,
+            final INetworkAgentRegistry registry) {
         log("Registering NetworkAgent for test");
         synchronized (mRegisterLock) {
             mNetwork = network;
             mInitialConfiguration = null;
+            mRegistry = registry;
         }
         return new NetworkAgentBinder(mHandler);
     }
@@ -958,7 +976,7 @@ public abstract class NetworkAgent {
                         FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_MESSAGE_QUEUED_BEFORE_CONNECT
                 );
             }
-            if (mRegistry != null) {
+            if (mConnected) {
                 try {
                     action.execute(mRegistry);
                 } catch (RemoteException e) {
