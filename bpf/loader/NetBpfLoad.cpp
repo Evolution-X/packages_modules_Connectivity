@@ -760,6 +760,67 @@ static int loadBtf(ifstream &elfFile, struct btf *btf) {
     return 0;
 }
 
+int getKeyValueTids(const struct btf *btf, const char *mapName,
+                    uint32_t expectedKeySize, uint32_t expectedValueSize,
+                    uint32_t *keyTypeId, uint32_t *valueTypeId) {
+    const struct btf_type *kvBt;
+    const struct btf_member *key, *value;
+    const size_t max_name = 256;
+    char kvTypeName[max_name];
+    int64_t keySize, valueSize;
+    uint32_t kvId;
+
+    if (snprintf(kvTypeName, max_name, "____btf_map_%s", mapName) == max_name) {
+        ALOGE("____btf_map_%s is too long", mapName);
+        return -1;
+    }
+
+    kvId = btf__find_by_name(btf, kvTypeName);
+    if (kvId < 0) {
+        ALOGE("section not found, map: %s typeName: %s", mapName, kvTypeName);
+        return -1;
+    }
+
+    kvBt = btf__type_by_id(btf, kvId);
+    if (!kvBt) {
+        ALOGE("Couldn't find BTF type, map: %s id: %u", mapName, kvId);
+        return -1;
+    }
+
+    if (!btf_is_struct(kvBt) || btf_vlen(kvBt) < 2) {
+        ALOGE("Non Struct kind or invalid vlen, map: %s id: %u", mapName, kvId);
+        return -1;
+    }
+
+    key = btf_members(kvBt);
+    value = key + 1;
+
+    keySize = btf__resolve_size(btf, key->type);
+    if (keySize < 0) {
+        ALOGE("Couldn't get key size, map: %s errno: %d", mapName, errno);
+        return -1;
+    }
+
+    valueSize = btf__resolve_size(btf, value->type);
+    if (valueSize < 0) {
+        ALOGE("Couldn't get value size, map: %s errno: %d", mapName, errno);
+        return -1;
+    }
+
+    if (expectedKeySize != keySize || expectedValueSize != valueSize) {
+        ALOGE("Key value size mismatch, map: %s key size: %d expected key size: "
+              "%d value size: %d expected value size: %d",
+              mapName, (uint32_t)keySize, expectedKeySize, (uint32_t)valueSize,
+              expectedValueSize);
+        return -1;
+    }
+
+    *keyTypeId = key->type;
+    *valueTypeId = value->type;
+
+    return 0;
+}
+
 static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>& mapFds,
                       const char* prefix, const unsigned int bpfloader_ver) {
     int ret;
