@@ -116,12 +116,12 @@ def get_ipv4_addresses(
   else:
     return []
 
-def get_ipv6_addresses(
+def get_non_tentative_ipv6_addresses(
     ad: android_device.AndroidDevice, iface_name: str
 ) -> list[str]:
-  """Retrieves the IPv6 addresses of a given interface on an Android device.
+  """Retrieves the non-tentative IPv6 addresses of a given interface on an Android device.
 
-  This function executes an ADB shell command (`ip -6 address show`) to get the
+  This function executes an ADB shell command (`ip -6 address show -tentative`) to get the
   network interface information and extracts the IPv6 address from the output.
   If devices have no IPv6 address, raise PatternNotFoundException.
 
@@ -139,7 +139,7 @@ def get_ipv6_addresses(
   #         valid_lft forever preferred_lft forever
   #     inet6 fe80::1233:aadb:3d32:1234/64 scope link
   #         valid_lft forever preferred_lft forever
-  output = adb_utils.adb_shell(ad, f"ip -6 address show {iface_name}")
+  output = adb_utils.adb_shell(ad, f"ip -6 address show -tentative {iface_name}")
   pattern = r"inet6\s+([0-9a-fA-F:]+)\/\d+"
   matches = re.findall(pattern, output)
 
