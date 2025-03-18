@@ -52,6 +52,7 @@
 #include <android-base/logging.h>
 #include <android-base/macros.h>
 #include <android-base/properties.h>
+#include <android-base/scopeguard.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android-base/unique_fd.h>
@@ -821,10 +822,14 @@ int getKeyValueTids(const struct btf *btf, const char *mapName,
     return 0;
 }
 
+static bool isBtfSupported(enum bpf_map_type type) {
+    return type != BPF_MAP_TYPE_DEVMAP_HASH && type != BPF_MAP_TYPE_RINGBUF;
+}
+
 static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>& mapFds,
                       const char* prefix, const unsigned int bpfloader_ver) {
     int ret;
-    vector<char> mdData;
+    vector<char> mdData, btfData;
     vector<struct bpf_map_def> md;
     vector<string> mapNames;
     string objName = pathToObjName(string(elfPath));
@@ -849,6 +854,21 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
     }
 
     ret = getSectionSymNames(elfFile, "maps", mapNames);
+    if (ret) return ret;
+
+    ret = readSectionByName(".BTF", elfFile, btfData);
+    if (ret) {
+        ALOGE("Failed to read .BTF section, ret:%d", ret);
+        return ret;
+    }
+    struct btf *btf = btf__new(btfData.data(), btfData.size());
+    if (btf == NULL) {
+        ALOGE("btf__new failed, errno: %d", errno);
+        return -errno;
+    }
+    auto scopeGuard = base::make_scope_guard([btf] { btf__free(btf); });
+
+    ret = loadBtf(elfFile, btf);
     if (ret) return ret;
 
     unsigned kvers = kernelVersion();
@@ -976,12 +996,26 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             };
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
+
+            if (isBtfSupported(type)) {
+                uint32_t kTid, vTid;
+                ret = getKeyValueTids(btf, mapNames[i].c_str(), md[i].key_size,
+                                      md[i].value_size, &kTid, &vTid);
+                if (ret) return ret;
+                req.btf_fd = btf__fd(btf);
+                req.btf_key_type_id = kTid;
+                req.btf_value_type_id = vTid;
+                ALOGI("Create map with BTF, map: %s", mapNames[i].c_str());
+            } else {
+                ALOGI("Create map without BTF, map: %s", mapNames[i].c_str());
+            }
+
             fd.reset(bpf(BPF_MAP_CREATE, req));
             saved_errno = errno;
             if (fd.ok()) {
-              ALOGD("bpf_create_map[%s] -> %d", mapNames[i].c_str(), fd.get());
+                ALOGD("bpf_create_map[%s] -> %d", mapNames[i].c_str(), fd.get());
             } else {
-              ALOGE("bpf_create_map[%s] -> %d errno:%d", mapNames[i].c_str(), fd.get(), saved_errno);
+                ALOGE("bpf_create_map[%s] -> %d errno:%d", mapNames[i].c_str(), fd.get(), saved_errno);
             }
         }
 
