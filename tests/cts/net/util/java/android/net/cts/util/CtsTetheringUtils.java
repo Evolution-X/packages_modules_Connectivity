@@ -119,7 +119,10 @@ public final class CtsTetheringUtils {
                     cv instanceof CallbackValue.OnTetheringStarted);
         }
 
-        public void expectTetheringFailed(final int expected) throws InterruptedException {
+        /**
+         * Verify that starting tethering failed with the specified error code.
+         */
+        public void expectTetheringFailed(final int expected) {
             final CallbackValue cv = mHistory.poll(TIMEOUT_MS, c -> true);
             assertNotNull("No onTetheringFailed after " + TIMEOUT_MS + " ms", cv);
             assertTrue("Expect fail with error code " + expected + ", but received: " + cv,
@@ -559,19 +562,28 @@ public final class CtsTetheringUtils {
     }
 
     /**
-     * Starts Wi-Fi tethering.
+     * Starts Wi-Fi tethering with TETHER_PRIVILEGED permission.
      */
-    public TetheringInterface startWifiTethering(final TestTetheringEventCallback callback)
-            throws InterruptedException {
+    public TetheringInterface startWifiTethering(final TestTetheringEventCallback callback) {
         return startWifiTethering(callback, null);
     }
 
     /**
-     * Starts Wi-Fi tethering with the specified SoftApConfiguration.
+     * Starts Wi-Fi tethering with TETHER_PRIVILEGED permission and the specified
+     * SoftApConfiguration.
      */
     public TetheringInterface startWifiTethering(final TestTetheringEventCallback callback,
-            final SoftApConfiguration softApConfiguration)
-            throws InterruptedException {
+            final SoftApConfiguration softApConfiguration) {
+        return runAsShell(TETHER_PRIVILEGED, () -> startWifiTetheringNoPermissions(
+                callback, softApConfiguration));
+    }
+
+    /**
+     * Starts Wi-Fi tethering without any permission with the specified SoftApConfiguration.
+     */
+    public TetheringInterface startWifiTetheringNoPermissions(
+            final TestTetheringEventCallback callback,
+            final SoftApConfiguration softApConfiguration) {
         final List<String> wifiRegexs = getWifiTetherableInterfaceRegexps(callback);
 
         final StartTetheringCallback startTetheringCallback = new StartTetheringCallback();
@@ -582,19 +594,17 @@ public final class CtsTetheringUtils {
         }
         final TetheringRequest request = builder.build();
 
-        return runAsShell(TETHER_PRIVILEGED, () -> {
-            mTm.startTethering(request, c -> c.run() /* executor */, startTetheringCallback);
-            startTetheringCallback.verifyTetheringStarted();
+        mTm.startTethering(request, c -> c.run() /* executor */, startTetheringCallback);
+        startTetheringCallback.verifyTetheringStarted();
 
-            final TetheringInterface iface =
-                    callback.expectTetheredInterfacesChanged(wifiRegexs, TETHERING_WIFI);
+        final TetheringInterface iface =
+                callback.expectTetheredInterfacesChanged(wifiRegexs, TETHERING_WIFI);
 
-            callback.expectOneOfOffloadStatusChanged(
-                    TETHER_HARDWARE_OFFLOAD_STARTED,
-                    TETHER_HARDWARE_OFFLOAD_FAILED);
+        callback.expectOneOfOffloadStatusChanged(
+                TETHER_HARDWARE_OFFLOAD_STARTED,
+                TETHER_HARDWARE_OFFLOAD_FAILED);
 
-            return iface;
-        });
+        return iface;
     }
 
     private static class StopSoftApCallback implements SoftApCallback {
