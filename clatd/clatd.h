@@ -52,7 +52,7 @@ struct tun_data;
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-extern volatile sig_atomic_t running;
+extern volatile sig_atomic_t sigterm;
 
 void send_dad(int fd, const struct in6_addr* tgt);
 

@@ -34,10 +34,10 @@
 
 #define DEVICEPREFIX "v4-"
 
-/* function: stop_loop
+/* function: handle_sigterm
  * signal handler: stop the event loop
  */
-static void stop_loop(__attribute__((unused)) int unused) { running = 0; };
+static void handle_sigterm(__attribute__((unused)) int unused) { sigterm = 1; };
 
 /* function: print_help
  * in case the user is running this on the command line
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
   }
 
   // Loop until someone sends us a signal or brings down the tun interface.
-  if (signal(SIGTERM, stop_loop) == SIG_ERR) {
+  if (signal(SIGTERM, handle_sigterm) == SIG_ERR) {
     logmsg(ANDROID_LOG_FATAL, "sigterm handler failed: %s", strerror(errno));
     exit(1);
   }
@@ -201,18 +201,17 @@ int main(int argc, char **argv) {
 
   event_loop(&tunnel);
 
-  logmsg(ANDROID_LOG_INFO, "Shutting down clat on %s", uplink_interface);
-
-  if (running) {
-    logmsg(ANDROID_LOG_INFO, "Clatd on %s waiting for SIGTERM", uplink_interface);
+  if (sigterm) {
+    logmsg(ANDROID_LOG_INFO, "Shutting down clatd on %s, already received SIGTERM", uplink_interface);
+  } else {
+    // this implies running == false, ie. we received EOF or ENETDOWN error.
+    logmsg(ANDROID_LOG_INFO, "Shutting down clatd on %s, waiting for SIGTERM", uplink_interface);
     // let's give higher level java code 15 seconds to kill us,
     // but eventually terminate anyway, in case system server forgets about us...
-    // sleep() should be interrupted by SIGTERM, the handler should clear running
+    // sleep() should be interrupted by SIGTERM, the handler should set 'sigterm'
     sleep(15);
     logmsg(ANDROID_LOG_INFO, "Clatd on %s %s SIGTERM", uplink_interface,
-           running ? "timed out waiting for" : "received");
-  } else {
-    logmsg(ANDROID_LOG_INFO, "Clatd on %s already received SIGTERM", uplink_interface);
+           sigterm ? "received" : "timed out waiting for");
   }
   return 0;
 }

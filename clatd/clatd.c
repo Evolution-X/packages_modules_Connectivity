@@ -49,7 +49,8 @@
 
 struct clat_config Global_Clatd_Config;
 
-volatile sig_atomic_t running = 1;
+volatile sig_atomic_t sigterm = 0;
+bool running = true;
 
 // reads IPv6 packet from AF_PACKET socket, translates to IPv4, writes to tun
 void process_packet_6_to_4(struct tun_data *tunnel) {
@@ -78,10 +79,11 @@ void process_packet_6_to_4(struct tun_data *tunnel) {
     if (errno != EAGAIN) {
       logmsg(ANDROID_LOG_WARN, "%s: read error: %s", __func__, strerror(errno));
     }
+    if (errno == ENETDOWN) running = false;
     return;
   } else if (readlen == 0) {
     logmsg(ANDROID_LOG_WARN, "%s: packet socket removed?", __func__);
-    running = 0;
+    running = false;
     return;
   } else if (readlen >= sizeof(buf)) {
     logmsg(ANDROID_LOG_WARN, "%s: read truncation - ignoring pkt", __func__);
@@ -161,10 +163,11 @@ void process_packet_4_to_6(struct tun_data *tunnel) {
     if (errno != EAGAIN) {
       logmsg(ANDROID_LOG_WARN, "%s: read error: %s", __func__, strerror(errno));
     }
+    if (errno == ENETDOWN) running = false;  // not sure if this can happen
     return;
   } else if (readlen == 0) {
     logmsg(ANDROID_LOG_WARN, "%s: tun interface removed", __func__);
-    running = 0;
+    running = false;
     return;
   } else if (readlen >= sizeof(buf)) {
     logmsg(ANDROID_LOG_WARN, "%s: read truncation - ignoring pkt", __func__);
@@ -278,7 +281,7 @@ void event_loop(struct tun_data *tunnel) {
     { tunnel->fd4, POLLIN, 0 },
   };
 
-  while (running) {
+  while (running && !sigterm) {
     if (poll(wait_fd, ARRAY_SIZE(wait_fd), -1) == -1) {
       if (errno != EINTR) {
         logmsg(ANDROID_LOG_WARN, "event_loop/poll returned an error: %s", strerror(errno));
