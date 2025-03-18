@@ -64,6 +64,48 @@ int main(int argc, char **argv) {
        *write_sock_str = NULL;
   unsigned len;
 
+  // Clatd binary is setuid/gid CLAT, thus when we reach here we have:
+  //   $ adb shell ps | grep clat
+  //                [pid] [ppid]
+  //   clat          7650  1393   10785364   2612 do_sys_poll         0 S clatd-wlan0
+  //   $ adb shell cat /proc/7650/status | egrep -i '^(Uid:|Gid:|Groups:)'
+  //         [real][effective][saved][filesystem]
+  //          [uid]   [euid]  [suid]  [fsuid]
+  //   Uid:    1000    1029    1029    1029
+  //          [gid]   [egid]  [sgid]  [fsgid]
+  //   Gid:    1000    1029    1029    1029
+  //   Groups: 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1018 1021 1023 1024 1032 1065 3001 3002 3003 3005 3006 3007 3009 3010 3011 3012
+  // This mismatch between uid & euid appears to cause periodic (every 5 minutes):
+  //                                                  objhash pid  ppid             uid
+  //   W ActivityManager: Stale PhantomProcessRecord {xxxxxxx 7650:1393:clatd-wlan0/1000}, removing
+  // This is due to:
+  //   $ adbz shell ls -ld /proc/7650
+  //   dr-xr-xr-x 9 clat clat 0 2025-03-14 11:37 /proc/7650
+  // which is used by
+  //   //frameworks/base/core/java/com/android/internal/os/ProcessCpuTracker.java
+  // which thus returns the uid 'clat' vs
+  //   //frameworks/base/core/java/android/os/Process.java
+  // getUidForPid() which grabs *real* 'uid' from /proc/<pid>/status and is used in:
+  //   //frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java
+  // (perhaps this should grab euid instead? unclear)
+  //
+  // However, we want to drop as many privs as possible, hence:
+  gid_t egid = getegid();  // documented to never fail, hence should return AID_CLAT == 1029
+  uid_t euid = geteuid();  // (ditto)
+  setresgid(egid, egid, egid);  // ignore any failure
+  setresuid(euid, euid, euid);  // ignore any failure
+  // ideally we'd somehow drop supplementary groups too...
+  // but for historical reasons that actually requires CAP_SETGID which we don't have
+  // (see man 2 setgroups)
+  //
+  // Now we (should) have:
+  // $ adb shell ps | grep clat
+  // clat          5370  1479   10785364   2528 do_sys_poll         0 S clatd-wlan0
+  // # adb shell cat /proc/5370/status | egrep -i '^(Uid:|Gid:|Groups:)'
+  // Uid:    1029    1029    1029    1029
+  // Gid:    1029    1029    1029    1029
+  // Groups: 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1018 1021 1023 1024 1032 1065 3001 3002 3003 3005 3006 3007 3009 3010 3011 3012
+
   while ((opt = getopt(argc, argv, "i:p:4:6:t:r:w:h")) != -1) {
     switch (opt) {
       case 'i':
