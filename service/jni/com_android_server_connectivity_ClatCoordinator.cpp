@@ -104,7 +104,7 @@ static void verifyClatPerms() {
     // First verify the clatd directory and binary,
     // since this is built into the apex file system image,
     // failures here are 99% likely to be build problems.
-    V(kClatdDir, S_IFDIR|0750, ROOT, SYSTEM, "system_file", DIR);
+    V(kClatdDir, S_IFDIR|0750, CLAT, SYSTEM, "system_file", DIR);
     V(kClatdBin, S_IFREG|S_ISUID|S_ISGID|0755, CLAT, CLAT, "clatd_exec", BIN);
 
     // Move on to verifying that the bpf programs and maps are as expected.
