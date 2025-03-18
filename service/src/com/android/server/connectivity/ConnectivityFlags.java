@@ -62,6 +62,9 @@ public final class ConnectivityFlags {
     public static final String QUEUE_CALLBACKS_FOR_FROZEN_APPS =
             "queue_callbacks_for_frozen_apps";
 
+    public static final String QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER =
+            "queue_network_agent_events_in_system_server";
+
     private boolean mNoRematchAllRequestsOnRegister;
 
     /**

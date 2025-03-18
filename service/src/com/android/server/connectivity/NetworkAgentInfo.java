@@ -62,6 +62,7 @@ import android.net.QosSession;
 import android.net.TcpKeepalivePacketData;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
@@ -630,6 +631,7 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
     // Used by ConnectivityService to keep track of 464xlat.
     public final Nat464Xlat clatd;
 
+    private final ArrayList<Message> mMessagesPendingRegistration = new ArrayList<>();
     // Set after asynchronous creation of the NetworkMonitor.
     private volatile NetworkMonitorManager mNetworkMonitor;
 
@@ -715,6 +717,29 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         }
 
         mHandler.obtainMessage(EVENT_AGENT_REGISTERED, ARG_AGENT_SUCCESS, 0, this).sendToTarget();
+        for (final Message enqueued : mMessagesPendingRegistration) {
+            mHandler.sendMessage(enqueued);
+        }
+        mMessagesPendingRegistration.clear();
+    }
+
+    /**
+     * Enqueues a message if it needs to be enqueued, and returns whether it was enqueued.
+     *
+     * The message is enqueued iff it can't be sent just yet. If it can be sent
+     * immediately, this method returns false and doesn't enqueue.
+     *
+     * If it enqueues, this method will make a copy of the message for enqueuing since
+     * messages can't be reused or recycled before the end of their processing by the
+     * handler.
+     */
+    public boolean maybeEnqueueMessage(final Message msg) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        if (null != mNetworkMonitor) return false;
+        final Message m = mHandler.obtainMessage();
+        m.copyFrom(msg);
+        mMessagesPendingRegistration.add(m);
+        return true;
     }
 
     /**
