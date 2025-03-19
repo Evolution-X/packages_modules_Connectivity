@@ -384,9 +384,9 @@ class NetworkAgentTest {
             initialLp = lp,
             initialNc = nc
         )
-        agent.setTeardownDelayMillis(0)
         // Connect the agent and verify initial status callbacks.
         agent.register()
+        agent.setTeardownDelayMillis(0)
         agent.markConnected()
         agent.expectCallback<OnNetworkCreated>()
         agent.expectPostConnectionCallbacks(expectedInitSignalStrengthThresholds)
@@ -1933,5 +1933,20 @@ class NetworkAgentTest {
     fun testNativeNetworkCreation_Vpn() {
         // VPN networks are always created as soon as the agent is registered.
         doTestNativeNetworkCreation(expectCreatedImmediately = true, intArrayOf(TRANSPORT_VPN))
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun testRegisterAgain() {
+        val agent = createNetworkAgent()
+        agent.register()
+        agent.unregister()
+        agent.register()
+    }
+
+    @Test
+    fun testUnregisterBeforeRegister() {
+        // For backward compatibility, this shouldn't crash.
+        val agent = createNetworkAgent()
+        agent.unregister()
     }
 }

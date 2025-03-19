@@ -1200,11 +1200,14 @@ public class ConnectivityManager {
 
     /** @hide */
     public static final long FEATURE_USE_DECLARED_METHODS_FOR_CALLBACKS = 1L;
+    /** @hide */
+    public static final long FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER = 1L << 1;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @LongDef(flag = true, prefix = "FEATURE_", value = {
-            FEATURE_USE_DECLARED_METHODS_FOR_CALLBACKS
+            FEATURE_USE_DECLARED_METHODS_FOR_CALLBACKS,
+            FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER
     })
     public @interface ConnectivityManagerFeature {}
 
@@ -4881,7 +4884,8 @@ public class ConnectivityManager {
         return 0;
     }
 
-    private boolean isFeatureEnabled(@ConnectivityManagerFeature long connectivityManagerFeature) {
+    /** @hide */
+    public boolean isFeatureEnabled(@ConnectivityManagerFeature long connectivityManagerFeature) {
         synchronized (mEnabledConnectivityManagerFeaturesLock) {
             if (mEnabledConnectivityManagerFeatures == null) {
                 try {
