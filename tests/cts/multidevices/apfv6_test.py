@@ -112,6 +112,7 @@ class ApfV6Test(apf_test_base.ApfTestBase):
         )
 
     @apf_utils.at_least_B()
+    @apf_utils.apf_ram_at_least(3000)
     def test_ipv6_icmp_echo_request_offload(self):
         eth = Ether(src=self.server_mac_address, dst=self.client_mac_address)
         ip = IPv6(src=self.server_ipv6_addresses[0], dst=self.client_ipv6_addresses[0])
