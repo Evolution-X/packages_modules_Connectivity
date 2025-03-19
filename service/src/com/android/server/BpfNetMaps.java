@@ -1327,7 +1327,7 @@ public class BpfNetMaps {
                             + value.iif1 + "(" + mDeps.getIfName(value.iif1) + "), "
                             + value.iif2 + "(" + mDeps.getIfName(value.iif2) + ")");
             if (sLocalNetBlockedUidMap != null) {
-                BpfDump.dumpMap(sLocalNetAccessMap, pw, "sLocalNetAccessMap",
+                BpfDump.dumpMap(sLocalNetAccessMap, pw, "sLocalNetAccessMap (default is true meaning global)",
                         (key, value) -> "" + key + ": " + value.val);
             }
             if (sLocalNetBlockedUidMap != null) {
