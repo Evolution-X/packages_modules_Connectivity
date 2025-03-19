@@ -915,10 +915,13 @@ public class BpfNetMaps {
             final InetAddress address, final int protocol, final int remotePort,
             final boolean isAllowed) {
         throwIfPre25Q2("addLocalNetAccess is not available on pre-B devices");
-        final int ifIndex;
         if (iface == null) {
-            ifIndex = 0;
-        } else {
+            Log.e(TAG, "Null iface, skip addLocalNetAccess for " + address);
+            return;
+        }
+        int ifIndex = mInterfaceTracker.getInterfaceIndex(iface);
+        if (ifIndex == 0) {
+            mInterfaceTracker.addInterface(iface);
             ifIndex = mInterfaceTracker.getInterfaceIndex(iface);
         }
         if (ifIndex == 0) {
