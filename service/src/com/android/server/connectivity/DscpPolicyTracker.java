@@ -233,6 +233,11 @@ public class DscpPolicyTracker {
      */
     public void addDscpPolicy(NetworkAgentInfo nai, DscpPolicy policy) {
         String iface = nai.linkProperties.getInterfaceName();
+        if (null == iface) {
+            Log.e(TAG, "DSCP policies are not supported on null interfaces.");
+            sendStatus(nai, policy.getPolicyId(), DSCP_POLICY_STATUS_REQUEST_DECLINED);
+            return;
+        }
         if (!isEthernet(iface)) {
             Log.e(TAG, "DSCP policies are not supported on raw IP interfaces.");
             sendStatus(nai, policy.getPolicyId(), DSCP_POLICY_STATUS_REQUEST_DECLINED);
