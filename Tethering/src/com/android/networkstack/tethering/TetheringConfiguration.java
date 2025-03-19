@@ -24,6 +24,7 @@ import static android.net.ConnectivityManager.TYPE_MOBILE_HIPRI;
 import static android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY;
 
 import static com.android.networkstack.apishim.ConstantsShim.KEY_CARRIER_SUPPORTS_TETHERING_BOOL;
+import static com.android.net.module.util.SdkUtil.isAtLeast25Q2;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -395,7 +396,7 @@ public class TetheringConfiguration {
      * use the async state machine.
      */
     public void readEnableSyncSM(final Context ctx) {
-        USE_SYNC_SM = mDeps.isFeatureNotChickenedOut(ctx, TETHER_ENABLE_SYNC_SM);
+        USE_SYNC_SM = isAtLeast25Q2() || mDeps.isFeatureNotChickenedOut(ctx, TETHER_ENABLE_SYNC_SM);
     }
 
     /** Does the dumping.*/
