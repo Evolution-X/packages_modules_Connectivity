@@ -32,6 +32,10 @@ static void throwIOException(JNIEnv *env, const char *msg, int error) {
 static jboolean com_android_net_module_util_TcUtils_isEthernet(JNIEnv *env,
                                                                jclass clazz,
                                                                jstring iface) {
+  if (nullptr == iface) {
+    jniThrowNullPointerException(env, "iface is null");
+    return false;
+  }
   ScopedUtfChars interface(env, iface);
   bool result = false;
   int error = isEthernet(interface.c_str(), result);
