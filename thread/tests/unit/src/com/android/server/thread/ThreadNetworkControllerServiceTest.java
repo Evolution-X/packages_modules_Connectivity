@@ -261,6 +261,7 @@ public final class ThreadNetworkControllerServiceTest {
                 .thenReturn(TEST_MODEL_NAME);
         when(mResources.getStringArray(eq(R.array.config_thread_mdns_vendor_specific_txts)))
                 .thenReturn(new String[] {});
+        when(mResources.getBoolean(eq(R.bool.config_thread_country_code_enabled))).thenReturn(true);
 
         final AtomicFile storageFile = new AtomicFile(tempFolder.newFile("thread_settings.xml"));
         mPersistentSettings = new ThreadPersistentSettings(storageFile, mConnectivityResources);

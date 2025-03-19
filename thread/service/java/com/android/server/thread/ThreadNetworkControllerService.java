@@ -628,12 +628,15 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         boolean srpServerWaitEnabled = mResources.get().getBoolean(srpServerConfig);
         int autoJoinConfig = R.bool.config_thread_border_router_auto_join_enabled;
         boolean autoJoinEnabled = mResources.get().getBoolean(autoJoinConfig);
+        boolean countryCodeEnabled =
+                mResources.get().getBoolean(R.bool.config_thread_country_code_enabled);
         return new OtDaemonConfiguration.Builder()
                 .setBorderRouterEnabled(threadConfig.isBorderRouterEnabled())
                 .setNat64Enabled(threadConfig.isNat64Enabled())
                 .setDhcpv6PdEnabled(threadConfig.isDhcpv6PdEnabled())
                 .setSrpServerWaitForBorderRoutingEnabled(srpServerWaitEnabled)
                 .setBorderRouterAutoJoinEnabled(autoJoinEnabled)
+                .setCountryCodeEnabled(countryCodeEnabled)
                 .build();
     }
 

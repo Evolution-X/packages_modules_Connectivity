@@ -206,6 +206,21 @@ public class ThreadNetworkCountryCodeTest {
     }
 
     @Test
+    public void initialize_countryCodeDisabled_defaultCountryCodeIsUsed() {
+        when(mResources.getBoolean(R.bool.config_thread_country_code_enabled)).thenReturn(false);
+
+        mThreadNetworkCountryCode.initialize();
+
+        verifyNoMoreInteractions(mWifiManager);
+        verifyNoMoreInteractions(mTelephonyManager);
+        verifyNoMoreInteractions(mSubscriptionManager);
+        verifyNoMoreInteractions(mGeocoder);
+        verifyNoMoreInteractions(mLocationManager);
+
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
+    }
+
+    @Test
     public void initialize_locationUseIsDisabled_locationFunctionIsNotCalled() {
         when(mResources.getBoolean(R.bool.config_thread_location_use_for_country_code_enabled))
                 .thenReturn(false);
@@ -507,6 +522,7 @@ public class ThreadNetworkCountryCodeTest {
         mThreadNetworkCountryCode.dump(new FileDescriptor(), printWriter, null);
         String outputString = stringWriter.toString();
 
+        assertThat(outputString).contains("isCountryCodeEnabled");
         assertThat(outputString).contains("mIsCpSettingCountryCodeSupported");
         assertThat(outputString).contains("mOverrideCountryCodeInfo");
         assertThat(outputString).contains("mTelephonyCountryCodeSlotInfoMap");
