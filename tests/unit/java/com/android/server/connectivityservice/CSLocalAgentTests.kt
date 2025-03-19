@@ -111,14 +111,18 @@ class CSLocalAgentTests : CSTest() {
         deps.setBuildSdk(VERSION_V)
 
         assertFailsWith<IllegalArgumentException> {
-            Agent(nc = NetworkCapabilities.Builder()
-                    .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                    .build(),
-                    lnc = null)
+            Agent(
+                    nc = NetworkCapabilities.Builder()
+                            .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                            .build(),
+                    lnc = null
+            )
         }
         assertFailsWith<IllegalArgumentException> {
-            Agent(nc = NetworkCapabilities.Builder().build(),
-                    lnc = FromS(LocalNetworkConfig.Builder().build()))
+            Agent(
+                    nc = NetworkCapabilities.Builder().build(),
+                    lnc = FromS(LocalNetworkConfig.Builder().build())
+            )
         }
     }
 
@@ -127,27 +131,31 @@ class CSLocalAgentTests : CSTest() {
         deps.setBuildSdk(VERSION_V)
 
         val cb = TestableNetworkCallback()
-        cm.requestNetwork(NetworkRequest.Builder()
-                .clearCapabilities()
-                .build(),
-                cb)
-        val agent = Agent(nc = NetworkCapabilities.Builder()
-                .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                .build(),
-                lnc = FromS(LocalNetworkConfig.Builder().build()))
+        cm.requestNetwork(
+                NetworkRequest.Builder()
+                        .clearCapabilities()
+                        .build(),
+                cb
+        )
+        val agent = Agent(
+                nc = NetworkCapabilities.Builder()
+                        .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                        .build(),
+                lnc = FromS(LocalNetworkConfig.Builder().build())
+        )
         agent.connect()
         cb.expectAvailableCallbacks(agent.network, validated = false)
         agent.sendNetworkCapabilities(NetworkCapabilities.Builder().build())
         cb.expect<Lost>(agent.network)
 
-        val agent2 = Agent(nc = NetworkCapabilities.Builder()
-                .build(),
-                lnc = null)
+        val agent2 = Agent(nc = NetworkCapabilities.Builder().build(), lnc = null)
         agent2.connect()
         cb.expectAvailableCallbacks(agent2.network, validated = false)
-        agent2.sendNetworkCapabilities(NetworkCapabilities.Builder()
-                .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                .build())
+        agent2.sendNetworkCapabilities(
+                NetworkCapabilities.Builder()
+                        .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                        .build()
+        )
         cb.expect<Lost>(agent2.network)
     }
 
@@ -156,10 +164,12 @@ class CSLocalAgentTests : CSTest() {
         deps.setBuildSdk(VERSION_V)
 
         val cb = TestableNetworkCallback()
-        cm.requestNetwork(NetworkRequest.Builder()
-                .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                .build(),
-                cb)
+        cm.requestNetwork(
+                NetworkRequest.Builder()
+                        .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                        .build(),
+                cb
+        )
 
         // Set up a local agent that should forward its traffic to the best DUN upstream.
         val localAgent = Agent(
@@ -171,15 +181,20 @@ class CSLocalAgentTests : CSTest() {
 
         cb.expectAvailableCallbacks(localAgent.network, validated = false)
 
-        val wifiAgent = Agent(score = keepScore(), lp = lp("wifi0"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        val wifiAgent = Agent(
+                score = keepScore(),
+                lp = lp("wifi0"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
         wifiAgent.connect()
 
         val newLnc = LocalNetworkConfig.Builder()
-                .setUpstreamSelector(NetworkRequest.Builder()
-                        .addTransportType(TRANSPORT_WIFI)
-                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build())
+                .setUpstreamSelector(
+                        NetworkRequest.Builder()
+                                .addTransportType(TRANSPORT_WIFI)
+                                .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                                .build()
+                )
                 .build()
         localAgent.sendLocalNetworkConfig(newLnc)
 
@@ -207,21 +222,29 @@ class CSLocalAgentTests : CSTest() {
                 nc = nc(TRANSPORT_THREAD, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp(name),
                 lnc = localNetworkConfig,
-                score = FromS(NetworkScore.Builder()
+                score = FromS(
+                    NetworkScore.Builder()
                         .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
-                        .build())
+                        .build()
+                )
         )
         return localAgent
     }
 
     private fun createWifiAgent(name: String): CSAgentWrapper {
-        return Agent(score = keepScore(), lp = lp(name),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        return Agent(
+                score = keepScore(),
+                lp = lp(name),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
     }
 
     private fun createCellAgent(name: String): CSAgentWrapper {
-        return Agent(score = keepScore(), lp = lp(name),
-                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET))
+        return Agent(
+                score = keepScore(),
+                lp = lp(name),
+                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET)
+        )
     }
 
     private fun sendLocalNetworkConfig(
@@ -245,11 +268,12 @@ class CSLocalAgentTests : CSTest() {
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
         val inOrder = inOrder(multicastRoutingCoordinatorService)
 
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(upstreamSelectorWifi)
-                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                .build()
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(upstreamSelectorWifi)
+                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                        .build()
         )
         val localAgent = createLocalAgent("local0", lnc)
         localAgent.connect()
@@ -264,9 +288,15 @@ class CSLocalAgentTests : CSTest() {
         }
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "wifi0", multicastRoutingConfigMinScope)
+                "local0",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local0", multicastRoutingConfigSelected)
+                "wifi0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         wifiAgent.disconnect()
 
@@ -282,11 +312,12 @@ class CSLocalAgentTests : CSTest() {
     fun testMulticastRoutingConfig_2LocalNetworks() {
         deps.setBuildSdk(VERSION_V)
         val inOrder = inOrder(multicastRoutingCoordinatorService)
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(upstreamSelectorWifi)
-                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                .build()
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(upstreamSelectorWifi)
+                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                        .build()
         )
         val localAgent0 = createLocalAgent("local0", lnc)
         localAgent0.connect()
@@ -296,18 +327,30 @@ class CSLocalAgentTests : CSTest() {
         waitForIdle()
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "wifi0", multicastRoutingConfigMinScope)
+                "local0",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local0", multicastRoutingConfigSelected)
+                "wifi0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         val localAgent1 = createLocalAgent("local1", lnc)
         localAgent1.connect()
         waitForIdle()
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local1", "wifi0", multicastRoutingConfigMinScope)
+                "local1",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local1", multicastRoutingConfigSelected)
+                "wifi0",
+                "local1",
+                multicastRoutingConfigSelected
+        )
 
         localAgent0.disconnect()
         localAgent1.disconnect()
@@ -318,15 +361,19 @@ class CSLocalAgentTests : CSTest() {
     fun testMulticastRoutingConfig_UpstreamNetworkCellToWifi() {
         deps.setBuildSdk(VERSION_V)
         val cb = TestableNetworkCallback()
-        cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities()
+        cm.registerNetworkCallback(
+                NetworkRequest.Builder().clearCapabilities()
                         .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build(), cb)
+                        .build(),
+            cb
+        )
         val inOrder = inOrder(multicastRoutingCoordinatorService)
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(upstreamSelectorAny)
-                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                .build()
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(upstreamSelectorAny)
+                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                        .build()
         )
         val localAgent = createLocalAgent("local0", lnc)
         val wifiAgent = createWifiAgent("wifi0")
@@ -341,9 +388,15 @@ class CSLocalAgentTests : CSTest() {
         }
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "cell0", multicastRoutingConfigMinScope)
+                "local0",
+                "cell0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "cell0", "local0", multicastRoutingConfigSelected)
+                "cell0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         wifiAgent.connect()
 
@@ -357,9 +410,15 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(multicastRoutingCoordinatorService)
                 .applyMulticastRoutingConfig("cell0", "local0", CONFIG_FORWARD_NONE)
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "wifi0", multicastRoutingConfigMinScope)
+                "local0",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local0", multicastRoutingConfigSelected)
+                "wifi0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         localAgent.disconnect()
         cellAgent.disconnect()
@@ -370,15 +429,19 @@ class CSLocalAgentTests : CSTest() {
     fun testMulticastRoutingConfig_UpstreamSelectorCellToWifi() {
         deps.setBuildSdk(VERSION_V)
         val cb = TestableNetworkCallback()
-        cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities()
+        cm.registerNetworkCallback(
+                NetworkRequest.Builder().clearCapabilities()
                         .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build(), cb)
+                        .build(),
+                cb
+        )
         val inOrder = inOrder(multicastRoutingCoordinatorService)
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(upstreamSelectorCell)
-                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                .build()
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(upstreamSelectorCell)
+                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                        .build()
         )
         val localAgent = createLocalAgent("local0", lnc)
         val wifiAgent = createWifiAgent("wifi0")
@@ -393,12 +456,22 @@ class CSLocalAgentTests : CSTest() {
         }
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "cell0", multicastRoutingConfigMinScope)
+                "local0",
+                "cell0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "cell0", "local0", multicastRoutingConfigSelected)
+                "cell0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
-        sendLocalNetworkConfig(localAgent, upstreamSelectorWifi, multicastRoutingConfigMinScope,
-                multicastRoutingConfigSelected)
+        sendLocalNetworkConfig(
+                localAgent,
+                upstreamSelectorWifi,
+                multicastRoutingConfigMinScope,
+                multicastRoutingConfigSelected
+        )
         cb.expect<LocalInfoChanged>(localAgent.network) {
             it.info.upstreamNetwork == wifiAgent.network
         }
@@ -409,9 +482,15 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(multicastRoutingCoordinatorService)
                 .applyMulticastRoutingConfig("cell0", "local0", CONFIG_FORWARD_NONE)
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "wifi0", multicastRoutingConfigMinScope)
+                "local0",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local0", multicastRoutingConfigSelected)
+                "wifi0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         localAgent.disconnect()
         cellAgent.disconnect()
@@ -422,15 +501,19 @@ class CSLocalAgentTests : CSTest() {
     fun testMulticastRoutingConfig_UpstreamSelectorWifiToNull() {
         deps.setBuildSdk(VERSION_V)
         val cb = TestableNetworkCallback()
-        cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities()
+        cm.registerNetworkCallback(
+                NetworkRequest.Builder().clearCapabilities()
                         .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build(), cb)
+                        .build(),
+                cb
+        )
         val inOrder = inOrder(multicastRoutingCoordinatorService)
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(upstreamSelectorWifi)
-                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                .build()
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(upstreamSelectorWifi)
+                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                        .build()
         )
         val localAgent = createLocalAgent("local0", lnc)
         localAgent.connect()
@@ -442,12 +525,22 @@ class CSLocalAgentTests : CSTest() {
         }
 
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", "wifi0", multicastRoutingConfigMinScope)
+                "local0",
+                "wifi0",
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "wifi0", "local0", multicastRoutingConfigSelected)
+                "wifi0",
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
-        sendLocalNetworkConfig(localAgent, null, multicastRoutingConfigMinScope,
-                multicastRoutingConfigSelected)
+        sendLocalNetworkConfig(
+                localAgent,
+                null,
+                multicastRoutingConfigMinScope,
+                multicastRoutingConfigSelected
+        )
         cb.expect<LocalInfoChanged>(localAgent.network) {
             it.info.upstreamNetwork == null
         }
@@ -458,9 +551,15 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(multicastRoutingCoordinatorService)
                 .applyMulticastRoutingConfig("wifi0", "local0", CONFIG_FORWARD_NONE)
         inOrder.verify(multicastRoutingCoordinatorService, never()).applyMulticastRoutingConfig(
-                eq("local0"), any(), eq(multicastRoutingConfigMinScope))
+                eq("local0"),
+                any(),
+                eq(multicastRoutingConfigMinScope)
+        )
         inOrder.verify(multicastRoutingCoordinatorService, never()).applyMulticastRoutingConfig(
-                any(), eq("local0"), eq(multicastRoutingConfigSelected))
+                any(),
+                eq("local0"),
+                eq(multicastRoutingConfigSelected)
+        )
 
         localAgent.disconnect()
         wifiAgent.disconnect()
@@ -482,23 +581,30 @@ class CSLocalAgentTests : CSTest() {
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
         // Set up a local agent that should forward its traffic to the best wifi upstream.
-        val localAgent = Agent(nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
+        val localAgent = Agent(
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp("local0"),
-                lnc = FromS(LocalNetworkConfig.Builder()
-                        .setUpstreamSelector(upstreamSelectorWifi)
-                        .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
-                        .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
-                        .build()),
-                score = FromS(NetworkScore.Builder()
-                        .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
-                        .build())
+                lnc = FromS(
+                        LocalNetworkConfig.Builder()
+                                .setUpstreamSelector(upstreamSelectorWifi)
+                                .setUpstreamMulticastRoutingConfig(multicastRoutingConfigMinScope)
+                                .setDownstreamMulticastRoutingConfig(multicastRoutingConfigSelected)
+                                .build()
+                ),
+                score = FromS(
+                        NetworkScore.Builder()
+                                .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
+                                .build()
+                )
         )
         localAgent.connect()
 
         cb.expectAvailableCallbacks(localAgent.network, validated = false)
 
-        val wifiAgent = Agent(lp = lp("wifi0"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        val wifiAgent = Agent(
+                lp = lp("wifi0"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
         wifiAgent.connect()
 
         cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
@@ -519,8 +625,10 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(netd).networkDestroy(wifiAgent.network.netId)
 
         val wifiIface2 = if (sameIfaceName) "wifi0" else "wifi1"
-        val wifiAgent2 = Agent(lp = lp(wifiIface2),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        val wifiAgent2 = Agent(
+                lp = lp(wifiIface2),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
         wifiAgent2.connect()
 
         cb.expectAvailableCallbacks(wifiAgent2.network, validated = false)
@@ -529,9 +637,15 @@ class CSLocalAgentTests : CSTest() {
 
         inOrder.verify(netd).ipfwdAddInterfaceForward("local0", wifiIface2)
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                "local0", wifiIface2, multicastRoutingConfigMinScope)
+                "local0",
+                wifiIface2,
+                multicastRoutingConfigMinScope
+        )
         inOrder.verify(multicastRoutingCoordinatorService).applyMulticastRoutingConfig(
-                wifiIface2, "local0", multicastRoutingConfigSelected)
+                wifiIface2,
+                "local0",
+                multicastRoutingConfigSelected
+        )
 
         inOrder.verify(netd, never()).ipfwdRemoveInterfaceForward(any(), any())
         inOrder.verify(multicastRoutingCoordinatorService, never())
@@ -547,24 +661,35 @@ class CSLocalAgentTests : CSTest() {
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
         // Set up a local agent that should forward its traffic to the best wifi upstream.
-        val localAgent = Agent(nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
+        val localAgent = Agent(
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp("local0"),
-                lnc = FromS(LocalNetworkConfig.Builder()
-                        .setUpstreamSelector(NetworkRequest.Builder()
-                                .addTransportType(TRANSPORT_WIFI)
-                                .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                                .build())
-                        .build()),
-                score = FromS(NetworkScore.Builder()
-                        .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
-                        .build())
+                lnc = FromS(
+                        LocalNetworkConfig.Builder()
+                                .setUpstreamSelector(
+                                        NetworkRequest.Builder()
+                                                .addTransportType(TRANSPORT_WIFI)
+                                                .addForbiddenCapability(
+                                                        NET_CAPABILITY_LOCAL_NETWORK
+                                                )
+                                                .build()
+                                )
+                                .build()
+                ),
+                score = FromS(
+                        NetworkScore.Builder()
+                                .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
+                                .build()
+                )
         )
         localAgent.connect()
 
         cb.expectAvailableCallbacks(localAgent.network, validated = false)
 
-        val wifiAgent = Agent(lp = lp("wifi0"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        val wifiAgent = Agent(
+                lp = lp("wifi0"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
         wifiAgent.connect()
 
         cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
@@ -587,21 +712,27 @@ class CSLocalAgentTests : CSTest() {
         deps.setBuildSdk(VERSION_V)
 
         val localCb = TestableNetworkCallback()
-        cm.requestNetwork(NetworkRequest.Builder().clearCapabilities()
-                .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                .build(),
-                localCb)
+        cm.requestNetwork(
+                NetworkRequest.Builder().clearCapabilities()
+                        .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                        .build(),
+                localCb
+        )
 
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
         val localNc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK)
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(NetworkRequest.Builder()
-                        .addTransportType(TRANSPORT_WIFI)
-                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build())
-                .build())
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(
+                                NetworkRequest.Builder()
+                                        .addTransportType(TRANSPORT_WIFI)
+                                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                                        .build()
+                        )
+                        .build()
+        )
         val localScore = FromS(NetworkScore.Builder().build())
 
         // Set up a local agent that should forward its traffic to the best wifi upstream.
@@ -628,10 +759,16 @@ class CSLocalAgentTests : CSTest() {
         val localAgent2 = Agent(nc = localNc, lp = lp("local0"), lnc = lnc, score = localScore)
         localAgent2.connect()
 
-        localCb.expectAvailableCallbacks(localAgent2.network,
-                validated = false, upstream = wifiAgent.network)
-        cb.expectAvailableCallbacks(localAgent2.network,
-                validated = false, upstream = wifiAgent.network)
+        localCb.expectAvailableCallbacks(
+                localAgent2.network,
+                validated = false,
+                upstream = wifiAgent.network
+        )
+        cb.expectAvailableCallbacks(
+                localAgent2.network,
+                validated = false,
+                upstream = wifiAgent.network
+        )
         cb.expect<Lost> { it.network == localAgent.network }
     }
 
@@ -648,24 +785,36 @@ class CSLocalAgentTests : CSTest() {
         // Unregister wifi pending replacement, then set up a local agent that would have
         // this network as its upstream.
         wifiAgent.unregisterAfterReplacement(LONG_TIMEOUT_MS)
-        val localAgent = Agent(nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
+        val localAgent = Agent(
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp("local0"),
-                lnc = FromS(LocalNetworkConfig.Builder()
-                        .setUpstreamSelector(NetworkRequest.Builder()
-                                .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                                .addTransportType(TRANSPORT_WIFI)
-                                .build())
-                        .build()),
-                score = FromS(NetworkScore.Builder()
-                        .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
-                        .build())
+                lnc = FromS(
+                        LocalNetworkConfig.Builder()
+                                .setUpstreamSelector(
+                                        NetworkRequest.Builder()
+                                                .addForbiddenCapability(
+                                                        NET_CAPABILITY_LOCAL_NETWORK
+                                                )
+                                                .addTransportType(TRANSPORT_WIFI)
+                                                .build()
+                                )
+                                .build()
+                ),
+                score = FromS(
+                        NetworkScore.Builder()
+                                .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
+                                .build()
+                )
         )
 
         // Connect the local agent. The zombie wifi is its upstream, but the stack doesn't
         // tell netd to add the forward since the wifi0 interface has gone.
         localAgent.connect()
-        cb.expectAvailableCallbacks(localAgent.network,
-                validated = false, upstream = wifiAgent.network)
+        cb.expectAvailableCallbacks(
+                localAgent.network,
+                validated = false,
+                upstream = wifiAgent.network
+        )
 
         verify(netd, never()).ipfwdAddInterfaceForward("local0", "wifi0")
 
@@ -679,33 +828,51 @@ class CSLocalAgentTests : CSTest() {
     fun testForwardingRules() {
         deps.setBuildSdk(VERSION_V)
         // Set up a local agent that should forward its traffic to the best DUN upstream.
-        val lnc = FromS(LocalNetworkConfig.Builder()
-                .setUpstreamSelector(NetworkRequest.Builder()
-                        .addCapability(NET_CAPABILITY_DUN)
-                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .build())
-                .build())
-        val localAgent = Agent(nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
+        val lnc = FromS(
+                LocalNetworkConfig.Builder()
+                        .setUpstreamSelector(
+                                NetworkRequest.Builder()
+                                        .addCapability(NET_CAPABILITY_DUN)
+                                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                                        .build()
+                        )
+                        .build()
+        )
+        val localAgent = Agent(
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp("local0"),
                 lnc = lnc,
-                score = FromS(NetworkScore.Builder()
-                        .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
-                        .build())
+                score = FromS(
+                        NetworkScore.Builder()
+                                .setKeepConnectedReason(KEEP_CONNECTED_LOCAL_NETWORK)
+                                .build()
+                )
         )
         localAgent.connect()
 
-        val wifiAgent = Agent(score = keepScore(), lp = lp("wifi0"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
-        val cellAgentDun = Agent(score = keepScore(), lp = lp("cell0"),
-                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN))
-        val wifiAgentDun = Agent(score = keepScore(), lp = lp("wifi1"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN))
+        val wifiAgent = Agent(
+                score = keepScore(),
+                lp = lp("wifi0"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+        )
+        val cellAgentDun = Agent(
+                score = keepScore(),
+                lp = lp("cell0"),
+                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN)
+        )
+        val wifiAgentDun = Agent(
+                score = keepScore(),
+                lp = lp("wifi1"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN)
+        )
 
         val cb = TestableNetworkCallback()
-        cm.registerNetworkCallback(NetworkRequest.Builder()
-                .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                .build(),
-                cb)
+        cm.registerNetworkCallback(
+                NetworkRequest.Builder()
+                        .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                        .build(),
+                cb
+        )
         cb.expectAvailableCallbacks(localAgent.network, validated = false)
 
         val inOrder = inOrder(netd)
@@ -750,8 +917,11 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(netd).ipfwdDisableForwarding(any())
         cb.expect<LocalInfoChanged>(localAgent.network) { it.info.upstreamNetwork == null }
 
-        val wifiAgentDun2 = Agent(score = keepScore(), lp = lp("wifi2"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN))
+        val wifiAgentDun2 = Agent(
+                score = keepScore(),
+                lp = lp("wifi2"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN)
+        )
         wifiAgentDun2.connect()
         inOrder.verify(netd).ipfwdEnableForwarding(any())
         inOrder.verify(netd).ipfwdAddInterfaceForward("local0", "wifi2")
@@ -764,8 +934,11 @@ class CSLocalAgentTests : CSTest() {
         inOrder.verify(netd).ipfwdDisableForwarding(any())
         cb.expect<LocalInfoChanged>(localAgent.network) { it.info.upstreamNetwork == null }
 
-        val wifiAgentDun3 = Agent(score = keepScore(), lp = lp("wifi3"),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN))
+        val wifiAgentDun3 = Agent(
+                score = keepScore(),
+                lp = lp("wifi3"),
+                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET, NET_CAPABILITY_DUN)
+        )
         wifiAgentDun3.connect()
         inOrder.verify(netd).ipfwdEnableForwarding(any())
         inOrder.verify(netd).ipfwdAddInterfaceForward("local0", "wifi3")
@@ -800,8 +973,11 @@ class CSLocalAgentTests : CSTest() {
         cm.registerNetworkCallback(nr, listenCb)
 
         val upstream = if (haveUpstream) {
-            Agent(score = keepScore(), lp = lp("wifi0"),
-                    nc = nc(TRANSPORT_WIFI)).also { it.connect() }
+            Agent(
+                    score = keepScore(),
+                    lp = lp("wifi0"),
+                    nc = nc(TRANSPORT_WIFI)
+            ).also { it.connect() }
         } else {
             null
         }
@@ -809,23 +985,32 @@ class CSLocalAgentTests : CSTest() {
         // Set up a local agent.
         val lnc = FromS(LocalNetworkConfig.Builder().apply {
             if (haveUpstream) {
-                setUpstreamSelector(NetworkRequest.Builder()
-                        .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                        .addTransportType(TRANSPORT_WIFI)
-                        .build())
+                setUpstreamSelector(
+                        NetworkRequest.Builder()
+                                .addForbiddenCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                                .addTransportType(TRANSPORT_WIFI)
+                                .build()
+                )
             }
         }.build())
-        val localAgent = Agent(nc = nc(TRANSPORT_THREAD, NET_CAPABILITY_LOCAL_NETWORK),
+        val localAgent = Agent(
+                nc = nc(TRANSPORT_THREAD, NET_CAPABILITY_LOCAL_NETWORK),
                 lp = lp("local0"),
                 lnc = lnc,
                 score = FromS(NetworkScore.Builder().build())
         )
         localAgent.connect()
 
-        requestCb.expectAvailableCallbacks(localAgent.network,
-                validated = false, upstream = upstream?.network)
-        listenCb.expectAvailableCallbacks(localAgent.network,
-                validated = false, upstream = upstream?.network)
+        requestCb.expectAvailableCallbacks(
+                localAgent.network,
+                validated = false,
+                upstream = upstream?.network
+        )
+        listenCb.expectAvailableCallbacks(
+                localAgent.network,
+                validated = false,
+                upstream = upstream?.network
+        )
 
         cm.unregisterNetworkCallback(requestCb)
 
@@ -866,12 +1051,14 @@ class CSLocalAgentTests : CSTest() {
         doTestLocalNetworkRequest(
                 request,
                 enableMatchLocalNetwork = false,
-                expectCallback = false)
+                expectCallback = false
+        )
         // If ENABLE_MATCH_LOCAL_NETWORK is true, request is satisfied by local network
         doTestLocalNetworkRequest(
                 request,
                 enableMatchLocalNetwork = true,
-                expectCallback = true)
+                expectCallback = true
+        )
     }
 
     @Test
@@ -880,10 +1067,12 @@ class CSLocalAgentTests : CSTest() {
         doTestLocalNetworkRequest(
                 request,
                 enableMatchLocalNetwork = false,
-                expectCallback = true)
+                expectCallback = true
+        )
         doTestLocalNetworkRequest(
                 request,
                 enableMatchLocalNetwork = true,
-                expectCallback = true)
+                expectCallback = true
+        )
     }
 }
