@@ -104,7 +104,8 @@ class CSAgentWrapper(
         doNothing().`when`(networkStack).makeNetworkMonitor(
                 nmNetworkCaptor.capture(),
                 any() /* name */,
-                nmCbCaptor.capture())
+                nmCbCaptor.capture()
+        )
 
         // Create the actual agent. NetworkAgent is abstract, so make an anonymous subclass.
         if (deps.isAtLeastS()) {
@@ -157,8 +158,10 @@ class CSAgentWrapper(
                 // Instead of forcefully adding NOT_SUSPENDED to all agents like older tools did,
                 // it's better to let the developer manage it as they see fit but help them
                 // debug if they forget.
-                fail("Could not connect the agent. Did you forget to add " +
-                        "NET_CAPABILITY_NOT_SUSPENDED ?")
+                fail(
+                    "Could not connect the agent. Did you forget to add " +
+                        "NET_CAPABILITY_NOT_SUSPENDED ?"
+                )
             }
             fail("Could not connect the agent. Instrumentation failure ?")
         }

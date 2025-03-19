@@ -61,7 +61,8 @@ class CSLocalAgentCreationTests : CSTest() {
     data class TestParams(
             val sdkLevel: Int,
             val isTv: Boolean = false,
-            val addLocalNetCapToRequest: Boolean = true)
+            val addLocalNetCapToRequest: Boolean = true
+    )
 
     companion object {
         @JvmStatic
@@ -81,8 +82,14 @@ class CSLocalAgentCreationTests : CSTest() {
     }
 
     private fun makeNativeNetworkConfigLocal(netId: Int, permission: Int) =
-            NativeNetworkConfig(netId, NativeNetworkType.PHYSICAL_LOCAL, permission,
-                    false /* secure */, VpnManager.TYPE_VPN_NONE, false /* excludeLocalRoutes */)
+            NativeNetworkConfig(
+                    netId,
+                    NativeNetworkType.PHYSICAL_LOCAL,
+                    permission,
+                    false /* secure */,
+                    VpnManager.TYPE_VPN_NONE,
+                    false /* excludeLocalRoutes */
+            )
 
     @Test
     fun testLocalAgents() {
@@ -99,8 +106,8 @@ class CSLocalAgentCreationTests : CSTest() {
             addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             addCapability(NET_CAPABILITY_LOCAL_NETWORK)
         }.build()
-        val localAgent = if (params.sdkLevel >= VERSION_V
-                || params.sdkLevel == VERSION_U && params.isTv) {
+        val localAgent = if (params.sdkLevel >= VERSION_V ||
+                params.sdkLevel == VERSION_U && params.isTv) {
             Agent(nc = ncTemplate, score = keepConnectedScore(), lnc = defaultLnc())
         } else {
             assertFailsWith<IllegalArgumentException> { Agent(nc = ncTemplate, lnc = defaultLnc()) }
@@ -109,7 +116,8 @@ class CSLocalAgentCreationTests : CSTest() {
         }
         localAgent.connect()
         netdInOrder.verify(netd).networkCreate(
-                makeNativeNetworkConfigLocal(localAgent.network.netId, INetd.PERMISSION_NONE))
+                makeNativeNetworkConfigLocal(localAgent.network.netId, INetd.PERMISSION_NONE)
+        )
         if (params.addLocalNetCapToRequest) {
             assertEquals(localAgent.network, allNetworksCb.expect<Available>().network)
         } else {
@@ -123,10 +131,12 @@ class CSLocalAgentCreationTests : CSTest() {
     @Test
     fun testBadAgents() {
         assertFailsWith<IllegalArgumentException> {
-            Agent(nc = NetworkCapabilities.Builder()
-                    .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                    .build(),
-                    lnc = null)
+            Agent(
+                    nc = NetworkCapabilities.Builder()
+                            .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                            .build(),
+                    lnc = null
+            )
         }
         assertFailsWith<IllegalArgumentException> {
             Agent(nc = NetworkCapabilities.Builder().build(), lnc = defaultLnc())
