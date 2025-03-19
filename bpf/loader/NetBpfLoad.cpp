@@ -1414,6 +1414,29 @@ static bool isWear() {
     return wear;
 }
 
+static int libbpfPrint(enum libbpf_print_level lvl, const char *const formatStr,
+                       va_list argList) {
+    int32_t prio;
+    switch (lvl) {
+      case LIBBPF_WARN:
+        prio = ANDROID_LOG_WARN;
+        break;
+      case LIBBPF_INFO:
+        prio = ANDROID_LOG_INFO;
+        break;
+      case LIBBPF_DEBUG:
+        prio = ANDROID_LOG_DEBUG;
+        break;
+    }
+    char *s = strdup(formatStr ?: "(no format string)");
+    int len = strlen(s);
+    if (len && s[len - 1] == '\n')
+        s[len - 1] = 0;
+    LOG_PRI_VA(prio, LOG_TAG, s, argList);
+    free(s);
+    return 0;
+}
+
 static int doLoad(char** argv, char * const envp[]) {
     if (!isAtLeastS) {
         ALOGE("Impossible - not reachable on Android <S.");
@@ -1421,6 +1444,7 @@ static int doLoad(char** argv, char * const envp[]) {
         // for any possible busted 'optimized' start everything vendor init hacks on R
         return 0;
     }
+    libbpf_set_print(libbpfPrint);
 
     const bool runningAsRoot = !getuid();  // true iff U QPR3 or V+
 
