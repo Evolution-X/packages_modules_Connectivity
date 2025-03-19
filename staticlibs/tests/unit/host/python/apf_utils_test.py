@@ -27,6 +27,7 @@ from net_tests_utils.host.python.apf_utils import (
     get_apf_counters_from_dumpsys,
     get_ipv4_addresses,
     get_non_tentative_ipv6_addresses,
+    get_exclude_all_host_ipv6_multicast_addresses,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
     is_packet_capture_supported,
@@ -168,6 +169,31 @@ IpClient.wlan1
   ) -> None:
     mock_adb_shell.return_value = ""
     ip_addresses = get_non_tentative_ipv6_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses, [])
+
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_exclude_all_host_ipv6_multicast_addresses_success(
+      self, mock_adb_shell: MagicMock
+  ) -> None:
+    mock_adb_shell.return_value = """
+47:     wlan0
+        inet6 ff02::1:ff99:37b0
+        inet6 ff02::1:ffb7:cba2 users 2
+        inet6 ff02::1
+        inet6 ff01::1
+"""
+    ip_addresses = get_exclude_all_host_ipv6_multicast_addresses(self.mock_ad, "wlan0")
+    asserts.assert_equal(ip_addresses,
+                         ["ff02::1:ff99:37b0",
+                          "ff02::1:ffb7:cba2"])
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_exclude_all_host_ipv6_multicast_addresses_not_found(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+    mock_adb_shell.return_value = ""
+    ip_addresses = get_exclude_all_host_ipv6_multicast_addresses(self.mock_ad, "wlan0")
     asserts.assert_equal(ip_addresses, [])
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
