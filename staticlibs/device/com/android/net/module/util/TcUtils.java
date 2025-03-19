@@ -16,6 +16,8 @@
 
 package com.android.net.module.util;
 
+import androidx.annotation.NonNull;
+
 import java.io.IOException;
 
 /**
@@ -33,7 +35,7 @@ public class TcUtils {
      * @return true if the interface uses an ethernet L2 header.
      * @throws IOException
      */
-    public static native boolean isEthernet(String iface) throws IOException;
+    public static native boolean isEthernet(@NonNull String iface) throws IOException;
 
     /**
      * Attach a tc bpf filter.
