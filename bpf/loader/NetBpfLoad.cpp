@@ -856,20 +856,24 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
     ret = getSectionSymNames(elfFile, "maps", mapNames);
     if (ret) return ret;
 
-    ret = readSectionByName(".BTF", elfFile, btfData);
-    if (ret) {
-        ALOGE("Failed to read .BTF section, ret:%d", ret);
-        return ret;
-    }
-    struct btf *btf = btf__new(btfData.data(), btfData.size());
-    if (btf == NULL) {
-        ALOGE("btf__new failed, errno: %d", errno);
-        return -errno;
-    }
-    auto scopeGuard = base::make_scope_guard([btf] { btf__free(btf); });
+    struct btf *btf = NULL;
+    auto scopeGuard = base::make_scope_guard([btf] { if (btf) btf__free(btf); });
+    if (isAtLeastKernelVersion(4, 18, 0)) {
+        // On Linux Kernels older than 4.18 BPF_BTF_LOAD command doesn't exist.
+        ret = readSectionByName(".BTF", elfFile, btfData);
+        if (ret) {
+            ALOGE("Failed to read .BTF section, ret:%d", ret);
+            return ret;
+        }
+        struct btf *btf = btf__new(btfData.data(), btfData.size());
+        if (btf == NULL) {
+            ALOGE("btf__new failed, errno: %d", errno);
+            return -errno;
+        }
 
-    ret = loadBtf(elfFile, btf);
-    if (ret) return ret;
+        ret = loadBtf(elfFile, btf);
+        if (ret) return ret;
+    }
 
     unsigned kvers = kernelVersion();
 
@@ -997,7 +1001,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
 
-            bool haveBtf = isBtfSupported(type);
+            bool haveBtf = btf && isBtfSupported(type);
             if (haveBtf) {
                 uint32_t kTid, vTid;
                 ret = getKeyValueTids(btf, mapNames[i].c_str(), md[i].key_size,
