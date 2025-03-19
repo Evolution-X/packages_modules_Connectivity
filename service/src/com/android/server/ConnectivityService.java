@@ -158,6 +158,7 @@ import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SO
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 import static com.android.server.connectivity.ConnectivityFlags.NAMESPACE_TETHERING_BOOT;
 import static com.android.server.connectivity.ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS;
+import static com.android.server.connectivity.ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER;
 import static com.android.server.connectivity.ConnectivityFlags.REQUEST_RESTRICTED_WIFI;
 import static com.android.server.connectivity.ConnectivityFlags.WIFI_DATA_INACTIVITY_TIMEOUT;
 
@@ -4696,6 +4697,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
             // If the network has been destroyed, the only thing that it can do is disconnect.
             if (nai.isDestroyed() && !isDisconnectRequest(msg)) {
+                if (DBG) {
+                    log("Message " + eventName(msg.what) + " from destroyed agent with netId "
+                            + nai.network.netId);
+                }
                 return;
             }
 
@@ -4704,6 +4709,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 // when registration is complete. It does this by sending all the
                 // messages in the order received immediately after the
                 // EVENT_AGENT_REGISTERED message.
+                if (DBG) {
+                    log("Message " + eventName(msg.what) + " enqueued for agent with netId "
+                            + nai.network.netId);
+                }
                 return;
             }
 
@@ -9418,10 +9427,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (DBG) log("registerNetworkAgent " + nai);
         mDeps.getNetworkStack().makeNetworkMonitor(
                 nai.network, name, new NetworkMonitorCallbacks(nai));
-        // NetworkAgentInfo registration will finish when the NetworkMonitor is created.
-        // If the network disconnects or sends any other event before that, messages are deferred by
-        // NetworkAgent until nai.connect(), which will be called when finalizing the
-        // registration. TODO : have NetworkAgentInfo defer them instead.
+        // NetworkAgentInfo registration is done, but CS will only accept messages when the
+        // NetworkMonitor is created. If the network disconnects or sends any other event
+        // before that, messages are deferred by the Tracker Handler until it is (by asking
+        // NetworkAgentInfo to do it). The window is very small unless the NetworkStack
+        // doesn't reply immediately, which would mean a broken system anyway.
         final NetworkAndAgentRegistryParcelable result = new NetworkAndAgentRegistryParcelable();
         result.network = nai.network;
         result.registry = nai.getRegistry();
@@ -9455,6 +9465,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
         updateVpnUids(nai, null, nai.networkCapabilities);
+        nai.processEnqueuedMessages(mTrackerHandler::handleMessage);
     }
 
     private class NetworkOfferInfo implements IBinder.DeathRecipient {
@@ -15048,6 +15059,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (mUseDeclaredMethodsForCallbacksEnabled) {
             features |= ConnectivityManager.FEATURE_USE_DECLARED_METHODS_FOR_CALLBACKS;
         }
+        if (mQueueNetworkAgentEventsInSystemServer) {
+            features |= ConnectivityManager.FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER;
+        }
         return features;
     }
 
@@ -15056,6 +15070,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         switch (featureFlag) {
             case INGRESS_TO_VPN_ADDRESS_FILTERING:
                 return mIngressToVpnAddressFiltering;
+            case QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
+                return mQueueNetworkAgentEventsInSystemServer;
             default:
                 throw new IllegalArgumentException("Unknown flag: " + featureFlag);
         }
