@@ -25,8 +25,8 @@ import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_TEST;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkCapabilities.transportNamesOf;
-import static android.system.OsConstants.EIO;
 import static android.system.OsConstants.EEXIST;
+import static android.system.OsConstants.EIO;
 import static android.system.OsConstants.ENOENT;
 
 import static com.android.net.module.util.FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED;
@@ -93,6 +93,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Consumer;
 
 /**
  * A bag class used by ConnectivityService for holding a collection of most recent
@@ -717,8 +718,20 @@ public class NetworkAgentInfo implements NetworkRanker.Scoreable {
         }
 
         mHandler.obtainMessage(EVENT_AGENT_REGISTERED, ARG_AGENT_SUCCESS, 0, this).sendToTarget();
+    }
+
+    /**
+     * Pass all enqueued messages to the message processor argument, and clear the queue.
+     *
+     * This is called by ConnectivityService when it is ready to receive messages for this
+     * network agent. The processor may process the messages synchronously or asynchronously
+     * at its option.
+     *
+     * @param messageProcessor a function to process the messages
+     */
+    public void processEnqueuedMessages(final Consumer<Message> messageProcessor) {
         for (final Message enqueued : mMessagesPendingRegistration) {
-            mHandler.sendMessage(enqueued);
+            messageProcessor.accept(enqueued);
         }
         mMessagesPendingRegistration.clear();
     }

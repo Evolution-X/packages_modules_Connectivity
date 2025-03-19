@@ -17,6 +17,7 @@
 package com.android.testutils
 
 import android.content.Context
+import android.net.ConnectivityManager.FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER
 import android.net.InetAddresses.parseNumericAddress
 import android.net.KeepalivePacketData
 import android.net.LinkAddress
@@ -28,6 +29,7 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED
 import android.net.NetworkCapabilities.TRANSPORT_TEST
 import android.net.NetworkProvider
 import android.net.NetworkRequest
+import android.net.NetworkScore
 import android.net.QosFilter
 import android.net.Uri
 import android.os.Looper
@@ -64,15 +66,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import org.junit.Assert.assertArrayEquals
 
 // Any legal score (0~99) for the test network would do, as it is going to be kept up by the
 // requests filed by the test and should never match normal internet requests. 70 is the default
 // score of Ethernet networks, it's as good a value as any other.
-private const val TEST_NETWORK_SCORE = 70
+private val TEST_NETWORK_SCORE = NetworkScore.Builder().setLegacyInt(70).build()
 
 private class Provider(context: Context, looper: Looper) :
             NetworkProvider(context, looper, "NetworkAgentTest NetworkProvider")
+
+private val enabledFeatures = mutableMapOf(
+    FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER to true
+)
 
 public open class TestableNetworkAgent(
     context: Context,
@@ -81,8 +88,17 @@ public open class TestableNetworkAgent(
     val lp: LinkProperties,
     conf: NetworkAgentConfig
 ) : NetworkAgent(context, looper, TestableNetworkAgent::class.java.simpleName /* tag */,
-        nc, lp, TEST_NETWORK_SCORE, conf, Provider(context, looper)) {
+    nc, lp, TEST_NETWORK_SCORE, conf, Provider(context, looper)) {
+
+    override fun isFeatureEnabled(context: Context, feature: Long): Boolean {
+        when (val it = enabledFeatures.get(feature)) {
+            null -> fail("Unmocked feature $feature, see TestableNetworkAgent.enabledFeatures")
+            else -> return it
+        }
+    }
+
     companion object {
+        fun setFeatureEnabled(flag: Long, enabled: Boolean) = enabledFeatures.set(flag, enabled)
 
         /**
          * Convenience method to create a [NetworkRequest] matching [TestableNetworkAgent]s from
