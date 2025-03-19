@@ -997,7 +997,8 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             if (isAtLeastKernelVersion(4, 15, 0))
                 strlcpy(req.map_name, mapNames[i].c_str(), sizeof(req.map_name));
 
-            if (isBtfSupported(type)) {
+            bool haveBtf = isBtfSupported(type);
+            if (haveBtf) {
                 uint32_t kTid, vTid;
                 ret = getKeyValueTids(btf, mapNames[i].c_str(), md[i].key_size,
                                       md[i].value_size, &kTid, &vTid);
@@ -1005,17 +1006,16 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
                 req.btf_fd = btf__fd(btf);
                 req.btf_key_type_id = kTid;
                 req.btf_value_type_id = vTid;
-                ALOGI("Create map with BTF, map: %s", mapNames[i].c_str());
-            } else {
-                ALOGI("Create map without BTF, map: %s", mapNames[i].c_str());
             }
 
             fd.reset(bpf(BPF_MAP_CREATE, req));
             saved_errno = errno;
             if (fd.ok()) {
-                ALOGD("bpf_create_map[%s] -> %d", mapNames[i].c_str(), fd.get());
+                ALOGD("bpf_create_map[%s] btf:%d -> %d",
+                      mapNames[i].c_str(), haveBtf, fd.get());
             } else {
-                ALOGE("bpf_create_map[%s] -> %d errno:%d", mapNames[i].c_str(), fd.get(), saved_errno);
+                ALOGE("bpf_create_map[%s] btf:%d -> %d errno:%d",
+                      mapNames[i].c_str(), haveBtf, fd.get(), saved_errno);
             }
         }
 
