@@ -23,6 +23,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.net.TetheringInterface;
@@ -30,6 +31,8 @@ import android.net.cts.util.CtsTetheringUtils;
 import android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiSsid;
+
+import com.android.modules.utils.build.SdkLevel;
 
 import org.junit.After;
 import org.junit.Before;
@@ -64,6 +67,8 @@ public class TetheringTest {
      */
     @Test
     public void testSoftApConfigurationRedactedForOtherUids() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastB());
+
         mTetheringEventCallback.assumeWifiTetheringSupported(
                 getInstrumentation().getTargetContext());
         SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
