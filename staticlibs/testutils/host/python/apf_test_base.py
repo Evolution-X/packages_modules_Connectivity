@@ -70,6 +70,9 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
     # Enable doze mode to activate APF.
     adb_utils.set_doze_mode(self.clientDevice, True)
 
+    # wait for APF to become active.
+    time.sleep(3)
+
   def teardown_class(self):
     adb_utils.set_doze_mode(self.clientDevice, False)
     tether_utils.cleanup_tethering_for_upstream_type(
