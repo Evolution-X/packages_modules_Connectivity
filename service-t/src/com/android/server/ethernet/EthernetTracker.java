@@ -755,7 +755,17 @@ public class EthernetTracker {
     private void parseEthernetConfig(String configString) {
         final EthernetTrackerConfig config = createEthernetTrackerConfig(configString);
         NetworkCapabilities nc;
-        if (TextUtils.isEmpty(config.mCapabilities)) {
+        // Starting with Android B (API level 36), we provide default NetworkCapabilities
+        // for Ethernet interfaces when no explicit capabilities are specified in the
+        // configuration string. This change is made to ensure consistent and expected
+        // network behavior for Ethernet devices.
+        //
+        // It's possible that OEMs or device manufacturers may have relied on the previous
+        // behavior (where interfaces without specified capabilities would have minimal
+        // capabilities) to prevent certain Ethernet interfaces from becoming
+        // the default network. To avoid breaking existing device configurations, this
+        // change is gated by the SDK level.
+        if (SdkLevel.isAtLeastB() && TextUtils.isEmpty(config.mCapabilities)) {
             boolean isTestIface = config.mIface.matches(TEST_IFACE_REGEXP);
             nc = createDefaultNetworkCapabilities(isTestIface, config.mTransport);
         } else {
