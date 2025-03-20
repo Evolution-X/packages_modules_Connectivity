@@ -10059,11 +10059,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // Adds dns allow rule to LocalNetAccessMap for both TCP and UDP protocol at port 53,
             // if it is a local dns (ie. it falls in the local prefix range).
             if (prefix.contains(dnsServer)) {
-                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.addLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_UDP, 53, true);
-                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.addLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_TCP, 53, true);
-                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.addLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_TCP, 853, true);  // DNS over TLS
             }
         }
@@ -10083,24 +10083,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // Removes dns allow rule from LocalNetAccessMap for both TCP and UDP protocol
             // at port 53, if it is a local dns (ie. it falls in the prefix range).
             if (prefix.contains(dnsServer)) {
-                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.removeLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_UDP, 53);
-                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.removeLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_TCP, 53);
-                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                mBpfNetMaps.removeLocalNetAccess(32 + 128 + 16 + 16, iface, dnsServer,
                         IPPROTO_TCP, 853);  // DNS over TLS
             }
         }
-    }
-
-    /**
-     * Returns total bit length of an Ipv4 mapped address.
-     */
-    private int getIpv4MappedAddressBitLen() {
-        final int ifaceLen = 32; // bit length of interface
-        final int inetAddressLen = 32 + 96; // length of ipv4 mapped addresses
-        final int portProtocolLen = 32;  //16 for port + 16 for protocol;
-        return ifaceLen + inetAddressLen + portProtocolLen;
     }
 
     /**
