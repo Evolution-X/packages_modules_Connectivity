@@ -10063,6 +10063,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         IPPROTO_UDP, 53, true);
                 mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
                         IPPROTO_TCP, 53, true);
+                mBpfNetMaps.addLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 853, true);  // DNS over TLS
             }
         }
     }
@@ -10085,6 +10087,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         IPPROTO_UDP, 53);
                 mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
                         IPPROTO_TCP, 53);
+                mBpfNetMaps.removeLocalNetAccess(getIpv4MappedAddressBitLen(), iface, dnsServer,
+                        IPPROTO_TCP, 853);  // DNS over TLS
             }
         }
     }
