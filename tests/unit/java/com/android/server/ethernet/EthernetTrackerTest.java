@@ -44,6 +44,7 @@ import android.os.RemoteException;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.ethernet.EthernetTracker.EthernetTrackerConfig;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.HandlerUtils;
@@ -298,8 +299,7 @@ public class EthernetTrackerTest {
         final String transport = "4";
         final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
 
-        final EthernetTracker.EthernetTrackerConfig config =
-                EthernetTracker.createEthernetTrackerConfig(configString);
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
 
         assertEquals(TEST_IFACE, config.mIface);
         assertEquals(capabilities, config.mCapabilities);
@@ -309,8 +309,7 @@ public class EthernetTrackerTest {
 
     @Test
     public void testCreateEthernetTrackerConfigThrowsNpeWithNullInput() {
-        assertThrows(NullPointerException.class,
-                () -> EthernetTracker.createEthernetTrackerConfig(null));
+        assertThrows(NullPointerException.class, () -> new EthernetTrackerConfig(null));
     }
 
     @Test
