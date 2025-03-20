@@ -16,44 +16,23 @@
 package android.net.thread.utils;
 
 import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
-import static android.net.InetAddresses.parseNumericAddress;
-import static android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED;
-import static android.net.NetworkCapabilities.TRANSPORT_TEST;
-import static android.system.OsConstants.AF_INET6;
-import static android.system.OsConstants.IPPROTO_UDP;
-import static android.system.OsConstants.SOCK_DGRAM;
 
 import static com.android.testutils.RecorderCallback.CallbackEntry.LINK_PROPERTIES_CHANGED;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
-import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
-import android.net.NetworkAgentConfig;
-import android.net.NetworkCapabilities;
-import android.net.NetworkRequest;
 import android.net.TestNetworkInterface;
 import android.net.TestNetworkManager;
-import android.net.TestNetworkSpecifier;
 import android.os.Looper;
-import android.system.ErrnoException;
-import android.system.Os;
 
-import com.android.compatibility.common.util.PollingCheck;
 import com.android.testutils.TestableNetworkAgent;
 import com.android.testutils.TestableNetworkCallback;
 
-import java.io.FileDescriptor;
 import java.io.IOException;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /** A class that can create/destroy a test network based on TAP interface. */
 public final class TapTestNetworkTracker {
