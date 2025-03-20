@@ -380,10 +380,12 @@ which can be specified by vendors to customize the stack behavior. See
 [config_thread.xml](https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Connectivity/service/ServiceConnectivityResources/res/values/config_thread.xml)
 for the full list.
 
-Typically, you must change the `config_thread_vendor_name`,
-`config_thread_vendor_oui` and `config_thread_model_name` to your vendor or
-product values. Those values will be included in the `_meshcop._udp` mDNS
-service which is always advertised by a Thread Border Router.
+Typically, you must set `config_thread_border_router_default_enabled` to `true`
+to enable your device as a Thread Border Router, and change the
+`config_thread_vendor_name`, `config_thread_vendor_oui` and
+`config_thread_model_name` to your vendor or product values. Those values will
+be included in the `_meshcop._udp` mDNS service which is always advertised by a
+Thread Border Router.
 
 To add the overlay, you need to create a new `ConnectivityOverlayOrange`
 runtime_resource_overlay target for your Orange device. Create a new
@@ -436,6 +438,7 @@ device/banana/orange/rro_overlays/ConnectivityOverlay/
   ```
 - `config_thread.xml`:
   ```
+  <bool name="config_thread_border_router_default_enabled">true</bool>
   <string translatable="false" name="config_thread_vendor_name">Banana Inc.</string>
   <string translatable="false" name="config_thread_vendor_oui">AC:DE:48</string>
   <string translatable="false" name="config_thread_model_name">Orange</string>
