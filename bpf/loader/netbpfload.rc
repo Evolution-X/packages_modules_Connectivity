@@ -1,3 +1,5 @@
+# 2025 2 36 0 0 # 25q2 sdk/api level 36.0 - Android 16 Baklava QPR0
+
 # Note: This will actually execute /apex/com.android.tethering/bin/netbpfload
 # by virtue of 'service bpfloader' being overridden by the apex shipped .rc
 # Warning: most of the below settings are irrelevant unless the apex is missing.
