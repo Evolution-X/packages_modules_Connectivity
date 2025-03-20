@@ -28,9 +28,9 @@ from scapy.layers.inet6 import (
     ICMPv6ND_NA,
     RouterAlert
 )
-from scapy.layers.l2 import Ether
+from scapy.layers.l2 import ARP, Ether
 from scapy.contrib.igmpv3 import IGMPv3, IGMPv3mq, IGMPv3mr, IGMPv3gr
-from net_tests_utils.host.python import apf_test_base, apf_utils, adb_utils, assert_utils, packet_utils
+from net_tests_utils.host.python import apf_test_base, apf_utils, adb_utils, assert_utils
 
 APFV6_VERSION = 6000
 ARP_OFFLOAD_REPLY_LEN = 60
@@ -53,51 +53,57 @@ class ApfV6Test(apf_test_base.ApfTestBase):
         super().teardown_class()
 
     def test_unicast_arp_request_offload(self):
-        arp_request = packet_utils.construct_arp_packet(
-            src_mac=self.server_mac_address,
-            dst_mac=self.client_mac_address,
-            src_ip=self.server_ipv4_addresses[0],
-            dst_ip=self.client_ipv4_addresses[0],
-            op=packet_utils.ARP_REQUEST_OP
+        eth = Ether(src=self.server_mac_address, dst=self.client_mac_address)
+        arp = ARP(
+            op=1,
+            psrc=self.server_ipv4_addresses[0],
+            pdst=self.client_ipv4_addresses[0],
+            hwsrc=self.server_mac_address
         )
+        arp_request = bytes(eth/arp).hex()
 
-        arp_reply = packet_utils.construct_arp_packet(
-            src_mac=self.client_mac_address,
-            dst_mac=self.server_mac_address,
-            src_ip=self.client_ipv4_addresses[0],
-            dst_ip=self.server_ipv4_addresses[0],
-            op=packet_utils.ARP_REPLY_OP
+        eth = Ether(src=self.client_mac_address, dst=self.server_mac_address)
+        arp = ARP(
+            op=2,
+            psrc=self.client_ipv4_addresses[0],
+            pdst=self.server_ipv4_addresses[0],
+            hwsrc=self.client_mac_address,
+            hwdst=self.server_mac_address
         )
+        expected_arp_reply = bytes(eth/arp).hex()
 
         # Add zero padding up to 60 bytes, since APFv6 ARP offload always sent out 60 bytes reply
-        arp_reply = arp_reply.ljust(ARP_OFFLOAD_REPLY_LEN * 2, "0")
+        expected_arp_reply = expected_arp_reply.ljust(ARP_OFFLOAD_REPLY_LEN * 2, "0")
 
         self.send_packet_and_expect_reply_received(
-            arp_request, "DROPPED_ARP_REQUEST_REPLIED", arp_reply
+            arp_request, "DROPPED_ARP_REQUEST_REPLIED", expected_arp_reply
         )
 
     def test_broadcast_arp_request_offload(self):
-        arp_request = packet_utils.construct_arp_packet(
-            src_mac=self.server_mac_address,
-            dst_mac=packet_utils.ETHER_BROADCAST_MAC_ADDRESS,
-            src_ip=self.server_ipv4_addresses[0],
-            dst_ip=self.client_ipv4_addresses[0],
-            op=packet_utils.ARP_REQUEST_OP
+        eth = Ether(src=self.server_mac_address, dst='ff:ff:ff:ff:ff:ff')
+        arp = ARP(
+            op=1,
+            psrc=self.server_ipv4_addresses[0],
+            pdst=self.client_ipv4_addresses[0],
+            hwsrc=self.server_mac_address
         )
+        arp_request = bytes(eth/arp).hex()
 
-        arp_reply = packet_utils.construct_arp_packet(
-            src_mac=self.client_mac_address,
-            dst_mac=self.server_mac_address,
-            src_ip=self.client_ipv4_addresses[0],
-            dst_ip=self.server_ipv4_addresses[0],
-            op=packet_utils.ARP_REPLY_OP
+        eth = Ether(src=self.client_mac_address, dst=self.server_mac_address)
+        arp = ARP(
+            op=2,
+            psrc=self.client_ipv4_addresses[0],
+            pdst=self.server_ipv4_addresses[0],
+            hwsrc=self.client_mac_address,
+            hwdst=self.server_mac_address
         )
+        expected_arp_reply = bytes(eth/arp).hex()
 
         # Add zero padding up to 60 bytes, since APFv6 ARP offload always sent out 60 bytes reply
-        arp_reply = arp_reply.ljust(ARP_OFFLOAD_REPLY_LEN * 2, "0")
+        expected_arp_reply = expected_arp_reply.ljust(ARP_OFFLOAD_REPLY_LEN * 2, "0")
 
         self.send_packet_and_expect_reply_received(
-            arp_request, "DROPPED_ARP_REQUEST_REPLIED", arp_reply
+            arp_request, "DROPPED_ARP_REQUEST_REPLIED", expected_arp_reply
         )
 
     def test_non_dad_ipv6_neighbor_solicitation_offload(self):
