@@ -268,6 +268,16 @@ Status BpfHandler::init(const char* cg2_path) {
     RETURN_IF_NOT_OK(initMaps());
 
     if (isAtLeast25Q2) {
+        struct rlimit limit = {
+            .rlim_cur = 1u << 30,  // 1 GiB
+            .rlim_max = 1u << 30,  // 1 GiB
+        };
+        // 25Q2 netd.rc includes "rlimit memlock 1073741824 1073741824"
+        // so this should be a no-op, and thus just succeed.
+        // make sure it isn't lowered in platform netd.rc...
+        if (setrlimit(RLIMIT_MEMLOCK, &limit))
+            return statusFromErrno(errno, "Failed to set 1GiB RLIMIT_MEMLOCK");
+
         // Make sure netd can create & write maps.  sepolicy is V+, but enough to enforce on 25Q2+
         int key = 1;
         int value = 123;
