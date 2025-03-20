@@ -18,6 +18,8 @@ package com.android.server.ethernet;
 
 import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -292,13 +294,12 @@ public class EthernetTrackerTest {
         final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
         assertEquals(
                 expectedNetworkCapabilities,
-                EthernetTracker.createNetworkCapabilities(config.mCapabilities, config.mTransport)
-                        .build());
+                EthernetTracker.createNetworkCapabilities(config.mCaps, config.mTransport).build());
     }
 
     @Test
     public void testCreateEthernetTrackerConfigReturnsCorrectValue() {
-        final String capabilities = "2";
+        final String capabilities = "2,4,6,8";
         final String ipConfig = "3";
         final String transport = "1";
         final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
@@ -306,7 +307,7 @@ public class EthernetTrackerTest {
         final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
 
         assertEquals(TEST_IFACE, config.mIface);
-        assertEquals(capabilities, config.mCapabilities);
+        assertThat(config.mCaps).containsExactly(2, 4, 6, 8);
         assertEquals(ipConfig, config.mIpConfig);
         assertEquals(NetworkCapabilities.TRANSPORT_WIFI, config.mTransport);
     }
