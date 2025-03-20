@@ -442,7 +442,7 @@ def at_least_B():
         "client device is not B+"
       )
 
-      asserts.abort_class_if(not self.client.isAtLeastB(), "not B+")
+      asserts.skip_if(not self.client.isAtLeastB(), "not B+")
       return test_function(self, *args, **kwargs)
     return wrapper
   return decorator
