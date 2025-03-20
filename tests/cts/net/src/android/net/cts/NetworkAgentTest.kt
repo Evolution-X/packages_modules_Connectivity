@@ -1660,17 +1660,16 @@ class NetworkAgentTest {
 
         // Connect a third network. Because network1 is awaiting replacement, network3 is preferred
         // as soon as it validates (until then, it is outscored by network1).
-        // The fact that the first event seen by matchAllCallback is the connection of network3
+        // The fact that the first events seen by matchAllCallback is the connection of network3
         // implicitly ensures that no callbacks are sent since network1 was lost.
         val (agent3, network3) = connectNetwork(lp = lp)
+        matchAllCallback.expectAvailableThenValidatedCallbacks(network3)
+        testCallback.expectAvailableDoubleValidatedCallbacks(network3)
+        sendAndExpectUdpPacket(network3, reader, iface)
 
         // As soon as the replacement arrives, network1 is disconnected.
         // Check that this happens before the replacement timeout (5 seconds) fires.
-        matchAllCallback.expectAvailableCallbacks(network3, validated = false)
         matchAllCallback.expect<Lost>(network1, 2_000 /* timeoutMs */)
-        matchAllCallback.expectCaps(network3) { it.hasCapability(NET_CAPABILITY_VALIDATED) }
-        sendAndExpectUdpPacket(network3, reader, iface)
-        testCallback.expectAvailableDoubleValidatedCallbacks(network3)
         agent1.expectCallback<OnNetworkUnwanted>()
 
         // Test lingering:
@@ -1718,7 +1717,7 @@ class NetworkAgentTest {
         val callback = TestableNetworkCallback()
         requestNetwork(makeTestNetworkRequest(specifier = specifier6), callback)
         val agent6 = createNetworkAgent(specifier = specifier6)
-        agent6.register()
+        val network6 = agent6.register()
         if (SHOULD_CREATE_NETWORKS_IMMEDIATELY) {
             agent6.expectCallback<OnNetworkCreated>()
         } else {
@@ -1788,9 +1787,8 @@ class NetworkAgentTest {
 
         val (newWifiAgent, newWifiNetwork) = connectNetwork(TRANSPORT_WIFI)
         testCallback.expectAvailableCallbacks(newWifiNetwork, validated = true)
-        matchAllCallback.expectAvailableCallbacks(newWifiNetwork, validated = false)
+        matchAllCallback.expectAvailableThenValidatedCallbacks(newWifiNetwork)
         matchAllCallback.expect<Lost>(wifiNetwork)
-        matchAllCallback.expectCaps(newWifiNetwork) { it.hasCapability(NET_CAPABILITY_VALIDATED) }
         wifiAgent.expectCallback<OnNetworkUnwanted>()
         testCallback.expect<CapabilitiesChanged>(newWifiNetwork)
 
