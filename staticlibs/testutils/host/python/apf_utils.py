@@ -439,10 +439,10 @@ def at_least_B():
     def wrapper(self, *args, **kwargs):
       asserts.abort_class_if(
         (not hasattr(self, 'client')) or (not hasattr(self.client, 'isAtLeastB')),
-        "client device is not B+"
+        "no valid client attribute"
       )
 
-      asserts.skip_if(not self.client.isAtLeastB(), "not B+")
+      asserts.abort_class_if(not self.client.isAtLeastB(), "client device is not Android B+")
       return test_function(self, *args, **kwargs)
     return wrapper
   return decorator
