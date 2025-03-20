@@ -447,6 +447,24 @@ def at_least_B():
     return wrapper
   return decorator
 
+def apf_ram_at_least(size):
+  def decorator(test_function):
+    @functools.wraps(test_function)
+    def wrapper(self, *args, **kwargs):
+      asserts.abort_class_if(
+        (not hasattr(self, 'clientDevice')) or (not hasattr(self, 'client_iface_name')),
+        "no valid client attribute"
+      )
+
+      caps = get_apf_capabilities(self.clientDevice, self.client_iface_name)
+      asserts.skip_if(
+        caps.apf_ram_size < size,
+        f'APF rame size {caps.apf_ram_size} < {size}'
+      )
+      return test_function(self, *args, **kwargs)
+    return wrapper
+  return decorator
+
 class AdbOutputHandler:
   def __init__(self, ad, cmd):
     self._ad = ad
