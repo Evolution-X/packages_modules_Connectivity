@@ -284,11 +284,15 @@ public class EthernetTrackerTest {
 
     private void assertParsedNetworkCapabilities(
             NetworkCapabilities expectedNetworkCapabilities,
-            String configCapabiltiies,
+            String configCapabilities,
             String configTransports) {
+        final String ipConfig = "";
+        final String configString =
+                String.join(";", TEST_IFACE, configCapabilities, ipConfig, configTransports);
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
         assertEquals(
                 expectedNetworkCapabilities,
-                EthernetTracker.createNetworkCapabilities(configCapabiltiies, configTransports)
+                EthernetTracker.createNetworkCapabilities(config.mCapabilities, config.mTransport)
                         .build());
     }
 
@@ -296,7 +300,7 @@ public class EthernetTrackerTest {
     public void testCreateEthernetTrackerConfigReturnsCorrectValue() {
         final String capabilities = "2";
         final String ipConfig = "3";
-        final String transport = "4";
+        final String transport = "1";
         final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
 
         final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
@@ -304,7 +308,29 @@ public class EthernetTrackerTest {
         assertEquals(TEST_IFACE, config.mIface);
         assertEquals(capabilities, config.mCapabilities);
         assertEquals(ipConfig, config.mIpConfig);
-        assertEquals(transport, config.mTransport);
+        assertEquals(NetworkCapabilities.TRANSPORT_WIFI, config.mTransport);
+    }
+
+    @Test
+    public void testCreateEthernetTrackerConfig_withInvalidTransport() {
+        final String capabilities = "2";
+        final String ipConfig = "3";
+        final String transport = "100"; // Invalid transport type
+        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
+
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
+    }
+
+    @Test
+    public void testCreateEthernetTrackerConfig_withDisallowedTransport() {
+        final String capabilities = "2";
+        final String ipConfig = "3";
+        final String transport = "4"; // TRANSPORT_VPN is not allowed
+        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
+
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
     }
 
     @Test
