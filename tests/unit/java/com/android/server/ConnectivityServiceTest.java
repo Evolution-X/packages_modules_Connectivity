@@ -2241,7 +2241,8 @@ public class ConnectivityServiceTest {
         private static final int VERSION_T = 3;
         private static final int VERSION_U = 4;
         private static final int VERSION_V = 5;
-        private static final int VERSION_MAX = VERSION_V;
+        private static final int VERSION_B = 6;
+        private static final int VERSION_MAX = VERSION_B;
         private int mSdkLevel = VERSION_UNMOCKED;
 
         private void setBuildSdk(final int sdkLevel) {
@@ -2268,6 +2269,12 @@ public class ConnectivityServiceTest {
         public boolean isAtLeastU() {
             return mSdkLevel == VERSION_UNMOCKED ? super.isAtLeastU()
                     : mSdkLevel >= VERSION_U;
+        }
+
+        @Override
+        public boolean isAtLeastB() {
+            return mSdkLevel == VERSION_UNMOCKED ? super.isAtLeastB()
+                    : mSdkLevel >= VERSION_B;
         }
 
         @Override
