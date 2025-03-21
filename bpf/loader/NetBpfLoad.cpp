@@ -1822,6 +1822,19 @@ static int doLoad(char** argv, char * const envp[]) {
         return 1;
     }
 
+    if (isAtLeast25Q2) {
+        FILE * f = fopen("/system/etc/init/netbpfload.rc", "re");
+        if (!f) {
+            ALOGE("failure opening /system/etc/init/netbpfload.rc");
+            return 1;
+        }
+        int y = -1, q = -1, a = -1, b = -1, c = -1;
+        int v = fscanf(f, "# %d %d %d %d %d #", &y, &q, &a, &b, &c);
+        ALOGI("detected %d of 5: %dQ%d api:%d.%d.%d", v, y, q, a, b, c);
+        fclose(f);
+        if (v != 5 || y != 2025 || q != 2 || a != 36 || b || c) return 1;
+    }
+
     // Ensure we can determine the Android build type.
     if (!isEng() && !isUser() && !isUserdebug()) {
         ALOGE("Failed to determine the build type: got %s, want 'eng', 'user', or 'userdebug'",
