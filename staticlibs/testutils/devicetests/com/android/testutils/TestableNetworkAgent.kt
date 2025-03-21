@@ -17,6 +17,7 @@
 package com.android.testutils
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.ConnectivityManager.FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER
 import android.net.InetAddresses.parseNumericAddress
 import android.net.KeepalivePacketData
@@ -77,9 +78,7 @@ private val TEST_NETWORK_SCORE = NetworkScore.Builder().setLegacyInt(70).build()
 private class Provider(context: Context, looper: Looper) :
             NetworkProvider(context, looper, "NetworkAgentTest NetworkProvider")
 
-private val enabledFeatures = mutableMapOf(
-    FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER to true
-)
+private val enabledFeatures = mutableMapOf<Long, Boolean>()
 
 public open class TestableNetworkAgent(
     context: Context,
@@ -92,7 +91,12 @@ public open class TestableNetworkAgent(
 
     override fun isFeatureEnabled(context: Context, feature: Long): Boolean {
         when (val it = enabledFeatures.get(feature)) {
-            null -> fail("Unmocked feature $feature, see TestableNetworkAgent.enabledFeatures")
+            null -> {
+                val cm = context.getSystemService(ConnectivityManager::class.java)
+                val res = cm.isFeatureEnabled(feature)
+                enabledFeatures[feature] = res
+                return res
+            }
             else -> return it
         }
     }
