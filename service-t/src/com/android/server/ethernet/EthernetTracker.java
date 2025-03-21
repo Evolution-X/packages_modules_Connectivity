@@ -18,6 +18,10 @@ package com.android.server.ethernet;
 
 import static android.net.EthernetManager.ETHERNET_STATE_DISABLED;
 import static android.net.EthernetManager.ETHERNET_STATE_ENABLED;
+import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
+import static android.net.NetworkCapabilities.TRANSPORT_LOWPAN;
+import static android.net.NetworkCapabilities.TRANSPORT_VPN;
+import static android.net.NetworkCapabilities.TRANSPORT_WIFI_AWARE;
 import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
@@ -65,6 +69,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
@@ -639,7 +644,7 @@ public class EthernetTracker {
             nc = mNetworkCapabilities.get(hwAddress);
             if (nc == null) {
                 final boolean isTestIface = iface.matches(TEST_IFACE_REGEXP);
-                nc = createDefaultNetworkCapabilities(isTestIface, /* overrideTransport */ null);
+                nc = createDefaultNetworkCapabilities(isTestIface, TRANSPORT_ETHERNET);
             }
         }
 
@@ -753,7 +758,7 @@ public class EthernetTracker {
      * <interface name|mac address>;[Network Capabilities];[IP config];[Override Transport]}
      */
     private void parseEthernetConfig(String configString) {
-        final EthernetTrackerConfig config = createEthernetTrackerConfig(configString);
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
         NetworkCapabilities nc;
         // Starting with Android B (API level 36), we provide default NetworkCapabilities
         // for Ethernet interfaces when no explicit capabilities are specified in the
@@ -765,11 +770,11 @@ public class EthernetTracker {
         // capabilities) to prevent certain Ethernet interfaces from becoming
         // the default network. To avoid breaking existing device configurations, this
         // change is gated by the SDK level.
-        if (SdkLevel.isAtLeastB() && TextUtils.isEmpty(config.mCapabilities)) {
+        if (SdkLevel.isAtLeastB() && config.mCaps.isEmpty()) {
             boolean isTestIface = config.mIface.matches(TEST_IFACE_REGEXP);
             nc = createDefaultNetworkCapabilities(isTestIface, config.mTransport);
         } else {
-            nc = createNetworkCapabilities(config.mCapabilities, config.mTransport).build();
+            nc = createNetworkCapabilities(config.mCaps, config.mTransport).build();
         }
         mNetworkCapabilities.put(config.mIface, nc);
 
@@ -779,16 +784,10 @@ public class EthernetTracker {
         }
     }
 
-    @VisibleForTesting
-    static EthernetTrackerConfig createEthernetTrackerConfig(@NonNull final String configString) {
-        Objects.requireNonNull(configString, "EthernetTrackerConfig requires non-null config");
-        return new EthernetTrackerConfig(configString.split(";", /* limit of tokens */ 4));
-    }
-
     private static NetworkCapabilities createDefaultNetworkCapabilities(
-            boolean isTestIface, @Nullable String overrideTransport) {
+            boolean isTestIface, int transportType) {
         NetworkCapabilities.Builder builder =
-                createNetworkCapabilities(/* commaSeparatedCapabilities */ null, overrideTransport)
+                createNetworkCapabilities(Collections.emptyList(), transportType)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
@@ -808,19 +807,18 @@ public class EthernetTracker {
     /**
      * Parses a static list of network capabilities
      *
-     * @param commaSeparatedCapabilities A comma separated string list of integer encoded
-     *                                   NetworkCapability.NET_CAPABILITY_* values
+     * @param capabilities      A List of NetworkCapabilities.
      * @param overrideTransport A string representing a single integer encoded override transport
      *                          type. Must be one of the NetworkCapability.TRANSPORT_*
      *                          values. TRANSPORT_VPN is not supported. Errors with input
      *                          will cause the override to be ignored.
      */
     @VisibleForTesting
-    static NetworkCapabilities.Builder createNetworkCapabilities(
-            @Nullable String commaSeparatedCapabilities, @Nullable String overrideTransport) {
+    static NetworkCapabilities.Builder createNetworkCapabilities(List<Integer> capabilities,
+            int transportType) {
 
         final NetworkCapabilities.Builder builder =
-                TextUtils.isEmpty(commaSeparatedCapabilities)
+                capabilities.isEmpty()
                         ? new NetworkCapabilities.Builder()
                         : NetworkCapabilities.Builder.withoutDefaultCapabilities();
 
@@ -828,50 +826,13 @@ public class EthernetTracker {
         // attempt to add it. Since we can only have one override, all errors with it will
         // gracefully default back to TRANSPORT_ETHERNET and warn the user. VPN is not allowed as an
         // override type. Wifi Aware and LoWPAN are currently unsupported as well.
-        int transport = NetworkCapabilities.TRANSPORT_ETHERNET;
-        if (!TextUtils.isEmpty(overrideTransport)) {
-            try {
-                int parsedTransport = Integer.valueOf(overrideTransport);
-                if (parsedTransport == NetworkCapabilities.TRANSPORT_VPN
-                        || parsedTransport == NetworkCapabilities.TRANSPORT_WIFI_AWARE
-                        || parsedTransport == NetworkCapabilities.TRANSPORT_LOWPAN) {
-                    Log.e(TAG, "Override transport '" + parsedTransport + "' is not supported. "
-                            + "Defaulting to TRANSPORT_ETHERNET");
-                } else {
-                    transport = parsedTransport;
-                }
-            } catch (NumberFormatException nfe) {
-                Log.e(TAG, "Override transport type '" + overrideTransport + "' "
-                        + "could not be parsed. Defaulting to TRANSPORT_ETHERNET");
-            }
-        }
-
-        // Apply the transport. If the user supplied a valid number that is not a valid transport
-        // then adding will throw an exception. Default back to TRANSPORT_ETHERNET if that happens
-        try {
-            builder.addTransportType(transport);
-        } catch (IllegalArgumentException iae) {
-            Log.e(TAG, transport + " is not a valid NetworkCapability.TRANSPORT_* value. "
-                    + "Defaulting to TRANSPORT_ETHERNET");
-            builder.addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET);
-        }
+        builder.addTransportType(transportType);
 
         builder.setLinkUpstreamBandwidthKbps(100 * 1000);
         builder.setLinkDownstreamBandwidthKbps(100 * 1000);
 
-        if (!TextUtils.isEmpty(commaSeparatedCapabilities)) {
-            for (String strNetworkCapability : commaSeparatedCapabilities.split(",")) {
-                if (!TextUtils.isEmpty(strNetworkCapability)) {
-                    try {
-                        builder.addCapability(Integer.valueOf(strNetworkCapability));
-                    } catch (NumberFormatException nfe) {
-                        Log.e(TAG, "Capability '" + strNetworkCapability + "' could not be parsed");
-                    } catch (IllegalArgumentException iae) {
-                        Log.e(TAG, strNetworkCapability + " is not a valid "
-                                + "NetworkCapability.NET_CAPABILITY_* value");
-                    }
-                }
-            }
+        for (int capability : capabilities) {
+            builder.addCapability(capability);
         }
         // Ethernet networks have no way to update the following capabilities, so they always
         // have them.
@@ -1053,16 +1014,67 @@ public class EthernetTracker {
     @VisibleForTesting
     static class EthernetTrackerConfig {
         final String mIface;
-        final String mCapabilities;
+        final List<Integer> mCaps;
         final String mIpConfig;
-        final String mTransport;
+        final int mTransport;
 
-        EthernetTrackerConfig(@NonNull final String[] tokens) {
-            Objects.requireNonNull(tokens, "EthernetTrackerConfig requires non-null tokens");
+        private static List<Integer> parseCapabilities(String capabilitiesString) {
+            if (TextUtils.isEmpty(capabilitiesString)) {
+                return Collections.emptyList();
+            }
+
+            final ArrayList<Integer> capabilities = new ArrayList<>();
+            for (String strNetworkCapability : capabilitiesString.split(",")) {
+                if (TextUtils.isEmpty(strNetworkCapability)) {
+                    continue;
+                }
+                final Integer capability;
+                try {
+                    capability = Integer.valueOf(strNetworkCapability);
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "Failed to parse capability: " + strNetworkCapability, e);
+                    continue;
+                }
+                capabilities.add(capability);
+            }
+            return capabilities;
+        }
+
+        private static int parseTransportType(String transportString) {
+            if (TextUtils.isEmpty(transportString)) {
+                return TRANSPORT_ETHERNET;
+            }
+
+            final int parsedTransport;
+            try {
+                parsedTransport = Integer.valueOf(transportString);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "Failed to parse transport type", e);
+                return TRANSPORT_ETHERNET;
+            }
+
+            if (!NetworkCapabilities.isValidTransport(parsedTransport)) {
+                return TRANSPORT_ETHERNET;
+            }
+
+            switch (parsedTransport) {
+                case TRANSPORT_VPN:
+                case TRANSPORT_WIFI_AWARE:
+                case TRANSPORT_LOWPAN:
+                    Log.e(TAG, "Unsupported transport type '" + parsedTransport + "'");
+                    return TRANSPORT_ETHERNET;
+                default:
+                    return parsedTransport;
+            }
+        }
+
+        EthernetTrackerConfig(String configString) {
+            Objects.requireNonNull(configString, "EthernetTrackerConfig requires non-null config");
+            final String[] tokens = configString.split(";", /* limit of tokens */ 4);
             mIface = tokens[0];
-            mCapabilities = tokens.length > 1 ? tokens[1] : null;
+            mCaps = tokens.length > 1 ? parseCapabilities(tokens[1]) : Collections.emptyList();
             mIpConfig = tokens.length > 2 && !TextUtils.isEmpty(tokens[2]) ? tokens[2] : null;
-            mTransport = tokens.length > 3 ? tokens[3] : null;
+            mTransport = tokens.length > 3 ? parseTransportType(tokens[3]) : TRANSPORT_ETHERNET;
         }
     }
 }
