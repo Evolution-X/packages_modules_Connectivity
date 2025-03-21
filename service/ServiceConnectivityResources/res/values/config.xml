@@ -193,6 +193,8 @@
                    The NOT_ROAMING, NOT_CONGESTED and NOT_SUSPENDED capabilities are always
                    added automatically because this configuration provides no way to update
                    them dynamically.
+                   On Android B+, a "*" string configures the same default capabilities as is
+                   used for interfaces without any explicit configuration.
                [IP config] Optional. If empty or not specified - DHCP will be used, otherwise
                    use the following format to specify static IP configuration:
                        ip=<ip-address/mask> gateway=<ip-address> dns=<comma-sep-ip-addresses>

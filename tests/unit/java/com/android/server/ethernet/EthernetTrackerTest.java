@@ -180,163 +180,77 @@ public class EthernetTrackerTest {
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED);
     }
 
-    /**
-     * Test: Attempt to create a capabilities with various valid sets of capabilities/transports
-     */
+
     @Test
-    public void createNetworkCapabilities() {
-        // Particularly common expected results
-        NetworkCapabilities defaultCapabilities =
-                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-                        .build();
+    public void testNetworkCapabilityParsing() {
+        final NetworkCapabilities baseNc = NetworkCapabilities.Builder.withoutDefaultCapabilities()
+                .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
+                .setLinkUpstreamBandwidthKbps(100 * 1000 /* 100 Mbps */)
+                .setLinkDownstreamBandwidthKbps(100 * 1000 /* 100 Mbps */)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED)
+                .build();
 
-        NetworkCapabilities ethernetClearedWithCommonCaps =
-                makeEthernetCapabilitiesBuilder(true /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-                        .addCapability(12)
-                        .addCapability(13)
-                        .addCapability(14)
-                        .addCapability(15)
-                        .build();
+        // Empty capabilities always default to the baseNc above.
+        EthernetConfigParser parser = new EthernetConfigParser("eth0;", false /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
+        parser = new EthernetConfigParser("eth0;", true /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
 
-        // Empty capabilities and transports should return the default capabilities set
-        // with TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "");
+        // On Android B+, "*" defaults to using DEFAULT_CAPABILITIES.
+        parser = new EthernetConfigParser("eth0;*;;;;;;", true /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(EthernetTracker.DEFAULT_CAPABILITIES);
 
-        // Adding a list of capabilities will leave exactly those capabilities with a default
-        // TRANSPORT_ETHERNET since no overrides are specified
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15", "");
+        // But not so before B.
+        parser = new EthernetConfigParser("eth0;*", false /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
 
-        // Adding any invalid capabilities to the list will cause them to be ignored
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15,65,73", "");
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "12,13,14,15,abcdefg", "");
+        parser = new EthernetConfigParser("eth0;12,13,14,15;", false /*isAtLeastB*/);
+        assertThat(parser.mCaps.getCapabilities()).asList().containsAtLeast(12, 13, 14, 15);
 
-        // Adding a valid override transport will remove the default TRANSPORT_ETHERNET transport
-        // and apply only the override to the capabilities object
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(0)
-                        .build(),
-                "",
-                "0");
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(1)
-                        .build(),
-                "",
-                "1");
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(2)
-                        .build(),
-                "",
-                "2");
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(false /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addTransportType(3)
-                        .build(),
-                "",
-                "3");
+        parser = new EthernetConfigParser("eth0;12,13,500,abc", false /*isAtLeastB*/);
+        // 18, 20, 21 are added by EthernetConfigParser.
+        assertThat(parser.mCaps.getCapabilities()).asList().containsExactly(12, 13, 18, 20, 21);
 
-        // "4" is TRANSPORT_VPN, which is unsupported. Should default back to TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "4");
+        parser = new EthernetConfigParser("eth0;1,2,3;;0", false /*isAtLeastB*/);
+        assertThat(parser.mCaps.getCapabilities()).asList().containsAtLeast(1, 2, 3);
+        assertThat(parser.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).isTrue();
 
-        // "5" is TRANSPORT_WIFI_AWARE, which is currently supported due to no legacy TYPE_NONE
-        // conversion. When that becomes available, this test must be updated
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "5");
+        // TRANSPORT_VPN (4) is not allowed.
+        parser = new EthernetConfigParser("eth0;;;4", false /*isAtLeastB*/);
+        assertThat(parser.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_ETHERNET)).isTrue();
 
-        // "6" is TRANSPORT_LOWPAN, which is currently supported due to no legacy TYPE_NONE
-        // conversion. When that becomes available, this test must be updated
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "6");
-
-        // Adding an invalid override transport will leave the transport as TRANSPORT_ETHERNET
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "100");
-        assertParsedNetworkCapabilities(defaultCapabilities, "", "abcdefg");
-
-        // Ensure the adding of both capabilities and transports work
-        assertParsedNetworkCapabilities(
-                makeEthernetCapabilitiesBuilder(true /* clearDefaults */)
-                        .setLinkUpstreamBandwidthKbps(100000)
-                        .setLinkDownstreamBandwidthKbps(100000)
-                        .addCapability(12)
-                        .addCapability(13)
-                        .addCapability(14)
-                        .addCapability(15)
-                        .addTransportType(3)
-                        .build(),
-                "12,13,14,15",
-                "3");
-
-        // Ensure order does not matter for capability list
-        assertParsedNetworkCapabilities(ethernetClearedWithCommonCaps, "13,12,15,14", "");
-    }
-
-    private void assertParsedNetworkCapabilities(
-            NetworkCapabilities expectedNetworkCapabilities,
-            String configCapabilities,
-            String configTransports) {
-        final String ipConfig = "";
-        final String configString =
-                String.join(";", TEST_IFACE, configCapabilities, ipConfig, configTransports);
-        final EthernetConfigParser config = new EthernetConfigParser(configString);
-        assertEquals(
-                expectedNetworkCapabilities,
-                EthernetTracker.createNetworkCapabilities(config.mCaps, config.mTransport).build());
+        // invalid capability and transport type
+        parser = new EthernetConfigParser("eth0;-1,a,1000,,;;-1", false /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
     }
 
     @Test
-    public void testCreateEthernetConfigParserReturnsCorrectValue() {
-        final String capabilities = "2,4,6,8";
-        final String ipConfig = "3";
-        final String transport = "1";
-        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
+    public void testInterfaceNameParsing() {
+        EthernetConfigParser parser = new EthernetConfigParser("eth12", false /*isAtLeastB*/);
+        assertThat(parser.mIface).isEqualTo("eth12");
 
-        final EthernetConfigParser config = new EthernetConfigParser(configString);
+        parser = new EthernetConfigParser("", true /*isAtLeastB*/);
+        assertThat(parser.mIface).isEqualTo("");
 
-        assertEquals(TEST_IFACE, config.mIface);
-        assertThat(config.mCaps).containsExactly(2, 4, 6, 8);
-        assertEquals(ipConfig, config.mIpConfig);
-        assertEquals(NetworkCapabilities.TRANSPORT_WIFI, config.mTransport);
+        parser = new EthernetConfigParser("eth0;12;", true /*isAtLeastB*/);
+        assertThat(parser.mIface).isEqualTo("eth0");
     }
 
     @Test
-    public void testCreateEthernetConfigParser_withInvalidTransport() {
-        final String capabilities = "2";
-        final String ipConfig = "3";
-        final String transport = "100"; // Invalid transport type
-        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
-
-        final EthernetConfigParser config = new EthernetConfigParser(configString);
-        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
-    }
-
-    @Test
-    public void testCreateEthernetConfigParser_withDisallowedTransport() {
-        final String capabilities = "2";
-        final String ipConfig = "3";
-        final String transport = "4"; // TRANSPORT_VPN is not allowed
-        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
-
-        final EthernetConfigParser config = new EthernetConfigParser(configString);
-        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
+    public void testIpConfigParsing() {
+        // Note that EthernetConfigParser doesn't actually parse the IpConfig (yet).
+        final EthernetConfigParser parser = new EthernetConfigParser(
+                "eth0;1,2,3;ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8;1",
+                false /*isAtLeastB*/);
+        assertThat(parser.mIpConfig)
+                .isEqualTo("ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8");
     }
 
     @Test
     public void testCreateEthernetConfigParserThrowsNpeWithNullInput() {
-        assertThrows(NullPointerException.class, () -> new EthernetConfigParser(null));
+        assertThrows(NullPointerException.class, () -> new EthernetConfigParser(null, false));
     }
 
     @Test
