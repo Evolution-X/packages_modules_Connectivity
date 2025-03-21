@@ -1938,8 +1938,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mUseDeclaredMethodsForCallbacksEnabled =
                 mDeps.isFeatureNotChickenedOut(context,
                         ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS);
-        mQueueNetworkAgentEventsInSystemServer =
-                mDeps.isFeatureNotChickenedOut(context,
+        mQueueNetworkAgentEventsInSystemServer = mDeps.isAtLeastB()
+                && mDeps.isFeatureNotChickenedOut(context,
                         ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
