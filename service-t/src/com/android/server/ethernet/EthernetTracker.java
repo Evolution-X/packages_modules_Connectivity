@@ -170,6 +170,10 @@ public class EthernetTracker {
             return resources.get().getStringArray(
                     com.android.connectivity.resources.R.array.config_ethernet_interfaces);
         }
+
+        public boolean isAtLeastB() {
+            return SdkLevel.isAtLeastB();
+        }
     }
 
     private class EthernetNetlinkMonitor extends NetlinkMonitor {
@@ -770,7 +774,7 @@ public class EthernetTracker {
         // capabilities) to prevent certain Ethernet interfaces from becoming
         // the default network. To avoid breaking existing device configurations, this
         // change is gated by the SDK level.
-        if (SdkLevel.isAtLeastB() && config.mCaps.isEmpty()) {
+        if (mDeps.isAtLeastB() && config.mCaps.isEmpty()) {
             nc = createDefaultNetworkCapabilities(false /* isTestIface */, config.mTransport);
         } else {
             nc = createNetworkCapabilities(config.mCaps, config.mTransport).build();
