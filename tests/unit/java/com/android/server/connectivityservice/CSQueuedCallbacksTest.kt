@@ -39,6 +39,7 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_TEMPORARILY_NOT_METERED
 import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
+import android.net.NetworkCapabilities.TRANSPORT_THREAD
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkPolicyManager.NetworkPolicyCallback
 import android.net.NetworkRequest
@@ -356,6 +357,7 @@ class CSQueuedCallbacksTest(freezingBehavior: FreezingBehavior) : CSTest() {
         val localAgent = Agent(
             nc = defaultNc()
                 .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                .addTransportType(TRANSPORT_THREAD)
                 .removeCapability(NET_CAPABILITY_INTERNET),
             lp = defaultLp().apply { interfaceName = "local42" },
             lnc = FromS(lnc)

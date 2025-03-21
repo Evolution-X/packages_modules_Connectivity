@@ -17,6 +17,8 @@
 package android.net;
 
 import static android.Manifest.permission.DUMP;
+import static android.Manifest.permission.LOG_COMPAT_CHANGE;
+import static android.Manifest.permission.READ_COMPAT_CHANGE_CONFIG;
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
@@ -29,6 +31,7 @@ import static android.net.TetheringTester.buildIcmpEchoPacketV4;
 import static android.net.TetheringTester.buildUdpPacket;
 import static android.net.TetheringTester.isExpectedIcmpPacket;
 import static android.net.TetheringTester.isExpectedUdpDnsPacket;
+import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS;
 import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 import static android.system.OsConstants.ICMP_ECHO;
 import static android.system.OsConstants.ICMP_ECHOREPLY;
@@ -52,6 +55,7 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
+import android.app.compat.CompatChanges;
 import android.content.Context;
 import android.net.TetheringManager.TetheringRequest;
 import android.net.TetheringTester.TetheredDevice;
@@ -1244,6 +1248,11 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @Test
     public void testLocalAgent_networkCallbacks() throws Exception {
+        final boolean isMatchNonThreadLocalNetworksEnabled = runAsShell(
+                READ_COMPAT_CHANGE_CONFIG, LOG_COMPAT_CHANGE,
+                () -> CompatChanges.isChangeEnabled(ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS));
+        assumeTrue(isMatchNonThreadLocalNetworksEnabled);
+
         mDeviceConfigRule.setConfig(NAMESPACE_TETHERING, TETHERING_LOCAL_NETWORK_AGENT, "1");
         assumeFalse(isInterfaceForTetheringAvailable());
         setIncludeTestInterfaces(true);

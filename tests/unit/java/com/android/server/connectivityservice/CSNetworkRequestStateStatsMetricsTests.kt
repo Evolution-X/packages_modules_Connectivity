@@ -20,6 +20,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
 import android.os.Process
+import android.text.TextUtils
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.TestableNetworkCallback
@@ -54,9 +55,17 @@ class CSNetworkRequestStateStatsMetricsTests : CSTest() {
         cm.requestNetwork(CELL_INTERNET_NOT_METERED_NR, TestableNetworkCallback())
         waitForIdle()
 
+        // Some fields might be altered by the service, e.g. mMatchNonThreadLocalNetworks.
+        // Check immutable differences instead.
         verify(networkRequestStateStatsMetrics).onNetworkRequestReceived(
-                argThat{req -> req.networkCapabilities.equals(
-                        CELL_INTERNET_NOT_METERED_NR.networkCapabilities)})
+                argThat { req ->
+                    TextUtils.isEmpty(
+                            req.networkCapabilities.describeImmutableDifferences(
+                                    CELL_INTERNET_NOT_METERED_NR.networkCapabilities
+                            )
+                    )
+                }
+        )
     }
 
     @Test
@@ -77,7 +86,13 @@ class CSNetworkRequestStateStatsMetricsTests : CSTest() {
         cm.unregisterNetworkCallback(cb)
         waitForIdle()
         verify(networkRequestStateStatsMetrics).onNetworkRequestRemoved(
-                argThat{req -> req.networkCapabilities.equals(
-                        CELL_INTERNET_NOT_METERED_NR.networkCapabilities)})
+                argThat { req ->
+                    TextUtils.isEmpty(
+                            req.networkCapabilities.describeImmutableDifferences(
+                                    CELL_INTERNET_NOT_METERED_NR.networkCapabilities
+                            )
+                    )
+                }
+        )
     }
 }

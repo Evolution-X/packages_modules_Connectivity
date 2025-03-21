@@ -360,8 +360,7 @@ public final class NetworkCapabilities implements Parcelable {
         mUnderlyingNetworks = null;
         mEnterpriseId = 0;
         mReservationId = RES_ID_UNSET;
-        // TODO: Change to default disabled when introduce this filtering.
-        mMatchNonThreadLocalNetworks = true;
+        mMatchNonThreadLocalNetworks = false;
     }
 
     /**
@@ -2961,8 +2960,7 @@ public final class NetworkCapabilities implements Parcelable {
      * Flag to control whether a NetworkRequest can match non-thread local networks.
      * @hide
      */
-    // TODO: Change to default disabled when introduce this filtering.
-    private boolean mMatchNonThreadLocalNetworks = true;
+    private boolean mMatchNonThreadLocalNetworks;
 
     /**
      * Returns the match non-thread local networks flag.
