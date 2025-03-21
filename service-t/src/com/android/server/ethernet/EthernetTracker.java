@@ -758,7 +758,7 @@ public class EthernetTracker {
      * <interface name|mac address>;[Network Capabilities];[IP config];[Override Transport]}
      */
     private void parseEthernetConfig(String configString) {
-        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        final EthernetConfigParser config = new EthernetConfigParser(configString);
         NetworkCapabilities nc;
         // Starting with Android B (API level 36), we provide default NetworkCapabilities
         // for Ethernet interfaces when no explicit capabilities are specified in the
@@ -1011,7 +1011,7 @@ public class EthernetTracker {
     }
 
     @VisibleForTesting
-    static class EthernetTrackerConfig {
+    static class EthernetConfigParser {
         final String mIface;
         final List<Integer> mCaps;
         final String mIpConfig;
@@ -1067,8 +1067,8 @@ public class EthernetTracker {
             }
         }
 
-        EthernetTrackerConfig(String configString) {
-            Objects.requireNonNull(configString, "EthernetTrackerConfig requires non-null config");
+        EthernetConfigParser(String configString) {
+            Objects.requireNonNull(configString, "EthernetConfigParser requires non-null config");
             final String[] tokens = configString.split(";", /* limit of tokens */ 4);
             mIface = tokens[0];
             mCaps = tokens.length > 1 ? parseCapabilities(tokens[1]) : Collections.emptyList();
