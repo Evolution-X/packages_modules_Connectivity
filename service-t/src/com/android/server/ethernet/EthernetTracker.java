@@ -771,8 +771,7 @@ public class EthernetTracker {
         // the default network. To avoid breaking existing device configurations, this
         // change is gated by the SDK level.
         if (SdkLevel.isAtLeastB() && config.mCaps.isEmpty()) {
-            boolean isTestIface = config.mIface.matches(TEST_IFACE_REGEXP);
-            nc = createDefaultNetworkCapabilities(isTestIface, config.mTransport);
+            nc = createDefaultNetworkCapabilities(false /* isTestIface */, config.mTransport);
         } else {
             nc = createNetworkCapabilities(config.mCaps, config.mTransport).build();
         }
