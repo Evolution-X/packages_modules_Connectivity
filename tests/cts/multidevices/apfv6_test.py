@@ -190,15 +190,18 @@ class ApfV6Test(apf_test_base.ApfTestBase):
 
         igmp = IGMPv3mr(records=mcast_records)
         expected_igmpv3_report = bytes(ether/ip/igmpv3_hdr/igmp).hex()
-        self.send_packet_and_expect_reply_received(
-            igmpv3_general_query, "DROPPED_IGMP_V3_GENERAL_QUERY_REPLIED", expected_igmpv3_report
-        )
-
-        for addr in mcast_addrs:
-            adb_utils.adb_shell(
-                self.clientDevice,
-                f'ip addr del {addr}/32 dev {self.client_iface_name}'
+        try:
+            self.send_packet_and_expect_reply_received(
+                igmpv3_general_query,
+                "DROPPED_IGMP_V3_GENERAL_QUERY_REPLIED",
+                expected_igmpv3_report
             )
+        finally:
+            for addr in mcast_addrs:
+                adb_utils.adb_shell(
+                    self.clientDevice,
+                    f'ip addr del {addr}/32 dev {self.client_iface_name}'
+                )
 
     @apf_utils.at_least_B()
     @apf_utils.apf_ram_at_least(3000)
