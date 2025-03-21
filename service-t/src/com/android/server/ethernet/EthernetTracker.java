@@ -792,8 +792,6 @@ public class EthernetTracker {
                 new NetworkCapabilities.Builder(DEFAULT_CAPABILITIES);
         if (isTestIface) {
             builder.addTransportType(NetworkCapabilities.TRANSPORT_TEST);
-            // TODO: do not remove INTERNET capability for test networks.
-            builder.removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         }
 
         return builder.build();
