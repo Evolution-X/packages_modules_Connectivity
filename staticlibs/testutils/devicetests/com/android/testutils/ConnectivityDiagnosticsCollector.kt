@@ -36,6 +36,7 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.ParcelFileDescriptor.AutoCloseInputStream
 import android.telephony.TelephonyManager
 import android.telephony.TelephonyManager.SIM_STATE_UNKNOWN
 import android.util.Log
@@ -46,6 +47,7 @@ import java.io.ByteArrayOutputStream
 import java.io.CharArrayWriter
 import java.io.File
 import java.io.FileReader
+import java.io.InputStream
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.io.PrintWriter
@@ -438,13 +440,44 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
      * <p>The output will be collected immediately, and exported to a test artifact file when the
      * test ends.
      * @param cmd The command to run. Stdout of the command will be collected.
-     * @param shell The shell to run the command in.
+     * @param shell The shell to run the command in, for example "sh".
+     * @param exceptionContext An exception to write a stacktrace to the dump for context.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    fun collectCommandOutput(
+        cmd: String,
+        shell: String,
+        exceptionContext: Throwable? = null
+    ) = collectCommandOutput(cmd, exceptionContext) { c, outputProcessor ->
+        runCommandInShell(c, shell, outputProcessor)
+    }
+
+    /**
+     * Add the output of a command to the test data dump.
+     *
+     * <p>The output will be collected immediately, and exported to a test artifact file when the
+     * test ends.
+     *
+     * <p>Note this does not support shell pipes, redirections, or quoted arguments. See the S+
+     * overload if that is needed.
+     * @param cmd The command to run. Stdout of the command will be collected.
      * @param exceptionContext An exception to write a stacktrace to the dump for context.
      */
     fun collectCommandOutput(
         cmd: String,
-        shell: String = "sh",
         exceptionContext: Throwable? = null
+    ) = collectCommandOutput(cmd, exceptionContext) { c, outputProcessor ->
+        AutoCloseInputStream(
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(c)
+        ).use {
+            outputProcessor(it)
+        }
+    }
+
+    private fun collectCommandOutput(
+        cmd: String,
+        exceptionContext: Throwable? = null,
+        commandRunner: (String, (InputStream) -> Unit) -> Unit
     ) {
         Log.i(TAG, "Collecting '$cmd' for test artifacts")
         PrintWriter(buffer).let {
@@ -453,7 +486,7 @@ class ConnectivityDiagnosticsCollector : BaseMetricListener() {
             it.flush()
         }
 
-        runCommandInShell(cmd, shell) { stdout, _ ->
+        commandRunner(cmd) { stdout ->
             stdout.copyTo(buffer)
         }
     }
