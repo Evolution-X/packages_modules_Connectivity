@@ -774,7 +774,9 @@ class DscpPolicyTest {
         runAsShell(MANAGE_TEST_NETWORKS) { agent.register() }
         // Without the fix, this will crash the system with SIGSEGV.
         agent.sendAddDscpPolicy(DscpPolicy.Builder(1, 1).build())
-        agent.expectCallback<OnDscpPolicyStatusUpdated>()
+        // Will receive OnNetworkCreated first if the agent is created early. To avoid reading
+        // the flag here, use eventuallyExpect.
+        agent.eventuallyExpect<OnDscpPolicyStatusUpdated>()
     }
 }
 
