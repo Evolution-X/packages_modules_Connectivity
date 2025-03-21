@@ -48,6 +48,7 @@ import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresSimulationThrea
 import android.net.thread.utils.ThreadFeatureCheckerRule.RequiresThreadFeature;
 import android.net.thread.utils.ThreadNetworkControllerWrapper;
 import android.os.HandlerThread;
+import android.os.SystemProperties;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
@@ -454,14 +455,22 @@ public class ServiceDiscoveryTest {
     }
 
     @Test
-    public void meshcopOverlay_vendorAndModelNameAreSetToOverlayValue() throws Exception {
+    public void meshcopOverlay_vendorAndModelNameAreSetToSystemProperties() throws Exception {
         NsdServiceInfo discoveredService = discoverService(mNsdManager, "_meshcop._udp");
         assertThat(discoveredService).isNotNull();
         NsdServiceInfo meshcopService = resolveService(mNsdManager, discoveredService);
+        String expectedVendorName = SystemProperties.get("ro.product.manufacturer");
+        if (expectedVendorName.length() > 24) {
+            expectedVendorName = expectedVendorName.substring(0, 24);
+        }
+        String expectedModelName = SystemProperties.get("ro.product.model");
+        if (expectedModelName.length() > 24) {
+            expectedModelName = expectedModelName.substring(0, 24);
+        }
 
         Map<String, byte[]> txtMap = meshcopService.getAttributes();
-        assertThat(txtMap.get("vn")).isEqualTo("Android".getBytes(UTF_8));
-        assertThat(txtMap.get("mn")).isEqualTo("Thread Border Router".getBytes(UTF_8));
+        assertThat(txtMap.get("vn")).isEqualTo(expectedVendorName.getBytes(UTF_8));
+        assertThat(txtMap.get("mn")).isEqualTo(expectedModelName.getBytes(UTF_8));
     }
 
     @Test
