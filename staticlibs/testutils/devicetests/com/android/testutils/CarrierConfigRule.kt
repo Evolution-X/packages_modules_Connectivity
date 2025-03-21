@@ -40,6 +40,7 @@ import com.android.modules.utils.build.SdkLevel
 import com.android.testutils.runAsShell
 import com.android.testutils.tryTest
 import java.security.MessageDigest
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.rules.TestRule
@@ -204,6 +205,7 @@ class CarrierConfigRule : TestRule {
                 }
                 return@tryTest
             }
+            cv.close()
             if (hold) {
                 addConfigOverrides(subId, PersistableBundle().also {
                     it.putStringArray(CarrierConfigManager.KEY_CARRIER_CERTIFICATE_STRING_ARRAY,
@@ -212,6 +214,9 @@ class CarrierConfigRule : TestRule {
             } else {
                 cleanUpNow()
             }
+            assertTrue(cv.block(CARRIER_CONFIG_CHANGE_TIMEOUT_MS),
+                "Timed out waiting for CarrierPrivilegesCallback")
+            assertEquals(cpb.hasPrivilege, hold, "Couldn't set carrier privilege")
         } cleanup @JvmSerializableLambda {
             runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.unregisterCarrierPrivilegesCallback(cpb)

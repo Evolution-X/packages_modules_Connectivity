@@ -67,4 +67,15 @@ public class TetheringPermissionsUtilsTest {
         when(mDevicePolicyManager.isDeviceOwnerApp(TEST_PACKAGE)).thenReturn(true);
         assertThat(mTetheringPermissionsUtils.isDeviceOwner(TEST_UID, TEST_PACKAGE)).isTrue();
     }
+
+    @Test
+    public void testHasCarrierPrivilege() {
+        when(mTelephonyManager.checkCarrierPrivilegesForPackageAnyPhone(TEST_PACKAGE))
+                .thenReturn(TelephonyManager.CARRIER_PRIVILEGE_STATUS_NO_ACCESS);
+        assertThat(mTetheringPermissionsUtils.isCarrierPrivileged(TEST_PACKAGE)).isFalse();
+
+        when(mTelephonyManager.checkCarrierPrivilegesForPackageAnyPhone(TEST_PACKAGE))
+                .thenReturn(TelephonyManager.CARRIER_PRIVILEGE_STATUS_HAS_ACCESS);
+        assertThat(mTetheringPermissionsUtils.isCarrierPrivileged(TEST_PACKAGE)).isTrue();
+    }
 }
