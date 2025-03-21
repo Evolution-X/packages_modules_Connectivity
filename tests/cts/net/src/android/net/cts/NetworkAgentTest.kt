@@ -1015,6 +1015,12 @@ class NetworkAgentTest {
             mock(Network::class.java),
             mock(INetworkAgentRegistry::class.java)
         )
+        doReturn(SHOULD_CREATE_NETWORKS_IMMEDIATELY).`when`(mockCm)
+            .isFeatureEnabled(
+                eq(ConnectivityManager.FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER)
+            )
+        doReturn(Context.CONNECTIVITY_SERVICE).`when`(mockContext)
+            .getSystemServiceName(ConnectivityManager::class.java)
         doReturn(mockCm).`when`(mockContext).getSystemService(Context.CONNECTIVITY_SERVICE)
         doReturn(mockedResult).`when`(mockCm).registerNetworkAgent(
             any(),
@@ -1673,14 +1679,22 @@ class NetworkAgentTest {
         // The fact that the first event seen by matchAllCallback is the connection of network3
         // implicitly ensures that no callbacks are sent since network1 was lost.
         val (agent3, network3) = connectNetwork(lp = lp)
-
-        // As soon as the replacement arrives, network1 is disconnected.
-        // Check that this happens before the replacement timeout (5 seconds) fires.
-        matchAllCallback.expectAvailableCallbacks(network3, validated = false)
-        matchAllCallback.expect<Lost>(network1, 2_000 /* timeoutMs */)
-        matchAllCallback.expectCaps(network3) { it.hasCapability(NET_CAPABILITY_VALIDATED) }
-        sendAndExpectUdpPacket(network3, reader, iface)
-        testCallback.expectAvailableDoubleValidatedCallbacks(network3)
+        if (SHOULD_CREATE_NETWORKS_IMMEDIATELY) {
+            // This is the correct sequence of events.
+            matchAllCallback.expectAvailableCallbacks(network3, validated = false)
+            matchAllCallback.expect<Lost>(network1, 2_000 /* timeoutMs */)
+            matchAllCallback.expectCaps(network3) { it.hasCapability(NET_CAPABILITY_VALIDATED) }
+            sendAndExpectUdpPacket(network3, reader, iface)
+            testCallback.expectAvailableDoubleValidatedCallbacks(network3)
+        } else {
+            // This is incorrect and fixed by the "create networks immediately" feature
+            matchAllCallback.expectAvailableThenValidatedCallbacks(network3)
+            testCallback.expectAvailableDoubleValidatedCallbacks(network3)
+            sendAndExpectUdpPacket(network3, reader, iface)
+            // As soon as the replacement arrives, network1 is disconnected.
+            // Check that this happens before the replacement timeout (5 seconds) fires.
+            matchAllCallback.expect<Lost>(network1, 2_000 /* timeoutMs */)
+        }
         agent1.expectCallback<OnNetworkUnwanted>()
 
         // Test lingering:
@@ -1798,9 +1812,19 @@ class NetworkAgentTest {
 
         val (newWifiAgent, newWifiNetwork) = connectNetwork(TRANSPORT_WIFI)
         testCallback.expectAvailableCallbacks(newWifiNetwork, validated = true)
-        matchAllCallback.expectAvailableCallbacks(newWifiNetwork, validated = false)
-        matchAllCallback.expect<Lost>(wifiNetwork)
-        matchAllCallback.expectCaps(newWifiNetwork) { it.hasCapability(NET_CAPABILITY_VALIDATED) }
+        if (SHOULD_CREATE_NETWORKS_IMMEDIATELY) {
+            // This is the correct sequence of events
+            matchAllCallback.expectAvailableCallbacks(newWifiNetwork, validated = false)
+            matchAllCallback.expect<Lost>(wifiNetwork)
+            matchAllCallback.expectCaps(newWifiNetwork) {
+                it.hasCapability(NET_CAPABILITY_VALIDATED)
+            }
+        } else {
+            // When networks are not created immediately, the sequence is slightly incorrect
+            // and instead is as follows
+            matchAllCallback.expectAvailableThenValidatedCallbacks(newWifiNetwork)
+            matchAllCallback.expect<Lost>(wifiNetwork)
+        }
         wifiAgent.expectCallback<OnNetworkUnwanted>()
         testCallback.expect<CapabilitiesChanged>(newWifiNetwork)
 
