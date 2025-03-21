@@ -858,8 +858,10 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
 
     struct btf *btf = NULL;
     auto scopeGuard = base::make_scope_guard([btf] { if (btf) btf__free(btf); });
-    if (isAtLeastKernelVersion(4, 18, 0)) {
+    if (isAtLeastKernelVersion(5, 10, 0)) {
+        // Untested on Linux Kernel 5.4, but likely compatible.
         // On Linux Kernels older than 4.18 BPF_BTF_LOAD command doesn't exist.
+        // On Linux Kernels older than 5.2 BTF_KIND_VAR and BTF_KIND_DATASEC don't exist.
         ret = readSectionByName(".BTF", elfFile, btfData);
         if (ret) {
             ALOGE("Failed to read .BTF section, ret:%d", ret);
