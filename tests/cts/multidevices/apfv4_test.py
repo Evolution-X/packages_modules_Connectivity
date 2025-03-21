@@ -15,10 +15,12 @@
 from absl.testing import parameterized
 from mobly import asserts
 from net_tests_utils.host.python import apf_test_base, apf_utils
+from scapy.layers.l2 import Ether
 
 # Constants.
 COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED = "DROPPED_ETHERTYPE_NOT_ALLOWED"
 ETHER_BROADCAST_ADDR = "FFFFFFFFFFFF"
+MIN_PACKET_SIZE = 60
 
 
 class ApfV4Test(apf_test_base.ApfTestBase, parameterized.TestCase):
@@ -45,20 +47,18 @@ class ApfV4Test(apf_test_base.ApfTestBase, parameterized.TestCase):
   # Tests can use any disallowed packet type. Currently,
   # several ethertypes from the legacy ApfFilter denylist are used.
   @parameterized.parameters(
-      "88a2",  # ATA over Ethernet
-      "88a4",  # EtherCAT
-      "88b8",  # GOOSE (Generic Object Oriented Substation event)
-      "88cd",  # SERCOS III
-      "88e3",  # Media Redundancy Protocol (IEC62439-2)
+      0x88a2,  # ATA over Ethernet
+      0x88a4,  # EtherCAT
+      0x88b8,  # GOOSE (Generic Object Oriented Substation event)
+      0x88cd,  # SERCOS III
+      0x88e3,  # Media Redundancy Protocol (IEC62439-2)
   )  # Declare inputs for state_str and expected_result.
   def test_apf_drop_ethertype_not_allowed(self, blocked_ether_type):
-    # Ethernet header (14 bytes).
-    packet = self.client_mac_address.replace(":", "")  # Destination MAC
-    packet += self.server_mac_address.replace(":", "")  # Source MAC
-    packet += blocked_ether_type
+    eth = Ether(src=self.server_mac_address, dst=self.client_mac_address, type=blocked_ether_type)
+    packet = bytes(eth).hex()
 
-    # Pad with zeroes to minimum ethernet frame length.
-    packet += "00" * 46
+    # Add zero padding up to minimum ethernet frame length
+    packet = packet.ljust(MIN_PACKET_SIZE * 2, "0")
     self.send_packet_and_expect_counter_increased(
         packet, COUNTER_DROPPED_ETHERTYPE_NOT_ALLOWED
     )
