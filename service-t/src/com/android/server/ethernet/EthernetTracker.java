@@ -170,6 +170,10 @@ public class EthernetTracker {
             return resources.get().getStringArray(
                     com.android.connectivity.resources.R.array.config_ethernet_interfaces);
         }
+
+        public boolean isAtLeastB() {
+            return SdkLevel.isAtLeastB();
+        }
     }
 
     private class EthernetNetlinkMonitor extends NetlinkMonitor {
@@ -758,7 +762,7 @@ public class EthernetTracker {
      * <interface name|mac address>;[Network Capabilities];[IP config];[Override Transport]}
      */
     private void parseEthernetConfig(String configString) {
-        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        final EthernetConfigParser config = new EthernetConfigParser(configString);
         NetworkCapabilities nc;
         // Starting with Android B (API level 36), we provide default NetworkCapabilities
         // for Ethernet interfaces when no explicit capabilities are specified in the
@@ -770,9 +774,8 @@ public class EthernetTracker {
         // capabilities) to prevent certain Ethernet interfaces from becoming
         // the default network. To avoid breaking existing device configurations, this
         // change is gated by the SDK level.
-        if (SdkLevel.isAtLeastB() && config.mCaps.isEmpty()) {
-            boolean isTestIface = config.mIface.matches(TEST_IFACE_REGEXP);
-            nc = createDefaultNetworkCapabilities(isTestIface, config.mTransport);
+        if (mDeps.isAtLeastB() && config.mCaps.isEmpty()) {
+            nc = createDefaultNetworkCapabilities(false /* isTestIface */, config.mTransport);
         } else {
             nc = createNetworkCapabilities(config.mCaps, config.mTransport).build();
         }
@@ -1012,13 +1015,13 @@ public class EthernetTracker {
     }
 
     @VisibleForTesting
-    static class EthernetTrackerConfig {
+    static class EthernetConfigParser {
         final String mIface;
         final List<Integer> mCaps;
         final String mIpConfig;
         final int mTransport;
 
-        private static List<Integer> parseCapabilities(String capabilitiesString) {
+        private static List<Integer> parseCapabilities(@Nullable String capabilitiesString) {
             if (TextUtils.isEmpty(capabilitiesString)) {
                 return Collections.emptyList();
             }
@@ -1037,10 +1040,10 @@ public class EthernetTracker {
                 }
                 capabilities.add(capability);
             }
-            return capabilities;
+            return Collections.unmodifiableList(capabilities);
         }
 
-        private static int parseTransportType(String transportString) {
+        private static int parseTransportType(@Nullable String transportString) {
             if (TextUtils.isEmpty(transportString)) {
                 return TRANSPORT_ETHERNET;
             }
@@ -1068,13 +1071,13 @@ public class EthernetTracker {
             }
         }
 
-        EthernetTrackerConfig(String configString) {
-            Objects.requireNonNull(configString, "EthernetTrackerConfig requires non-null config");
+        EthernetConfigParser(String configString) {
+            Objects.requireNonNull(configString, "EthernetConfigParser requires non-null config");
             final String[] tokens = configString.split(";", /* limit of tokens */ 4);
             mIface = tokens[0];
-            mCaps = tokens.length > 1 ? parseCapabilities(tokens[1]) : Collections.emptyList();
+            mCaps = parseCapabilities(tokens.length > 1 ? tokens[1] : null);
             mIpConfig = tokens.length > 2 && !TextUtils.isEmpty(tokens[2]) ? tokens[2] : null;
-            mTransport = tokens.length > 3 ? parseTransportType(tokens[3]) : TRANSPORT_ETHERNET;
+            mTransport = parseTransportType(tokens.length > 3 ? tokens[3] : null);
         }
     }
 }
