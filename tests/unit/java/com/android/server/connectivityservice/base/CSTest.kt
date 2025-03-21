@@ -112,7 +112,8 @@ internal const val VERSION_S = 2
 internal const val VERSION_T = 3
 internal const val VERSION_U = 4
 internal const val VERSION_V = 5
-internal const val VERSION_MAX = VERSION_V
+internal const val VERSION_B = 6
+internal const val VERSION_MAX = VERSION_B
 
 internal const val CALLING_UID_UNMOCKED = Process.INVALID_UID
 
@@ -388,6 +389,7 @@ open class CSTest {
         override fun isAtLeastT() = if (isSdkUnmocked) super.isAtLeastT() else sdkLevel >= VERSION_T
         override fun isAtLeastU() = if (isSdkUnmocked) super.isAtLeastU() else sdkLevel >= VERSION_U
         override fun isAtLeastV() = if (isSdkUnmocked) super.isAtLeastV() else sdkLevel >= VERSION_V
+        override fun isAtLeastB() = if (isSdkUnmocked) super.isAtLeastB() else sdkLevel >= VERSION_B
 
         private var callingUid = CALLING_UID_UNMOCKED
 
