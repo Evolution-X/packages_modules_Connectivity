@@ -148,6 +148,12 @@ public class TetheringConfiguration {
      */
     public static final String TETHER_ACTIVE_SESSIONS_METRICS = "tether_active_sessions_metrics";
 
+    /**
+     * A feature flag to control whether the tethering local network agent should be enabled.
+     * Disabled by default.
+     */
+    public static final String TETHERING_LOCAL_NETWORK_AGENT = "tethering_local_network_agent";
+
     public final String[] tetherableUsbRegexs;
     public final String[] tetherableWifiRegexs;
     public final String[] tetherableWigigRegexs;
