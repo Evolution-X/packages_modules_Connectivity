@@ -556,9 +556,9 @@ static int readCodeSections(ifstream& elfFile, vector<codeSection>& cs) {
         vector<string> csSymNames;
         ret = getSectionSymNames(elfFile, oldName, csSymNames, STT_FUNC);
         if (ret || !csSymNames.size()) return ret;
-        for (size_t i = 0; i < progDefNames.size(); ++i) {
-            if (!progDefNames[i].compare(csSymNames[0] + "_def")) {
-                cs_temp.prog_def = pd[i];
+        for (size_t j = 0; j < progDefNames.size(); ++j) {
+            if (!progDefNames[j].compare(csSymNames[0] + "_def")) {
+                cs_temp.prog_def = pd[j];
                 break;
             }
         }
@@ -858,14 +858,16 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
 
     struct btf *btf = NULL;
     auto scopeGuard = base::make_scope_guard([btf] { if (btf) btf__free(btf); });
-    if (isAtLeastKernelVersion(4, 18, 0)) {
+    if (isAtLeastKernelVersion(5, 10, 0)) {
+        // Untested on Linux Kernel 5.4, but likely compatible.
         // On Linux Kernels older than 4.18 BPF_BTF_LOAD command doesn't exist.
+        // On Linux Kernels older than 5.2 BTF_KIND_VAR and BTF_KIND_DATASEC don't exist.
         ret = readSectionByName(".BTF", elfFile, btfData);
         if (ret) {
             ALOGE("Failed to read .BTF section, ret:%d", ret);
             return ret;
         }
-        struct btf *btf = btf__new(btfData.data(), btfData.size());
+        btf = btf__new(btfData.data(), btfData.size());
         if (btf == NULL) {
             ALOGE("btf__new failed, errno: %d", errno);
             return -errno;
