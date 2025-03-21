@@ -1037,7 +1037,7 @@ public class EthernetTracker {
                 }
                 capabilities.add(capability);
             }
-            return capabilities;
+            return Collections.unmodifiableList(capabilities);
         }
 
         private static int parseTransportType(String transportString) {
