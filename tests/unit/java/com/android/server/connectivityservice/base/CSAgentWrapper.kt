@@ -137,7 +137,7 @@ class CSAgentWrapper(
         nmCallbacks.notifyNetworkTestedWithExtras(p)
     }
 
-    fun connect() {
+    fun connect(expectAvailable: Boolean = true) {
         val mgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val request = NetworkRequest.Builder().apply {
             clearCapabilities()
@@ -149,26 +149,30 @@ class CSAgentWrapper(
         val cb = TestableNetworkCallback()
         mgr.registerNetworkCallback(request, cb)
         agent.markConnected()
-        if (null == cb.poll { it is Available && agent.network == it.network }) {
-            if (!nc.hasCapability(NET_CAPABILITY_NOT_SUSPENDED) &&
-                    nc.hasTransport(TRANSPORT_CELLULAR)) {
-                // ConnectivityService adds NOT_SUSPENDED by default to all non-cell agents. An
-                // agent without NOT_SUSPENDED will not connect, instead going into the SUSPENDED
-                // state, so this call will not terminate.
-                // Instead of forcefully adding NOT_SUSPENDED to all agents like older tools did,
-                // it's better to let the developer manage it as they see fit but help them
-                // debug if they forget.
-                fail(
-                    "Could not connect the agent. Did you forget to add " +
-                        "NET_CAPABILITY_NOT_SUSPENDED ?"
-                )
+        if (expectAvailable) {
+            if (null == cb.poll { it is Available && agent.network == it.network }) {
+                if (!nc.hasCapability(NET_CAPABILITY_NOT_SUSPENDED) &&
+                        nc.hasTransport(TRANSPORT_CELLULAR)) {
+                    // ConnectivityService adds NOT_SUSPENDED by default to all non-cell agents. An
+                    // agent without NOT_SUSPENDED will not connect, instead going into the
+                    // SUSPENDED state, so this call will not terminate.
+                    // Instead of forcefully adding NOT_SUSPENDED to all agents like older tools did,
+                    // it's better to let the developer manage it as they see fit but help them
+                    // debug if they forget.
+                    fail(
+                        "Could not connect the agent. Did you forget to add " +
+                            "NET_CAPABILITY_NOT_SUSPENDED ?"
+                    )
+                }
+                fail("Could not connect the agent. Instrumentation failure ?")
             }
-            fail("Could not connect the agent. Instrumentation failure ?")
+        } else {
+            cb.assertNoCallback()
         }
         mgr.unregisterNetworkCallback(cb)
     }
 
-    fun disconnect() {
+    fun disconnect(expectAvailable: Boolean = true) {
         val mgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val request = NetworkRequest.Builder().apply {
             clearCapabilities()
@@ -179,9 +183,14 @@ class CSAgentWrapper(
         }.build()
         val cb = TestableNetworkCallback(timeoutMs = SHORT_TIMEOUT_MS)
         mgr.registerNetworkCallback(request, cb)
-        cb.eventuallyExpect<Available> { it.network == agent.network }
-        agent.unregister()
-        cb.eventuallyExpect<Lost> { it.network == agent.network }
+        if (expectAvailable) {
+            cb.eventuallyExpect<Available> { it.network == agent.network }
+            agent.unregister()
+            cb.eventuallyExpect<Lost> { it.network == agent.network }
+        } else {
+            agent.unregister()
+            cb.assertNoCallback()
+        }
     }
 
     fun setTeardownDelayMillis(delayMillis: Int) = agent.setTeardownDelayMillis(delayMillis)

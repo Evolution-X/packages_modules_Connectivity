@@ -34,6 +34,7 @@ import android.net.INetd
 import android.net.IpPrefix
 import android.net.LinkAddress
 import android.net.LinkProperties
+import android.net.LocalNetworkConfig
 import android.net.NetworkAgentConfig
 import android.net.NetworkCapabilities
 import android.net.NetworkScore
@@ -83,6 +84,11 @@ internal fun defaultNc() = NetworkCapabilities.Builder()
         .build()
 
 internal fun defaultScore() = FromS(NetworkScore.Builder().build())
+
+internal fun keepConnectedScore() = FromS(NetworkScore.Builder()
+                .setKeepConnectedReason(NetworkScore.KEEP_CONNECTED_FOR_TEST).build())
+
+internal fun defaultLnc() = FromS(LocalNetworkConfig.Builder().build())
 
 internal fun defaultLp() = LinkProperties().apply {
     addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
