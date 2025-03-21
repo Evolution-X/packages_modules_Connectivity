@@ -20,6 +20,7 @@ import static android.net.NetworkStats.DEFAULT_NETWORK_ALL;
 import static android.net.NetworkStats.DEFAULT_NETWORK_NO;
 import static android.net.NetworkStats.METERED_ALL;
 import static android.net.NetworkStats.METERED_NO;
+import static android.net.NetworkStats.METERED_YES;
 import static android.net.NetworkStats.ROAMING_ALL;
 import static android.net.NetworkStats.ROAMING_NO;
 import static android.net.NetworkStats.SET_ALL;
@@ -29,6 +30,8 @@ import static android.net.NetworkStats.TAG_ALL;
 import static android.net.NetworkStats.TAG_NONE;
 import static android.net.NetworkStats.UID_ALL;
 
+import static com.android.server.net.NetworkStatsFactory.CONFIG_PER_UID_TAG_THROTTLING;
+import static com.android.server.net.NetworkStatsFactory.CONFIG_PER_UID_TAG_THROTTLING_THRESHOLD;
 import static com.android.server.net.NetworkStatsFactory.kernelToTag;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
@@ -36,6 +39,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 
 import android.content.Context;
@@ -52,12 +58,15 @@ import com.android.internal.util.ProcFileReader;
 import com.android.server.BpfNetMaps;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule.FeatureFlag;
 
 import libcore.io.IoUtils;
 import libcore.testing.io.TestIoUtils;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -66,6 +75,7 @@ import org.mockito.MockitoAnnotations;
 import java.io.File;
 import java.io.IOException;
 import java.net.ProtocolException;
+import java.util.HashMap;
 
 /** Tests for {@link NetworkStatsFactory}. */
 @RunWith(DevSdkIgnoreRunner.class)
@@ -73,12 +83,23 @@ import java.net.ProtocolException;
 @DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
 public class NetworkStatsFactoryTest extends NetworkStatsBaseTest {
     private static final String CLAT_PREFIX = "v4-";
+    private static final int TEST_TAGS_PER_UID_THRESHOLD = 10;
 
     private File mTestProc;
     private NetworkStatsFactory mFactory;
     @Mock private Context mContext;
     @Mock private NetworkStatsFactory.Dependencies mDeps;
     @Mock private BpfNetMaps mBpfNetMaps;
+
+    final HashMap<String, Boolean> mFeatureFlags = new HashMap<>();
+    // This will set feature flags from @FeatureFlag annotations
+    // into the map before setUp() runs.
+    @Rule
+    public final SetFeatureFlagsRule mSetFeatureFlagsRule =
+            new SetFeatureFlagsRule((name, enabled) -> {
+                mFeatureFlags.put(name, enabled);
+                return null;
+            }, (name) -> mFeatureFlags.getOrDefault(name, false));
 
     @Before
     public void setUp() throws Exception {
@@ -90,6 +111,10 @@ public class NetworkStatsFactoryTest extends NetworkStatsBaseTest {
         // related to networkStatsFactory is compiled to a minimal native library and loaded here.
         System.loadLibrary("networkstatsfactorytestjni");
         doReturn(mBpfNetMaps).when(mDeps).createBpfNetMaps(any());
+        doAnswer(invocation -> mFeatureFlags.getOrDefault((String) invocation.getArgument(1), true))
+            .when(mDeps).isFeatureNotChickenedOut(any(), anyString());
+        doReturn(TEST_TAGS_PER_UID_THRESHOLD).when(mDeps)
+                .getDeviceConfigPropertyInt(eq(CONFIG_PER_UID_TAG_THROTTLING_THRESHOLD), anyInt());
 
         mFactory = new NetworkStatsFactory(mContext, mDeps);
         mFactory.updateUnderlyingNetworkInfos(new UnderlyingNetworkInfo[0]);
@@ -496,6 +521,71 @@ public class NetworkStatsFactoryTest extends NetworkStatsBaseTest {
         assertValues(removedUidsStats, TEST_IFACE, UID_RED, 0L, 0L, 0L, 0L);
         assertValues(removedUidsStats, TEST_IFACE, UID_BLUE, 0L, 0L, 0L, 0L);
         assertValues(removedUidsStats, TEST_IFACE, UID_GREEN, 64L, 3L, 1024L, 8L);
+    }
+
+    @FeatureFlag(name = CONFIG_PER_UID_TAG_THROTTLING)
+    @Test
+    public void testFilterTooManyTags_featureEnabled() throws Exception {
+        doTestFilterTooManyTags(true);
+    }
+
+    @FeatureFlag(name = CONFIG_PER_UID_TAG_THROTTLING, enabled = false)
+    @Test
+    public void testFilterTooManyTags_featureDisabled() throws Exception {
+        doTestFilterTooManyTags(false);
+    }
+
+    private void doTestFilterTooManyTags(boolean supportPerUidTagThrottling) throws Exception {
+        // Add entries for UID_RED which reaches the threshold.
+        final NetworkStats statsWithManyTags = new NetworkStats(0L, TEST_TAGS_PER_UID_THRESHOLD);
+        for (int tag = 1; tag <= TEST_TAGS_PER_UID_THRESHOLD; tag++) {
+            statsWithManyTags.combineValues(
+                    new NetworkStats.Entry(TEST_IFACE, UID_RED, SET_DEFAULT, tag,
+                            METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 12L, 18L, 14L, 1L, 0L));
+        }
+        doReturn(statsWithManyTags).when(mDeps).getNetworkStatsDetail();
+        final NetworkStats stats1 = mFactory.readNetworkStatsDetail();
+        assertEquals(stats1.size(), TEST_TAGS_PER_UID_THRESHOLD);
+
+        // Add 2 new entries with pre-existing tag, verify they can be added no matter what.
+        final NetworkStats newDiffWithExistingTag = new NetworkStats(0L, 2);
+        // This one should be added as a new entry, as the metered data doesn't exist yet.
+        newDiffWithExistingTag.combineValues(
+                new NetworkStats.Entry(TEST_IFACE, UID_RED, SET_DEFAULT,
+                        TEST_TAGS_PER_UID_THRESHOLD,
+                        METERED_YES, ROAMING_NO, DEFAULT_NETWORK_NO, 3L, 5L, 8L, 1L, 1L));
+        // This one should be combined into existing entry.
+        newDiffWithExistingTag.combineValues(
+                new NetworkStats.Entry(TEST_IFACE, UID_RED, SET_DEFAULT,
+                        TEST_TAGS_PER_UID_THRESHOLD,
+                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 1L, 2L, 3L, 4L, 5L));
+
+        doReturn(newDiffWithExistingTag).when(mDeps).getNetworkStatsDetail();
+        final NetworkStats stats2 = mFactory.readNetworkStatsDetail();
+        assertEquals(stats2.size(), TEST_TAGS_PER_UID_THRESHOLD + 1);
+        assertValues(stats2, TEST_IFACE, UID_RED, SET_DEFAULT, TEST_TAGS_PER_UID_THRESHOLD,
+                METERED_YES, ROAMING_NO, DEFAULT_NETWORK_NO, 3L, 5L, 8L, 1L, 1L);
+        assertValues(stats2, TEST_IFACE, UID_RED, SET_DEFAULT, TEST_TAGS_PER_UID_THRESHOLD,
+                METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 13L, 20L, 17L, 5L, 5L);
+
+        // Add an entry which exceeds the threshold, verify the entry is filtered out.
+        final NetworkStats newDiffWithNonExistingTag = new NetworkStats(0L, 1);
+        newDiffWithNonExistingTag.combineValues(
+                new NetworkStats.Entry(TEST_IFACE, UID_RED, SET_DEFAULT,
+                        TEST_TAGS_PER_UID_THRESHOLD + 1,
+                        METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 12L, 18L, 14L, 1L, 0L));
+        doReturn(newDiffWithNonExistingTag).when(mDeps).getNetworkStatsDetail();
+        final NetworkStats stats3 = mFactory.readNetworkStatsDetail();
+        if (supportPerUidTagThrottling) {
+            assertEquals(stats3.size(), TEST_TAGS_PER_UID_THRESHOLD + 1);
+            assertNoStatsEntry(stats3, TEST_IFACE, UID_RED, SET_DEFAULT,
+                    TEST_TAGS_PER_UID_THRESHOLD + 1);
+        } else {
+            assertEquals(stats3.size(), TEST_TAGS_PER_UID_THRESHOLD + 2);
+            assertValues(stats3, TEST_IFACE, UID_RED, SET_DEFAULT,
+                    TEST_TAGS_PER_UID_THRESHOLD + 1,
+                    METERED_NO, ROAMING_NO, DEFAULT_NETWORK_NO, 12L, 18L, 14L, 1L, 0L);
+        }
     }
 
     private NetworkStats buildEmptyStats() {
