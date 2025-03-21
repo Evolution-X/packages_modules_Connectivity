@@ -18,6 +18,8 @@ package com.android.server.ethernet;
 
 import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -44,6 +46,7 @@ import android.os.RemoteException;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.ethernet.EthernetTracker.EthernetTrackerConfig;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.HandlerUtils;
@@ -283,34 +286,57 @@ public class EthernetTrackerTest {
 
     private void assertParsedNetworkCapabilities(
             NetworkCapabilities expectedNetworkCapabilities,
-            String configCapabiltiies,
+            String configCapabilities,
             String configTransports) {
+        final String ipConfig = "";
+        final String configString =
+                String.join(";", TEST_IFACE, configCapabilities, ipConfig, configTransports);
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
         assertEquals(
                 expectedNetworkCapabilities,
-                EthernetTracker.createNetworkCapabilities(configCapabiltiies, configTransports)
-                        .build());
+                EthernetTracker.createNetworkCapabilities(config.mCaps, config.mTransport).build());
     }
 
     @Test
     public void testCreateEthernetTrackerConfigReturnsCorrectValue() {
-        final String capabilities = "2";
+        final String capabilities = "2,4,6,8";
         final String ipConfig = "3";
-        final String transport = "4";
+        final String transport = "1";
         final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
 
-        final EthernetTracker.EthernetTrackerConfig config =
-                EthernetTracker.createEthernetTrackerConfig(configString);
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
 
         assertEquals(TEST_IFACE, config.mIface);
-        assertEquals(capabilities, config.mCapabilities);
+        assertThat(config.mCaps).containsExactly(2, 4, 6, 8);
         assertEquals(ipConfig, config.mIpConfig);
-        assertEquals(transport, config.mTransport);
+        assertEquals(NetworkCapabilities.TRANSPORT_WIFI, config.mTransport);
+    }
+
+    @Test
+    public void testCreateEthernetTrackerConfig_withInvalidTransport() {
+        final String capabilities = "2";
+        final String ipConfig = "3";
+        final String transport = "100"; // Invalid transport type
+        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
+
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
+    }
+
+    @Test
+    public void testCreateEthernetTrackerConfig_withDisallowedTransport() {
+        final String capabilities = "2";
+        final String ipConfig = "3";
+        final String transport = "4"; // TRANSPORT_VPN is not allowed
+        final String configString = String.join(";", TEST_IFACE, capabilities, ipConfig, transport);
+
+        final EthernetTrackerConfig config = new EthernetTrackerConfig(configString);
+        assertEquals(NetworkCapabilities.TRANSPORT_ETHERNET, config.mTransport);
     }
 
     @Test
     public void testCreateEthernetTrackerConfigThrowsNpeWithNullInput() {
-        assertThrows(NullPointerException.class,
-                () -> EthernetTracker.createEthernetTrackerConfig(null));
+        assertThrows(NullPointerException.class, () -> new EthernetTrackerConfig(null));
     }
 
     @Test
