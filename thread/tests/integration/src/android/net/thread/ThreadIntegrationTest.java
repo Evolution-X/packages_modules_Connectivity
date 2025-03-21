@@ -27,6 +27,8 @@ import static android.net.thread.utils.IntegrationTestUtils.waitFor;
 import static android.net.thread.utils.ThreadNetworkControllerWrapper.JOIN_TIMEOUT;
 import static android.os.SystemClock.elapsedRealtime;
 
+import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
+
 import static com.android.compatibility.common.util.SystemUtil.runShellCommand;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
@@ -121,6 +123,12 @@ public class ThreadIntegrationTest {
 
     @Before
     public void setUp() throws Exception {
+        getInstrumentation()
+                .getUiAutomation()
+                .grantRuntimePermission(
+                        "com.android.thread.tests.integration",
+                        "android.permission.NEARBY_WIFI_DEVICES");
+
         mExecutor = Executors.newSingleThreadExecutor();
         mFtd = new FullThreadDevice(10 /* nodeId */);
         mOtCtl = new OtDaemonController();
