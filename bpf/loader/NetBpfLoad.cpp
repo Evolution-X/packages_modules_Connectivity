@@ -769,7 +769,7 @@ int getKeyValueTids(const struct btf *btf, const char *mapName,
     const size_t max_name = 256;
     char kvTypeName[max_name];
     int64_t keySize, valueSize;
-    uint32_t kvId;
+    int32_t kvId;
 
     if (snprintf(kvTypeName, max_name, "____btf_map_%s", mapName) == max_name) {
         ALOGE("____btf_map_%s is too long", mapName);
