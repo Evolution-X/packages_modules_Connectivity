@@ -139,13 +139,13 @@ public final class ConnectivityCompatChanges {
 
     /**
      * Restrict local network access.
-     *
      * Apps targeting a release after V will require permissions to access the local network.
      *
+     * ToDo: Update the target SDK version once it's finalized.
      * @hide
      */
     @ChangeId
-    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.CUR_DEVELOPMENT)
+    @EnabledAfter(targetSdkVersion = 36)
     public static final long RESTRICT_LOCAL_NETWORK = 365139289L;
 
     private ConnectivityCompatChanges() {
