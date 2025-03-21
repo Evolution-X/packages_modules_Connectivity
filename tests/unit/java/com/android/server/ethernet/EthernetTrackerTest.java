@@ -192,12 +192,19 @@ public class EthernetTrackerTest {
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED)
                 .build();
 
+        // Empty capabilities always default to the baseNc above.
         EthernetConfigParser parser = new EthernetConfigParser("eth0;", false /*isAtLeastB*/);
         assertThat(parser.mCaps).isEqualTo(baseNc);
+        parser = new EthernetConfigParser("eth0;", true /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
 
-        // On Android B+, empty capabilities default to using DEFAULT_CAPABILITIES.
-        parser = new EthernetConfigParser("eth0;;;;;;;", true /*isAtLeastB*/);
+        // On Android B+, "*" defaults to using DEFAULT_CAPABILITIES.
+        parser = new EthernetConfigParser("eth0;*;;;;;;", true /*isAtLeastB*/);
         assertThat(parser.mCaps).isEqualTo(EthernetTracker.DEFAULT_CAPABILITIES);
+
+        // But not so before B.
+        parser = new EthernetConfigParser("eth0;*", false /*isAtLeastB*/);
+        assertThat(parser.mCaps).isEqualTo(baseNc);
 
         parser = new EthernetConfigParser("eth0;12,13,14,15;", false /*isAtLeastB*/);
         assertThat(parser.mCaps.getCapabilities()).asList().containsAtLeast(12, 13, 14, 15);

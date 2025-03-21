@@ -985,11 +985,12 @@ public class EthernetTracker {
             builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED);
             builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED);
 
-            if (TextUtils.isEmpty(capabilitiesString)) {
-                if (!isAtLeastB) {
-                    return builder.build();
-                }
-                // On Android B+, a null or empty string defaults to the same set of default
+            if (capabilitiesString == null) {
+                return builder.build();
+            }
+
+            if (isAtLeastB && capabilitiesString.equals("*")) {
+                // On Android B+, a "*" string defaults to the same set of default
                 // capabilities assigned to unconfigured interfaces.
                 return new NetworkCapabilities(DEFAULT_CAPABILITIES);
             }
