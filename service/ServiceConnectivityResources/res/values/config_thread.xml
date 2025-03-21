@@ -46,11 +46,12 @@
     <bool name="config_thread_location_use_for_country_code_enabled">true</bool>
 
     <!-- Specifies the UTF-8 vendor name of this device. If this value is not an empty string, it
-    will be included in TXT value (key is 'vn') of the "_meshcop._udp" mDNS service which is
-    published by the Thread service. A non-empty string value must not exceed length of 24 UTF-8
-    bytes.
+    will be included in TXT value (key is 'vn') of the "_meshcop._udp" mDNS service as well as the
+    Vendor Name TLV for network diagnostic. A non-empty string value must not exceed length of 24
+    UTF-8 bytes. A special value "ro.product.manufacturer" indicates this value should be derived
+    from the `ro.product.manufacturer` system property.
     -->
-    <string translatable="false" name="config_thread_vendor_name">Android</string>
+    <string translatable="false" name="config_thread_vendor_name">ro.product.manufacturer</string>
 
     <!-- Specifies the 24 bits vendor OUI of this device. If this value is not an empty string, it
     will be included in TXT (key is 'vo') value of the "_meshcop._udp" mDNS service which is
@@ -61,11 +62,12 @@
     <string translatable="false" name="config_thread_vendor_oui"></string>
 
     <!-- Specifies the UTF-8 product model name of this device. If this value is not an empty
-    string, it will be included in TXT (key is 'mn') value of the "_meshcop._udp" mDNS service
-    which is published by the Thread service. A non-empty string value must not exceed length of 24
-    UTF-8 bytes.
+    string, it will be included in TXT (key is 'mn') value of the "_meshcop._udp" mDNS service as
+    well as the Vendor Model TLV for network diagnostic. A non-empty string value must not exceed
+    length of 24 UTF-8 bytes. A special value "ro.product.model" indicates this value should be
+    derived from the `ro.product.model` system property.
     -->
-    <string translatable="false" name="config_thread_model_name">Thread Border Router</string>
+    <string translatable="false" name="config_thread_model_name">ro.product.model</string>
 
     <!-- Specifies vendor-specific mDNS TXT entries which will be included in the "_meshcop._udp"
     service. The TXT entries list MUST conform to the format requirement in RFC 6763 section 6. For

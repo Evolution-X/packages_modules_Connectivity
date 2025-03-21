@@ -128,6 +128,7 @@ import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
 import com.android.server.ServiceManagerWrapper;
 import com.android.server.connectivity.ConnectivityResources;
+import com.android.server.connectivity.MockableSystemProperties;
 import com.android.server.thread.openthread.BackboneRouterState;
 import com.android.server.thread.openthread.DnsTxtAttribute;
 import com.android.server.thread.openthread.IChannelMasksReceiver;
@@ -191,6 +192,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
     private final Context mContext;
     private final Handler mHandler;
+    private final MockableSystemProperties mSystemProperties;
 
     // Below member fields can only be accessed from the handler thread (`mHandler`). In
     // particular, the constructor does not run on the handler thread, so it must not touch any of
@@ -235,6 +237,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     ThreadNetworkControllerService(
             Context context,
             Handler handler,
+            MockableSystemProperties systemProperties,
             NetworkProvider networkProvider,
             Supplier<IOtDaemon> otDaemonSupplier,
             ConnectivityManager connectivityManager,
@@ -249,6 +252,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             Map<Network, LinkProperties> networkToLinkProperties) {
         mContext = context;
         mHandler = handler;
+        mSystemProperties = systemProperties;
         mNetworkProvider = networkProvider;
         mOtDaemonSupplier = otDaemonSupplier;
         mConnectivityManager = connectivityManager;
@@ -286,6 +290,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return new ThreadNetworkControllerService(
                 context,
                 handler,
+                new MockableSystemProperties(),
                 networkProvider,
                 () -> IOtDaemon.Stub.asInterface(ServiceManagerWrapper.waitForService("ot_daemon")),
                 connectivityManager,
@@ -355,7 +360,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 newOtDaemonConfig(mPersistentSettings.getConfiguration()),
                 mTunIfController.getTunFd(),
                 mNsdPublisher,
-                getMeshcopTxtAttributes(mResources.get()),
+                getMeshcopTxtAttributes(mResources.get(), mSystemProperties),
                 mCountryCodeSupplier.get(),
                 FeatureFlags.isTrelEnabled(),
                 mOtDaemonCallbackProxy);
@@ -365,10 +370,37 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return mOtDaemon;
     }
 
+    static String getVendorName(Resources resources, MockableSystemProperties systemProperties) {
+        final String PROP_MANUFACTURER = "ro.product.manufacturer";
+        String vendorName = resources.getString(R.string.config_thread_vendor_name);
+        if (vendorName.equalsIgnoreCase(PROP_MANUFACTURER)) {
+            vendorName = systemProperties.get(PROP_MANUFACTURER);
+            // Assume it's always ASCII chars in ro.product.manufacturer
+            if (vendorName.length() > MAX_VENDOR_NAME_UTF8_BYTES) {
+                vendorName = vendorName.substring(0, MAX_VENDOR_NAME_UTF8_BYTES);
+            }
+        }
+        return vendorName;
+    }
+
+    static String getModelName(Resources resources, MockableSystemProperties systemProperties) {
+        final String PROP_MODEL = "ro.product.model";
+        String modelName = resources.getString(R.string.config_thread_model_name);
+        if (modelName.equalsIgnoreCase(PROP_MODEL)) {
+            modelName = systemProperties.get(PROP_MODEL);
+            // Assume it's always ASCII chars in ro.product.model
+            if (modelName.length() > MAX_MODEL_NAME_UTF8_BYTES) {
+                modelName = modelName.substring(0, MAX_MODEL_NAME_UTF8_BYTES);
+            }
+        }
+        return modelName;
+    }
+
     @VisibleForTesting
-    static MeshcopTxtAttributes getMeshcopTxtAttributes(Resources resources) {
-        final String modelName = resources.getString(R.string.config_thread_model_name);
-        final String vendorName = resources.getString(R.string.config_thread_vendor_name);
+    static MeshcopTxtAttributes getMeshcopTxtAttributes(
+            Resources resources, MockableSystemProperties systemProperties) {
+        final String vendorName = getVendorName(resources, systemProperties);
+        final String modelName = getModelName(resources, systemProperties);
         final String vendorOui = resources.getString(R.string.config_thread_vendor_oui);
         final String[] vendorSpecificTxts =
                 resources.getStringArray(R.array.config_thread_mdns_vendor_specific_txts);
@@ -637,6 +669,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 .setSrpServerWaitForBorderRoutingEnabled(srpServerWaitEnabled)
                 .setBorderRouterAutoJoinEnabled(autoJoinEnabled)
                 .setCountryCodeEnabled(countryCodeEnabled)
+                .setVendorName(getVendorName(mResources.get(), mSystemProperties))
+                .setModelName(getModelName(mResources.get(), mSystemProperties))
                 .build();
     }
 

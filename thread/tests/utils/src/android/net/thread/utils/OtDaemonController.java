@@ -24,10 +24,13 @@ import android.os.SystemClock;
 import com.android.compatibility.common.util.SystemUtil;
 
 import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +40,9 @@ import java.util.stream.Collectors;
  * <p>Note that this class takes root privileged to run.
  */
 public final class OtDaemonController {
+    public static final int DIAG_VENDOR_NAME_TLV_TYPE = 25;
+    public static final int DIAG_VENDOR_MODEL_TLV_TYPE = 26;
+
     private static final String OT_CTL = "/system/bin/ot-ctl";
 
     /**
@@ -185,6 +191,35 @@ public final class OtDaemonController {
 
     public String executeCommand(String cmd) {
         return SystemUtil.runShellCommand(OT_CTL + " " + cmd);
+    }
+
+    /**
+     * Sends DIAG_GET request to the given peer device and returns the parsed result as a dict of
+     * the requested TLV values.
+     *
+     * <p>For example, a request {@code netDiagGet("fdad:3d13:7b11:4049:ed1a:7e87:4770:a345",
+     * [DIAG_VENDOR_NAME_TLV_TYPE, DIAG_VENDOR_MODEL_TLV_TYPE])} can return a dict of {@code
+     * {"Vendor Name" : "ABC", "Vendor Model" : "Cuttlefish"}}
+     */
+    public Map<String, String> netDiagGet(InetAddress peerAddr, List<Integer> tlvTypes) {
+        String tlvTypeList =
+                tlvTypes.stream().map(Object::toString).collect(Collectors.joining(" "));
+
+        List<String> outputs =
+                executeCommandAndParse(
+                        "networkdiagnostic get " + peerAddr.getHostAddress() + " " + tlvTypeList);
+        Map<String, String> result = new HashMap<>();
+        for (String line : outputs) {
+            if (line.startsWith("DIAG_GET")) {
+                continue;
+            }
+            String[] keyValue = line.split(":");
+            if (keyValue.length != 2) {
+                throw new IllegalStateException("Unexpected OT output: " + line);
+            }
+            result.put(keyValue[0].strip(), keyValue[1].strip());
+        }
+        return result;
     }
 
     /**
