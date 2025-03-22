@@ -73,7 +73,9 @@ import org.junit.Assert.assertArrayEquals
 // Any legal score (0~99) for the test network would do, as it is going to be kept up by the
 // requests filed by the test and should never match normal internet requests. 70 is the default
 // score of Ethernet networks, it's as good a value as any other.
-private val TEST_NETWORK_SCORE = NetworkScore.Builder().setLegacyInt(70).build()
+// Note that this can't use NetworkScore.Builder() because this test must be able to
+// run on R, which doesn't know this class.
+private const val TEST_NETWORK_SCORE = 70
 
 private class Provider(context: Context, looper: Looper) :
             NetworkProvider(context, looper, "NetworkAgentTest NetworkProvider")
