@@ -193,58 +193,58 @@ public class EthernetTrackerTest {
                 .build();
 
         // Empty capabilities always default to the baseNc above.
-        EthernetConfigParser parser = new EthernetConfigParser("eth0;", false /*isAtLeastB*/);
-        assertThat(parser.mCaps).isEqualTo(baseNc);
-        parser = new EthernetConfigParser("eth0;", true /*isAtLeastB*/);
-        assertThat(parser.mCaps).isEqualTo(baseNc);
+        EthernetConfigParser p = new EthernetConfigParser("eth0;", false /*isAtLeastB*/);
+        assertThat(p.mCaps).isEqualTo(baseNc);
+        p = new EthernetConfigParser("eth0;", true /*isAtLeastB*/);
+        assertThat(p.mCaps).isEqualTo(baseNc);
 
         // On Android B+, "*" defaults to using DEFAULT_CAPABILITIES.
-        parser = new EthernetConfigParser("eth0;*;;;;;;", true /*isAtLeastB*/);
-        assertThat(parser.mCaps).isEqualTo(EthernetTracker.DEFAULT_CAPABILITIES);
+        p = new EthernetConfigParser("eth0;*;;;;;;", true /*isAtLeastB*/);
+        assertThat(p.mCaps).isEqualTo(EthernetTracker.DEFAULT_CAPABILITIES);
 
         // But not so before B.
-        parser = new EthernetConfigParser("eth0;*", false /*isAtLeastB*/);
-        assertThat(parser.mCaps).isEqualTo(baseNc);
+        p = new EthernetConfigParser("eth0;*", false /*isAtLeastB*/);
+        assertThat(p.mCaps).isEqualTo(baseNc);
 
-        parser = new EthernetConfigParser("eth0;12,13,14,15;", false /*isAtLeastB*/);
-        assertThat(parser.mCaps.getCapabilities()).asList().containsAtLeast(12, 13, 14, 15);
+        p = new EthernetConfigParser("eth0;12,13,14,15;", false /*isAtLeastB*/);
+        assertThat(p.mCaps.getCapabilities()).asList().containsAtLeast(12, 13, 14, 15);
 
-        parser = new EthernetConfigParser("eth0;12,13,500,abc", false /*isAtLeastB*/);
+        p = new EthernetConfigParser("eth0;12,13,500,abc", false /*isAtLeastB*/);
         // 18, 20, 21 are added by EthernetConfigParser.
-        assertThat(parser.mCaps.getCapabilities()).asList().containsExactly(12, 13, 18, 20, 21);
+        assertThat(p.mCaps.getCapabilities()).asList().containsExactly(12, 13, 18, 20, 21);
 
-        parser = new EthernetConfigParser("eth0;1,2,3;;0", false /*isAtLeastB*/);
-        assertThat(parser.mCaps.getCapabilities()).asList().containsAtLeast(1, 2, 3);
-        assertThat(parser.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).isTrue();
+        p = new EthernetConfigParser("eth0;1,2,3;;0", false /*isAtLeastB*/);
+        assertThat(p.mCaps.getCapabilities()).asList().containsAtLeast(1, 2, 3);
+        assertThat(p.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).isTrue();
 
         // TRANSPORT_VPN (4) is not allowed.
-        parser = new EthernetConfigParser("eth0;;;4", false /*isAtLeastB*/);
-        assertThat(parser.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_ETHERNET)).isTrue();
+        p = new EthernetConfigParser("eth0;;;4", false /*isAtLeastB*/);
+        assertThat(p.mCaps.hasSingleTransport(NetworkCapabilities.TRANSPORT_ETHERNET)).isTrue();
 
         // invalid capability and transport type
-        parser = new EthernetConfigParser("eth0;-1,a,1000,,;;-1", false /*isAtLeastB*/);
-        assertThat(parser.mCaps).isEqualTo(baseNc);
+        p = new EthernetConfigParser("eth0;-1,a,1000,,;;-1", false /*isAtLeastB*/);
+        assertThat(p.mCaps).isEqualTo(baseNc);
     }
 
     @Test
     public void testInterfaceNameParsing() {
-        EthernetConfigParser parser = new EthernetConfigParser("eth12", false /*isAtLeastB*/);
-        assertThat(parser.mIface).isEqualTo("eth12");
+        EthernetConfigParser p = new EthernetConfigParser("eth12", false /*isAtLeastB*/);
+        assertThat(p.mIface).isEqualTo("eth12");
 
-        parser = new EthernetConfigParser("", true /*isAtLeastB*/);
-        assertThat(parser.mIface).isEqualTo("");
+        p = new EthernetConfigParser("", true /*isAtLeastB*/);
+        assertThat(p.mIface).isEqualTo("");
 
-        parser = new EthernetConfigParser("eth0;12;", true /*isAtLeastB*/);
-        assertThat(parser.mIface).isEqualTo("eth0");
+        p = new EthernetConfigParser("eth0;12;", true /*isAtLeastB*/);
+        assertThat(p.mIface).isEqualTo("eth0");
     }
 
     @Test
     public void testIpConfigParsing() {
         // Note that EthernetConfigParser doesn't actually parse the IpConfig (yet).
-        final EthernetConfigParser parser = new EthernetConfigParser(
+        final EthernetConfigParser p = new EthernetConfigParser(
                 "eth0;1,2,3;ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8;1",
                 false /*isAtLeastB*/);
-        assertThat(parser.mIpConfig)
+        assertThat(p.mIpConfig)
                 .isEqualTo("ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8");
     }
 
