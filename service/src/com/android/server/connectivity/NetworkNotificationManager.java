@@ -38,6 +38,7 @@ import android.os.Bundle;
 import android.os.UserHandle;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.text.BidiFormatter;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
@@ -87,6 +88,7 @@ public class NetworkNotificationManager {
 
     // The context is for the current user (system server)
     private final Context mContext;
+    private final Dependencies mDependencies;
     private final ConnectivityResources mResources;
     private final TelephonyManager mTelephonyManager;
     // The notification manager is created from a context for User.ALL, so notifications
@@ -96,13 +98,28 @@ public class NetworkNotificationManager {
     private final SparseIntArray mNotificationTypeMap;
 
     public NetworkNotificationManager(@NonNull final Context c, @NonNull final TelephonyManager t) {
+        this(c, t, new Dependencies());
+    }
+
+    @VisibleForTesting
+    protected NetworkNotificationManager(@NonNull final Context c,
+            @NonNull final TelephonyManager t,
+            @NonNull Dependencies dependencies) {
         mContext = c;
+        mDependencies = dependencies;
         mTelephonyManager = t;
         mNotificationManager =
                 (NotificationManager) c.createContextAsUser(UserHandle.ALL, 0 /* flags */)
                         .getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationTypeMap = new SparseIntArray();
         mResources = new ConnectivityResources(mContext);
+    }
+
+    @VisibleForTesting
+    protected static class Dependencies {
+        public BidiFormatter getBidiFormatter() {
+            return BidiFormatter.getInstance();
+        }
     }
 
     @VisibleForTesting
@@ -174,7 +191,7 @@ public class NetworkNotificationManager {
                 name = extraInfo;
             } else {
                 final String ssid = WifiInfo.sanitizeSsid(nai.networkCapabilities.getSsid());
-                name = ssid == null ? "" : ssid;
+                name = ssid == null ? "" : mDependencies.getBidiFormatter().unicodeWrap(ssid);
             }
             // Only notify for Internet-capable networks.
             if (!nai.networkCapabilities.hasCapability(NET_CAPABILITY_INTERNET)) return;
