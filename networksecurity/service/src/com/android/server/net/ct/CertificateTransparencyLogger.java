@@ -36,6 +36,8 @@ public interface CertificateTransparencyLogger {
         UNKNOWN_STATE,
         HTTP_ERROR,
         LOG_LIST_INVALID,
+        PUBLIC_KEY_INVALID,
+        PUBLIC_KEY_NOT_ALLOWED,
         PUBLIC_KEY_NOT_FOUND,
         SIGNATURE_INVALID,
         SIGNATURE_NOT_FOUND,
