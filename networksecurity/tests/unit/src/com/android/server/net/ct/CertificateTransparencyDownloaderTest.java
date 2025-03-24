@@ -184,6 +184,41 @@ public class CertificateTransparencyDownloaderTest {
 
     @Test
     public void
+            testDownloader_publicKeyDownloadSuccess_publicKeyNotAllowed_logsFailure()
+                    throws Exception {
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
+        PublicKey notAllowed = KeyPairGenerator.getInstance("RSA").generateKeyPair().getPublic();
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makePublicKeyDownloadCompleteIntent(writePublicKeyToFile(notAllowed)));
+
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEvent(
+                        LogListUpdateStatus.builder()
+                                .setState(CTLogListUpdateState.PUBLIC_KEY_NOT_ALLOWED)
+                                .build());
+    }
+
+    @Test
+    public void
+            testDownloader_publicKeyDownloadSuccess_publicKeyInvalidEncoding_logsFailure()
+                    throws Exception {
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext,
+                makePublicKeyDownloadCompleteIntent(
+                        writeToFile("i_am_not_a_base64_encoded_public_key".getBytes())));
+
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEvent(
+                        LogListUpdateStatus.builder()
+                                .setState(CTLogListUpdateState.PUBLIC_KEY_INVALID)
+                                .build());
+    }
+
+    @Test
+    public void
             testDownloader_publicKeyDownloadSuccess_updatePublicKeyFail_doNotStartMetadataDownload()
                     throws Exception {
         mCertificateTransparencyDownloader.startPublicKeyDownload();
@@ -216,7 +251,7 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
-    public void testDownloader_publicKeyDownloadFail_logsFailure() throws Exception {
+    public void testDownloader_publicKeyDownloadFail_logsDownloadFailure() throws Exception {
         mCertificateTransparencyDownloader.startPublicKeyDownload();
 
         mCertificateTransparencyDownloader.onReceive(
