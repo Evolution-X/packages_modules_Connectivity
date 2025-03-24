@@ -24,6 +24,7 @@ import static android.net.ConnectivityManager.TYPE_MOBILE_HIPRI;
 import static android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY;
 
 import static com.android.networkstack.apishim.ConstantsShim.KEY_CARRIER_SUPPORTS_TETHERING_BOOL;
+import static com.android.net.module.util.SdkUtil.isAtLeast25Q2;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -146,6 +147,12 @@ public class TetheringConfiguration {
      * Disabled by default.
      */
     public static final String TETHER_ACTIVE_SESSIONS_METRICS = "tether_active_sessions_metrics";
+
+    /**
+     * A feature flag to control whether the tethering local network agent should be enabled.
+     * Disabled by default.
+     */
+    public static final String TETHERING_LOCAL_NETWORK_AGENT = "tethering_local_network_agent";
 
     public final String[] tetherableUsbRegexs;
     public final String[] tetherableWifiRegexs;
@@ -395,7 +402,7 @@ public class TetheringConfiguration {
      * use the async state machine.
      */
     public void readEnableSyncSM(final Context ctx) {
-        USE_SYNC_SM = mDeps.isFeatureNotChickenedOut(ctx, TETHER_ENABLE_SYNC_SM);
+        USE_SYNC_SM = isAtLeast25Q2() || mDeps.isFeatureNotChickenedOut(ctx, TETHER_ENABLE_SYNC_SM);
     }
 
     /** Does the dumping.*/

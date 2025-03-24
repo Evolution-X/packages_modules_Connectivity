@@ -289,7 +289,7 @@ DEFINE_BPF_PROG("schedcls/egress4/clat_rawip", AID_ROOT, AID_SYSTEM, sched_cls_e
     if (ip4->ihl != 5) return TC_ACT_PIPE;
 
     // Packet must not be multicast
-    if ((ip4->daddr & 0xf0000000) == 0xe0000000) return TC_ACT_PIPE;
+    if ((ip4->daddr & htonl(0xf0000000)) == htonl(0xe0000000)) return TC_ACT_PIPE;
 
     // Calculate the IPv4 one's complement checksum of the IPv4 header.
     __wsum sum4 = 0;

@@ -17,6 +17,7 @@
 package com.android.server.thread;
 
 import static android.net.thread.ThreadNetworkException.ERROR_INTERNAL_ERROR;
+import static android.net.thread.ThreadNetworkException.ERROR_UNSUPPORTED_FEATURE;
 
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
 import static com.android.server.thread.ThreadPersistentSettings.KEY_COUNTRY_CODE;
@@ -109,6 +110,7 @@ public class ThreadNetworkCountryCodeTest {
 
     private ThreadNetworkCountryCode mThreadNetworkCountryCode;
     private boolean mErrorSetCountryCode;
+    private boolean mErrorUnsupportedFeatureSetCountryCode;
 
     @Captor private ArgumentCaptor<LocationListener> mLocationListenerCaptor;
     @Captor private ArgumentCaptor<Geocoder.GeocodeListener> mGeocodeListenerCaptor;
@@ -143,6 +145,10 @@ public class ThreadNetworkCountryCodeTest {
 
                     if (mErrorSetCountryCode) {
                         cb.onError(ERROR_INTERNAL_ERROR, new String("Invalid country code"));
+                    } else if (mErrorUnsupportedFeatureSetCountryCode) {
+                        cb.onError(
+                                ERROR_UNSUPPORTED_FEATURE,
+                                new String("Setting country code is not supported"));
                     } else {
                         cb.onSuccess();
                     }
@@ -197,6 +203,21 @@ public class ThreadNetworkCountryCodeTest {
         mThreadNetworkCountryCode.initialize();
 
         assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(TEST_COUNTRY_CODE_US);
+    }
+
+    @Test
+    public void initialize_countryCodeDisabled_defaultCountryCodeIsUsed() {
+        when(mResources.getBoolean(R.bool.config_thread_country_code_enabled)).thenReturn(false);
+
+        mThreadNetworkCountryCode.initialize();
+
+        verifyNoMoreInteractions(mWifiManager);
+        verifyNoMoreInteractions(mTelephonyManager);
+        verifyNoMoreInteractions(mSubscriptionManager);
+        verifyNoMoreInteractions(mGeocoder);
+        verifyNoMoreInteractions(mLocationManager);
+
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
     }
 
     @Test
@@ -453,6 +474,39 @@ public class ThreadNetworkCountryCodeTest {
     }
 
     @Test
+    public void setCountryCodeNotSupported_returnUnsupportedFeatureError_countryCodeNotSetAgain() {
+        mThreadNetworkCountryCode.initialize();
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
+
+        mErrorUnsupportedFeatureSetCountryCode = true;
+        mThreadNetworkCountryCode.setOverrideCountryCode(TEST_COUNTRY_CODE_CN);
+        verify(mThreadNetworkControllerService)
+                .setCountryCode(eq(TEST_COUNTRY_CODE_CN), mOperationReceiverCaptor.capture());
+
+        mThreadNetworkCountryCode.setOverrideCountryCode(TEST_COUNTRY_CODE_US);
+        verifyNoMoreInteractions(mThreadNetworkControllerService);
+
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
+    }
+
+    @Test
+    public void setCountryCodeNotSupported_returnUnsupportedFeatureError_unregisterAllCallbacks() {
+        mThreadNetworkCountryCode.initialize();
+        assertThat(mThreadNetworkCountryCode.getCountryCode()).isEqualTo(DEFAULT_COUNTRY_CODE);
+
+        mErrorUnsupportedFeatureSetCountryCode = true;
+        mThreadNetworkCountryCode.setOverrideCountryCode(TEST_COUNTRY_CODE_CN);
+        verify(mThreadNetworkControllerService)
+                .setCountryCode(eq(TEST_COUNTRY_CODE_CN), mOperationReceiverCaptor.capture());
+
+        verify(mLocationManager).removeUpdates(mLocationListenerCaptor.capture());
+        verify(mWifiManager)
+                .unregisterActiveCountryCodeChangedCallback(
+                        mWifiCountryCodeReceiverCaptor.capture());
+        verify(mContext).unregisterReceiver(mTelephonyCountryCodeReceiverCaptor.capture());
+    }
+
+    @Test
     public void settingsCountryCode_settingsCountryCodeIsActive_settingsCountryCodeIsUsed() {
         when(mPersistentSettings.get(KEY_COUNTRY_CODE)).thenReturn(TEST_COUNTRY_CODE_CN);
         mThreadNetworkCountryCode.initialize();
@@ -468,6 +522,8 @@ public class ThreadNetworkCountryCodeTest {
         mThreadNetworkCountryCode.dump(new FileDescriptor(), printWriter, null);
         String outputString = stringWriter.toString();
 
+        assertThat(outputString).contains("isCountryCodeEnabled");
+        assertThat(outputString).contains("mIsCpSettingCountryCodeSupported");
         assertThat(outputString).contains("mOverrideCountryCodeInfo");
         assertThat(outputString).contains("mTelephonyCountryCodeSlotInfoMap");
         assertThat(outputString).contains("mTelephonyCountryCodeInfo");

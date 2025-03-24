@@ -757,6 +757,27 @@ class DscpPolicyTest {
         assertEquals(IPPROTO_UDP, policy2.protocol)
         assertParcelingIsLossless(policy2)
     }
+
+    @Test
+    fun testSendDscpPolicyWithoutInterfaceName() {
+        val nc = NetworkCapabilities().apply {
+            addTransportType(TRANSPORT_TEST)
+        }
+        val agent = TestableNetworkAgent(
+                realContext,
+                handlerThread.looper,
+                nc,
+                LinkProperties() /* note: no interface name */,
+                NetworkAgentConfig.Builder().build()
+        )
+        agentsToCleanUp.add(agent)
+        runAsShell(MANAGE_TEST_NETWORKS) { agent.register() }
+        // Without the fix, this will crash the system with SIGSEGV.
+        agent.sendAddDscpPolicy(DscpPolicy.Builder(1, 1).build())
+        // Will receive OnNetworkCreated first if the agent is created early. To avoid reading
+        // the flag here, use eventuallyExpect.
+        agent.eventuallyExpect<OnDscpPolicyStatusUpdated>()
+    }
 }
 
 private fun ByteBuffer.readAsArray(): ByteArray {

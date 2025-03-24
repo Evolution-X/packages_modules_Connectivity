@@ -267,6 +267,11 @@ public class VpnTest {
         mNetwork = null;
         mTestContext = getInstrumentation().getContext();
         mTargetContext = getInstrumentation().getTargetContext();
+        getInstrumentation()
+                .getUiAutomation()
+                .grantRuntimePermission(
+                        "com.android.cts.net.hostside",
+                        "android.permission.NEARBY_WIFI_DEVICES");
         storePrivateDnsSetting();
         mDevice = UiDevice.getInstance(getInstrumentation());
         mActivity = launchActivity(mTargetContext.getPackageName(), MyActivity.class);

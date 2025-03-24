@@ -37,6 +37,7 @@ import android.telephony.data.EpsBearerQosSessionAttributes;
 import android.telephony.data.NrQosSessionAttributes;
 import android.util.Log;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.net.module.util.FrameworkConnectivityStatsLog;
 
@@ -98,6 +99,7 @@ public abstract class NetworkAgent {
     @Nullable
     private volatile Network mNetwork;
 
+    // Null before the agent is registered
     @Nullable
     private volatile INetworkAgentRegistry mRegistry;
 
@@ -115,12 +117,32 @@ public abstract class NetworkAgent {
     private final ArrayList<RegistryAction> mPreConnectedQueue = new ArrayList<>();
     private volatile long mLastBwRefreshTime = 0;
     private static final long BW_REFRESH_MIN_WIN_MS = 500;
+
+    private final boolean mQueueRemoved;
+
     private boolean mBandwidthUpdateScheduled = false;
     private AtomicBoolean mBandwidthUpdatePending = new AtomicBoolean(false);
     @NonNull
     private NetworkInfo mNetworkInfo;
     @NonNull
     private final Object mRegisterLock = new Object();
+    // TODO : when ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER is
+    // not chickened out this is never read. Remove when retiring this flag.
+    private boolean mConnected = false;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = { "STATE_" }, value = {
+        STATE_CREATED,
+        STATE_REGISTERED,
+        STATE_UNREGISTERED
+    })
+    public @interface NetworkAgentState {}
+    private static final int STATE_CREATED = 0;
+    private static final int STATE_REGISTERED = 1;
+    private static final int STATE_UNREGISTERED = 2;
+    @GuardedBy("mRegisterLock")
+    private int mState = STATE_CREATED;
 
     /**
      * The ID of the {@link NetworkProvider} that created this object, or
@@ -503,6 +525,18 @@ public abstract class NetworkAgent {
         return ni;
     }
 
+    /**
+     * Returns whether a given ConnectivityManager feature is enabled.
+     *
+     * Tests can override this.
+     * @hide
+     */
+    @VisibleForTesting
+    public boolean isFeatureEnabled(@NonNull Context context,
+            @ConnectivityManager.ConnectivityManagerFeature long feature) {
+        return context.getSystemService(ConnectivityManager.class).isFeatureEnabled(feature);
+    }
+
     // Temporary backward compatibility constructor
     public NetworkAgent(@NonNull Context context, @NonNull Looper looper, @NonNull String logTag,
             @NonNull NetworkCapabilities nc, @NonNull LinkProperties lp, int score,
@@ -585,6 +619,10 @@ public abstract class NetworkAgent {
             @Nullable LocalNetworkConfig localNetworkConfig, @NonNull NetworkScore score,
             @NonNull NetworkAgentConfig config, int providerId, @NonNull NetworkInfo ni) {
         mHandler = new NetworkAgentHandler(looper);
+        // If the feature is enabled, then events are queued in the system
+        // server, and it's removed from this NetworkAgent.
+        mQueueRemoved = isFeatureEnabled(context,
+                ConnectivityManager.FEATURE_QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER);
         LOG_TAG = logTag;
         mNetworkInfo = new NetworkInfo(ni);
         this.providerId = providerId;
@@ -606,22 +644,30 @@ public abstract class NetworkAgent {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case EVENT_AGENT_CONNECTED: {
-                    if (mRegistry != null) {
-                        log("Received new connection while already connected!");
+                    if (mQueueRemoved) {
+                        // No handling. This message is legacy from a time where the
+                        // agent had to wait until the registry was sent to it, which
+                        // would only happen after the corresponding NetworkMonitor
+                        // was created.
+                        mConnected = true; // never read, but mConnected = false would be confusing
                     } else {
-                        if (VDBG) log("NetworkAgent fully connected");
-                        synchronized (mPreConnectedQueue) {
-                            final INetworkAgentRegistry registry = (INetworkAgentRegistry) msg.obj;
-                            mRegistry = registry;
-                            for (RegistryAction a : mPreConnectedQueue) {
-                                try {
-                                    a.execute(registry);
-                                } catch (RemoteException e) {
-                                    Log.wtf(LOG_TAG, "Communication error with registry", e);
-                                    // Fall through
+                        // Feature chickened out, keep the old queueing behavior
+                        synchronized (mRegisterLock) {
+                            if (mConnected) {
+                                log("Received new connection while already connected!");
+                            } else {
+                                if (VDBG) log("NetworkAgent fully connected");
+                                for (RegistryAction a : mPreConnectedQueue) {
+                                    try {
+                                        a.execute(mRegistry);
+                                    } catch (RemoteException e) {
+                                        Log.wtf(LOG_TAG, "Communication error with registry", e);
+                                        // Fall through
+                                    }
                                 }
+                                mPreConnectedQueue.clear();
                             }
-                            mPreConnectedQueue.clear();
+                            mConnected = true;
                         }
                     }
                     break;
@@ -630,8 +676,9 @@ public abstract class NetworkAgent {
                     if (DBG) log("NetworkAgent channel lost");
                     // let the client know CS is done with us.
                     onNetworkUnwanted();
-                    synchronized (mPreConnectedQueue) {
-                        mRegistry = null;
+                    synchronized (mRegisterLock) {
+                        mState = STATE_UNREGISTERED;
+                        mConnected = false;
                     }
                     break;
                 }
@@ -753,24 +800,48 @@ public abstract class NetworkAgent {
     public Network register() {
         if (VDBG) log("Registering NetworkAgent");
         synchronized (mRegisterLock) {
-            if (mNetwork != null) {
-                throw new IllegalStateException("Agent already registered");
+            if (mQueueRemoved) {
+                switch (mState) {
+                    case STATE_REGISTERED:
+                        throw new IllegalStateException("Agent already registered");
+                    case STATE_UNREGISTERED:
+                        throw new IllegalStateException("Agent already unregistered");
+                    default: // CREATED, this is the normal case
+                }
+            } else {
+                // Feature is chickened out, do the old processing
+                if (mNetwork != null) {
+                    throw new IllegalStateException("Agent already registered");
+                }
             }
             final ConnectivityManager cm = (ConnectivityManager) mInitialConfiguration.context
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
+            final NetworkAndAgentRegistryParcelable result;
             if (mInitialConfiguration.localNetworkConfig == null) {
                 // Call registerNetworkAgent without localNetworkConfig argument to pass
                 // android.net.cts.NetworkAgentTest#testAgentStartsInConnecting in old cts
-                mNetwork = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
+                result = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
                         new NetworkInfo(mInitialConfiguration.info),
                         mInitialConfiguration.properties, mInitialConfiguration.capabilities,
                         mInitialConfiguration.score, mInitialConfiguration.config, providerId);
             } else {
-                mNetwork = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
+                result = cm.registerNetworkAgent(new NetworkAgentBinder(mHandler),
                         new NetworkInfo(mInitialConfiguration.info),
                         mInitialConfiguration.properties, mInitialConfiguration.capabilities,
                         mInitialConfiguration.localNetworkConfig, mInitialConfiguration.score,
                         mInitialConfiguration.config, providerId);
+            }
+            if (null == result && Process.isApplicationUid(Process.myUid())) {
+                // Let it slide in tests to allow mocking, since NetworkAndAgentRegistryParcelable
+                // is not public and can't be instantiated by CTS. The danger here is that if
+                // this happens in production for some reason the code will crash later instead
+                // of here. If this is a system app, it will still crash as expected.
+                Log.e(LOG_TAG, "registerNetworkAgent returned null. This agent will not work. "
+                        + "Is ConnectivityManager a mock ?");
+            } else {
+                mNetwork = result.network;
+                mRegistry = result.registry;
+                mState = STATE_REGISTERED;
             }
             mInitialConfiguration = null; // All this memory can now be GC'd
         }
@@ -787,8 +858,8 @@ public abstract class NetworkAgent {
         }
 
         @Override
-        public void onRegistered(@NonNull INetworkAgentRegistry registry) {
-            mHandler.sendMessage(mHandler.obtainMessage(EVENT_AGENT_CONNECTED, registry));
+        public void onRegistered() {
+            mHandler.sendMessage(mHandler.obtainMessage(EVENT_AGENT_CONNECTED));
         }
 
         @Override
@@ -913,11 +984,14 @@ public abstract class NetworkAgent {
      *
      * @hide
      */
-    public INetworkAgent registerForTest(final Network network) {
+    public INetworkAgent registerForTest(final Network network,
+            final INetworkAgentRegistry registry) {
         log("Registering NetworkAgent for test");
         synchronized (mRegisterLock) {
             mNetwork = network;
             mInitialConfiguration = null;
+            mRegistry = registry;
+            mState = STATE_REGISTERED;
         }
         return new NetworkAgentBinder(mHandler);
     }
@@ -943,30 +1017,49 @@ public abstract class NetworkAgent {
         return mNetwork;
     }
 
-    private void queueOrSendMessage(@NonNull RegistryAction action) {
-        synchronized (mPreConnectedQueue) {
-            if (mNetwork == null && !Process.isApplicationUid(Process.myUid())) {
-                // Theoretically, it should not be valid to queue messages here before
-                // registering the NetworkAgent. However, practically, with the way
-                // queueing works right now, it ends up working out just fine.
-                // Log a statistic so that we know if this is happening in the
-                // wild. The check for isApplicationUid is to prevent logging the
-                // metric from test code.
+    private void logTerribleErrorMessageBeforeConnect() {
+        FrameworkConnectivityStatsLog.write(
+                FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_MESSAGE_QUEUED_BEFORE_CONNECT
+        );
+    }
 
-                FrameworkConnectivityStatsLog.write(
-                        FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                        FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_MESSAGE_QUEUED_BEFORE_CONNECT
-                );
-            }
-            if (mRegistry != null) {
-                try {
-                    action.execute(mRegistry);
-                } catch (RemoteException e) {
-                    Log.wtf(LOG_TAG, "Error executing registry action", e);
-                    // Fall through: the channel is asynchronous and does not report errors back
+    private void send(@NonNull RegistryAction action) {
+        synchronized (mRegisterLock) {
+            if (mQueueRemoved) {
+                if (mState <= STATE_CREATED) {
+                    // Log a terrible error. There is nothing to do with this message
+                    // so drop it.
+                    logTerribleErrorMessageBeforeConnect();
+                    Log.e(LOG_TAG, "Agent not yet registered, ignoring command");
+                    return;
+                }
+                if (mState >= STATE_UNREGISTERED) {
+                    // This should not crash for two reasons : first, the agent may
+                    // be disconnected by ConnectivityService at any time and the message
+                    // typically arrives on another thread, so it's not feasible for
+                    // apps to check before sending, they'd have to always catch. Second,
+                    // historically this hasn't thrown and some code may be relying on
+                    // the historical behavior.
+                    Log.e(LOG_TAG, "Agent already unregistered, ignoring command");
+                    return;
                 }
             } else {
-                mPreConnectedQueue.add(action);
+                if (null == mNetwork) {
+                    // Log a terrible error but still enqueue the message for backward
+                    // compatibility.
+                    logTerribleErrorMessageBeforeConnect();
+                }
+                if (!mConnected) {
+                    mPreConnectedQueue.add(action);
+                    return;
+                }
+            }
+            try {
+                action.execute(mRegistry);
+            } catch (RemoteException e) {
+                Log.wtf(LOG_TAG, "Error executing registry action", e);
+                // Fall through: the channel is asynchronous and does not report errors back
             }
         }
     }
@@ -977,8 +1070,9 @@ public abstract class NetworkAgent {
      */
     public void sendLinkProperties(@NonNull LinkProperties linkProperties) {
         Objects.requireNonNull(linkProperties);
-        final LinkProperties lp = new LinkProperties(linkProperties);
-        queueOrSendMessage(reg -> reg.sendLinkProperties(lp));
+        // Copy the object because if the agent is running in the system server
+        // then the same instance will be seen by the registry
+        send(reg -> reg.sendLinkProperties(new LinkProperties(linkProperties)));
     }
 
     /**
@@ -1004,7 +1098,7 @@ public abstract class NetworkAgent {
             @SuppressLint("NullableCollection") @Nullable List<Network> underlyingNetworks) {
         final ArrayList<Network> underlyingArray = (underlyingNetworks != null)
                 ? new ArrayList<>(underlyingNetworks) : null;
-        queueOrSendMessage(reg -> reg.sendUnderlyingNetworks(underlyingArray));
+        send(reg -> reg.sendUnderlyingNetworks(underlyingArray));
     }
 
     /**
@@ -1014,7 +1108,7 @@ public abstract class NetworkAgent {
     public void markConnected() {
         mNetworkInfo.setDetailedState(NetworkInfo.DetailedState.CONNECTED, null /* reason */,
                 mNetworkInfo.getExtraInfo());
-        queueOrSendNetworkInfo(mNetworkInfo);
+        sendNetworkInfo(mNetworkInfo);
     }
 
     /**
@@ -1027,7 +1121,12 @@ public abstract class NetworkAgent {
         // When unregistering an agent nobody should use the extrainfo (or reason) any more.
         mNetworkInfo.setDetailedState(NetworkInfo.DetailedState.DISCONNECTED, null /* reason */,
                 null /* extraInfo */);
-        queueOrSendNetworkInfo(mNetworkInfo);
+        synchronized (mRegisterLock) {
+            if (mState >= STATE_REGISTERED) {
+                sendNetworkInfo(mNetworkInfo);
+            }
+            mState = STATE_UNREGISTERED;
+        }
     }
 
     /**
@@ -1050,7 +1149,7 @@ public abstract class NetworkAgent {
      */
     public void setTeardownDelayMillis(
             @IntRange(from = 0, to = MAX_TEARDOWN_DELAY_MS) int teardownDelayMillis) {
-        queueOrSendMessage(reg -> reg.sendTeardownDelayMs(teardownDelayMillis));
+        send(reg -> reg.sendTeardownDelayMs(teardownDelayMillis));
     }
 
     /**
@@ -1089,7 +1188,7 @@ public abstract class NetworkAgent {
      */
     public void unregisterAfterReplacement(
             @IntRange(from = 0, to = MAX_TEARDOWN_DELAY_MS) int timeoutMillis) {
-        queueOrSendMessage(reg -> reg.sendUnregisterAfterReplacement(timeoutMillis));
+        send(reg -> reg.sendUnregisterAfterReplacement(timeoutMillis));
     }
 
     /**
@@ -1107,7 +1206,7 @@ public abstract class NetworkAgent {
     @SystemApi
     public void setLegacySubtype(final int legacySubtype, @NonNull final String legacySubtypeName) {
         mNetworkInfo.setSubtype(legacySubtype, legacySubtypeName);
-        queueOrSendNetworkInfo(mNetworkInfo);
+        sendNetworkInfo(mNetworkInfo);
     }
 
     /**
@@ -1129,7 +1228,7 @@ public abstract class NetworkAgent {
     @Deprecated
     public void setLegacyExtraInfo(@Nullable final String extraInfo) {
         mNetworkInfo.setExtraInfo(extraInfo);
-        queueOrSendNetworkInfo(mNetworkInfo);
+        sendNetworkInfo(mNetworkInfo);
     }
 
     /**
@@ -1137,13 +1236,9 @@ public abstract class NetworkAgent {
      * @hide TODO: expose something better.
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    public final void sendNetworkInfo(NetworkInfo networkInfo) {
-        queueOrSendNetworkInfo(networkInfo);
-    }
-
-    private void queueOrSendNetworkInfo(NetworkInfo networkInfo) {
+    private void sendNetworkInfo(final NetworkInfo networkInfo) {
         final NetworkInfo ni = new NetworkInfo(networkInfo);
-        queueOrSendMessage(reg -> reg.sendNetworkInfo(ni));
+        send(reg -> reg.sendNetworkInfo(ni));
     }
 
     /**
@@ -1156,7 +1251,7 @@ public abstract class NetworkAgent {
         mLastBwRefreshTime = System.currentTimeMillis();
         final NetworkCapabilities nc =
                 new NetworkCapabilities(networkCapabilities, NetworkCapabilities.REDACT_NONE);
-        queueOrSendMessage(reg -> reg.sendNetworkCapabilities(nc));
+        send(reg -> reg.sendNetworkCapabilities(nc));
     }
 
     /**
@@ -1168,7 +1263,7 @@ public abstract class NetworkAgent {
         Objects.requireNonNull(config);
         // If the agent doesn't have NET_CAPABILITY_LOCAL_NETWORK, this will be ignored by
         // ConnectivityService with a Log.wtf.
-        queueOrSendMessage(reg -> reg.sendLocalNetworkConfig(config));
+        send(reg -> reg.sendLocalNetworkConfig(config));
     }
 
     /**
@@ -1178,7 +1273,7 @@ public abstract class NetworkAgent {
      */
     public void sendNetworkScore(@NonNull NetworkScore score) {
         Objects.requireNonNull(score);
-        queueOrSendMessage(reg -> reg.sendScore(score));
+        send(reg -> reg.sendScore(score));
     }
 
     /**
@@ -1228,8 +1323,7 @@ public abstract class NetworkAgent {
      * @hide should move to NetworkAgentConfig.
      */
     public void explicitlySelected(boolean explicitlySelected, boolean acceptUnvalidated) {
-        queueOrSendMessage(reg -> reg.sendExplicitlySelected(
-                explicitlySelected, acceptUnvalidated));
+        send(reg -> reg.sendExplicitlySelected(explicitlySelected, acceptUnvalidated));
     }
 
     /**
@@ -1369,7 +1463,7 @@ public abstract class NetworkAgent {
      */
     public final void sendSocketKeepaliveEvent(int slot,
             @SocketKeepalive.KeepaliveEvent int event) {
-        queueOrSendMessage(reg -> reg.sendSocketKeepaliveEvent(slot, event));
+        send(reg -> reg.sendSocketKeepaliveEvent(slot, event));
     }
     /** @hide TODO delete once callers have moved to sendSocketKeepaliveEvent */
     public void onSocketKeepaliveEvent(int slot, int reason) {
@@ -1475,11 +1569,11 @@ public abstract class NetworkAgent {
             @NonNull final QosSessionAttributes attributes) {
         Objects.requireNonNull(attributes, "The attributes must be non-null");
         if (attributes instanceof EpsBearerQosSessionAttributes) {
-            queueOrSendMessage(ra -> ra.sendEpsQosSessionAvailable(qosCallbackId,
+            send(reg -> reg.sendEpsQosSessionAvailable(qosCallbackId,
                     new QosSession(sessionId, QosSession.TYPE_EPS_BEARER),
                     (EpsBearerQosSessionAttributes)attributes));
         } else if (attributes instanceof NrQosSessionAttributes) {
-            queueOrSendMessage(ra -> ra.sendNrQosSessionAvailable(qosCallbackId,
+            send(reg -> reg.sendNrQosSessionAvailable(qosCallbackId,
                     new QosSession(sessionId, QosSession.TYPE_NR_BEARER),
                     (NrQosSessionAttributes)attributes));
         }
@@ -1494,7 +1588,7 @@ public abstract class NetworkAgent {
      */
     public final void sendQosSessionLost(final int qosCallbackId,
             final int sessionId, final int qosSessionType) {
-        queueOrSendMessage(ra -> ra.sendQosSessionLost(qosCallbackId,
+        send(reg -> reg.sendQosSessionLost(qosCallbackId,
                 new QosSession(sessionId, qosSessionType)));
     }
 
@@ -1508,7 +1602,7 @@ public abstract class NetworkAgent {
      */
     public final void sendQosCallbackError(final int qosCallbackId,
             @QosCallbackException.ExceptionType final int exceptionType) {
-        queueOrSendMessage(ra -> ra.sendQosCallbackError(qosCallbackId, exceptionType));
+        send(reg -> reg.sendQosCallbackError(qosCallbackId, exceptionType));
     }
 
     /**
@@ -1525,7 +1619,7 @@ public abstract class NetworkAgent {
             throw new IllegalArgumentException("Duration must be within ["
                     + MIN_LINGER_TIMER_MS + "," + Integer.MAX_VALUE + "]ms");
         }
-        queueOrSendMessage(ra -> ra.sendLingerDuration((int) durationMs));
+        send(reg -> reg.sendLingerDuration((int) durationMs));
     }
 
     /**
@@ -1534,7 +1628,7 @@ public abstract class NetworkAgent {
      */
     public void sendAddDscpPolicy(@NonNull final DscpPolicy policy) {
         Objects.requireNonNull(policy);
-        queueOrSendMessage(ra -> ra.sendAddDscpPolicy(policy));
+        send(reg -> reg.sendAddDscpPolicy(policy));
     }
 
     /**
@@ -1542,14 +1636,14 @@ public abstract class NetworkAgent {
      * @param policyId the ID corresponding to a specific DSCP Policy.
      */
     public void sendRemoveDscpPolicy(final int policyId) {
-        queueOrSendMessage(ra -> ra.sendRemoveDscpPolicy(policyId));
+        send(reg -> reg.sendRemoveDscpPolicy(policyId));
     }
 
     /**
      * Remove all the DSCP policies on this network.
      */
     public void sendRemoveAllDscpPolicies() {
-        queueOrSendMessage(ra -> ra.sendRemoveAllDscpPolicies());
+        send(reg -> reg.sendRemoveAllDscpPolicies());
     }
 
     /** @hide */

@@ -597,10 +597,12 @@ public class L2capNetworkProvider {
             final ClientRequestInfo cri = mClientNetworkRequests.get(specifier);
             if (cri == null) return;
 
+            // Release ClientNetworkRequest before sending onUnavailable() to ensure the app
+            // first receives an onLost() callback if a network had been created.
+            releaseClientNetworkRequest(cri);
             for (NetworkRequest request : cri.requests) {
                 mProvider.declareNetworkRequestUnfulfillable(request);
             }
-            releaseClientNetworkRequest(cri);
         }
     }
 

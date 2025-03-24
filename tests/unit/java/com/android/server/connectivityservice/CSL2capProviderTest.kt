@@ -38,12 +38,14 @@ import android.net.NetworkRequest
 import android.net.NetworkSpecifier
 import android.net.RouteInfo
 import android.os.Build
+import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import com.android.server.net.L2capNetwork.L2capIpClient
 import com.android.server.net.L2capPacketForwarder
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
+import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
@@ -59,6 +61,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.doAnswer
@@ -393,5 +396,35 @@ class CSL2capProviderTest : CSTest() {
 
         val cb2 = requestNetwork(nr)
         cb2.expectAvailableCallbacks(anyNetwork(), validated = false)
+    }
+
+    /** Test to ensure onLost() is sent before onUnavailable() when the network is torn down. */
+    @Test
+    fun testClientNetwork_gracefulTearDown() {
+        val specifier = L2capNetworkSpecifier.Builder()
+            .setRole(ROLE_CLIENT)
+            .setHeaderCompression(HEADER_COMPRESSION_NONE)
+            .setRemoteAddress(MacAddress.fromBytes(REMOTE_MAC))
+            .setPsm(PSM)
+            .build()
+
+        val nr = REQUEST.copyWithSpecifier(specifier)
+        val cb = requestNetwork(nr)
+        cb.expectAvailableCallbacks(anyNetwork(), validated = false)
+
+        // Capture the L2capPacketForwarder callback object to tear down the network.
+        val handlerCaptor = ArgumentCaptor.forClass(Handler::class.java)
+        val forwarderCbCaptor = ArgumentCaptor.forClass(L2capPacketForwarder.ICallback::class.java)
+        verify(providerDeps).createL2capPacketForwarder(
+                handlerCaptor.capture(), any(), any(), any(), forwarderCbCaptor.capture())
+        val handler = handlerCaptor.value
+        val forwarderCb = forwarderCbCaptor.value
+
+        // Trigger a forwarding error
+        handler.post { forwarderCb.onError() }
+        handler.waitForIdle(HANDLER_TIMEOUT_MS)
+
+        cb.expect<Lost>()
+        cb.expect<Unavailable>()
     }
 }

@@ -63,6 +63,7 @@ import com.android.internal.util.test.BroadcastInterceptingContext;
 import com.android.internal.util.test.FakeSettingsProvider;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.DeviceConfigUtils;
+import com.android.net.module.util.SdkUtil;
 import com.android.net.module.util.SharedLog;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreAfter;
@@ -779,7 +780,10 @@ public class TetheringConfigurationTest {
         setTetherEnableSyncSMFlagEnabled(true);
         assertEnableSyncSM(true);
 
-        setTetherEnableSyncSMFlagEnabled(false);
-        assertEnableSyncSM(false);
+        // Feature is enabled by default after 25Q2 release.
+        if (!SdkUtil.isAtLeast25Q2()) {
+            setTetherEnableSyncSMFlagEnabled(false);
+            assertEnableSyncSM(false);
+        }
     }
 }

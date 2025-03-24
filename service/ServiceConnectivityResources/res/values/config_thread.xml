@@ -30,6 +30,15 @@
     -->
     <bool name="config_thread_border_router_default_enabled">false</bool>
 
+    <!-- Whether to enable or disable setting Thread country code from the telephony, wifi, location,
+     etc. The country code could be used by the Thread co-processor for setting the fixed output
+	 power of Thread radio. If the device needs to dynamically change the max output power according
+	 to the user scenario to meet the requirement of Specific Absorption Rate (SAR), it should call
+	 the API `setChannelMaxPowers()` to change the max output power, and this configuration could be
+	 set to false to disable the Thread service from setting the Thread country code.
+    -->
+    <bool name="config_thread_country_code_enabled">true</bool>
+
     <!-- Whether to use location APIs in the algorithm to determine country code or not.
     If disabled, will use other sources (telephony, wifi, etc) to determine device location for
     Thread Network regulatory purposes.
@@ -37,11 +46,12 @@
     <bool name="config_thread_location_use_for_country_code_enabled">true</bool>
 
     <!-- Specifies the UTF-8 vendor name of this device. If this value is not an empty string, it
-    will be included in TXT value (key is 'vn') of the "_meshcop._udp" mDNS service which is
-    published by the Thread service. A non-empty string value must not exceed length of 24 UTF-8
-    bytes.
+    will be included in TXT value (key is 'vn') of the "_meshcop._udp" mDNS service as well as the
+    Vendor Name TLV for network diagnostic. A non-empty string value must not exceed length of 24
+    UTF-8 bytes. A special value "ro.product.manufacturer" indicates this value should be derived
+    from the `ro.product.manufacturer` system property.
     -->
-    <string translatable="false" name="config_thread_vendor_name">Android</string>
+    <string translatable="false" name="config_thread_vendor_name">ro.product.manufacturer</string>
 
     <!-- Specifies the 24 bits vendor OUI of this device. If this value is not an empty string, it
     will be included in TXT (key is 'vo') value of the "_meshcop._udp" mDNS service which is
@@ -52,11 +62,12 @@
     <string translatable="false" name="config_thread_vendor_oui"></string>
 
     <!-- Specifies the UTF-8 product model name of this device. If this value is not an empty
-    string, it will be included in TXT (key is 'mn') value of the "_meshcop._udp" mDNS service
-    which is published by the Thread service. A non-empty string value must not exceed length of 24
-    UTF-8 bytes.
+    string, it will be included in TXT (key is 'mn') value of the "_meshcop._udp" mDNS service as
+    well as the Vendor Model TLV for network diagnostic. A non-empty string value must not exceed
+    length of 24 UTF-8 bytes. A special value "ro.product.model" indicates this value should be
+    derived from the `ro.product.model` system property.
     -->
-    <string translatable="false" name="config_thread_model_name">Thread Border Router</string>
+    <string translatable="false" name="config_thread_model_name">ro.product.model</string>
 
     <!-- Specifies vendor-specific mDNS TXT entries which will be included in the "_meshcop._udp"
     service. The TXT entries list MUST conform to the format requirement in RFC 6763 section 6. For

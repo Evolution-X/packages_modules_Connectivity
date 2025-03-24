@@ -316,7 +316,7 @@ public class MdnsFeatureFlags {
             mIsAggressiveQueryModeEnabled = false;
             mIsQueryWithKnownAnswerEnabled = false;
             mAvoidAdvertisingEmptyTxtRecords = true; // Default enabled.
-            mIsCachedServicesRemovalEnabled = false;
+            mIsCachedServicesRemovalEnabled = true; // Default enabled.
             mCachedServicesRetentionTime = DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS;
             mIsAccurateDelayCallbackEnabled = false;
             mIsShortHostnamesEnabled = true; // Default enabled.

@@ -17,6 +17,12 @@
 <configuration description="Runs NetworkSecurity Mainline unit Tests.">
     <option name="test-tag" value="NetworkSecurityUnitTests" />
 
+    <!--
+        Only run tests if the device under test is SDK version 35 (Android 15) or above.
+    -->
+    <object type="module_controller"
+            class="com.android.tradefed.testtype.suite.module.Sdk35ModuleController" />
+
     <target_preparer class="com.android.tradefed.targetprep.suite.SuiteApkInstaller">
         <option name="test-file-name" value="NetworkSecurityUnitTests.apk" />
     </target_preparer>

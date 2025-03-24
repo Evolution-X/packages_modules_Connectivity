@@ -16,6 +16,9 @@
     },
     {
       "name": "ThreadNetworkTrelDisabledTests"
+    },
+    {
+      "name": "ThreadBorderRouterIntegrationTests"
     }
   ]
 }

@@ -17,7 +17,11 @@
 package android.net;
 
 import static android.Manifest.permission.DUMP;
+import static android.Manifest.permission.LOG_COMPAT_CHANGE;
+import static android.Manifest.permission.READ_COMPAT_CHANGE_CONFIG;
 import static android.net.InetAddresses.parseNumericAddress;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK;
+import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.TetheringManager.CONNECTIVITY_SCOPE_LOCAL;
 import static android.net.TetheringManager.CONNECTIVITY_SCOPE_GLOBAL;
 import static android.net.TetheringManager.TETHERING_ETHERNET;
@@ -27,6 +31,8 @@ import static android.net.TetheringTester.buildIcmpEchoPacketV4;
 import static android.net.TetheringTester.buildUdpPacket;
 import static android.net.TetheringTester.isExpectedIcmpPacket;
 import static android.net.TetheringTester.isExpectedUdpDnsPacket;
+import static android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS;
+import static android.provider.DeviceConfig.NAMESPACE_TETHERING;
 import static android.system.OsConstants.ICMP_ECHO;
 import static android.system.OsConstants.ICMP_ECHOREPLY;
 import static android.system.OsConstants.IPPROTO_UDP;
@@ -49,6 +55,7 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
+import android.app.compat.CompatChanges;
 import android.content.Context;
 import android.net.TetheringManager.TetheringRequest;
 import android.net.TetheringTester.TetheredDevice;
@@ -78,12 +85,16 @@ import com.android.net.module.util.bpf.TetherStatsKey;
 import com.android.net.module.util.bpf.TetherStatsValue;
 import com.android.net.module.util.structs.Ipv4Header;
 import com.android.net.module.util.structs.UdpHeader;
+import com.android.testutils.AutoReleaseNetworkCallbackRule;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
+import com.android.testutils.DeviceConfigRule;
 import com.android.testutils.DeviceInfoUtils;
 import com.android.testutils.DumpTestUtils;
 import com.android.testutils.NetworkStackModuleTest;
 import com.android.testutils.PollPacketReader;
+import com.android.testutils.RecorderCallback.CallbackEntry;
+import com.android.testutils.TestableNetworkCallback;
 
 import org.junit.After;
 import org.junit.Rule;
@@ -111,6 +122,12 @@ import java.util.concurrent.TimeoutException;
 public class EthernetTetheringTest extends EthernetTetheringTestBase {
     @Rule
     public final DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
+    // For manipulating feature flag before and after testing.
+    @Rule
+    public final DeviceConfigRule mDeviceConfigRule = new DeviceConfigRule();
+    @Rule
+    public final AutoReleaseNetworkCallbackRule
+            mNetworkCallbackRule = new AutoReleaseNetworkCallbackRule();
 
     private static final String TAG = EthernetTetheringTest.class.getSimpleName();
 
@@ -199,6 +216,9 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
             (byte) 0x00, (byte) 0x04,                           /* Data length: 4 */
             (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04  /* Address: 1.2.3.4 */
     };
+
+    // Shamelessly copied from TetheringConfiguration.
+    private static final String TETHERING_LOCAL_NETWORK_AGENT = "tethering_local_network_agent";
 
     @After
     public void tearDown() throws Exception {
@@ -1222,6 +1242,51 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
             maybeStopTapPacketReader(downstreamReader);
             maybeCloseTestInterface(downstreamIface);
             maybeUnregisterTetheringEventCallback(tetheringEventCallback);
+        }
+    }
+
+    @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Test
+    public void testLocalAgent_networkCallbacks() throws Exception {
+        final boolean isMatchNonThreadLocalNetworksEnabled = runAsShell(
+                READ_COMPAT_CHANGE_CONFIG, LOG_COMPAT_CHANGE,
+                () -> CompatChanges.isChangeEnabled(ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS));
+        assumeTrue(isMatchNonThreadLocalNetworksEnabled);
+
+        mDeviceConfigRule.setConfig(NAMESPACE_TETHERING, TETHERING_LOCAL_NETWORK_AGENT, "1");
+        assumeFalse(isInterfaceForTetheringAvailable());
+        setIncludeTestInterfaces(true);
+
+        TestNetworkInterface downstreamIface = null;
+        MyTetheringEventCallback tetheringEventCallback = null;
+
+        final TestableNetworkCallback networkCallback = new TestableNetworkCallback();
+        final NetworkRequest networkRequest = new NetworkRequest.Builder()
+                .addCapability(NET_CAPABILITY_LOCAL_NETWORK).build();
+        mNetworkCallbackRule.registerNetworkCallback(networkRequest, networkCallback);
+
+        try {
+            downstreamIface = createTestInterface();
+
+            final String iface = mTetheredInterfaceRequester.getInterface();
+            assertEquals("TetheredInterfaceCallback for unexpected interface",
+                    downstreamIface.getInterfaceName(), iface);
+
+            final TetheringRequest request = new TetheringRequest.Builder(TETHERING_ETHERNET)
+                    .setConnectivityScope(CONNECTIVITY_SCOPE_GLOBAL).build();
+            tetheringEventCallback = enableTethering(iface, request, null /* any upstream */);
+            tetheringEventCallback.awaitInterfaceTethered();
+
+            // Verify NetworkCallback works accordingly.
+            final Network network = networkCallback.expect(CallbackEntry.AVAILABLE).getNetwork();
+            final CallbackEntry.CapabilitiesChanged capEvent =
+                    networkCallback.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED);
+            assertEquals(network, capEvent.getNetwork());
+            assertTrue(capEvent.getCaps().hasTransport(TRANSPORT_ETHERNET));
+            assertTrue(capEvent.getCaps().hasCapability(NET_CAPABILITY_LOCAL_NETWORK));
+        } finally {
+            stopEthernetTethering(tetheringEventCallback);
+            maybeCloseTestInterface(downstreamIface);
         }
     }
 }

@@ -49,7 +49,8 @@
 
 struct clat_config Global_Clatd_Config;
 
-volatile sig_atomic_t running = 1;
+volatile sig_atomic_t sigterm = 0;
+bool running = true;
 
 // reads IPv6 packet from AF_PACKET socket, translates to IPv4, writes to tun
 void process_packet_6_to_4(struct tun_data *tunnel) {
@@ -78,10 +79,11 @@ void process_packet_6_to_4(struct tun_data *tunnel) {
     if (errno != EAGAIN) {
       logmsg(ANDROID_LOG_WARN, "%s: read error: %s", __func__, strerror(errno));
     }
+    if (errno == ENETDOWN) running = false;
     return;
   } else if (readlen == 0) {
     logmsg(ANDROID_LOG_WARN, "%s: packet socket removed?", __func__);
-    running = 0;
+    running = false;
     return;
   } else if (readlen >= sizeof(buf)) {
     logmsg(ANDROID_LOG_WARN, "%s: read truncation - ignoring pkt", __func__);
@@ -161,10 +163,11 @@ void process_packet_4_to_6(struct tun_data *tunnel) {
     if (errno != EAGAIN) {
       logmsg(ANDROID_LOG_WARN, "%s: read error: %s", __func__, strerror(errno));
     }
+    if (errno == ENETDOWN) running = false;  // not sure if this can happen
     return;
   } else if (readlen == 0) {
     logmsg(ANDROID_LOG_WARN, "%s: tun interface removed", __func__);
-    running = 0;
+    running = false;
     return;
   } else if (readlen >= sizeof(buf)) {
     logmsg(ANDROID_LOG_WARN, "%s: read truncation - ignoring pkt", __func__);
@@ -273,23 +276,12 @@ void send_dad(int fd, const struct in6_addr* tgt) {
  *   tunnel - tun device data
  */
 void event_loop(struct tun_data *tunnel) {
-  // Apparently some network gear will refuse to perform NS for IPs that aren't DAD'ed,
-  // this would then result in an ipv6-only network with working native ipv6, working
-  // IPv4 via DNS64, but non-functioning IPv4 via CLAT (ie. IPv4 literals + IPv4 only apps).
-  // The kernel itself doesn't do DAD for anycast ips (but does handle IPV6 MLD and handle ND).
-  // So we'll spoof dad here, and yeah, we really should check for a response and in
-  // case of failure pick a different IP.  Seeing as 48-bits of the IP are utterly random
-  // (with the other 16 chosen to guarantee checksum neutrality) this seems like a remote
-  // concern...
-  // TODO: actually perform true DAD
-  send_dad(tunnel->write_fd6, &Global_Clatd_Config.ipv6_local_subnet);
-
   struct pollfd wait_fd[] = {
     { tunnel->read_fd6, POLLIN, 0 },
     { tunnel->fd4, POLLIN, 0 },
   };
 
-  while (running) {
+  while (running && !sigterm) {
     if (poll(wait_fd, ARRAY_SIZE(wait_fd), -1) == -1) {
       if (errno != EINTR) {
         logmsg(ANDROID_LOG_WARN, "event_loop/poll returned an error: %s", strerror(errno));

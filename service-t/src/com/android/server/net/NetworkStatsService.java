@@ -3228,6 +3228,12 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             pw.increaseIndent();
             mSkDestroyListener.dump(pw);
             pw.decreaseIndent();
+
+            pw.println();
+            pw.println("NetworkStatsFactory logs:");
+            pw.increaseIndent();
+            mStatsFactory.dump(pw);
+            pw.decreaseIndent();
         }
     }
 

@@ -61,12 +61,46 @@ public class LocalNetAccessKey extends Struct {
 
     @Override
     public String toString() {
-        return "LocalNetAccessKey{"
-                + "lpmBitlen=" + lpmBitlen
-                + ", ifIndex=" + ifIndex
-                + ", remoteAddress=" + remoteAddress
-                + ", protocol=" + protocol
-                + ", remotePort=" + remotePort
-                + "}";
+        String s = "LocalNetAccessKey{lpmBitlen=" + lpmBitlen;
+
+        long bits = lpmBitlen;
+
+        // u32 ifIndex
+        if (bits <= 0 && ifIndex != 0) s += " ??";
+        if (bits > 0 || ifIndex != 0) s += " ifIndex=" + ifIndex;
+        if (bits > 0 && bits < 32) s += "/" + bits + "[LE]";
+        bits -= 32;
+
+        // u128 remoteAddress
+        if (bits <= 0 && !remoteAddress.isAnyLocalAddress()) s += " ??";
+        if (bits > 0 || !remoteAddress.isAnyLocalAddress()) {
+            s += " remoteAddress=";
+            String ip = remoteAddress.toString();
+            if (ip.startsWith("/::ffff:")) { // technically wrong IPv4-mapped IPv6 address detection
+              s += ip.substring(8);
+              if (bits >= 96 && bits < 128) s += "/" + (bits - 96);
+            } else if (ip.startsWith("/")) {
+              s += ip.substring(1);
+              if (bits >= 0 && bits < 128) s += "/" + bits;
+            } else { // WTF, includes a hostname or what?
+              s += ip;
+            }
+        }
+        bits -= 128;
+
+        // u16 protocol
+        if (bits <= 0 && protocol != 0) s += " ??";
+        if (bits > 0 || protocol != 0) s += " protocol=" + protocol;
+        if (bits > 0 && bits < 16) s += "/" + bits + "[LE16]";
+        bits -= 16;
+
+        // be16 remotePort
+        if (bits <= 0 && remotePort != 0) s += " ??";
+        if (bits > 0 || remotePort != 0) s += " remotePort=" + remotePort;
+        if (bits > 0 && bits < 16) s += "/" + bits + "[BE16]";
+        bits -= 16;
+
+        s += "}";
+        return s;
     }
 }

@@ -372,7 +372,7 @@ class ApfIntegrationTest {
 
         if (caps.apfVersionSupported > 4) {
             assertThat(caps.maximumApfProgramSize).isAtLeast(2048)
-            assertThat(caps.apfVersionSupported).isEqualTo(6000) // v6.0000
+            assertThat(caps.apfVersionSupported).isAnyOf(6000, 6100) // v6.000 or v6.100
         }
 
         // DEVICEs launching with Android 15 (AOSP experimental) or higher with CHIPSETs that set
@@ -383,14 +383,22 @@ class ApfIntegrationTest {
             assertThat(caps.maximumApfProgramSize).isAtLeast(2048)
         }
 
-        // CHIPSETs (or DEVICES with CHIPSETs) that set ro.board.first_api_level or
-        // ro.board.api_level to 202504 or higher:
-        // - [VSR-5.3.12-018] MUST implement version 6 of the Android Packet Filtering (APF)
-        //   interpreter in the Wi-Fi firmware.
-        // - [VSR-5.3.12-019] MUST provide at least 4000 bytes of APF RAM.
+        // DEVICEs with CHIPSETs that set ro.board.first_api_level or ro.board.api_level to 202504
+        // or higher:
+        // - [VSR-5.3.12-018] MUST implement version 6 or version 6.1 of the Android Packet
+        //   Filtering (APF) interpreter in the Wi-Fi firmware.
+        // - [VSR-5.3.12-019] MUST provide at least 4000 bytes of APF RAM when version 6 is
+        //   implemented OR 3000 bytes when version 6.1 is implemented.
+        // - Note, the APF RAM requirement for APF version 6.1 will become 4000 bytes in Android 17
+        //   with CHIPSETs that set ro.board.first_api_level or ro.board.api_level to 202604 or
+        //   higher.
         if (vsrApiLevel >= 202504) {
-            assertThat(caps.apfVersionSupported).isEqualTo(6000)
-            assertThat(caps.maximumApfProgramSize).isAtLeast(4000)
+            assertThat(caps.apfVersionSupported).isAnyOf(6000, 6100)
+            if (caps.apfVersionSupported == 6000) {
+                assertThat(caps.maximumApfProgramSize).isAtLeast(4000)
+            } else {
+                assertThat(caps.maximumApfProgramSize).isAtLeast(3000)
+            }
         }
 
         // ApfFilter does not support anything but ARPHRD_ETHER.

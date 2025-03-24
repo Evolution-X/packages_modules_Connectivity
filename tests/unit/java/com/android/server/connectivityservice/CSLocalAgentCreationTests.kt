@@ -18,14 +18,11 @@ package com.android.server
 
 import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.net.INetd
-import android.net.LocalNetworkConfig
 import android.net.NativeNetworkConfig
 import android.net.NativeNetworkType
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK
 import android.net.NetworkRequest
-import android.net.NetworkScore
-import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.VpnManager
 import android.os.Build
 import androidx.test.filters.SmallTest
@@ -46,11 +43,6 @@ import org.mockito.Mockito.timeout
 private const val TIMEOUT_MS = 2_000L
 private const val NO_CALLBACK_TIMEOUT_MS = 200L
 
-private fun keepConnectedScore() =
-        FromS(NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build())
-
-private fun defaultLnc() = FromS(LocalNetworkConfig.Builder().build())
-
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
@@ -61,7 +53,8 @@ class CSLocalAgentCreationTests : CSTest() {
     data class TestParams(
             val sdkLevel: Int,
             val isTv: Boolean = false,
-            val addLocalNetCapToRequest: Boolean = true)
+            val addLocalNetCapToRequest: Boolean = true
+    )
 
     companion object {
         @JvmStatic
@@ -81,8 +74,14 @@ class CSLocalAgentCreationTests : CSTest() {
     }
 
     private fun makeNativeNetworkConfigLocal(netId: Int, permission: Int) =
-            NativeNetworkConfig(netId, NativeNetworkType.PHYSICAL_LOCAL, permission,
-                    false /* secure */, VpnManager.TYPE_VPN_NONE, false /* excludeLocalRoutes */)
+            NativeNetworkConfig(
+                    netId,
+                    NativeNetworkType.PHYSICAL_LOCAL,
+                    permission,
+                    false /* secure */,
+                    VpnManager.TYPE_VPN_NONE,
+                    false /* excludeLocalRoutes */
+            )
 
     @Test
     fun testLocalAgents() {
@@ -96,11 +95,11 @@ class CSLocalAgentCreationTests : CSTest() {
         }
         cm.registerNetworkCallback(request.build(), allNetworksCb)
         val ncTemplate = NetworkCapabilities.Builder().run {
-            addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            addTransportType(NetworkCapabilities.TRANSPORT_THREAD)
             addCapability(NET_CAPABILITY_LOCAL_NETWORK)
         }.build()
-        val localAgent = if (params.sdkLevel >= VERSION_V
-                || params.sdkLevel == VERSION_U && params.isTv) {
+        val localAgent = if (params.sdkLevel >= VERSION_V ||
+                params.sdkLevel == VERSION_U && params.isTv) {
             Agent(nc = ncTemplate, score = keepConnectedScore(), lnc = defaultLnc())
         } else {
             assertFailsWith<IllegalArgumentException> { Agent(nc = ncTemplate, lnc = defaultLnc()) }
@@ -109,7 +108,8 @@ class CSLocalAgentCreationTests : CSTest() {
         }
         localAgent.connect()
         netdInOrder.verify(netd).networkCreate(
-                makeNativeNetworkConfigLocal(localAgent.network.netId, INetd.PERMISSION_NONE))
+                makeNativeNetworkConfigLocal(localAgent.network.netId, INetd.PERMISSION_NONE)
+        )
         if (params.addLocalNetCapToRequest) {
             assertEquals(localAgent.network, allNetworksCb.expect<Available>().network)
         } else {
@@ -123,10 +123,12 @@ class CSLocalAgentCreationTests : CSTest() {
     @Test
     fun testBadAgents() {
         assertFailsWith<IllegalArgumentException> {
-            Agent(nc = NetworkCapabilities.Builder()
-                    .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
-                    .build(),
-                    lnc = null)
+            Agent(
+                    nc = NetworkCapabilities.Builder()
+                            .addCapability(NET_CAPABILITY_LOCAL_NETWORK)
+                            .build(),
+                    lnc = null
+            )
         }
         assertFailsWith<IllegalArgumentException> {
             Agent(nc = NetworkCapabilities.Builder().build(), lnc = defaultLnc())
