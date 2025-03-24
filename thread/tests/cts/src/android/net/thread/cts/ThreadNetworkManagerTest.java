@@ -43,6 +43,8 @@ import org.junit.runner.RunWith;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class ThreadNetworkManagerTest {
+    private static final String THREAD_NETWORK_FEATURE = "android.hardware.thread_network";
+
     @Rule public DevSdkIgnoreRule mIgnoreRule = new DevSdkIgnoreRule();
 
     private final Context mContext = ApplicationProvider.getApplicationContext();
@@ -64,7 +66,7 @@ public class ThreadNetworkManagerTest {
     @Test
     @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void getManager_hasThreadFeatureOnVOrHigher_returnsNonNull() {
-        assumeTrue(mPackageManager.hasSystemFeature("android.hardware.thread_network"));
+        assumeTrue(mPackageManager.hasSystemFeature(THREAD_NETWORK_FEATURE));
 
         assertThat(mManager).isNotNull();
     }
@@ -81,8 +83,9 @@ public class ThreadNetworkManagerTest {
     @Test
     @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
     @IgnoreAfter(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    public void getManager_onUAndTv_returnsNonNull() {
+    public void getManager_onUAndTvWithThreadFeature_returnsNonNull() {
         assumeTrue(mPackageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK));
+        assumeTrue(mPackageManager.hasSystemFeature(THREAD_NETWORK_FEATURE));
 
         assertThat(mManager).isNotNull();
     }
