@@ -451,13 +451,26 @@ public class MdnsSocketClient implements MdnsSocketClientBase {
 
                 if (!shouldStopSocketLoop) {
                     String responseType = socket == multicastSocket ? MULTICAST_TYPE : UNICAST_TYPE;
+                    final SocketKey key = mdnsFeatureFlags.mIsSocketClientNetworkGuessingEnabled
+                            ? interfaceProvider.guessNetworkOfRemoteHost(packet.getAddress())
+                            : null;
+                    final int interfaceIndex;
+                    if (socket == null || !propagateInterfaceIndex) {
+                        interfaceIndex = MdnsSocket.INTERFACE_INDEX_UNSPECIFIED;
+                    } else if (mdnsFeatureFlags.mIsSocketClientNetworkGuessingEnabled) {
+                        interfaceIndex = key == null
+                                ? MdnsSocket.INTERFACE_INDEX_UNSPECIFIED
+                                : key.getInterfaceIndex();
+                    } else {
+                        // Note this is incorrect: getInterfaceIndex is the last interface that sent
+                        // a packet, not the one that received the packet.
+                        interfaceIndex = socket.getInterfaceIndex();
+                    }
                     processResponsePacket(
                             packet,
                             responseType,
-                            /* interfaceIndex= */ (socket == null || !propagateInterfaceIndex)
-                                    ? MdnsSocket.INTERFACE_INDEX_UNSPECIFIED
-                                    : socket.getInterfaceIndex(),
-                            /* network= */ socket.getNetwork());
+                            interfaceIndex,
+                            key == null ? null : key.getNetwork());
                 }
             } catch (IOException e) {
                 if (!shouldStopSocketLoop) {
