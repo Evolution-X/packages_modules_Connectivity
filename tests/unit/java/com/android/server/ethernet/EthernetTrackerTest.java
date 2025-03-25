@@ -20,11 +20,9 @@ import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,8 +33,6 @@ import android.content.Context;
 import android.net.INetd;
 import android.net.InetAddresses;
 import android.net.IpConfiguration;
-import android.net.IpConfiguration.IpAssignment;
-import android.net.IpConfiguration.ProxySettings;
 import android.net.LinkAddress;
 import android.net.NetworkCapabilities;
 import android.net.StaticIpConfiguration;
@@ -104,70 +100,70 @@ public class EthernetTrackerTest {
         HandlerUtils.waitForIdle(mHandlerThread, TIMEOUT_MS);
     }
 
-    /**
-     * Test: Creation of various valid static IP configurations
-     */
     @Test
-    public void createStaticIpConfiguration() {
-        // Empty gives default StaticIPConfiguration object
-        assertStaticConfiguration(new StaticIpConfiguration(), "");
+    public void testIpConfigurationParsing() {
+        EthernetConfigParser p = new EthernetConfigParser("eth0;*;;", true /*isAtLeastB*/);
+        assertThat(p.mIpConfig).isNull();
 
-        // Setting only the IP address properly cascades and assumes defaults
-        assertStaticConfiguration(new StaticIpConfiguration.Builder()
-                .setIpAddress(new LinkAddress("192.0.2.10/24")).build(), "ip=192.0.2.10/24");
-
-        final ArrayList<InetAddress> dnsAddresses = new ArrayList<>();
-        dnsAddresses.add(InetAddresses.parseNumericAddress("4.4.4.4"));
-        dnsAddresses.add(InetAddresses.parseNumericAddress("8.8.8.8"));
-        // Setting other fields properly cascades them
-        assertStaticConfiguration(new StaticIpConfiguration.Builder()
+        p = new EthernetConfigParser("eth0;*;ip=192.0.2.10/24", true /*isAtLeastB*/);
+        StaticIpConfiguration s = new StaticIpConfiguration.Builder()
                 .setIpAddress(new LinkAddress("192.0.2.10/24"))
-                .setDnsServers(dnsAddresses)
+                .build();
+        assertThat(p.mIpConfig)
+                .isEqualTo(new IpConfiguration.Builder().setStaticIpConfiguration(s).build());
+
+        p = new EthernetConfigParser(
+                "eth0;*;ip=192.0.2.10/24 dns=4.4.4.4,8.8.8.8   gateway=192.0.2.1  domains=android ",
+                true /*isAtLeastB*/);
+        ArrayList<InetAddress> dns = new ArrayList<>();
+        dns.add(InetAddresses.parseNumericAddress("4.4.4.4"));
+        dns.add(InetAddresses.parseNumericAddress("8.8.8.8"));
+        s = new StaticIpConfiguration.Builder()
+                .setIpAddress(new LinkAddress("192.0.2.10/24"))
+                .setDnsServers(dns)
                 .setGateway(InetAddresses.parseNumericAddress("192.0.2.1"))
-                .setDomains("android").build(),
-                "ip=192.0.2.10/24 dns=4.4.4.4,8.8.8.8 gateway=192.0.2.1 domains=android");
+                .setDomains("android")
+                .build();
+        assertThat(p.mIpConfig)
+                .isEqualTo(new IpConfiguration.Builder().setStaticIpConfiguration(s).build());
 
         // Verify order doesn't matter
-        assertStaticConfiguration(new StaticIpConfiguration.Builder()
-                .setIpAddress(new LinkAddress("192.0.2.10/24"))
-                .setDnsServers(dnsAddresses)
-                .setGateway(InetAddresses.parseNumericAddress("192.0.2.1"))
-                .setDomains("android").build(),
-                "domains=android ip=192.0.2.10/24 gateway=192.0.2.1 dns=4.4.4.4,8.8.8.8 ");
+        p = new EthernetConfigParser(
+                "eth0;; domains=android ip=192.0.2.10/24 gateway=192.0.2.1 dns=4.4.4.4,8.8.8.8   ;",
+                false /*isAtLeastB*/);
+        assertThat(p.mIpConfig)
+                .isEqualTo(new IpConfiguration.Builder().setStaticIpConfiguration(s).build());
     }
 
-    /**
-     * Test: Attempt creation of various bad static IP configurations
-     */
     @Test
-    public void createStaticIpConfiguration_Bad() {
-        assertStaticConfigurationFails("ip=192.0.2.1/24 gateway= blah=20.20.20.20");  // Unknown key
-        assertStaticConfigurationFails("ip=192.0.2.1");  // mask is missing
-        assertStaticConfigurationFails("ip=a.b.c");  // not a valid ip address
-        assertStaticConfigurationFails("dns=4.4.4.4,1.2.3.A");  // not valid ip address in dns
-        assertStaticConfigurationFails("=");  // Key and value is empty
-        assertStaticConfigurationFails("ip=");  // Value is empty
-        assertStaticConfigurationFails("ip=192.0.2.1/24 gateway=");  // Gateway is empty
-    }
+    public void testIpConfigurationParsing_withInvalidInputs() {
+        assertThrows(IllegalArgumentException.class, () -> { // unknown key
+            new EthernetConfigParser("eth0;;ip=192.0.2.1/24 blah=20.20.20.20", true /*isAtLeastB*/);
+        });
 
-    private void assertStaticConfigurationFails(String config) {
-        try {
-            EthernetTracker.parseStaticIpConfiguration(config);
-            fail("Expected to fail: " + config);
-        } catch (IllegalArgumentException e) {
-            // expected
-        }
-    }
+        assertThrows(IllegalArgumentException.class, () -> { // mask missing
+            new EthernetConfigParser("eth0;;ip=192.0.2.1", true /*isAtLeastB*/);
+        });
 
-    private void assertStaticConfiguration(StaticIpConfiguration expectedStaticIpConfig,
-                String configAsString) {
-        final IpConfiguration expectedIpConfiguration = new IpConfiguration();
-        expectedIpConfiguration.setIpAssignment(IpAssignment.STATIC);
-        expectedIpConfiguration.setProxySettings(ProxySettings.NONE);
-        expectedIpConfiguration.setStaticIpConfiguration(expectedStaticIpConfig);
+        assertThrows(IllegalArgumentException.class, () -> { // invalid ip address
+            new EthernetConfigParser("eth0;;ip=x.y.z", true /*isAtLeastB*/);
+        });
 
-        assertEquals(expectedIpConfiguration,
-                EthernetTracker.parseStaticIpConfiguration(configAsString));
+        assertThrows(IllegalArgumentException.class, () -> { // invalid dns ip
+            new EthernetConfigParser("eth0;;dns=4.4.4.4,1.2.3.A", true /*isAtLeastB*/);
+        });
+
+        assertThrows(IllegalArgumentException.class, () -> { // empty key / value
+            new EthernetConfigParser("eth0;;=", true /*isAtLeastB*/);
+        });
+
+        assertThrows(IllegalArgumentException.class, () -> { // empty value
+            new EthernetConfigParser("eth0;;ip=", true /*isAtLeastB*/);
+        });
+
+        assertThrows(IllegalArgumentException.class, () -> { // empty gateway
+            new EthernetConfigParser("eth0;;ip=192.0.2.1/24 gateway=", true /*isAtLeastB*/);
+        });
     }
 
     private NetworkCapabilities.Builder makeEthernetCapabilitiesBuilder(boolean clearDefaults) {
@@ -236,16 +232,6 @@ public class EthernetTrackerTest {
 
         p = new EthernetConfigParser("eth0;12;", true /*isAtLeastB*/);
         assertThat(p.mIface).isEqualTo("eth0");
-    }
-
-    @Test
-    public void testIpConfigParsing() {
-        // Note that EthernetConfigParser doesn't actually parse the IpConfig (yet).
-        final EthernetConfigParser p = new EthernetConfigParser(
-                "eth0;1,2,3;ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8;1",
-                false /*isAtLeastB*/);
-        assertThat(p.mIpConfig)
-                .isEqualTo("ip=192.168.0.10/24 gateway=192.168.0.1 dns=4.4.4.4,8.8.8.8");
     }
 
     @Test
