@@ -35,14 +35,14 @@ import com.android.server.connectivity.mdns.util.MdnsUtils.createQueryDatagramPa
 import com.android.server.connectivity.mdns.util.MdnsUtils.truncateServiceName
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
+import java.net.DatagramPacket
+import kotlin.test.assertContentEquals
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.net.DatagramPacket
-import kotlin.test.assertContentEquals
 
 @RunWith(DevSdkIgnoreRunner::class)
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
@@ -178,8 +178,13 @@ class MdnsUtilsTest {
         val interfaceIndex = 99
         val response = MdnsResponse(0 /* now */, serviceName, interfaceIndex, null /* network */)
         // Set PTR record
-        response.addPointerRecord(MdnsPointerRecord(serviceType.split(".").toTypedArray(),
-                testElapsedRealtime, false /* cacheFlush */, ttlTime, serviceName))
+        response.addPointerRecord(MdnsPointerRecord(
+                serviceType.split(".").toTypedArray(),
+                testElapsedRealtime,
+                false /* cacheFlush */,
+                ttlTime,
+                serviceName
+        ))
         // Set SRV record.
         response.serviceRecord = MdnsServiceRecord(serviceName, testElapsedRealtime,
                 false /* cacheFlush */, ttlTime, 0 /* servicePriority */, 0 /* serviceWeight */,
@@ -189,16 +194,27 @@ class MdnsUtilsTest {
                 testElapsedRealtime, true /* cacheFlush */, 0L /* ttlMillis */,
                 listOf(MdnsServiceInfo.TextEntry.fromString("somedifferent=entry")))
         // Set InetAddress record.
-        response.addInet4AddressRecord(MdnsInetAddressRecord(hostName.split(".").toTypedArray(),
-                testElapsedRealtime, true /* cacheFlush */,
-                0L /* ttlMillis */, InetAddresses.parseNumericAddress(v4Address)))
-        response.addInet6AddressRecord(MdnsInetAddressRecord(hostName.split(".").toTypedArray(),
-                testElapsedRealtime, true /* cacheFlush */,
-                0L /* ttlMillis */, InetAddresses.parseNumericAddress(v6Address)))
+        response.addInet4AddressRecord(MdnsInetAddressRecord(
+                hostName.split(".").toTypedArray(),
+                testElapsedRealtime,
+                true /* cacheFlush */,
+                0L /* ttlMillis */,
+                InetAddresses.parseNumericAddress(v4Address)
+        ))
+        response.addInet6AddressRecord(MdnsInetAddressRecord(
+                hostName.split(".").toTypedArray(),
+                testElapsedRealtime,
+                true /* cacheFlush */,
+                0L /* ttlMillis */,
+                InetAddresses.parseNumericAddress(v6Address)
+        ))
 
         // Convert a MdnsResponse to a MdnsServiceInfo
         val serviceInfo = MdnsUtils.buildMdnsServiceInfoFromResponse(
-                response, serviceType.split(".").toTypedArray(), testElapsedRealtime)
+                response,
+                serviceType.split(".").toTypedArray(),
+                testElapsedRealtime
+        )
 
         assertEquals(serviceInstanceName, serviceInfo.serviceInstanceName)
         assertArrayEquals(serviceType.split(".").toTypedArray(), serviceInfo.serviceType)
@@ -210,7 +226,6 @@ class MdnsUtilsTest {
         assertEquals(v6Address, serviceInfo.ipv6Addresses[0])
         assertEquals(interfaceIndex, serviceInfo.interfaceIndex)
         assertEquals(null, serviceInfo.network)
-        assertEquals(mapOf("somedifferent" to "entry"),
-                serviceInfo.attributes)
+        assertEquals(mapOf("somedifferent" to "entry"), serviceInfo.attributes)
     }
 }
