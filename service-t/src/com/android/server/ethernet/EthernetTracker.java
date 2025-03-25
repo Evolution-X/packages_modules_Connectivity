@@ -993,15 +993,14 @@ public class EthernetTracker {
             for (String keyValueAsString : staticIpConfig.trim().split(" ")) {
                 if (TextUtils.isEmpty(keyValueAsString)) continue;
 
-                String[] pair = keyValueAsString.split("=");
+                final String[] pair = keyValueAsString.split("=");
                 if (pair.length != 2) {
                     throw new IllegalArgumentException("Unexpected token: " + keyValueAsString
                             + " in " + staticIpConfig);
                 }
 
-                String key = pair[0];
-                String value = pair[1];
-
+                final String key = pair[0];
+                final String value = pair[1];
                 switch (key) {
                     case "ip":
                         staticIpConfigBuilder.setIpAddress(new LinkAddress(value));
@@ -1020,7 +1019,7 @@ public class EthernetTracker {
                         staticIpConfigBuilder.setDnsServers(dnsAddresses);
                         break;
                     }
-                    default : {
+                    default: {
                         throw new IllegalArgumentException("Unexpected key: " + key
                                 + " in " + staticIpConfig);
                     }
