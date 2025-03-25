@@ -772,9 +772,24 @@ static __always_inline inline uint8_t get_app_permissions() {
     return permissions ? *permissions : BPF_PERMISSION_INTERNET;
 }
 
-DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create", inet_socket_create, KVER_4_14)
-(__unused struct bpf_sock* sk) {
+static __always_inline inline int inet_socket_create(struct bpf_sock* sk,
+                                                     const struct kver_uint kver) {
+    if (KVER_IS_AT_LEAST(kver, 5, 10, 0)) {
+        SkStorageValue *v = bpf_sk_storage_get(sk, 0, BPF_SK_STORAGE_GET_F_CREATE);
+        if (v) v->cookie = bpf_get_sk_cookie(sk);
+    }
     return (get_app_permissions() & BPF_PERMISSION_INTERNET) ? BPF_ALLOW : BPF_DISALLOW;
+}
+
+DEFINE_NETD_BPF_PROG_KVER("cgroupsock/inet_create$5_10", inet_socket_create_5_10, KVER_5_10)
+(struct bpf_sock* sk) {
+    return inet_socket_create(sk, KVER_5_10);
+}
+
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupsock/inet_create$4_14",
+                                inet_socket_create_4_14, KVER_4_14, KVER_5_10)
+(struct bpf_sock* sk) {
+    return inet_socket_create(sk, KVER_4_14);
 }
 
 DEFINE_NETD_BPF_PROG_KVER("cgroupsockrelease/inet_release", inet_socket_release, KVER_5_10)
