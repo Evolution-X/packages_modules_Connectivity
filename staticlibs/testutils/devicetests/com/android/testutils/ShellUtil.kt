@@ -19,8 +19,10 @@
 package com.android.testutils
 
 import android.app.UiAutomation
+import android.os.Build
 import android.os.ParcelFileDescriptor.AutoCloseInputStream
 import android.os.ParcelFileDescriptor.AutoCloseOutputStream
+import androidx.annotation.RequiresApi
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.InputStream
 
@@ -37,18 +39,17 @@ import java.io.InputStream
  *                        when this function returns.
  * @return Result of [outputProcessor].
  */
+@RequiresApi(Build.VERSION_CODES.S) // executeShellCommandRw is 31+
 fun <T> runCommandInShell(
     cmd: String,
     shell: String = "sh",
-    outputProcessor: (InputStream, InputStream) -> T,
+    outputProcessor: (InputStream) -> T,
 ): T {
-    val (stdout, stdin, stderr) = InstrumentationRegistry.getInstrumentation().uiAutomation
-        .executeShellCommandRwe(shell)
+    val (stdout, stdin) = InstrumentationRegistry.getInstrumentation().uiAutomation
+        .executeShellCommandRw(shell)
     AutoCloseOutputStream(stdin).bufferedWriter().use { it.write(cmd) }
     AutoCloseInputStream(stdout).use { outStream ->
-        AutoCloseInputStream(stderr).use { errStream ->
-            return outputProcessor(outStream, errStream)
-        }
+        return outputProcessor(outStream)
     }
 }
 
@@ -57,10 +58,11 @@ fun <T> runCommandInShell(
  *
  * Overload of [runCommandInShell] that reads and returns stdout as String.
  */
+@RequiresApi(Build.VERSION_CODES.S)
 fun runCommandInShell(
     cmd: String,
     shell: String = "sh",
-) = runCommandInShell(cmd, shell) { stdout, _ ->
+) = runCommandInShell(cmd, shell) { stdout ->
     stdout.reader().use { it.readText() }
 }
 
@@ -70,6 +72,7 @@ fun runCommandInShell(
  * This is generally only usable on devices on which [DeviceInfoUtils.isDebuggable] is true.
  * @see runCommandInShell
  */
+@RequiresApi(Build.VERSION_CODES.S)
 fun runCommandInRootShell(
     cmd: String
 ) = runCommandInShell(cmd, shell = "su root sh")
