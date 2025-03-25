@@ -1832,7 +1832,9 @@ static int doLoad(char** argv, char * const envp[]) {
         int v = fscanf(f, "# %d %d %d %d %d #", &y, &q, &a, &b, &c);
         ALOGI("detected %d of 5: %dQ%d api:%d.%d.%d", v, y, q, a, b, c);
         fclose(f);
-        if (v != 5 || y != 2025 || q != 2 || a != 36 || b || c) return 1;
+        if (v != 5 || y != 2025 || a != 36 || b) return 1;
+        if (q < 2 || q > 3) return 1;
+        if (c < 0 || c > 1) return 1;
     }
 
     // Ensure we can determine the Android build type.
