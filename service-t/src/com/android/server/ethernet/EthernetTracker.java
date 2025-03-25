@@ -1031,18 +1031,17 @@ public class EthernetTracker {
                     .build();
         }
 
-        EthernetConfigParser(String configString, boolean isAtLeastB) {
+        EthernetConfigParser(String configString, boolean bplus) {
             Objects.requireNonNull(configString, "EthernetConfigParser requires non-null config");
-            final String[] tokens = configString.split(";", /* limit of tokens */ 4);
-            mIface = tokens[0];
+            final String[] t = configString.split(";", /* limit of tokens */ 4);
+            mIface = t[0];
 
-            final NetworkCapabilities nc =
-                    parseCapabilities(tokens.length > 1 ? tokens[1] : null, isAtLeastB);
-            final int transportType = parseTransportType(tokens.length > 3 ? tokens[3] : null);
+            final NetworkCapabilities nc = parseCapabilities(t.length > 1 ? t[1] : null, bplus);
+            final int transportType = parseTransportType(t.length > 3 ? t[3] : null);
             nc.addTransportType(transportType);
             mCaps = nc;
 
-            mIpConfig = parseStaticIpConfiguration(tokens.length > 2 ? tokens[2] : null);
+            mIpConfig = parseStaticIpConfiguration(t.length > 2 ? t[2] : null);
         }
     }
 }
