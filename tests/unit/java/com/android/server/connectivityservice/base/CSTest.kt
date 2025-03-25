@@ -288,6 +288,8 @@ open class CSTest {
             netd: INetd,
             interfaceTracker: InterfaceTracker
         ) = this@CSTest.bpfNetMaps
+
+        override fun getInterfaceTracker(context: Context?) = this@CSTest.interfaceTracker
         override fun getClatCoordinator(netd: INetd?) = this@CSTest.clatCoordinator
         override fun getNetworkStack() = this@CSTest.networkStack
 
