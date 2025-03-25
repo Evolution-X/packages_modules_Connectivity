@@ -166,17 +166,6 @@ public class EthernetTrackerTest {
         });
     }
 
-    private NetworkCapabilities.Builder makeEthernetCapabilitiesBuilder(boolean clearDefaults) {
-        final NetworkCapabilities.Builder builder =
-                clearDefaults
-                        ? NetworkCapabilities.Builder.withoutDefaultCapabilities()
-                        : new NetworkCapabilities.Builder();
-        return builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED);
-    }
-
-
     @Test
     public void testNetworkCapabilityParsing() {
         final NetworkCapabilities baseNc = NetworkCapabilities.Builder.withoutDefaultCapabilities()
