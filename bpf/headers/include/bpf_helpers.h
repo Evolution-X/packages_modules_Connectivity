@@ -256,10 +256,11 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
 
 #define ABSOLUTE(x) ((x) < 0 ? -(x) : (x))
 
-#define DEFAULT_BPF_MAP_FLAGS(type, num_entries, mapflags)    \
-    ( (mapflags) |                                            \
-      ((num_entries) < 0 ? BPF_F_NO_PREALLOC : 0) |           \
-      (type == BPF_MAP_TYPE_LPM_TRIE ? BPF_F_NO_PREALLOC : 0) \
+#define DEFAULT_BPF_MAP_FLAGS(type, num_entries, mapflags)         \
+    ( (mapflags) |                                                 \
+      ((num_entries) < 0 ? BPF_F_NO_PREALLOC : 0) |                \
+      ( (type == BPF_MAP_TYPE_LPM_TRIE ||                          \
+         type == BPF_MAP_TYPE_SK_STORAGE) ? BPF_F_NO_PREALLOC : 0) \
     )
 
 #define DEFINE_BPF_MAP_BASE(the_map, TYPE, keysize, valuesize, num_entries, \
