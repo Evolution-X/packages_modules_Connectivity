@@ -21,7 +21,6 @@ import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.Manifest.permission.ACCESS_NETWORK_STATE;
 import static android.Manifest.permission.CONNECTIVITY_INTERNAL;
 import static android.Manifest.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS;
-import static android.Manifest.permission.MANAGE_TEST_NETWORKS;
 import static android.Manifest.permission.NETWORK_FACTORY;
 import static android.Manifest.permission.NETWORK_SETTINGS;
 import static android.Manifest.permission.NETWORK_SETUP_WIZARD;
@@ -101,11 +100,6 @@ import static android.provider.Settings.Global.NETWORK_METERED_MULTIPATH_PREFERE
 import static android.system.OsConstants.AF_INET;
 import static android.system.OsConstants.AF_INET6;
 import static android.system.OsConstants.AF_UNSPEC;
-import static android.system.OsConstants.ECONNABORTED;
-import static android.system.OsConstants.EDESTADDRREQ;
-import static android.system.OsConstants.IPPROTO_UDP;
-import static android.system.OsConstants.POLLIN;
-import static android.system.OsConstants.SOCK_DGRAM;
 
 import static com.android.compatibility.common.util.SystemUtil.callWithShellPermissionIdentity;
 import static com.android.compatibility.common.util.SystemUtil.runShellCommand;
@@ -188,9 +182,7 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.MessageQueue;
-import android.os.ParcelFileDescriptor;
 import android.os.Process;
-import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -198,9 +190,6 @@ import android.os.VintfRuntimeInfo;
 import android.platform.test.annotations.AppModeFull;
 import android.provider.DeviceConfig;
 import android.provider.Settings;
-import android.system.ErrnoException;
-import android.system.Os;
-import android.system.StructPollfd;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -216,10 +205,6 @@ import com.android.internal.util.ArrayUtils;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DnsPacket;
-import com.android.net.module.util.Struct;
-import com.android.net.module.util.structs.Ipv4Header;
-import com.android.net.module.util.structs.Ipv6Header;
-import com.android.net.module.util.structs.UdpHeader;
 import com.android.networkstack.apishim.ConnectivityManagerShimImpl;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.NetworkInformationShimImpl;
@@ -243,7 +228,6 @@ import com.android.testutils.TestableNetworkCallback;
 
 import junit.framework.AssertionFailedError;
 
-import libcore.io.IoUtils;
 import libcore.io.Streams;
 
 import org.junit.After;
@@ -269,7 +253,6 @@ import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.URL;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -368,15 +351,6 @@ public class ConnectivityManagerTest {
             "https://ipv6test.googleapis-cn.com/ip.js?fmt=text");
     // Re-connecting to the AP, obtaining an IP address, revalidating can take a long time
     private static final long WIFI_CONNECT_TIMEOUT_MS = 60_000L;
-
-    // Timeout for waiting the QUIC connection close information registration/unregistration
-    private static final long QUIC_CONNECTION_CLOSE_INFO_REGISTRATION_TIMEOUT_MS = 500L;
-
-    // Timeout for waiting the QUIC connection close packet to be sent
-    private static final long QUIC_CONNECTION_CLOSE_PACKET_TIMEOUT_MS = 200L;
-
-    // Name of the feature flag for closing quic connection
-    private static final String CLOSE_QUIC_CONNECTION = "close_quic_connection";
 
     private Context mContext;
     private Instrumentation mInstrumentation;
@@ -2415,8 +2389,8 @@ public class ConnectivityManagerTest {
         waitForAvailable(cb);
     }
 
-    private CallbackEntry.Available waitForAvailable(@NonNull final TestableNetworkCallback cb) {
-        return cb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+    private void waitForAvailable(@NonNull final TestableNetworkCallback cb) {
+        cb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                 c -> c instanceof CallbackEntry.Available);
     }
 
@@ -4156,303 +4130,5 @@ public class ConnectivityManagerTest {
         assumeTrue(Build.VERSION.SDK_INT > Build.VERSION_CODES.VANILLA_ICE_CREAM);
         assertThrows(UnsupportedOperationException.class, () -> mCm.tether("iface"));
         assertThrows(UnsupportedOperationException.class, () -> mCm.untether("iface"));
-    }
-
-    private ParcelFileDescriptor setupTestNetworkAndGetFd() {
-        return runWithShellPermissionIdentity(() -> {
-            final TestNetworkManager tnm = mContext.getSystemService(TestNetworkManager.class);
-            final List<LinkAddress> linkAddresses = List.of(new LinkAddress("192.0.2.2/24"),
-                    new LinkAddress("2001:db8:1:2::2/64"));
-            final TestNetworkInterface iface = tnm.createTunInterface(linkAddresses);
-            tnm.setupTestNetwork(iface.getInterfaceName(), new Binder());
-            return iface.getFileDescriptor();
-        }, MANAGE_TEST_NETWORKS);
-    }
-
-    private Network getTestNetwork() {
-        final TestableNetworkCallback callback = networkCallbackRule.requestNetwork(
-                new NetworkRequest.Builder()
-                        .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                        .removeCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
-                        .addTransportType(TRANSPORT_TEST)
-                        .build()
-        );
-        return waitForAvailable(callback).getNetwork();
-    }
-
-    private void waitForQuicConnectionCloseInfoRegistration(final int myUid,
-            final boolean expectRegistered)
-            throws ErrnoException, RemoteException, InterruptedException {
-        final long timeout = SystemClock.elapsedRealtime()
-                + QUIC_CONNECTION_CLOSE_INFO_REGISTRATION_TIMEOUT_MS;
-        while (timeout > SystemClock.elapsedRealtime()) {
-            if (DumpTestUtils.dumpServiceWithShellPermission(
-                    Context.CONNECTIVITY_SERVICE, "--short")
-                    .contains("QuicConnectionCloseInfo{uid: " + myUid) == expectRegistered) {
-                return;
-            }
-            Thread.sleep(50);
-        }
-        fail("Failed to register/unregister QUIC connection close information in "
-                + QUIC_CONNECTION_CLOSE_INFO_REGISTRATION_TIMEOUT_MS
-                + "ms, expectRegistered=" + expectRegistered);
-    }
-
-    private void doTestRegisterQuicConnectionClosePayload(final boolean isV6,
-            final boolean unregister, final boolean closeSocket, final boolean blockNetwork,
-            final boolean expectPacketSent) throws Exception {
-        final InetAddress dstAddress = isV6 ? InetAddresses.parseNumericAddress("2001:db8:1:2::3")
-                : InetAddresses.parseNumericAddress("192.0.2.3");
-        final InetSocketAddress dstSockAddress = new InetSocketAddress(dstAddress, 443);
-        final int myUid = Process.myUid();
-
-        final ParcelFileDescriptor tunFd = setupTestNetworkAndGetFd();
-        final Network testNetwork = getTestNetwork();
-
-        // Firewall chain status will be restored after the test.
-        final boolean wasChainEnabled = runWithShellPermissionIdentity(() ->
-                mCm.getFirewallChainEnabled(FIREWALL_CHAIN_BACKGROUND), NETWORK_SETTINGS);
-        final int previousUidFirewallRule = runWithShellPermissionIdentity(() ->
-                mCm.getUidFirewallRule(FIREWALL_CHAIN_BACKGROUND, myUid), NETWORK_SETTINGS);
-        runWithShellPermissionIdentity(() -> {
-            mCm.setFirewallChainEnabled(FIREWALL_CHAIN_BACKGROUND, true /* enable */);
-            mCm.setUidFirewallRule(FIREWALL_CHAIN_BACKGROUND, myUid, FIREWALL_RULE_ALLOW);
-        }, NETWORK_SETTINGS);
-
-        final FileDescriptor sock = Os.socket(isV6 ? AF_INET6 : AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        final ParcelFileDescriptor pfd = ParcelFileDescriptor.fromFd(sock.getInt$());
-        testNetwork.bindSocket(sock);
-        Os.connect(sock, dstSockAddress);
-        final InetSocketAddress srcSockAddress = (InetSocketAddress) Os.getsockname(sock);
-
-        testAndCleanup(() -> {
-            final Random random = new Random();
-            final byte[] payload = new byte[100];
-            random.nextBytes(payload);
-
-            // register/unregisterQuicConnectionClosePayload are oneway binder calls,
-            // while setUidFirewallRule is a two-way binder call. So if
-            // setUidFirewallRule is called immediately after them, it's possible that
-            // setUidFirewallRule could be processed before them.
-            // To ensure that uid networking is blocked after the connection close information
-            // is registered/unregistered, wait for the registration/unregistration.
-            mCm.registerQuicConnectionClosePayload(pfd, payload);
-            waitForQuicConnectionCloseInfoRegistration(myUid, true /* expectRegistered */);
-            if (unregister) {
-                mCm.unregisterQuicConnectionClosePayload(pfd);
-                waitForQuicConnectionCloseInfoRegistration(myUid, false /* expectRegistered */);
-            }
-
-            if (closeSocket) {
-                Os.close(sock);
-                pfd.close();
-            }
-
-            if (blockNetwork) {
-                runWithShellPermissionIdentity(() ->
-                        mCm.setUidFirewallRule(FIREWALL_CHAIN_BACKGROUND, myUid,
-                                FIREWALL_RULE_DENY), NETWORK_SETTINGS);
-            }
-
-            final long timeout = SystemClock.elapsedRealtime()
-                    + QUIC_CONNECTION_CLOSE_PACKET_TIMEOUT_MS;
-            long remainingTimeMs;
-            while ((remainingTimeMs = timeout - SystemClock.elapsedRealtime()) > 0) {
-                final StructPollfd pollfd = new StructPollfd();
-                pollfd.events = (short) POLLIN;
-                pollfd.fd = tunFd.getFileDescriptor();
-                final int ret = Os.poll(new StructPollfd[] { pollfd }, (int) remainingTimeMs);
-                if (ret == 0) {
-                    continue;
-                }
-
-                final byte[] recvData = new byte[200];
-                final int readSize = Os.read(tunFd.getFileDescriptor(), recvData,
-                        0 /* byteOffset */, recvData.length);
-
-                if (readSize < payload.length
-                        || !Arrays.equals(payload, 0, payload.length,
-                        recvData, readSize - payload.length, readSize)) {
-                    continue;
-                }
-                // If the control comes here then the payload was received, otherwise poll would
-                // have returned 0 or the test above would have matched it and gone to continue.
-                if (!expectPacketSent) {
-                    fail("Unexpectedly received the QUIC connection close packet.");
-                }
-
-                final ByteBuffer buf = ByteBuffer.wrap(recvData, 0 /* offset */, readSize);
-                if (isV6) {
-                    final Ipv6Header header = Struct.parse(Ipv6Header.class, buf);
-                    assertEquals(srcSockAddress.getAddress(), header.srcIp);
-                    assertEquals(dstSockAddress.getAddress(), header.dstIp);
-                } else {
-                    final Ipv4Header header = Struct.parse(Ipv4Header.class, buf);
-                    assertEquals(srcSockAddress.getAddress(), header.srcIp);
-                    assertEquals(dstSockAddress.getAddress(), header.dstIp);
-                }
-                final UdpHeader udpHeader = Struct.parse(UdpHeader.class, buf);
-                assertEquals(srcSockAddress.getPort(), udpHeader.srcPort);
-                assertEquals(dstSockAddress.getPort(), udpHeader.dstPort);
-                assertEquals(payload.length + Struct.getSize(UdpHeader.class), udpHeader.length);
-
-                if (!closeSocket) {
-                    // After the socket is destroyed and QUIC connection is closed by
-                    // ConnectivityService, writing to the UDP socket should throw.
-                    try {
-                        Os.write(sock, payload, 0 /* byteOffset */, payload.length);
-                        fail("Write to the destroyed socket must throw.");
-                    } catch (ErrnoException e) {
-                        assertEquals(EDESTADDRREQ, e.errno);
-                    }
-                    try {
-                        Os.sendto(sock, payload, 0 /* byteOffset */,
-                                payload.length, 0 /* flags */, dstSockAddress);
-                        fail("Sendto with the destroyed socket must throw.");
-                    } catch (ErrnoException e) {
-                        assertEquals(ECONNABORTED, e.errno);
-                    }
-                }
-                return;
-            }
-            if (expectPacketSent) {
-                fail("Did not receive the QUIC connection close packet.");
-            }
-        }, /* cleanup */ () -> {
-            runWithShellPermissionIdentity(() -> {
-                mContext.getSystemService(TestNetworkManager.class).teardownTestNetwork(
-                        testNetwork);
-            }, MANAGE_TEST_NETWORKS);
-            IoUtils.closeQuietly(tunFd);
-            IoUtils.closeQuietly(sock);
-            IoUtils.closeQuietly(pfd);
-        }, /* cleanup */ () -> {
-            // Restore firewall chain global status
-            runWithShellPermissionIdentity(() -> {
-                mCm.setFirewallChainEnabled(FIREWALL_CHAIN_BACKGROUND, wasChainEnabled);
-            }, NETWORK_SETTINGS);
-        }, /* cleanup */ () -> {
-            // Restore firewall chain status for myUid
-            runWithShellPermissionIdentity(() -> {
-                try {
-                    mCm.setUidFirewallRule(FIREWALL_CHAIN_BACKGROUND, myUid,
-                            previousUidFirewallRule);
-                } catch (IllegalStateException ignored) {
-                    // Removing match causes an exception when the rule entry for the uid does
-                    // not exist. But this is fine and can be ignored.
-                }
-            }, NETWORK_SETTINGS);
-        });
-    }
-
-    @Test
-    @IgnoreUpTo(Build.VERSION_CODES.R)
-    @ConnectivityModuleTest
-    @AppModeFull(reason = "Cannot create test network in instant app mode")
-    public void testRegisterQuicConnectionClosePayload_blockNetwork() throws Exception {
-        assumeTrue(mCm.isConnectivityServiceFeatureEnabledForTesting(CLOSE_QUIC_CONNECTION));
-
-        // Network is blocked while the connection close payload is registered.
-        // Packet should be sent.
-        doTestRegisterQuicConnectionClosePayload(
-                false /* isV6 */, false /* unregister */, false /* closeSocket */,
-                true /* blockNetwork */, true /* expectPacketSent */);
-        doTestRegisterQuicConnectionClosePayload(
-                true /* isV6 */, false /* unregister */, false /* closeSocket */,
-                true /* blockNetwork */, true /* expectPacketSent */);
-
-        // Network is blocked after the connection close payload is unregistered.
-        // Packet should not be sent.
-        doTestRegisterQuicConnectionClosePayload(
-                false /* isV6 */, true /* unregister */, false /* closeSocket */,
-                true /* blockNetwork */, false /* expectPacketSent */);
-        doTestRegisterQuicConnectionClosePayload(
-                true /* isV6 */, true /* unregister */, false /* closeSocket */,
-                true /* blockNetwork */, false /* expectPacketSent */);
-    }
-
-    @Test
-    @IgnoreUpTo(Build.VERSION_CODES.R)
-    @ConnectivityModuleTest
-    @AppModeFull(reason = "Cannot create test network in instant app mode")
-    public void testRegisterQuicConnectionClosePayload_closeSocket() throws Exception {
-        assumeTrue(mCm.isConnectivityServiceFeatureEnabledForTesting(CLOSE_QUIC_CONNECTION));
-
-        // Registered socket is closed while the connection close payload is registered.
-        // Packet should be sent. This simulates that apps crash or are killed.
-        doTestRegisterQuicConnectionClosePayload(
-                false /* isV6 */, false /* unregister */, true /* closeSocket */,
-                false /* blockNetwork */, true /* expectPacketSent */);
-        doTestRegisterQuicConnectionClosePayload(
-                true /* isV6 */, false /* unregister */, true /* closeSocket */,
-                false /* blockNetwork */, true /* expectPacketSent */);
-    }
-
-    /**
-     * Repeat register a connection close payload, unregister it, and then close the socket.
-     * The registered payload must not be sent because it is unregistered before the socket
-     * is closed.
-     * This test tries to detect threading issues between
-     * register/unregisterQuicConnectionClosePayload and socket destroy message handling.
-     */
-    @Test
-    @IgnoreUpTo(Build.VERSION_CODES.R)
-    @ConnectivityModuleTest
-    @AppModeFull(reason = "Cannot create test network in instant app mode")
-    public void testRegisterQuicConnectionClosePayload_closeSocketAfterUnregister()
-            throws Exception {
-        assumeTrue(mCm.isConnectivityServiceFeatureEnabledForTesting(CLOSE_QUIC_CONNECTION));
-
-        final ParcelFileDescriptor tunFd = setupTestNetworkAndGetFd();
-        final Network testNetwork = getTestNetwork();
-
-        final Random random = new Random();
-        final byte[] payload = new byte[100];
-        random.nextBytes(payload);
-
-        final InetSocketAddress dstSockAddress =
-                new InetSocketAddress(InetAddresses.parseNumericAddress("2001:db8:1:2::3"), 443);
-        for (int i = 0; i < 100; i++) {
-            final FileDescriptor sock = Os.socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-            testNetwork.bindSocket(sock);
-            Os.connect(sock, dstSockAddress);
-
-            final ParcelFileDescriptor pfd = ParcelFileDescriptor.fromFd(sock.getInt$());
-            mCm.registerQuicConnectionClosePayload(pfd, payload);
-            mCm.unregisterQuicConnectionClosePayload(pfd);
-            Os.close(sock);
-            pfd.close();
-        }
-
-        testAndCleanup(() -> {
-            final long timeout = SystemClock.elapsedRealtime()
-                    + QUIC_CONNECTION_CLOSE_PACKET_TIMEOUT_MS;
-            long remainingTimeMs;
-            while ((remainingTimeMs = timeout - SystemClock.elapsedRealtime()) > 0) {
-                StructPollfd pollfd = new StructPollfd();
-                pollfd.events = (short) POLLIN;
-                pollfd.fd = tunFd.getFileDescriptor();
-                final int ret = Os.poll(new StructPollfd[]{pollfd}, (int) remainingTimeMs);
-                if (ret == 0) {
-                    continue;
-                }
-
-                final byte[] recvData = new byte[200];
-                final int readSize = Os.read(tunFd.getFileDescriptor(), recvData,
-                        0 /* byteOffset */, recvData.length);
-                if (readSize < payload.length
-                        || !Arrays.equals(payload, 0, payload.length,
-                        recvData, readSize - payload.length, readSize)) {
-                    continue;
-                }
-                fail("Unexpectedly received the QUIC connection close packet.");
-            }
-        }, /* cleanup */ () -> {
-            runWithShellPermissionIdentity(() -> {
-                mContext.getSystemService(TestNetworkManager.class).teardownTestNetwork(
-                        testNetwork);
-            }, MANAGE_TEST_NETWORKS);
-            IoUtils.closeQuietly(tunFd);
-        });
     }
 }

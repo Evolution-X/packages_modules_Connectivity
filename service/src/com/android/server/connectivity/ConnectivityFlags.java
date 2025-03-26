@@ -65,8 +65,6 @@ public final class ConnectivityFlags {
     public static final String QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER =
             "queue_network_agent_events_in_system_server";
 
-    public static final String CLOSE_QUIC_CONNECTION = "close_quic_connection";
-
     private boolean mNoRematchAllRequestsOnRegister;
 
     /**
