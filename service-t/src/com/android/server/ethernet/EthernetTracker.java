@@ -933,7 +933,11 @@ public class EthernetTracker {
             if (isAtLeastB && capabilitiesString.equals("*")) {
                 // On Android B+, a "*" string defaults to the same set of default
                 // capabilities assigned to unconfigured interfaces.
-                return new NetworkCapabilities(DEFAULT_CAPABILITIES);
+                // Note that the transport type is populated later with the result of
+                // parseTransportType().
+                return new NetworkCapabilities.Builder(DEFAULT_CAPABILITIES)
+                        .removeTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
+                        .build();
             }
 
             for (String strNetworkCapability : capabilitiesString.split(",")) {
