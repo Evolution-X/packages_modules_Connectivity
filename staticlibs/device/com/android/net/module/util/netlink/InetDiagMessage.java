@@ -491,7 +491,7 @@ public class InetDiagMessage extends NetlinkMessage {
      * Close the udp socket which can be uniquely identified with the cookie and other information.
      */
     public static void destroyUdpSocket(final InetSocketAddress src, final InetSocketAddress dst,
-            final long cookie)
+            final int ifIndex, final long cookie)
             throws ErrnoException, SocketException, InterruptedIOException {
         FileDescriptor fd = null;
 
@@ -502,7 +502,7 @@ public class InetDiagMessage extends NetlinkMessage {
             final StructInetDiagSockId id = new StructInetDiagSockId(
                     src,
                     dst,
-                    0 /* ifIndex */,
+                    ifIndex,
                     cookie
             );
             sendNetlinkDestroyRequest(fd, IPPROTO_UDP, id, (short) family, 0 /* state */);
