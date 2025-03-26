@@ -155,7 +155,6 @@ class CSDestroySocketTest : CSTest() {
     @Test
     fun testReplaceFirewallChain() {
         val netdEventListener = getRegisteredNetdUnsolicitedEventListener()
-        val inOrder = inOrder(destroySocketsWrapper)
 
         val cellAgent = Agent(nc = cellNc(), lp = cellLp())
         cellAgent.connect()
@@ -193,8 +192,8 @@ class CSDestroySocketTest : CSTest() {
                 .`when`(bpfNetMaps).getUidNetworkingBlockedReasons(TEST_UID2)
         cm.replaceFirewallChain(FIREWALL_CHAIN_BACKGROUND, intArrayOf(TEST_UID2))
         waitForIdle()
-        inOrder.verify(destroySocketsWrapper, never())
-                .destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+        verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+        verify(quicConnectionCloser, never()).closeQuicConnectionByUids(setOf(TEST_UID))
 
         netdEventListener.onInterfaceClassActivityChanged(
                 true, // isActive
@@ -203,8 +202,8 @@ class CSDestroySocketTest : CSTest() {
                 TEST_UID
         )
         waitForIdle()
-        inOrder.verify(destroySocketsWrapper)
-                .destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+        verify(destroySocketsWrapper).destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+        verify(quicConnectionCloser).closeQuicConnectionByUids(setOf(TEST_UID))
 
         cellAgent.disconnect()
     }
@@ -277,8 +276,10 @@ class CSDestroySocketTest : CSTest() {
 
         if (expectDestroySockets) {
             verify(destroySocketsWrapper).destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+            verify(quicConnectionCloser).closeQuicConnectionByUids(setOf(TEST_UID))
         } else {
             verify(destroySocketsWrapper, never()).destroyLiveTcpSocketsByOwnerUids(setOf(TEST_UID))
+            verify(quicConnectionCloser, never()).closeQuicConnectionByUids(setOf(TEST_UID))
         }
     }
 

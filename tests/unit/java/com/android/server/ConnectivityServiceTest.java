@@ -2188,6 +2188,7 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                 case ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN:
+                case ConnectivityFlags.CLOSE_QUIC_CONNECTION:
                 case ConnectivityService.KEY_DESTROY_FROZEN_SOCKETS_VERSION:
                     return true;
                 default:
