@@ -58,6 +58,7 @@ import android.permission.PermissionManager.PermissionResult
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.testing.TestableContext
+import android.util.SparseArray
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.internal.app.IBatteryStats
 import com.android.internal.util.test.BroadcastInterceptingContext
@@ -72,9 +73,11 @@ import com.android.server.connectivity.InterfaceTracker
 import com.android.server.connectivity.MulticastRoutingCoordinatorService
 import com.android.server.connectivity.MultinetworkPolicyTracker
 import com.android.server.connectivity.MultinetworkPolicyTrackerTestDependencies
+import com.android.server.connectivity.NetworkAgentInfo
 import com.android.server.connectivity.NetworkRequestStateStatsMetrics
 import com.android.server.connectivity.PermissionMonitor
 import com.android.server.connectivity.ProxyTracker
+import com.android.server.connectivity.QuicConnectionCloser
 import com.android.server.connectivity.SatelliteAccessController
 import com.android.testutils.visibleOnHandlerThread
 import com.android.testutils.waitForIdle
@@ -171,6 +174,7 @@ open class CSTest {
         it[ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS] = true
         it[ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS] = true
         it[ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER] = true
+        it[ConnectivityFlags.CLOSE_QUIC_CONNECTION] = true
     }
     fun setFeatureEnabled(flag: String, enabled: Boolean) = enabledFeatures.set(flag, enabled)
 
@@ -219,6 +223,7 @@ open class CSTest {
 
     val multicastRoutingCoordinatorService = mock<MulticastRoutingCoordinatorService>()
     val satelliteAccessController = mock<SatelliteAccessController>()
+    val quicConnectionCloser = mock<QuicConnectionCloser>()
     val destroySocketsWrapper = mock<DestroySocketsWrapper>()
 
     val deps = CSDeps()
@@ -412,6 +417,11 @@ open class CSTest {
         }
 
         override fun makeL2capNetworkProvider(context: Context) = null
+
+        override fun makeQuicConnectionCloser(
+                networkForNetId: SparseArray<NetworkAgentInfo>,
+                handler: Handler
+        ): QuicConnectionCloser = quicConnectionCloser
     }
 
     inner class PermDeps : PermissionMonitor.Dependencies() {
