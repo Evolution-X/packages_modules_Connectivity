@@ -156,6 +156,7 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
+import static com.android.server.connectivity.ConnectivityFlags.CLOSE_QUIC_CONNECTION;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 import static com.android.server.connectivity.ConnectivityFlags.NAMESPACE_TETHERING_BOOT;
@@ -389,6 +390,7 @@ import com.android.server.connectivity.PermissionMonitor;
 import com.android.server.connectivity.ProfileNetworkPreferenceInfo;
 import com.android.server.connectivity.ProxyTracker;
 import com.android.server.connectivity.QosCallbackTracker;
+import com.android.server.connectivity.QuicConnectionCloser;
 import com.android.server.connectivity.SatelliteAccessController;
 import com.android.server.connectivity.UidRangeUtils;
 import com.android.server.connectivity.VpnNetworkPreferenceInfo;
@@ -436,6 +438,7 @@ import java.util.function.Predicate;
 /**
  * @hide
  */
+@TargetApi(Build.VERSION_CODES.S)
 public class ConnectivityService extends IConnectivityManager.Stub {
     private static final String TAG = ConnectivityService.class.getSimpleName();
 
@@ -1103,6 +1106,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
     // Flag to drop packets to VPN addresses ingressing via non-VPN interfaces.
     private final boolean mIngressToVpnAddressFiltering;
+
+    // Flag to close QUIC connection for registered sockets when apps lose network access.
+    private final boolean mCloseQuicConnection;
+
+    // This is null if mCloseQuicConnection is false
+    @Nullable
+    private final QuicConnectionCloser mQuicConnectionCloser;
 
     /**
      * Implements support for the legacy "one network per network type" model.
@@ -1825,6 +1835,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             handler.sendMessageDelayed(
                     handler.obtainMessage(EVENT_INITIAL_EVALUATION_TIMEOUT, network), delayMs);
         }
+
+        /**
+         * Create {@link QuicConnectionCloser}.
+         */
+        public QuicConnectionCloser makeQuicConnectionCloser(
+                final SparseArray<NetworkAgentInfo> networkForNetId, final Handler handler) {
+            return new QuicConnectionCloser(networkForNetId, handler);
+        }
     }
 
     public ConnectivityService(Context context) {
@@ -2133,6 +2151,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 && mDeps.isFeatureNotChickenedOut(mContext, INGRESS_TO_VPN_ADDRESS_FILTERING);
 
         mL2capNetworkProvider = mDeps.makeL2capNetworkProvider(mContext);
+
+        mCloseQuicConnection = mDeps.isFeatureEnabled(context, CLOSE_QUIC_CONNECTION);
+        if (mCloseQuicConnection) {
+            mQuicConnectionCloser = mDeps.makeQuicConnectionCloser(mNetworkForNetId, mHandler);
+        } else {
+            mQuicConnectionCloser = null;
+        }
     }
 
     /**
@@ -3687,6 +3712,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         } catch (SocketException | InterruptedIOException | ErrnoException e) {
             loge("Failed to destroy sockets: " + e);
         }
+
+        if (mCloseQuicConnection) {
+            mQuicConnectionCloser.closeQuicConnectionByUids(uids);
+        }
+
         mDestroySocketPendingUids.clear();
     }
 
@@ -4515,6 +4545,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         pw.increaseIndent();
         mNetworkActivityTracker.dump(pw);
         pw.decreaseIndent();
+
+        pw.println();
+        pw.println("Close QUIC connection: " + mCloseQuicConnection);
+        if (mCloseQuicConnection) {
+            mQuicConnectionCloser.dump(pw);
+        }
 
         pw.println();
         pw.println("Multicast routing supported: " +
@@ -15125,8 +15161,33 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 return mIngressToVpnAddressFiltering;
             case QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
                 return mQueueNetworkAgentEventsInSystemServer;
+            case CLOSE_QUIC_CONNECTION:
+                return mCloseQuicConnection;
             default:
                 throw new IllegalArgumentException("Unknown flag: " + featureFlag);
         }
     }
+
+    @Override
+    public void registerQuicConnectionClosePayload(final ParcelFileDescriptor pfd,
+            final byte[] payload) {
+        if (!mCloseQuicConnection) {
+            IoUtils.closeQuietly(pfd);
+            return;
+        }
+        // pfd is closed by registerQuicConnectionClosePayload
+        mQuicConnectionCloser.registerQuicConnectionClosePayload(mDeps.getCallingUid(),
+                pfd, payload);
+    }
+
+    @Override
+    public void unregisterQuicConnectionClosePayload(final ParcelFileDescriptor pfd) {
+        if (!mCloseQuicConnection) {
+            IoUtils.closeQuietly(pfd);
+            return;
+        }
+        // pfd is closed by unregisterQuicConnectionClosePayload
+        mQuicConnectionCloser.unregisterQuicConnectionClosePayload(pfd);
+    }
+
 }
