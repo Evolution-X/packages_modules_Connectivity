@@ -767,23 +767,17 @@ public class TetheringConfigurationTest {
                 mMockContext, mLog, INVALID_SUBSCRIPTION_ID, mDeps).readEnableSyncSM(mMockContext);
     }
 
-    private void assertEnableSyncSM(boolean value) {
-        assertEquals(value, TetheringConfiguration.USE_SYNC_SM);
-    }
-
     @Test
     public void testEnableSyncSMFlag() throws Exception {
         // Test default enabled
         setTetherEnableSyncSMFlagEnabled(null);
-        assertEnableSyncSM(true);
+        assertEquals(true, TetheringConfiguration.USE_SYNC_SM);
 
         setTetherEnableSyncSMFlagEnabled(true);
-        assertEnableSyncSM(true);
+        assertEquals(true, TetheringConfiguration.USE_SYNC_SM);
 
-        // Feature is enabled by default after 25Q2 release.
-        if (!SdkUtil.isAtLeast25Q2()) {
-            setTetherEnableSyncSMFlagEnabled(false);
-            assertEnableSyncSM(false);
-        }
+        // Feature is enabled forcefully after 25Q2 release.
+        setTetherEnableSyncSMFlagEnabled(false);
+        assertEquals(SdkUtil.isAtLeast25Q2(), TetheringConfiguration.USE_SYNC_SM);
     }
 }

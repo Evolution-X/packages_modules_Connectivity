@@ -236,6 +236,11 @@ static void* (*bpf_ringbuf_reserve_unsafe)(const struct bpf_map_def* ringbuf,
         BPF_FUNC_ringbuf_reserve;
 static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*)
         BPF_FUNC_ringbuf_submit;
+static void* (*bpf_sk_storage_get_unsafe) (const struct bpf_map_def* sk_storage, const void* sk,
+                                           const void* value, unsigned long long flags) = (void*)
+        BPF_FUNC_sk_storage_get;
+static int (*bpf_sk_storage_delete_unsafe) (const struct bpf_map_def* sk_storage,
+                                            const void* sk) = (void*) BPF_FUNC_sk_storage_delete;
 
 #define BPF_ANNOTATE_KV_PAIR(name, type_key, type_val)  \
         struct ____btf_map_##name {                     \
@@ -329,6 +334,34 @@ static void (*bpf_ringbuf_submit_unsafe)(const void* data, __u64 flags) = (void*
                            DEFAULT_BPF_MAP_SELINUX_CONTEXT, DEFAULT_BPF_MAP_PIN_SUBDIR, \
                            PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,               \
                            LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG)
+
+// Type safe macro to declare a sk storage and related accessor functions.
+// BPF_MAP_TYPE_SK_STORAGE was introduced in kernel 5.2 but this map requires BTF and
+// BTF is enabled on kernel 5.10 or higher.
+#define DEFINE_BPF_SK_STORAGE_EXT(the_map, ValueType, usr, grp, md, selinux, pindir,    \
+                                  share, min_loader, max_loader, ignore_eng,            \
+                                  ignore_user, ignore_userdebug, mapFlags)              \
+    DEFINE_BPF_MAP_BASE(the_map, SK_STORAGE, sizeof(uint32_t), sizeof(ValueType),       \
+                        0, usr, grp, md, selinux, pindir, share,                        \
+                        KVER_5_10, KVER_INF, min_loader, max_loader,                    \
+                        ignore_eng, ignore_user, ignore_userdebug, mapFlags);           \
+    BPF_ANNOTATE_KV_PAIR(the_map, uint32_t, ValueType);                                 \
+                                                                                        \
+    static inline __always_inline __unused ValueType* bpf_##the_map##_get(              \
+            const struct bpf_sock* sk, const ValueType* v, unsigned long long flags) {  \
+        return bpf_sk_storage_get_unsafe(&the_map, sk, v, flags);                       \
+    };                                                                                  \
+                                                                                        \
+    static inline __always_inline __unused int bpf_##the_map##_delete(                  \
+            const struct bpf_sock* sk) {                                                \
+        return bpf_sk_storage_delete_unsafe(&the_map, sk);                              \
+    };
+
+#define DEFINE_BPF_SK_STORAGE(the_map, TypeOfValue)                                      \
+    DEFINE_BPF_SK_STORAGE_EXT(the_map, TypeOfValue,                                      \
+                              AID_ROOT, AID_NET_BW_ACCT, 0060, "fs_bpf_net_shared", "",  \
+                              PRIVATE, BPFLOADER_MIN_VER, BPFLOADER_MAX_VER,             \
+                              LOAD_ON_ENG, LOAD_ON_USER, LOAD_ON_USERDEBUG, 0)
 
 /* There exist buggy kernels with pre-T OS, that due to
  * kernel patch "[ALPS05162612] bpf: fix ubsan error"
