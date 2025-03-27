@@ -84,10 +84,10 @@ import static com.android.networkstack.tethering.OffloadHardwareInterface.OFFLOA
 import static com.android.networkstack.tethering.TestConnectivityManager.BROADCAST_FIRST;
 import static com.android.networkstack.tethering.TestConnectivityManager.CALLBACKS_FIRST;
 import static com.android.networkstack.tethering.Tethering.UserRestrictionActionListener;
-import static com.android.networkstack.tethering.TetheringConfiguration.TETHERING_LOCAL_NETWORK_AGENT;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_FORCE_USB_FUNCTIONS;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_USB_NCM_FUNCTION;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_USB_RNDIS_FUNCTION;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.TETHERING_LOCAL_NETWORK_AGENT;
 import static com.android.networkstack.tethering.TetheringNotificationUpdater.DOWNSTREAM_NONE;
 import static com.android.networkstack.tethering.UpstreamNetworkMonitor.EVENT_ON_CAPABILITIES;
 import static com.android.testutils.TestPermissionUtil.runAsShell;

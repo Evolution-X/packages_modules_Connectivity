@@ -41,9 +41,9 @@ import static android.system.OsConstants.RT_SCOPE_UNIVERSE;
 
 import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTH;
 import static com.android.net.module.util.NetworkStackConstants.RFC7421_PREFIX_LENGTH;
-import static com.android.networkstack.tethering.TetheringConfiguration.TETHERING_LOCAL_NETWORK_AGENT;
 import static com.android.networkstack.tethering.TetheringConfiguration.USE_SYNC_SM;
-import static com.android.networkstack.tethering.TetheringConfiguration.WIFIP2PGO_LOCAL_NETWORK_AGENT;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.TETHERING_LOCAL_NETWORK_AGENT;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.WIFIP2PGO_LOCAL_NETWORK_AGENT;
 import static com.android.networkstack.tethering.util.PrefixUtils.asIpPrefix;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_IPSERVER;
 import static com.android.networkstack.tethering.util.TetheringUtils.getTransportTypeForTetherableType;

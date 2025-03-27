@@ -31,6 +31,7 @@ import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_E
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_FORCE_USB_FUNCTIONS;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_USB_NCM_FUNCTION;
 import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_USB_RNDIS_FUNCTION;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.TETHER_FORCE_UPSTREAM_AUTOMATIC_VERSION;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -179,7 +180,7 @@ public class TetheringConfigurationTest {
 
         @Override
         boolean isTetherForceUpstreamAutomaticFeatureEnabled() {
-            return isMockFlagEnabled(TetheringConfiguration.TETHER_FORCE_UPSTREAM_AUTOMATIC_VERSION,
+            return isMockFlagEnabled(TETHER_FORCE_UPSTREAM_AUTOMATIC_VERSION,
                     false /* defaultEnabled */);
         }
 
@@ -639,8 +640,7 @@ public class TetheringConfigurationTest {
     }
 
     private void setTetherForceUpstreamAutomaticFlagEnabled(Boolean enabled) {
-        mDeps.setFeatureEnabled(
-                TetheringConfiguration.TETHER_FORCE_UPSTREAM_AUTOMATIC_VERSION, enabled);
+        mDeps.setFeatureEnabled(TETHER_FORCE_UPSTREAM_AUTOMATIC_VERSION, enabled);
     }
 
     private void assertChooseUpstreamAutomaticallyIs(boolean value) {
@@ -762,7 +762,7 @@ public class TetheringConfigurationTest {
     }
 
     private void setTetherEnableSyncSMFlagEnabled(Boolean enabled) {
-        mDeps.setFeatureEnabled(TetheringConfiguration.TETHER_ENABLE_SYNC_SM, enabled);
+        mDeps.setFeatureEnabled(TetheringFeatureFlags.TETHER_ENABLE_SYNC_SM, enabled);
         new TetheringConfiguration(
                 mMockContext, mLog, INVALID_SUBSCRIPTION_ID, mDeps).readEnableSyncSM(mMockContext);
     }
