@@ -43,6 +43,7 @@ public interface CertificateTransparencyLogger {
         SIGNATURE_NOT_FOUND,
         SIGNATURE_VERIFICATION_FAILED,
         SUCCESS,
+        UNABLE_TO_READ_FILE,
         VERSION_ALREADY_EXISTS
     }
 }

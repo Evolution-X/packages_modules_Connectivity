@@ -21,6 +21,7 @@ import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListU
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_INVALID;
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_NOT_FOUND;
 import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.SIGNATURE_VERIFICATION_FAILED;
+import static com.android.server.net.ct.CertificateTransparencyLogger.CTLogListUpdateState.UNABLE_TO_READ_FILE;
 
 import android.annotation.NonNull;
 import android.annotation.RequiresApi;
@@ -86,9 +87,12 @@ public class SignatureVerifier {
         mPublicKey = Optional.empty();
     }
 
-    LogListUpdateStatus setPublicKeyFrom(Uri file) throws IOException {
+    LogListUpdateStatus setPublicKeyFrom(Uri file) {
         try (InputStream fileStream = mContext.getContentResolver().openInputStream(file)) {
             return setPublicKey(new String(fileStream.readAllBytes()));
+        } catch (IOException e) {
+            Log.e(TAG, "Could not read the public key file", e);
+            return LogListUpdateStatus.builder().setState(UNABLE_TO_READ_FILE).build();
         }
     }
 
@@ -153,7 +157,11 @@ public class SignatureVerifier {
             Log.e(TAG, "Key invalid for log list verification", e);
             statusBuilder.setState(SIGNATURE_INVALID);
             return statusBuilder.build();
-        } catch (IOException | GeneralSecurityException e) {
+        } catch (IOException e) {
+            Log.e(TAG, "Could not read log list file", e);
+            statusBuilder.setState(UNABLE_TO_READ_FILE);
+            return statusBuilder.build();
+        } catch (GeneralSecurityException e) {
             Log.e(TAG, "Could not verify new log list", e);
             statusBuilder.setState(SIGNATURE_VERIFICATION_FAILED);
             return statusBuilder.build();

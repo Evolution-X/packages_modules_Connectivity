@@ -150,14 +150,7 @@ class CertificateTransparencyDownloader extends BroadcastReceiver {
             return;
         }
 
-        LogListUpdateStatus updateStatus;
-        try {
-            updateStatus = mSignatureVerifier.setPublicKeyFrom(publicKeyUri);
-        } catch (IOException e) {
-            Log.e(TAG, "Error setting the public Key", e);
-            return;
-        }
-
+        LogListUpdateStatus updateStatus = mSignatureVerifier.setPublicKeyFrom(publicKeyUri);
         if (!updateStatus.isPublicKeySet()) {
             mLogger.logCTLogListUpdateStateChangedEvent(updateStatus);
             return;
