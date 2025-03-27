@@ -438,6 +438,7 @@ import java.util.function.Predicate;
 /**
  * @hide
  */
+@TargetApi(Build.VERSION_CODES.S)
 public class ConnectivityService extends IConnectivityManager.Stub {
     private static final String TAG = ConnectivityService.class.getSimpleName();
 

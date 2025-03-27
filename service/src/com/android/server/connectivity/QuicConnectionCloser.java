@@ -21,8 +21,10 @@ import static android.system.OsConstants.SOL_SOCKET;
 import static android.system.OsConstants.SO_SNDTIMEO;
 
 import android.annotation.NonNull;
+import android.annotation.TargetApi;
 import android.net.Network;
 import android.net.NetworkUtils;
+import android.os.Build;
 import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.system.ErrnoException;
@@ -53,6 +55,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+@TargetApi(Build.VERSION_CODES.S)
 public class QuicConnectionCloser {
     private static final String TAG = QuicConnectionCloser.class.getSimpleName();
 
