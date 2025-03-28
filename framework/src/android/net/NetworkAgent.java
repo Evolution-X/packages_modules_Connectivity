@@ -1236,7 +1236,11 @@ public abstract class NetworkAgent {
      * @hide TODO: expose something better.
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private void sendNetworkInfo(final NetworkInfo networkInfo) {
+    // Note : this should be private, but is still called by some OEM network agents
+    // linking against the full module. They should not do this, and it should be
+    // forbidden, but as long as there are such devices this can't be made private
+    // on pain of breaking them.
+    public void sendNetworkInfo(final NetworkInfo networkInfo) {
         final NetworkInfo ni = new NetworkInfo(networkInfo);
         send(reg -> reg.sendNetworkInfo(ni));
     }
