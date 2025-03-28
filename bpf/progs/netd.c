@@ -433,6 +433,20 @@ static __always_inline inline BpfConfig getConfig(uint32_t configKey) {
     return *config;
 }
 
+static __always_inline inline uint8_t get_uid_permissions(uint32_t uid) {
+    /*
+     * A given app is guaranteed to have the same app ID in all the profiles in
+     * which it is installed, and install permission is granted to an app for all
+     * users at install time so we only check the appId part of a request uid at
+     * run time. See UserHandle#isSameApp for detail.
+     */
+    uint32_t appId = uid % AID_USER_OFFSET; // == PER_USER_RANGE == 100000
+
+    uint8_t *permissions = bpf_uid_permission_map_lookup_elem(&appId);
+    // if UID not in map, then default to just INTERNET permission.
+    return permissions ? *permissions : BPF_PERMISSION_INTERNET;
+}
+
 static __always_inline inline bool ingress_should_discard(struct __sk_buff* skb,
                                                           const struct kver_uint kver) {
     // Require 4.19, since earlier kernels don't have bpf_skb_load_bytes_relative() which
@@ -496,8 +510,9 @@ static __always_inline inline int bpf_owner_match(struct __sk_buff* skb, uint32_
         }
     }
 
-    if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && skb->ifindex == 1) {
-        // TODO: sdksandbox localhost restrictions
+    if (SDK_LEVEL_IS_AT_LEAST(lvl, 25Q2) && skb->ifindex == 1 && is_sdksandbox_uid(uid)) {
+        // check if the UID is allowed localhost connections
+        if (!(get_uid_permissions(uid) & BPF_PERMISSION_SDKSANDBOX_LOCALHOST)) return DROP;
     }
 
     return PASS;
@@ -759,17 +774,7 @@ DEFINE_XTBPF_PROG("skfilter/denylist/xtbpf", xt_bpf_denylist_prog)
 }
 
 static __always_inline inline uint8_t get_app_permissions() {
-    uint64_t gid_uid = bpf_get_current_uid_gid();
-    /*
-     * A given app is guaranteed to have the same app ID in all the profiles in
-     * which it is installed, and install permission is granted to app for all
-     * user at install time so we only check the appId part of a request uid at
-     * run time. See UserHandle#isSameApp for detail.
-     */
-    uint32_t appId = (gid_uid & 0xffffffff) % AID_USER_OFFSET;  // == PER_USER_RANGE == 100000
-    uint8_t* permissions = bpf_uid_permission_map_lookup_elem(&appId);
-    // if UID not in map, then default to just INTERNET permission.
-    return permissions ? *permissions : BPF_PERMISSION_INTERNET;
+    return get_uid_permissions(bpf_get_current_uid_gid() & 0xffffffff);
 }
 
 static __always_inline inline int inet_socket_create(struct bpf_sock* sk,
