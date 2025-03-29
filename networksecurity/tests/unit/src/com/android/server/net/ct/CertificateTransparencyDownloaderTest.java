@@ -183,6 +183,24 @@ public class CertificateTransparencyDownloaderTest {
     }
 
     @Test
+    public void testDownloader_publicKeyDownloadSuccess_publicKeyFileNotRead_logsFailure()
+            throws Exception {
+        mCertificateTransparencyDownloader.startPublicKeyDownload();
+
+        File publicKeyFile = writePublicKeyToFile(mPublicKey);
+        // Set the public key file to not be readable to simulate an IOException being thrown
+        publicKeyFile.setReadable(false);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makePublicKeyDownloadCompleteIntent(publicKeyFile));
+
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEvent(
+                        LogListUpdateStatus.builder()
+                                .setState(CTLogListUpdateState.UNABLE_TO_READ_FILE)
+                                .build());
+    }
+
+    @Test
     public void
             testDownloader_publicKeyDownloadSuccess_publicKeyNotAllowed_logsFailure()
                     throws Exception {
@@ -398,6 +416,27 @@ public class CertificateTransparencyDownloaderTest {
                 .logCTLogListUpdateStateChangedEvent(mUpdateStatusCaptor.capture());
         assertThat(mUpdateStatusCaptor.getValue().state())
                 .isEqualTo(CTLogListUpdateState.PUBLIC_KEY_NOT_FOUND);
+    }
+
+    @Test
+    public void testDownloader_contentDownloadSuccess_signatureFileNotRead_logsSingleFailure()
+            throws Exception {
+        File logListFile = makeLogListFile("456");
+        File metadataFile = sign(logListFile);
+        mSignatureVerifier.setPublicKey(mPublicKey);
+        mCertificateTransparencyDownloader.startMetadataDownload();
+
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeMetadataDownloadCompleteIntent(mCompatVersion, metadataFile));
+        // Set the log list file to not be readable to simulate an IOException being thrown
+        logListFile.setReadable(false);
+        mCertificateTransparencyDownloader.onReceive(
+                mContext, makeContentDownloadCompleteIntent(mCompatVersion, logListFile));
+
+        verify(mLogger, times(1))
+                .logCTLogListUpdateStateChangedEvent(mUpdateStatusCaptor.capture());
+        assertThat(mUpdateStatusCaptor.getValue().state())
+                .isEqualTo(CTLogListUpdateState.UNABLE_TO_READ_FILE);
     }
 
     @Test
