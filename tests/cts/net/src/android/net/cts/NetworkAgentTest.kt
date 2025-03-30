@@ -1392,6 +1392,22 @@ class NetworkAgentTest {
                 agent.expectCallback<OnRegisterQosCallback>().let {
                     callbackId = it.callbackId
                     assertTrue(it.filter.matchesProtocol(proto))
+                    // This test is only validating QosFilter address match APIs can be called.
+                    // Detail functionality checks are executed on QosSocketFilterTest.
+                    // Verify the match of test socket's Local address, currently the test socket
+                    // binds to the loopback address.
+                    assertTrue(it.filter.matchesLocalPrefix(
+                        IpPrefix(InetAddress.getLoopbackAddress(), 128),
+                        0,
+                        65535
+                    ))
+                    // Since the test socket doesn't connect to the remote address, we expect
+                    // unmatched result.
+                    assertFalse(it.filter.matchesRemotePrefix(
+                        IpPrefix(InetAddress.getLoopbackAddress(), 128),
+                        0,
+                        65535
+                    ))
                 }
 
                 assertFailsWith<QosCallbackRegistrationException>(
