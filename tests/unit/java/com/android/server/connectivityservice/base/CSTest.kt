@@ -604,4 +604,11 @@ open class CSTest {
     fun keepScore() = FromS(
         NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
     )
+
+    fun nc(transport: Int, vararg caps: Int) = defaultNc().apply {
+        addTransportType(transport)
+        caps.forEach {
+            addCapability(it)
+        }
+    }
 }
