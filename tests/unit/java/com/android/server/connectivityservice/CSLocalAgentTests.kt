@@ -204,19 +204,11 @@ class CSLocalAgentTests : CSTest() {
     }
 
     private fun createWifiAgent(name: String): CSAgentWrapper {
-        return Agent(
-                score = keepScore(),
-                lp = lp(name),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
-        )
+        return createAgent(name, TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
     }
 
     private fun createCellAgent(name: String): CSAgentWrapper {
-        return Agent(
-                score = keepScore(),
-                lp = lp(name),
-                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET)
-        )
+        return createAgent(name, TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET)
     }
 
     private fun sendLocalNetworkConfig(

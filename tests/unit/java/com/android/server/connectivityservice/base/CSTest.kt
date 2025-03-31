@@ -611,4 +611,13 @@ open class CSTest {
             addCapability(it)
         }
     }
+
+    // Create a network agent with the given parameters.
+    fun createAgent(interfaceName: String, transport: Int, vararg caps: Int): CSAgentWrapper {
+        return Agent(
+                score = keepScore(),
+                lp = defaultLp().apply { this.interfaceName = interfaceName },
+                nc = nc(transport, *caps)
+        )
+    }
 }

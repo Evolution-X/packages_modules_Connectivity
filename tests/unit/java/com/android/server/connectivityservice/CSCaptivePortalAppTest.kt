@@ -56,7 +56,7 @@ class CSCaptivePortalAppTest : CSTest() {
         val captivePortalRequest = NetworkRequest.Builder()
                 .addCapability(NET_CAPABILITY_CAPTIVE_PORTAL).build()
         cm.registerNetworkCallback(captivePortalRequest, captivePortalCallback)
-        val wifiAgent = createWifiAgent()
+        val wifiAgent = createAgent(WIFI_IFACE, TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
         wifiAgent.connectWithCaptivePortal(TEST_REDIRECT_URL)
         captivePortalCallback.expectAvailableCallbacksUnvalidated(wifiAgent)
         val signInIntent = startCaptivePortalApp(wifiAgent)
@@ -69,14 +69,6 @@ class CSCaptivePortalAppTest : CSTest() {
         val captivePortal: CaptivePortal? = signInIntent.getParcelableExtra(EXTRA_CAPTIVE_PORTAL)
         captivePortal?.reevaluateNetwork()
         verify(wifiAgent.networkMonitor, never()).forceReevaluation(anyInt())
-    }
-
-    private fun createWifiAgent(): CSAgentWrapper {
-        return Agent(
-            score = keepScore(),
-            lp = defaultLp().apply { interfaceName = WIFI_IFACE },
-            nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
-        )
     }
 
     private fun startCaptivePortalApp(networkAgent: CSAgentWrapper): Intent {
