@@ -25,12 +25,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 
 /** Class to persist data needed by CT. */
 class DataStore extends Properties {
 
     private static final String TAG = "CertificateTransparency";
 
+    private static final long MAX_FILE_SIZE = 20 * 1024; // 20KB
+    private static final int MAX_KEY_SIZE = 50;
     private final File mPropertyFile;
 
     DataStore(File file) {
@@ -42,17 +45,49 @@ class DataStore extends Properties {
         if (!mPropertyFile.exists()) {
             return;
         }
+
+        if (!validatePropertyFile()) {
+            Log.e(TAG, "Invalid property file, not load it!");
+            delete();
+            return;
+        }
+
         try (InputStream in = new FileInputStream(mPropertyFile)) {
             load(in);
+            if (!validateProperties()) {
+                Log.e(TAG, "Invalid property store, clear it!");
+                delete();
+                return;
+            }
         } catch (IOException | IllegalArgumentException e) {
             Log.e(TAG, "Error loading property store", e);
             delete();
         }
     }
 
+    private boolean validateProperties() {
+        Set<String> keys = stringPropertyNames();
+        for (String key : keys) {
+            if (key.length() > MAX_KEY_SIZE) {
+                Log.e(TAG, "Unexpected Property: " + key);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validatePropertyFile() {
+        if (mPropertyFile.length() > MAX_FILE_SIZE) {
+            Log.e(TAG, "Property file size exceeds " + MAX_FILE_SIZE + "!");
+            return false;
+        }
+        return true;
+    }
+
     void store() {
-        try (OutputStream out = new FileOutputStream(mPropertyFile)) {
+        try (FileOutputStream out = new FileOutputStream(mPropertyFile)) {
             store(out, "");
+            out.getFD().sync();
         } catch (IOException e) {
             Log.e(TAG, "Error storing property store", e);
         }
