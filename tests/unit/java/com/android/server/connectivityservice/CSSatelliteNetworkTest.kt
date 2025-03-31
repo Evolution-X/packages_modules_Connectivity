@@ -17,9 +17,6 @@
 package com.android.server
 
 import android.net.INetd
-import android.net.IpPrefix
-import android.net.LinkAddress
-import android.net.LinkProperties
 import android.net.NativeNetworkConfig
 import android.net.NativeNetworkType
 import android.net.NetworkCapabilities
@@ -30,7 +27,6 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
-import android.net.RouteInfo
 import android.net.UidRange
 import android.net.UidRangeParcel
 import android.net.VpnManager
@@ -255,7 +251,7 @@ class CSSatelliteNetworkTest : CSTest() {
     private fun createSatelliteAgent(name: String, restricted: Boolean = true): CSAgentWrapper {
         return Agent(
             score = keepScore(),
-            lp = lp(name),
+            lp = defaultLp().apply { interfaceName = name },
             nc = satelliteNc(restricted)
         )
     }
@@ -293,10 +289,4 @@ class CSSatelliteNetworkTest : CSTest() {
                 }
                 removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
             }.build()
-
-    private fun lp(iface: String) = LinkProperties().apply {
-        interfaceName = iface
-        addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
-        addRoute(RouteInfo(IpPrefix("0.0.0.0/0"), null, null))
-    }
 }
