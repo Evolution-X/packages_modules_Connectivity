@@ -158,7 +158,7 @@ public class MdnsServiceTypeClient {
                     break;
                 }
                 case EVENT_QUERY_RESULT: {
-                    final QuerySentArguments sentResult = (QuerySentArguments) msg.obj;
+                    final QuerySentResult sentResult = (QuerySentResult) msg.obj;
                     // If a task is cancelled while the Executor is running it, EVENT_QUERY_RESULT
                     // will still be sent when it ends. So use session ID to check if this task
                     // should continue to schedule more.
@@ -169,7 +169,7 @@ public class MdnsServiceTypeClient {
                     if ((sentResult.transactionId != INVALID_TRANSACTION_ID)) {
                         for (int i = 0; i < listeners.size(); i++) {
                             listeners.keyAt(i).onDiscoveryQuerySent(
-                                    sentResult.subTypes, sentResult.transactionId);
+                                    sentResult.queriedSubtypes, sentResult.transactionId);
                         }
                     }
 
@@ -716,16 +716,36 @@ public class MdnsServiceTypeClient {
         }
     }
 
-    private static class QuerySentArguments {
+    public static class QuerySentResult {
         private final int transactionId;
-        private final List<String> subTypes = new ArrayList<>();
+        private final List<String> queriedSubtypes = new ArrayList<>();
         private final ScheduledQueryTaskArgs taskArgs;
+        private final boolean queriedBaseType;
+        private final Collection<MdnsResponse> resolvedServices = new ArrayList<>();
 
-        QuerySentArguments(int transactionId, @NonNull List<String> subTypes,
-                @NonNull ScheduledQueryTaskArgs taskArgs) {
+        QuerySentResult(int transactionId, @NonNull List<String> subTypes,
+                @NonNull ScheduledQueryTaskArgs taskArgs, boolean queriedBaseType,
+                @NonNull Collection<MdnsResponse> resolvedServices) {
             this.transactionId = transactionId;
-            this.subTypes.addAll(subTypes);
+            this.queriedSubtypes.addAll(subTypes);
             this.taskArgs = taskArgs;
+            this.queriedBaseType = queriedBaseType;
+            this.resolvedServices.addAll(resolvedServices);
+        }
+
+
+        /**
+         * Creates a QuerySentResult instance representing a failed query attempt.
+         *
+         * This factory method is used when the query packet could not be sent successfully.
+         *
+         * @param taskArgs The arguments of the task that attempted the query.
+         * @return A QuerySentResult configured to indicate failure.
+         */
+        public static QuerySentResult createFailedQueryResult(
+                @NonNull ScheduledQueryTaskArgs taskArgs) {
+            return new QuerySentResult(INVALID_TRANSACTION_ID, new ArrayList<>(), taskArgs,
+                    false /* queriedBaseType */, Collections.emptyList() /* resolvedServices */);
         }
     }
 
@@ -755,15 +775,14 @@ public class MdnsServiceTypeClient {
 
         @Override
         public void run() {
-            Pair<Integer, List<String>> result;
+            QuerySentResult result;
             try {
                 result =
                         new EnqueueMdnsQueryCallable(
                                 socketClient,
                                 serviceType,
                                 subtypes,
-                                taskArgs.config.expectUnicastResponse,
-                                taskArgs.config.getTransactionId(),
+                                taskArgs,
                                 socketKey,
                                 onlyUseIpv6OnIpv6OnlyNetworks,
                                 sendDiscoveryQueries,
@@ -777,11 +796,9 @@ public class MdnsServiceTypeClient {
             } catch (RuntimeException e) {
                 sharedLog.e(String.format("Failed to run EnqueueMdnsQueryCallable for subtype: %s",
                         TextUtils.join(",", subtypes)), e);
-                result = Pair.create(INVALID_TRANSACTION_ID, new ArrayList<>());
+                result = QuerySentResult.createFailedQueryResult(taskArgs);
             }
-            dependencies.sendMessage(
-                    handler, handler.obtainMessage(EVENT_QUERY_RESULT,
-                            new QuerySentArguments(result.first, result.second, taskArgs)));
+            dependencies.sendMessage(handler, handler.obtainMessage(EVENT_QUERY_RESULT, result));
         }
     }
 
