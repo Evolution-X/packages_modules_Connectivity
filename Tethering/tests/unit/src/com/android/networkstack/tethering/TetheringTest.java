@@ -538,8 +538,8 @@ public class TetheringTest {
         public RoutingCoordinatorManager getRoutingCoordinator(
                 final Context context, SharedLog log) {
             ConnectivityManager cm = context.getSystemService(ConnectivityManager.class);
-            when(mPrivateAddressCoordinatorDependencies.isFeatureEnabled(anyString()))
-                    .thenReturn(false);
+            when(mPrivateAddressCoordinatorDependencies.isFeatureNotChickenedOut(anyString()))
+                    .thenReturn(true);
             RoutingCoordinatorService service = new RoutingCoordinatorService(
                     getINetd(context, log),
                             cm::getAllNetworks,

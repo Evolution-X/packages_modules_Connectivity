@@ -325,7 +325,8 @@ public final class PrivateAddressCoordinatorTest {
 
     @Test
     public void testStartedPrefixRange() throws Exception {
-        when(mDeps.isFeatureEnabled(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION)).thenReturn(true);
+        when(mDeps.isFeatureNotChickenedOut(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION))
+                .thenReturn(true);
 
         startedPrefixBaseTest("192.168.0.0/16", 0);
 

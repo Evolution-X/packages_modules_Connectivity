@@ -34,6 +34,7 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.RemoteException;
+import android.provider.DeviceConfig;
 import android.util.ArrayMap;
 
 import androidx.annotation.Nullable;
@@ -98,14 +99,14 @@ public class PrivateAddressCoordinator {
         }
 
         /**
-         * Check whether or not one specific experimental feature is enabled according to {@link
-         * DeviceConfigUtils}.
+         * Check whether one specific experimental feature in Tethering module
+         * from {@link DeviceConfig} is not disabled.
          *
          * @param featureName The feature's name to look up.
          * @return true if this feature is enabled, or false if disabled.
          */
-        public boolean isFeatureEnabled(String featureName) {
-            return DeviceConfigUtils.isTetheringFeatureEnabled(mContext, featureName);
+        public boolean isFeatureNotChickenedOut(String featureName) {
+            return DeviceConfigUtils.isTetheringFeatureNotChickenedOut(mContext, featureName);
         }
     }
 
@@ -259,7 +260,7 @@ public class PrivateAddressCoordinator {
     }
 
     private int getRandomPrefixIndex() {
-        if (!mDeps.isFeatureEnabled(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION)) return 0;
+        if (!mDeps.isFeatureNotChickenedOut(TETHER_FORCE_RANDOM_PREFIX_BASE_SELECTION)) return 0;
 
         final int random = getRandomInt() & 0xffffff;
         // This is to select the starting prefix range (/8, /12, or /16) instead of the actual
