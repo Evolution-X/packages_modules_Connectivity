@@ -133,6 +133,66 @@ class RaPkt(
         addPioOption(IpPrefix(prefix), validLft, preferredLft, enumSetOfFlags<PioFlags>(flags))
     }
 
+    fun addRdnssOption(dns: List<Inet6Address>, lft: Int) {
+        val length = 1 + (dns.size * 2)
+        val rdnss = ByteBuffer.allocate(length * 8) // length is in units of 8 octets.
+        rdnss.put(25) // Type = 25
+        rdnss.put(length.toByte()) // Length = 1 + number of dns servers * 2 in units of 8 octets.
+        rdnss.putShort(0) // Reserved
+        rdnss.putInt(lft)
+        for (dnsServer in dns) {
+            rdnss.put(dnsServer.address)
+        }
+        rdnss.flip()
+        outputStream.write(rdnss.array())
+    }
+
+    fun addRdnssOption(dns: String, lft: Int = 1800) {
+        val dnsServers = dns.split(",").map { InetAddress.getByName(it) as Inet6Address }
+        addRdnssOption(dnsServers, lft)
+    }
+
+    fun addRioOption(prefix: IpPrefix, lft: Int) {
+        val rio = ByteBuffer.allocate(24)
+        rio.put(24) // Type = 24
+        rio.put(3) // Length = 3 -- TODO: support variable prefix length
+        rio.put(prefix.prefixLength.toByte())
+        // TODO: support setting pref
+        rio.put(0) // res (3 bits) | pref (2 bits) | res (3 bits)
+        rio.putInt(lft)
+        rio.put(prefix.rawAddress)
+        rio.flip()
+        outputStream.write(rio.array())
+    }
+
+    fun addRioOption(prefix: String, lft: Int = 1800) {
+        addRioOption(IpPrefix(prefix), lft)
+    }
+
+    fun addPref64Option(prefix: IpPrefix, lft: Int) {
+        val pref64 = ByteBuffer.allocate(16)
+        pref64.put(38) // Type = 38
+        pref64.put(2) // Length = 2 (*8)
+        val scaledLifetime = lft and 0xfff8
+        val plc = when (prefix.prefixLength) {
+            96 -> 0
+            64 -> 1
+            56 -> 2
+            48 -> 3
+            40 -> 4
+            32 -> 5
+            else -> throw IllegalArgumentException("Invalid pref64 prefix length")
+        }
+        pref64.putShort((scaledLifetime or plc).toShort()) // Scaled lft (13 bits) | plc (3 bits)
+        pref64.put(prefix.rawAddress, 0 /*offset*/, 12 /*length*/) // highest 96 bits of prefix.
+        pref64.flip()
+        outputStream.write(pref64.array())
+    }
+
+    fun addPref64Option(prefix: String, lft: Int = 1800) {
+        addPref64Option(IpPrefix(prefix), lft)
+    }
+
     override fun toByteArray() = outputStream.toByteArray()
 }
 
