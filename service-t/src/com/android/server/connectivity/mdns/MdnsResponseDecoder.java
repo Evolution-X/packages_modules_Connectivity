@@ -16,6 +16,9 @@
 
 package com.android.server.connectivity.mdns;
 
+import static com.android.server.connectivity.mdns.MdnsRecord.TYPE_A;
+import static com.android.server.connectivity.mdns.MdnsRecord.TYPE_AAAA;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.net.Network;
@@ -127,7 +130,8 @@ public class MdnsResponseDecoder {
     public Pair<Set<MdnsResponse>, ArrayList<MdnsResponse>> augmentResponses(
             @NonNull MdnsPacket mdnsPacket,
             @NonNull Collection<MdnsResponse> existingResponses, int interfaceIndex,
-            @Nullable Network network) {
+            @Nullable Network network,
+            @NonNull MdnsFeatureFlags flags) {
         final ArrayList<MdnsRecord> records = new ArrayList<>(
                 mdnsPacket.questions.size() + mdnsPacket.answers.size()
                         + mdnsPacket.authorityRecords.size() + mdnsPacket.additionalRecords.size());
@@ -218,7 +222,8 @@ public class MdnsResponseDecoder {
                 List<MdnsResponse> matchingResponses =
                         findResponsesWithHostName(responses, inetRecord.getName());
                 for (MdnsResponse response : matchingResponses) {
-                    // Per RFC6762 10.2, clear all address records if the cache-flush bit set.
+                    // Per RFC6762 10.2, clear all same-type address records if the cache-flush bit
+                    // set.
                     // This bit, the cache-flush bit, tells neighboring hosts
                     // that this is not a shared record type.  Instead of merging this new
                     // record additively into the cache in addition to any previous records with
@@ -227,8 +232,14 @@ public class MdnsResponseDecoder {
                     //       received more than one second ago are declared invalid, and marked
                     //       to expire from the cache in one second.
                     if (inetRecord.getCacheFlush()) {
-                        response.clearInet4AddressRecords();
-                        response.clearInet6AddressRecords();
+                        if (!flags.mIsCacheFlushPerAddressTypeEnabled
+                                || inetRecord.getType() == TYPE_A) {
+                            response.clearInet4AddressRecords();
+                        }
+                        if (!flags.mIsCacheFlushPerAddressTypeEnabled
+                                || inetRecord.getType() == TYPE_AAAA) {
+                            response.clearInet6AddressRecords();
+                        }
                     }
                 }
             }
