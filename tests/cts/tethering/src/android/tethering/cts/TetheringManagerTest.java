@@ -75,6 +75,7 @@ import android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiSsid;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.os.ResultReceiver;
@@ -87,6 +88,7 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.modules.utils.build.SdkLevel;
+import com.android.testutils.ConnectivityDiagnosticsCollector;
 import com.android.testutils.ParcelUtils;
 import com.android.testutils.com.android.testutils.CarrierConfigRule;
 
@@ -477,6 +479,18 @@ public class TetheringManagerTest {
 
             mCtsTetheringUtils.stopAllTethering();
             tetherEventCallback.expectNoTetheringActive();
+        } catch (Throwable e) {
+            if (Build.VERSION.SDK_INT == Build.VERSION_CODES.TIRAMISU) {
+                // This test fails on T devices in rare cases due to hostapd hanging. Log the
+                // hostapd callstack to help analyze the failure the next time it happens.
+                final ConnectivityDiagnosticsCollector collector =
+                        ConnectivityDiagnosticsCollector.getInstance();
+                if (collector != null) {
+                    collector.collectCommandOutput(
+                            "getprop init.svc_debug_pid.hostapd | xargs debuggerd -b", "sh", e);
+                }
+            }
+            throw e;
         } finally {
             mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
         }
