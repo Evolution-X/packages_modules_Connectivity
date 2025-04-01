@@ -146,7 +146,7 @@ class Ip6Pkt(
             InetAddress.getByName(src) as Inet6Address,
             InetAddress.getByName(dst) as Inet6Address,
             payload,
-    ) {}
+    )
 
     override val etherType = 0x86dd.toShort()
 
@@ -195,7 +195,7 @@ class EtherPkt(
         payload: L3Packet,
     ) : Packet {
     constructor(dst: String, src: String, payload: L3Packet) :
-        this(MacAddress.fromString(dst), MacAddress.fromString(src), payload) {}
+        this(MacAddress.fromString(dst), MacAddress.fromString(src), payload)
 
     val bytes: ByteArray
 
