@@ -41,7 +41,6 @@ import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -356,7 +355,6 @@ public class MdnsResponseDecoderTests {
     @Test
     public void decode_singleHostname_multipleSrvRecords_flagEnabled_multipleCompleteResponses()
             throws Exception {
-        //MdnsScannerConfigsFlagsImpl.allowMultipleSrvRecordsPerHost.override(true);
         MdnsResponseDecoder decoder = new MdnsResponseDecoder(mClock, MATTER_SERVICE_TYPE);
         assertNotNull(matterDuplicateHostname);
 
@@ -379,24 +377,6 @@ public class MdnsResponseDecoderTests {
         assertTrue(response2.getInet6AddressRecords().stream().anyMatch(
                 record -> record.getInet6Address().equals(
                         parseNumericAddress("2605:a601:a846:5700:3e61:5ff:fe0c:89f8"))));
-    }
-
-    @Test
-    @Ignore("MdnsConfigs is not configurable currently.")
-    public void decode_singleHostname_multipleSrvRecords_flagDisabled_singleCompleteResponse()
-            throws Exception {
-        //MdnsScannerConfigsFlagsImpl.allowMultipleSrvRecordsPerHost.override(false);
-        MdnsResponseDecoder decoder = new MdnsResponseDecoder(mClock, MATTER_SERVICE_TYPE);
-        assertNotNull(matterDuplicateHostname);
-
-        responses = decode(decoder, matterDuplicateHostname);
-
-        // This should emit only two records:
-        assertEquals(2, responses.size());
-
-        // But only the first is complete:
-        assertTrue(responses.valueAt(0).isComplete());
-        assertFalse(responses.valueAt(1).isComplete());
     }
 
     @Test
