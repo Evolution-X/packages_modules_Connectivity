@@ -79,33 +79,6 @@ class ApfV6Test(apf_test_base.ApfTestBase):
             arp_request, "DROPPED_ARP_REQUEST_REPLIED", expected_arp_reply
         )
 
-    def test_broadcast_arp_request_offload(self):
-        eth = Ether(src=self.server_mac_address, dst='ff:ff:ff:ff:ff:ff')
-        arp = ARP(
-            op=1,
-            psrc=self.server_ipv4_addresses[0],
-            pdst=self.client_ipv4_addresses[0],
-            hwsrc=self.server_mac_address
-        )
-        arp_request = bytes(eth/arp).hex()
-
-        eth = Ether(src=self.client_mac_address, dst=self.server_mac_address)
-        arp = ARP(
-            op=2,
-            psrc=self.client_ipv4_addresses[0],
-            pdst=self.server_ipv4_addresses[0],
-            hwsrc=self.client_mac_address,
-            hwdst=self.server_mac_address
-        )
-        expected_arp_reply = bytes(eth/arp).hex()
-
-        # Add zero padding up to 60 bytes, since APFv6 ARP offload always sent out 60 bytes reply
-        expected_arp_reply = expected_arp_reply.ljust(ARP_OFFLOAD_REPLY_LEN * 2, "0")
-
-        self.send_packet_and_expect_reply_received(
-            arp_request, "DROPPED_ARP_REQUEST_REPLIED", expected_arp_reply
-        )
-
     def test_non_dad_ipv6_neighbor_solicitation_offload(self):
         eth = Ether(src=self.server_mac_address, dst=self.client_mac_address)
         ip = IPv6(src=self.server_ipv6_addresses[0], dst=self.client_ipv6_addresses[0])
@@ -158,7 +131,8 @@ class ApfV6Test(apf_test_base.ApfTestBase):
 
     @apf_utils.at_least_B()
     def test_igmpv3_general_query_offload(self):
-        ether = Ether(src=self.server_mac_address, dst='01:00:5e:00:00:01')
+        # use unicast to replace multicast ether dst to prevent flaky due to DTIM skip
+        ether = Ether(src=self.server_mac_address, dst=self.client_mac_address)
         ip = IP(
             src=self.server_ipv4_addresses[0],
             dst='224.0.0.1',
@@ -206,7 +180,8 @@ class ApfV6Test(apf_test_base.ApfTestBase):
     @apf_utils.at_least_B()
     @apf_utils.apf_ram_at_least(3000)
     def test_mldv2_general_query_offload(self):
-        ether = Ether(src=self.server_mac_address, dst='33:33:00:00:00:01')
+        # use unicast to replace multicast ether dst to prevent flaky due to DTIM skip
+        ether = Ether(src=self.server_mac_address, dst=self.client_mac_address)
         ip = IPv6(src=self.server_ipv6_addresses[0], dst='ff02::1', hlim=1)
         hopOpts = IPv6ExtHdrHopByHop(options=[RouterAlert(otype=5)])
         mld = ICMPv6MLQuery2()

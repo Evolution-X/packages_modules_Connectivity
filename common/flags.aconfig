@@ -1,8 +1,9 @@
 package: "com.android.net.flags"
 container: "com.android.tethering"
 
-# This file contains aconfig flags for FlaggedAPI annotations
-# Flags used from platform code must be in under frameworks
+# This file contains aconfig flags for toggling features entirely implemented within the tethering
+# module. Flags used from platform code must be in the android.net.platform.flags package in
+# frameworks/base.
 
 flag {
   name: "set_data_saver_via_cm"

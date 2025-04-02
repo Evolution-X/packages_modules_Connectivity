@@ -193,7 +193,8 @@ public class MulticastNetworkInterfaceProviderTests {
 
     @Test
     public void testStartWatchingConnectivityChanges() {
-        ConnectivityMonitor mockMonitor = mock(ConnectivityMonitor.class);
+        ConnectivityMonitorWithConnectivityManager mockMonitor =
+                mock(ConnectivityMonitorWithConnectivityManager.class);
         provider.connectivityMonitor = mockMonitor;
 
         InOrder inOrder = inOrder(mockMonitor);
