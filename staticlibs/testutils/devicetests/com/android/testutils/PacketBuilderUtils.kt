@@ -105,13 +105,14 @@ class NaPkt(
     }
 
     /** Add Target Link-Layer Address Option */
-    fun addTllaOption(lla: MacAddress) {
+    fun addTllaOption(lla: MacAddress): NaPkt {
         val llao = ByteBuffer.allocate(8)
         llao.put(2) // Type = 2 (Target Link-layer Address)
         llao.put(1) // Length in units of 8 octets
         llao.put(lla.toByteArray())
         llao.flip()
         outputStream.write(llao.array())
+        return this
     }
 
     /**
@@ -119,8 +120,8 @@ class NaPkt(
      *
      * @param lla Link-Layer Address as a String; e.g. {@code "0:0:5e:0:53:0"}
      */
-    fun addTllaOption(lla: String) {
-        addTllaOption(MacAddress.fromString(lla))
+    fun addTllaOption(lla: String): NaPkt {
+        return addTllaOption(MacAddress.fromString(lla))
     }
 
     override fun toByteArray() = outputStream.toByteArray()
@@ -207,7 +208,7 @@ class RaPkt(
             validLft: Int,
             preferredLft: Int,
             flags: EnumSet<PioFlags>,
-    ) {
+    ): RaPkt {
         if (!prefix.isIPv6()) throw IllegalArgumentException("Invalid prefix")
         val pio = ByteBuffer.allocate(32)
         pio.put(3) // Type = 3
@@ -220,6 +221,7 @@ class RaPkt(
         pio.put(prefix.getRawAddress())
         pio.flip()
         outputStream.write(pio.array())
+        return this
     }
 
     /**
@@ -235,8 +237,13 @@ class RaPkt(
             validLft: Int = 2592000,
             preferredLft: Int = 604800,
             flags: String = "L",
-    ) {
-        addPioOption(IpPrefix(prefix), validLft, preferredLft, enumSetOfFlags<PioFlags>(flags))
+    ): RaPkt {
+        return addPioOption(
+                IpPrefix(prefix),
+                validLft,
+                preferredLft,
+                enumSetOfFlags<PioFlags>(flags)
+        )
     }
 
     /** Add a Recursive DNS Server Option
@@ -244,7 +251,7 @@ class RaPkt(
      * @param dns The list of DNS servers.
      * @param lft The time, in seconds, over which the DNS servers may be used for resolution.
      */
-    fun addRdnssOption(dns: List<Inet6Address>, lft: Int) {
+    fun addRdnssOption(dns: List<Inet6Address>, lft: Int): RaPkt {
         val length = 1 + (dns.size * 2)
         val rdnss = ByteBuffer.allocate(length * 8) // length is in units of 8 octets.
         rdnss.put(25) // Type = 25
@@ -256,6 +263,7 @@ class RaPkt(
         }
         rdnss.flip()
         outputStream.write(rdnss.array())
+        return this
     }
 
     /** Add a Recursive DNS Server Option
@@ -263,9 +271,9 @@ class RaPkt(
      * @param dns The list of DNS servers as a String; e.g. {@code "2001:db8:1,2001:db8:2"}
      * @param lft The time, in seconds, over which the DNS servers may be used for resolution.
      */
-    fun addRdnssOption(dns: String, lft: Int = 1800) {
+    fun addRdnssOption(dns: String, lft: Int = 1800): RaPkt {
         val dnsServers = dns.split(",").map { InetAddress.getByName(it) as Inet6Address }
-        addRdnssOption(dnsServers, lft)
+        return addRdnssOption(dnsServers, lft)
     }
 
     /** Add a Route Information Option
@@ -273,7 +281,7 @@ class RaPkt(
      * @param prefix The IPv6 prefix of the route.
      * @param lft The lifetime of the route in seconds.
      */
-    fun addRioOption(prefix: IpPrefix, lft: Int) {
+    fun addRioOption(prefix: IpPrefix, lft: Int): RaPkt {
         val rio = ByteBuffer.allocate(24)
         rio.put(24) // Type = 24
         rio.put(3) // Length = 3 -- TODO: support variable prefix length
@@ -284,6 +292,7 @@ class RaPkt(
         rio.put(prefix.rawAddress)
         rio.flip()
         outputStream.write(rio.array())
+        return this
     }
 
     /** Add a Route Information Option
@@ -291,8 +300,8 @@ class RaPkt(
      * @param prefix The IPv6 prefix of the route as a String; e.g. {@code "2001:db8::/48"}
      * @param lft The lifetime of the route in seconds.
      */
-    fun addRioOption(prefix: String, lft: Int = 1800) {
-        addRioOption(IpPrefix(prefix), lft)
+    fun addRioOption(prefix: String, lft: Int = 1800): RaPkt {
+        return addRioOption(IpPrefix(prefix), lft)
     }
 
     /** Add a PREF64 Option
@@ -300,7 +309,7 @@ class RaPkt(
      * @param prefix The PREF64 prefix.
      * @param lft The lifetime of the PREF64 prefix in seconds.
      */
-    fun addPref64Option(prefix: IpPrefix, lft: Int) {
+    fun addPref64Option(prefix: IpPrefix, lft: Int): RaPkt {
         val pref64 = ByteBuffer.allocate(16)
         pref64.put(38) // Type = 38
         pref64.put(2) // Length = 2 (*8)
@@ -318,6 +327,7 @@ class RaPkt(
         pref64.put(prefix.rawAddress, 0 /*offset*/, 12 /*length*/) // highest 96 bits of prefix.
         pref64.flip()
         outputStream.write(pref64.array())
+        return this
     }
 
     /** Add a PREF64 Option
@@ -325,8 +335,8 @@ class RaPkt(
      * @param prefix The PREF64 prefix as a String; e.g. {@code "2001:db8::/64"}
      * @param lft The lifetime of the PREF64 prefix in seconds.
      */
-    fun addPref64Option(prefix: String, lft: Int = 1800) {
-        addPref64Option(IpPrefix(prefix), lft)
+    fun addPref64Option(prefix: String, lft: Int = 1800): RaPkt {
+        return addPref64Option(IpPrefix(prefix), lft)
     }
 
     override fun toByteArray() = outputStream.toByteArray()
