@@ -494,6 +494,21 @@ public final class NetworkStats implements Parcelable, Iterable<NetworkStats.Ent
             return this;
         }
 
+        /**
+         * Checks if this entry matches the given filter parameters.
+         * @param uid UID to filter for, or {@link #UID_ALL}.
+         * @param ifaces Interfaces to filter for, or {@link #INTERFACES_ALL}.
+         * @param tag Tag to filter for, or {@link #TAG_ALL}.
+         *
+         * @return true if this entry matches the given filter parameters.
+         * @hide
+         */
+        public boolean matches(int uid, String[] ifaces, int tag) {
+            return (uid == UID_ALL || uid == this.uid)
+                && (tag == TAG_ALL || tag == this.tag)
+                && (ifaces == INTERFACES_ALL || CollectionUtils.contains(ifaces, this.iface));
+        }
+
         @Override
         public String toString() {
             final StringBuilder builder = new StringBuilder();
@@ -1379,10 +1394,7 @@ public final class NetworkStats implements Parcelable, Iterable<NetworkStats.Ent
         if (limitUid == UID_ALL && limitTag == TAG_ALL && limitIfaces == INTERFACES_ALL) {
             return;
         }
-        filter(e -> (limitUid == UID_ALL || limitUid == e.uid)
-                && (limitTag == TAG_ALL || limitTag == e.tag)
-                && (limitIfaces == INTERFACES_ALL
-                    || CollectionUtils.contains(limitIfaces, e.iface)));
+        filter(e -> e.matches(limitUid, limitIfaces, limitTag));
     }
 
     /**
@@ -1408,6 +1420,34 @@ public final class NetworkStats implements Parcelable, Iterable<NetworkStats.Ent
             }
         }
         size = nextOutputEntry;
+    }
+
+    /**
+     * Make a filtered copy of the network stats.
+     *
+     * @param limitUid UID to filter for, or {@link #UID_ALL}.
+     * @param limitIfaces Interfaces to filter for, or {@link #INTERFACES_ALL}.
+     * @param limitTag Tag to filter for, or {@link #TAG_ALL}.
+     * @hide
+     */
+    public NetworkStats filteredClone(int limitUid, String[] limitIfaces, int limitTag) {
+        NetworkStats.Entry e = null;
+        int filteredSize = 0;
+        for (int i = 0; i < size; i++) {
+            e = getValues(i, e);
+            if (e.matches(limitUid, limitIfaces, limitTag)) {
+                filteredSize++;
+            }
+        }
+
+        final NetworkStats clone = new NetworkStats(elapsedRealtime, filteredSize);
+        for (int i = 0; i < size; i++) {
+            e = getValues(i, e);
+            if (e.matches(limitUid, limitIfaces, limitTag)) {
+                clone.insertEntry(e);
+            }
+        }
+        return clone;
     }
 
     /** @hide */
