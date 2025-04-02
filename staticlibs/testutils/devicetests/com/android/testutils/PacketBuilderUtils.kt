@@ -213,12 +213,12 @@ class RaPkt(
         val pio = ByteBuffer.allocate(32)
         pio.put(3) // Type = 3
         pio.put(4) // Length = 4 (*8)
-        pio.put(prefix.getPrefixLength().toByte()) // Prefix Length
+        pio.put(prefix.prefixLength.toByte()) // Prefix Length
         pio.put(flags.toByte()) // Flags
         pio.putInt(validLft) // Valid Lifetime
         pio.putInt(preferredLft) // Preferred Lifetime
         pio.putInt(0) // Reserved2
-        pio.put(prefix.getRawAddress())
+        pio.put(prefix.rawAddress)
         pio.flip()
         outputStream.write(pio.array())
         return this
@@ -368,8 +368,8 @@ class Ip6Pkt(
         ipv6Header.putShort(data.size)
         ipv6Header.put(data.proto)
         ipv6Header.put(hlim)
-        ipv6Header.put(src.getAddress())
-        ipv6Header.put(dst.getAddress())
+        ipv6Header.put(src.address)
+        ipv6Header.put(dst.address)
         ipv6Header.flip()
 
         val outputStream = ByteArrayOutputStream()
