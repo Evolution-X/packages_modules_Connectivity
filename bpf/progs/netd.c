@@ -483,16 +483,16 @@ static __always_inline inline int bpf_owner_match(struct __sk_buff* skb, uint32_
 
     if (!egress.egress && skb->ifindex != 1) {
         if (ingress_should_discard(skb, kver)) return DROP;
-        if (uidRules & LOCKDOWN_VPN_MATCH) {
-            // Drops packets not coming from lo and rule does not have IIF_MATCH but has
-            // LOCKDOWN_VPN_MATCH
-            return DROP_UNLESS_DNS;
-        } else if (uidRules & IIF_MATCH) {
+        if (uidRules & IIF_MATCH) {
             if (allowed_iif && skb->ifindex != allowed_iif) {
                 // Drops packets not coming from lo nor the allowed interface
                 // allowed interface=0 is a wildcard and does not drop packets
                 return DROP_UNLESS_DNS;
             }
+        } else if (uidRules & LOCKDOWN_VPN_MATCH) {
+            // Drops packets not coming from lo and rule does not have IIF_MATCH but has
+            // LOCKDOWN_VPN_MATCH
+            return DROP_UNLESS_DNS;
         }
     }
 
