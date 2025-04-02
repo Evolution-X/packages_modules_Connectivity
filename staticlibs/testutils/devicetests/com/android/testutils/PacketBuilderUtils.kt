@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Ktlint forces a blank line between declarations with comments which wastes space in enum
+// declarations.
+@file:Suppress("ktlint:standard:spacing-between-declarations-with-comments")
 
 package com.android.testutils
 
@@ -53,6 +56,74 @@ private inline fun <reified E> enumSetOfFlags(str: String): EnumSet<E>
         result.add(enumValueOf<E>(char.uppercase()))
     }
     return result
+}
+
+/**
+ * Class that facilitates the creation of NA packets.
+ *
+ * @param target The IPv6 address of the target.
+ * @param flags The Neighbor Advertisement flags.
+ */
+class NaPkt(
+    target: Inet6Address,
+    flags: EnumSet<NaFlags>,
+) : L4Packet {
+    /**
+     * Convenience constructor accepting parameters as Strings.
+     *
+     * @param target Target IPv6 address as a String; e.g. {@code "2001:db8::1"}.
+     * @param flags Neighbor Advertisement flags as a String; e.g. {@code "RS"}
+     */
+    constructor(target: String, flags: String = "RO") :
+        this(Inet6Address.getByName(target) as Inet6Address, enumSetOfFlags<NaFlags>(flags))
+
+    enum class NaFlags(override val value: Int) : Flags {
+        /** Router flag: indicates that the sender is a router. */
+        R(0x80),
+        /** Solicited flag: indicates the advertisement was sent in response to a solicitation. */
+        S(0x40),
+        /** Override flag: indicates the advertisement should override an existing cache entry. */
+        O(0x20),
+    }
+
+    override val proto: Byte = 58
+    override val size: Short
+      get() = outputStream.size().toShort()
+    private val outputStream = ByteArrayOutputStream()
+
+    init {
+        val naHeader = ByteBuffer.allocate(24)
+        naHeader.put(136.toByte()) // Type = 136 (Neighbor Advertisement)
+        naHeader.put(0) // Code = 0
+        naHeader.putShort(0) // Checksum = 0 (ignored)
+        naHeader.put(flags.toByte())
+        naHeader.put(0) // reserved
+        naHeader.putShort(0) // reserved
+        naHeader.put(target.address) // Target address
+        naHeader.flip()
+        outputStream.write(naHeader.array())
+    }
+
+    /** Add Target Link-Layer Address Option */
+    fun addTllaOption(lla: MacAddress) {
+        val llao = ByteBuffer.allocate(8)
+        llao.put(2) // Type = 2 (Target Link-layer Address)
+        llao.put(1) // Length in units of 8 octets
+        llao.put(lla.toByteArray())
+        llao.flip()
+        outputStream.write(llao.array())
+    }
+
+    /**
+     * Add Target Link-Layer Address Option
+     *
+     * @param lla Link-Layer Address as a String; e.g. {@code "0:0:5e:0:53:0"}
+     */
+    fun addTllaOption(lla: String) {
+        addTllaOption(MacAddress.fromString(lla))
+    }
+
+    override fun toByteArray() = outputStream.toByteArray()
 }
 
 /**
