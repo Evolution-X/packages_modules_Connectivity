@@ -130,6 +130,11 @@ class NaPkt(
  * Class that facilitates the creation of RA packets.
  *
  * Default argument values reflect the rfc4861 defaults where applicable.
+ *
+ * @param routerLft lifetime of the default router in seconds.
+ * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
+ * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
+ * @param flags The Router Advertisement flags.
  */
 class RaPkt(
     private val routerLft: Short,
@@ -137,6 +142,14 @@ class RaPkt(
     private val retransTimer: Int,
     private val flags: EnumSet<RaFlags>,
 ) : L4Packet {
+    /**
+     * Convenience constructor accepting flags parameter as String
+     *
+     * @param routerLft lifetime of the default router in seconds.
+     * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
+     * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
+     * @param flags The Router Advertisement flags as a String; e.g. {@code "MO"}. Defaults to "".
+     */
     constructor(
         routerLft: Short = 1800,
         reachableTime: Int = 0,
@@ -145,7 +158,9 @@ class RaPkt(
     ) : this(routerLft, reachableTime, retransTimer, enumSetOfFlags<RaFlags>(flags))
 
     enum class RaFlags(override val value: Int) : Flags {
+        /** Managed address configuration: indicates addresses are available via DHCPv6. */
         M(0x80),
+        /** Other configuration: indicates other configuration info is available via DHCPv6. */
         O(0x40),
     }
 
@@ -169,12 +184,24 @@ class RaPkt(
     }
 
     enum class PioFlags(override val value: Int) : Flags {
+        /** On-Link: indicates that this prefix can be used for on-link determination. */
         L(0x80),
+        /** Autonomous address-configuration: indicates that this prefix can be used for SLAAC. */
         A(0x40),
+        /** Router Address: obsolete. */
         R(0x20),
+        /** PD Preferred: indicates that the network prefers the use of DHCPv6-PD over SLAAC. */
         P(0x10),
     }
 
+    /**
+     * Add a Prefix Information Option
+     *
+     * @param prefix The prefix of an IPv6 address.
+     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param flags The Prefix Information Option flags.
+     */
     fun addPioOption(
             prefix: IpPrefix,
             validLft: Int,
@@ -195,6 +222,14 @@ class RaPkt(
         outputStream.write(pio.array())
     }
 
+    /**
+     * Add a Prefix Information Option
+     *
+     * @param prefix The IPv6 prefix as a String; e.g. {@code "2001:db8::/64"}
+     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param flags The PIO flags as a String; e.g. {@code "LA"}
+     */
     fun addPioOption(
             prefix: String,
             validLft: Int = 2592000,
@@ -204,6 +239,11 @@ class RaPkt(
         addPioOption(IpPrefix(prefix), validLft, preferredLft, enumSetOfFlags<PioFlags>(flags))
     }
 
+    /** Add a Recursive DNS Server Option
+     *
+     * @param dns The list of DNS servers.
+     * @param lft The time, in seconds, over which the DNS servers may be used for resolution.
+     */
     fun addRdnssOption(dns: List<Inet6Address>, lft: Int) {
         val length = 1 + (dns.size * 2)
         val rdnss = ByteBuffer.allocate(length * 8) // length is in units of 8 octets.
@@ -218,11 +258,21 @@ class RaPkt(
         outputStream.write(rdnss.array())
     }
 
+    /** Add a Recursive DNS Server Option
+     *
+     * @param dns The list of DNS servers as a String; e.g. {@code "2001:db8:1,2001:db8:2"}
+     * @param lft The time, in seconds, over which the DNS servers may be used for resolution.
+     */
     fun addRdnssOption(dns: String, lft: Int = 1800) {
         val dnsServers = dns.split(",").map { InetAddress.getByName(it) as Inet6Address }
         addRdnssOption(dnsServers, lft)
     }
 
+    /** Add a Route Information Option
+     *
+     * @param prefix The IPv6 prefix of the route.
+     * @param lft The lifetime of the route in seconds.
+     */
     fun addRioOption(prefix: IpPrefix, lft: Int) {
         val rio = ByteBuffer.allocate(24)
         rio.put(24) // Type = 24
@@ -236,10 +286,20 @@ class RaPkt(
         outputStream.write(rio.array())
     }
 
+    /** Add a Route Information Option
+     *
+     * @param prefix The IPv6 prefix of the route as a String; e.g. {@code "2001:db8::/48"}
+     * @param lft The lifetime of the route in seconds.
+     */
     fun addRioOption(prefix: String, lft: Int = 1800) {
         addRioOption(IpPrefix(prefix), lft)
     }
 
+    /** Add a PREF64 Option
+     *
+     * @param prefix The PREF64 prefix.
+     * @param lft The lifetime of the PREF64 prefix in seconds.
+     */
     fun addPref64Option(prefix: IpPrefix, lft: Int) {
         val pref64 = ByteBuffer.allocate(16)
         pref64.put(38) // Type = 38
@@ -260,6 +320,11 @@ class RaPkt(
         outputStream.write(pref64.array())
     }
 
+    /** Add a PREF64 Option
+     *
+     * @param prefix The PREF64 prefix as a String; e.g. {@code "2001:db8::/64"}
+     * @param lft The lifetime of the PREF64 prefix in seconds.
+     */
     fun addPref64Option(prefix: String, lft: Int = 1800) {
         addPref64Option(IpPrefix(prefix), lft)
     }
