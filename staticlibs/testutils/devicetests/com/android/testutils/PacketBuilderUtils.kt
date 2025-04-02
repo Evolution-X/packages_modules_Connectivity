@@ -271,12 +271,12 @@ class RaPkt(
 class Ip6Pkt(
         private val src: Inet6Address,
         private val dst: Inet6Address,
-        private val payload: L4Packet,
+        private val data: L4Packet,
 ) : L3Packet {
-    constructor(src: String, dst: String, payload: L4Packet) : this(
+    constructor(src: String, dst: String, data: L4Packet) : this(
             InetAddress.getByName(src) as Inet6Address,
             InetAddress.getByName(dst) as Inet6Address,
-            payload,
+            data,
     )
 
     override val etherType = 0x86dd.toShort()
@@ -290,8 +290,8 @@ class Ip6Pkt(
     init {
         val ipv6Header = ByteBuffer.allocate(40)
         ipv6Header.putInt((6 shl 28) or (tc shl 20) or flowlabel)
-        ipv6Header.putShort(payload.size)
-        ipv6Header.put(payload.proto)
+        ipv6Header.putShort(data.size)
+        ipv6Header.put(data.proto)
         ipv6Header.put(hlim)
         ipv6Header.put(src.getAddress())
         ipv6Header.put(dst.getAddress())
@@ -299,7 +299,7 @@ class Ip6Pkt(
 
         val outputStream = ByteArrayOutputStream()
         outputStream.write(ipv6Header.array())
-        outputStream.write(payload.toByteArray())
+        outputStream.write(data.toByteArray())
         bytes = outputStream.toByteArray()
     }
 
@@ -315,18 +315,18 @@ class Ip6Pkt(
  * {@code
  * val ra = RaPkt(routerLft = 50, reachableTime = 100, flags = "O")
  * ra.addPioOption(prefix = "2001:db8::1/64", flags = "LA")
- * val ipv6 = Ip6Pkt(src = "fe80::1", dst = "fe80::2", payload = ra)
- * val ether = EtherPkt(src = "1:2:3:4:5:6", dst = "1:1:1:1:1:1", payload = ipv6)
+ * val ipv6 = Ip6Pkt(src = "fe80::1", dst = "fe80::2", data = ra)
+ * val ether = EtherPkt(src = "1:2:3:4:5:6", dst = "1:1:1:1:1:1", data = ipv6)
  * }
  * </pre>
  **/
 class EtherPkt(
         dst: MacAddress,
         src: MacAddress,
-        payload: L3Packet,
+        data: L3Packet,
     ) : Packet {
-    constructor(dst: String, src: String, payload: L3Packet) :
-        this(MacAddress.fromString(dst), MacAddress.fromString(src), payload)
+    constructor(dst: String, src: String, data: L3Packet) :
+        this(MacAddress.fromString(dst), MacAddress.fromString(src), data)
 
     val bytes: ByteArray
 
@@ -334,12 +334,12 @@ class EtherPkt(
         val ethernetHeader = ByteBuffer.allocate(14)
         ethernetHeader.put(dst.toByteArray())
         ethernetHeader.put(src.toByteArray())
-        ethernetHeader.putShort(payload.etherType)
+        ethernetHeader.putShort(data.etherType)
         ethernetHeader.flip()
 
         val outputStream = ByteArrayOutputStream()
         outputStream.write(ethernetHeader.array())
-        outputStream.write(payload.toByteArray())
+        outputStream.write(data.toByteArray())
         bytes = outputStream.toByteArray()
     }
 
