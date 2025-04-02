@@ -139,6 +139,9 @@ public class MdnsFeatureFlags {
     // Flag to use shorter (16 characters + .local) hostnames
     public final boolean mIsShortHostnamesEnabled;
 
+    // Flag to enable guessing the Network of received packets in the legacy MdnsSocketClient.
+    public final boolean mIsSocketClientNetworkGuessingEnabled;
+
     @Nullable
     private final FlagOverrideProvider mOverrideProvider;
 
@@ -262,6 +265,7 @@ public class MdnsFeatureFlags {
             long cachedServicesRetentionTime,
             boolean isAccurateDelayCallbackEnabled,
             boolean isShortHostnamesEnabled,
+            boolean isSocketClientNetworkGuessingEnabled,
             @Nullable FlagOverrideProvider overrideProvider) {
         mIsMdnsOffloadFeatureEnabled = isOffloadFeatureEnabled;
         mIncludeInetAddressRecordsInProbing = includeInetAddressRecordsInProbing;
@@ -276,6 +280,7 @@ public class MdnsFeatureFlags {
         mCachedServicesRetentionTime = cachedServicesRetentionTime;
         mIsAccurateDelayCallbackEnabled = isAccurateDelayCallbackEnabled;
         mIsShortHostnamesEnabled = isShortHostnamesEnabled;
+        mIsSocketClientNetworkGuessingEnabled = isSocketClientNetworkGuessingEnabled;
         mOverrideProvider = overrideProvider;
     }
 
@@ -301,6 +306,7 @@ public class MdnsFeatureFlags {
         private long mCachedServicesRetentionTime;
         private boolean mIsAccurateDelayCallbackEnabled;
         private boolean mIsShortHostnamesEnabled;
+        private boolean mIsSocketClientNetworkGuessingEnabled;
         private FlagOverrideProvider mOverrideProvider;
 
         /**
@@ -320,6 +326,7 @@ public class MdnsFeatureFlags {
             mCachedServicesRetentionTime = DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS;
             mIsAccurateDelayCallbackEnabled = false;
             mIsShortHostnamesEnabled = true; // Default enabled.
+            mIsSocketClientNetworkGuessingEnabled = false;
             mOverrideProvider = null;
         }
 
@@ -466,6 +473,15 @@ public class MdnsFeatureFlags {
         }
 
         /**
+         * Set whether MdnsSocketClient should try to guess the Network of received packets.
+         */
+        public Builder setIsSocketClientNetworkGuessingEnabled(
+                boolean isSocketClientNetworkGuessingEnabled) {
+            mIsSocketClientNetworkGuessingEnabled = isSocketClientNetworkGuessingEnabled;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsFeatureFlags} with the arguments supplied to this builder.
          */
         public MdnsFeatureFlags build() {
@@ -482,6 +498,7 @@ public class MdnsFeatureFlags {
                     mCachedServicesRetentionTime,
                     mIsAccurateDelayCallbackEnabled,
                     mIsShortHostnamesEnabled,
+                    mIsSocketClientNetworkGuessingEnabled,
                     mOverrideProvider);
         }
     }
