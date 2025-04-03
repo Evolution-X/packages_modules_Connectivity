@@ -22,7 +22,10 @@ import static com.android.server.connectivity.mdns.MdnsQueryScheduler.TIME_BETWE
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.ACTIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.AGGRESSIVE_QUERY_MODE;
 import static com.android.server.connectivity.mdns.MdnsSearchOptions.PASSIVE_QUERY_MODE;
+import static com.android.server.connectivity.mdns.MdnsServiceTypeClient.EVENT_QUERY_RESULT;
+import static com.android.server.connectivity.mdns.MdnsServiceTypeClient.EVENT_REMOVE_EXPIRED_SERVICES;
 import static com.android.server.connectivity.mdns.MdnsServiceTypeClient.EVENT_START_QUERYTASK;
+import static com.android.server.connectivity.mdns.MdnsServiceTypeClient.REMOVE_SERVICE_AFTER_QUERY_SENT_TIME;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -42,6 +45,7 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -253,7 +257,10 @@ public class MdnsServiceTypeClientTests {
         }).when(mockDeps).createScheduler(any(Handler.class));
 
         doAnswer(inv -> {
-            message = (Message) inv.getArguments()[0];
+            final Message temp = (Message) inv.getArguments()[0];
+            if (temp.what == EVENT_START_QUERYTASK) {
+                message = (Message) inv.getArguments()[0];
+            }
             latestDelayMs = (long) inv.getArguments()[1];
             return null;
         }).when(mockScheduler).sendDelayedMessage(any(), anyLong());
@@ -300,6 +307,11 @@ public class MdnsServiceTypeClientTests {
     private void dispatchMessage() {
         runOnHandler(() -> realHandler.dispatchMessage(delayMessage));
         delayMessage = null;
+    }
+
+    private void dispatchRealtimeSchedulerMessage() {
+        runOnHandler(() -> realHandler.dispatchMessage(message));
+        message = null;
     }
 
     @Test
@@ -2191,6 +2203,124 @@ public class MdnsServiceTypeClientTests {
         verify(mockScheduler).close();
     }
 
+    private void verifyQuerySentAndRemoveExpiredServices(int count) {
+        currentThreadExecutor.getAndClearLastScheduledRunnable().run();
+        verify(mockDeps, times(count)).sendMessage(
+                any(Handler.class), argThat(message -> message.what == EVENT_QUERY_RESULT));
+        verify(mockScheduler, times(count)).sendDelayedMessage(
+                argThat(message -> message.what == EVENT_REMOVE_EXPIRED_SERVICES), anyLong());
+        verify(mockScheduler, times(count)).sendDelayedMessage(
+                argThat(message -> message.what == EVENT_START_QUERYTASK), anyLong());
+    }
+
+    @Test
+    public void testExpireServiceRemovedAfterQuerySent() throws IOException {
+        final String requestedInstance = "instance1";
+        final String ipV4Address = "192.0.2.0";
+        final MdnsFeatureFlags flags = MdnsFeatureFlags.newBuilder()
+                .setIsExpiredServicesRemovalEnabled(true)
+                .setIsOptimizedExpiredServiceRemovalEnabled(true)
+                .setIsAccurateDelayCallbackEnabled(true)
+                .build();
+        serviceCache = new MdnsServiceCache(thread.getLooper(), flags, mockDecoderClock);
+        client = makeMdnsServiceTypeClient(flags);
+        startSendAndReceive(mockListenerOne,
+                MdnsSearchOptions.newBuilder().setQueryMode(AGGRESSIVE_QUERY_MODE).build());
+
+        // Sent a query
+        verifyQuerySentAndRemoveExpiredServices(1 /* count */);
+
+        // Receive a response
+        processResponse(
+                createResponse(requestedInstance, ipV4Address, 5353, SERVICE_TYPE_LABELS,
+                        Collections.emptyMap() /* textAttributes */, TEST_TTL),
+                socketKey);
+        verify(mockListenerOne).onServiceNameDiscovered(
+                matchServiceName(requestedInstance), eq(false) /* isServiceFromCache */);
+        verify(mockListenerOne).onServiceFound(
+                matchServiceName(requestedInstance), eq(false) /* isServiceFromCache */);
+
+        // Advance the time so that the service's TTL is not expired and send a query again. Attempt
+        // to remove expired services for which there should be no callback.
+        doReturn(TEST_ELAPSED_REALTIME + TEST_TTL - 1).when(mockDecoderClock).elapsedRealtime();
+        dispatchRealtimeSchedulerMessage();
+        verifyQuerySentAndRemoveExpiredServices(2 /* count */);
+        runOnHandler(() -> realHandler.dispatchMessage(
+                realHandler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES)));
+        verify(mockListenerOne, never()).onServiceRemoved(any());
+        verify(mockListenerOne, never()).onServiceNameRemoved(any());
+
+        // Advance the time so that the service's TTL is expired, and send a query again. Attempt to
+        // remove expired services for which there should be a callback.
+        doReturn(TEST_ELAPSED_REALTIME + TEST_TTL + REMOVE_SERVICE_AFTER_QUERY_SENT_TIME)
+                .when(mockDecoderClock).elapsedRealtime();
+        dispatchRealtimeSchedulerMessage();
+        verifyQuerySentAndRemoveExpiredServices(3 /* count */);
+        runOnHandler(() -> realHandler.dispatchMessage(
+                realHandler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES)));
+        verify(mockListenerOne, timeout(TEST_TIMEOUT_MS).times(1))
+                .onServiceRemoved(matchServiceName(requestedInstance));
+        verify(mockListenerOne, timeout(TEST_TIMEOUT_MS).times(1))
+                .onServiceNameRemoved(matchServiceName(requestedInstance));
+    }
+
+    @Test
+    public void testNoLostCallbackIfServiceHasNotNotified() throws IOException {
+        final String requestedInstance = "instance1";
+        final String ipV4Address = "192.0.2.0";
+        final MdnsFeatureFlags flags = MdnsFeatureFlags.newBuilder()
+                .setIsExpiredServicesRemovalEnabled(true)
+                .setIsOptimizedExpiredServiceRemovalEnabled(true)
+                .setIsAccurateDelayCallbackEnabled(true)
+                .build();
+        long currentTime = TEST_ELAPSED_REALTIME;
+        serviceCache = new MdnsServiceCache(thread.getLooper(), flags, mockDecoderClock);
+        client = makeMdnsServiceTypeClient(flags);
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        startSendAndReceive(mockListenerOne,
+                MdnsSearchOptions.newBuilder().setQueryMode(AGGRESSIVE_QUERY_MODE).build());
+
+        // Sent a query
+        verifyQuerySentAndRemoveExpiredServices(1 /* count */);
+
+        // Receive a response
+        processResponse(
+                createResponse(requestedInstance, ipV4Address, 5353, SERVICE_TYPE_LABELS,
+                        Collections.emptyMap() /* textAttributes */, TEST_TTL),
+                socketKey);
+        verify(mockListenerOne).onServiceNameDiscovered(
+                matchServiceName(requestedInstance), eq(false) /* isServiceFromCache */);
+        verify(mockListenerOne).onServiceFound(
+                matchServiceName(requestedInstance), eq(false) /* isServiceFromCache */);
+
+        // Advance the time so that the service's TTL is expired, and send a query again
+        currentTime += TEST_TTL + 1;
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        dispatchRealtimeSchedulerMessage();
+        verifyQuerySentAndRemoveExpiredServices(2 /* count */);
+
+        // A new listener was added, but it should not receive any callback because the existing
+        // service is expired.
+        startSendAndReceive(mockListenerTwo,
+                MdnsSearchOptions.newBuilder().setQueryMode(AGGRESSIVE_QUERY_MODE).build());
+        verifyQuerySentAndRemoveExpiredServices(3 /* count */);
+        verify(mockListenerTwo, never()).onServiceNameDiscovered(any(), anyBoolean());
+        verify(mockListenerTwo, never()).onServiceFound(any(), anyBoolean());
+
+        // Advance the time and attempt to remove expired services. Only the listener, which was
+        // previously notified, should receive a callback.
+        currentTime += REMOVE_SERVICE_AFTER_QUERY_SENT_TIME;
+        doReturn(currentTime).when(mockDecoderClock).elapsedRealtime();
+        runOnHandler(() -> realHandler.dispatchMessage(
+                realHandler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES)));
+        verify(mockListenerOne, timeout(TEST_TIMEOUT_MS).times(1))
+                .onServiceRemoved(matchServiceName(requestedInstance));
+        verify(mockListenerOne, timeout(TEST_TIMEOUT_MS).times(1))
+                .onServiceNameRemoved(matchServiceName(requestedInstance));
+        verify(mockListenerTwo, never()).onServiceRemoved(any());
+        verify(mockListenerTwo, never()).onServiceNameRemoved(any());
+    }
+
     private static MdnsServiceInfo matchServiceName(String name) {
         return argThat(info -> info.getServiceInstanceName().equals(name));
     }
@@ -2213,8 +2343,7 @@ public class MdnsServiceTypeClientTests {
             boolean multipleSocketDiscovery, int scheduledCount, int sendMessageCount,
             boolean useAccurateDelayCallback) {
         if (useAccurateDelayCallback && message != null && realHandler != null) {
-            runOnHandler(() -> realHandler.dispatchMessage(message));
-            message = null;
+            dispatchRealtimeSchedulerMessage();
         } else {
             // Dispatch the message
             if (delayMessage != null && realHandler != null) {

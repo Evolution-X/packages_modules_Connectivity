@@ -35,8 +35,6 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
-import android.net.NetworkScore
-import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.NetworkStack
 import android.net.RouteInfo
 import android.os.Build
@@ -51,12 +49,6 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
-
-// This allows keeping all the networks connected without having to file individual requests
-// for them.
-private fun keepScore() = FromS(
-        NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
-)
 
 private fun nc(transport: Int, vararg caps: Int) = NetworkCapabilities.Builder().apply {
     addTransportType(transport)

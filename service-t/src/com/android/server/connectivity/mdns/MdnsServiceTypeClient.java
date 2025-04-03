@@ -65,7 +65,9 @@ public class MdnsServiceTypeClient {
     @VisibleForTesting
     static final int EVENT_START_QUERYTASK = 1;
     static final int EVENT_QUERY_RESULT = 2;
+    static final int EVENT_REMOVE_EXPIRED_SERVICES = 3;
     static final int INVALID_TRANSACTION_ID = -1;
+    static final long REMOVE_SERVICE_AFTER_QUERY_SENT_TIME = 2000L;
 
     private final String serviceType;
     private final String[] serviceTypeLabels;
@@ -129,8 +131,13 @@ public class MdnsServiceTypeClient {
             return discoveredServiceNames.add(DnsUtils.toDnsUpperCase(serviceName));
         }
 
-        void unsetServiceDiscovered(@NonNull String serviceName) {
-            discoveredServiceNames.remove(DnsUtils.toDnsUpperCase(serviceName));
+        /**
+         * Unset the given service name as discovered.
+         *
+         * @return true if the service name was discovered before.
+         */
+        boolean unsetServiceDiscovered(@NonNull String serviceName) {
+            return discoveredServiceNames.remove(DnsUtils.toDnsUpperCase(serviceName));
         }
     }
 
@@ -173,7 +180,10 @@ public class MdnsServiceTypeClient {
                         }
                     }
 
-                    tryRemoveServiceAfterTtlExpires();
+                    if (!featureFlags.mIsOptimizedExpiredServiceRemovalEnabled) {
+                        tryRemoveServiceAfterTtlExpires();
+                    }
+
 
                     final long now = clock.elapsedRealtime();
                     lastSentTime = now;
@@ -201,6 +211,42 @@ public class MdnsServiceTypeClient {
                                 handler.obtainMessage(EVENT_START_QUERYTASK, args),
                                 timeToNextTaskMs);
                     }
+                    if (featureFlags.mIsOptimizedExpiredServiceRemovalEnabled) {
+                        // Update the first query time based on the query result
+                        if (sentResult.queriedBaseType) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    null /* serviceName */,
+                                    Collections.emptyList() /* subtypes */, cacheKey, now);
+                        }
+                        if (sentResult.queriedSubtypes.size() != 0) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    null /* serviceName */,
+                                    sentResult.queriedSubtypes, cacheKey, now);
+                        }
+                        for (MdnsResponse service : sentResult.resolvedServices) {
+                            serviceCache.updateFirstQueryTimeForCachedServices(
+                                    service.getServiceInstanceName(),
+                                    Collections.emptyList() /* subtypes */, cacheKey, now);
+                        }
+
+                        // A query is sent. Schedule a task with a delay to wait for responses, and
+                        // then remove expired services, and notify listeners.
+                        if (scheduler != null) {
+                            scheduler.sendDelayedMessage(
+                                    handler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES),
+                                    REMOVE_SERVICE_AFTER_QUERY_SENT_TIME);
+                        } else {
+                            dependencies.sendMessageDelayed(
+                                    handler,
+                                    handler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES),
+                                    REMOVE_SERVICE_AFTER_QUERY_SENT_TIME);
+                        }
+                    }
+                    break;
+                }
+                case EVENT_REMOVE_EXPIRED_SERVICES: {
+                    serviceCache.removeExpiredServicesAndNotifyListeners(
+                            cacheKey, clock.elapsedRealtime());
                     break;
                 }
                 default:
@@ -335,7 +381,8 @@ public class MdnsServiceTypeClient {
 
     private List<MdnsResponse> getExistingServices() {
         return featureFlags.isQueryWithKnownAnswerEnabled()
-                ? serviceCache.getCachedServices(cacheKey) : Collections.emptyList();
+                ? serviceCache.getCachedServices(cacheKey, true /* excludeExpiredServices */)
+                : Collections.emptyList();
     }
 
     private void setDelayedTask(ScheduledQueryTaskArgs args, long timeToNextTaskMs) {
@@ -363,7 +410,8 @@ public class MdnsServiceTypeClient {
         final ListenerInfo listenerInfo = new ListenerInfo(searchOptions, existingInfo);
         listeners.put(listener, listenerInfo);
         if (existingInfo == null) {
-            for (MdnsResponse existingResponse : serviceCache.getCachedServices(cacheKey)) {
+            for (MdnsResponse existingResponse : serviceCache.getCachedServices(
+                    cacheKey, true /* excludeExpiredServices */)) {
                 if (!responseMatchesInstanceNameAndSubtypes(existingResponse,
                         searchOptions.getResolveInstanceName(), searchOptions.getSubtypes())) {
                     continue;
@@ -490,7 +538,9 @@ public class MdnsServiceTypeClient {
         ensureRunningOnHandlerThread(handler);
         // Augment the list of current known responses, and generated responses for resolve
         // requests if there is no known response
-        final List<MdnsResponse> cachedList = serviceCache.getCachedServices(cacheKey);
+        // Expired services are also needed because the response may include them.
+        final List<MdnsResponse> cachedList = serviceCache.getCachedServices(
+                cacheKey, false /* excludeExpiredServices */);
         final List<MdnsResponse> currentList = new ArrayList<>(cachedList);
         List<MdnsResponse> additionalResponses = makeResponsesForResolve(socketKey);
         for (MdnsResponse additionalResponse : additionalResponses) {
@@ -501,7 +551,7 @@ public class MdnsServiceTypeClient {
         }
         final Pair<Set<MdnsResponse>, ArrayList<MdnsResponse>> augmentedResult =
                 responseDecoder.augmentResponses(packet, currentList,
-                        socketKey.getInterfaceIndex(), socketKey.getNetwork());
+                        socketKey.getInterfaceIndex(), socketKey.getNetwork(), featureFlags);
 
         final Set<MdnsResponse> modifiedResponse = augmentedResult.first;
         final ArrayList<MdnsResponse> allResponses = augmentedResult.second;
@@ -568,7 +618,11 @@ public class MdnsServiceTypeClient {
             }
             final MdnsServiceBrowserListener listener = listeners.keyAt(i);
             if (response.getServiceInstanceName() != null) {
-                listeners.valueAt(i).unsetServiceDiscovered(response.getServiceInstanceName());
+                if (!listeners.valueAt(i).unsetServiceDiscovered(
+                        response.getServiceInstanceName())) {
+                    // Skip the lost callback if this service has not been notified previously
+                    continue;
+                }
                 final MdnsServiceInfo serviceInfo = buildMdnsServiceInfoFromResponse(
                         response, serviceTypeLabels, clock.elapsedRealtime());
                 if (response.isComplete()) {
@@ -584,7 +638,8 @@ public class MdnsServiceTypeClient {
     /** Notify all services are removed because the socket is destroyed. */
     public void notifySocketDestroyed() {
         ensureRunningOnHandlerThread(handler);
-        for (MdnsResponse response : serviceCache.getCachedServices(cacheKey)) {
+        for (MdnsResponse response : serviceCache.getCachedServices(
+                cacheKey, false /* excludeExpiredServices */)) {
             final String name = response.getServiceInstanceName();
             if (name == null) continue;
             notifyRemovedServiceToListeners(response, "Socket destroyed");
@@ -594,8 +649,8 @@ public class MdnsServiceTypeClient {
 
     private void onResponseModified(@NonNull MdnsResponse response) {
         final String serviceInstanceName = response.getServiceInstanceName();
-        final MdnsResponse currentResponse =
-                serviceCache.getCachedService(serviceInstanceName, cacheKey);
+        final MdnsResponse currentResponse = serviceCache.getCachedService(serviceInstanceName,
+                cacheKey, false /* excludeExpiredServices */);
 
         final boolean newInCache = currentResponse == null;
         boolean serviceBecomesComplete = false;
@@ -674,8 +729,12 @@ public class MdnsServiceTypeClient {
                     r -> DnsUtils.equalsIgnoreDnsCase(resolveName, r.getServiceInstanceName()))) {
                 continue;
             }
-            MdnsResponse knownResponse =
-                    serviceCache.getCachedService(resolveName, cacheKey);
+            // The "knownResponse" is used by the query to understand what information the cache
+            // already holds, allowing it to determine which records need to be renewed. Therefore,
+            // expired services should always be included in the returned responses to ensure all
+            // their records are renewed.
+            MdnsResponse knownResponse = serviceCache.getCachedService(
+                    resolveName, cacheKey, false /* excludeExpiredServices */);
             if (knownResponse == null) {
                 final ArrayList<String> instanceFullName = new ArrayList<>(
                         serviceTypeLabels.length + 1);
@@ -704,7 +763,8 @@ public class MdnsServiceTypeClient {
     private void tryRemoveServiceAfterTtlExpires() {
         if (!shouldRemoveServiceAfterTtlExpires()) return;
 
-        final Iterator<MdnsResponse> iter = serviceCache.getCachedServices(cacheKey).iterator();
+        final Iterator<MdnsResponse> iter = serviceCache.getCachedServices(
+                cacheKey, false /* excludeExpiredServices */).iterator();
         while (iter.hasNext()) {
             MdnsResponse existingResponse = iter.next();
             if (existingResponse.hasServiceRecord()
@@ -804,7 +864,8 @@ public class MdnsServiceTypeClient {
 
     private long getMinRemainingTtl(long now) {
         long minRemainingTtl = Long.MAX_VALUE;
-        for (MdnsResponse response : serviceCache.getCachedServices(cacheKey)) {
+        for (MdnsResponse response : serviceCache.getCachedServices(
+                cacheKey, false /* excludeExpiredServices */)) {
             if (!response.isComplete()) {
                 continue;
             }

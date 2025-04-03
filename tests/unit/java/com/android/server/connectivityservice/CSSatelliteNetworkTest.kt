@@ -16,8 +16,8 @@
 
 package com.android.server
 
-import android.net.IpPrefix
 import android.net.INetd
+import android.net.IpPrefix
 import android.net.LinkAddress
 import android.net.LinkProperties
 import android.net.NativeNetworkConfig
@@ -29,9 +29,7 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
-import android.net.NetworkScore
 import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
-import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.RouteInfo
 import android.net.UidRange
 import android.net.UidRangeParcel
@@ -47,6 +45,8 @@ import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.visibleOnHandlerThread
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
@@ -55,8 +55,6 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 private const val SECONDARY_USER = 10
 private val SECONDARY_USER_HANDLE = UserHandle(SECONDARY_USER)
@@ -100,7 +98,8 @@ class CSSatelliteNetworkTest : CSTest() {
         val satelliteNetId = satelliteAgent.network.netId
         val permission = if (restricted) {INetd.PERMISSION_SYSTEM} else {INetd.PERMISSION_NONE}
         netdInOrder.verify(netd).networkCreate(
-            nativeNetworkConfigPhysical(satelliteNetId, permission))
+            nativeNetworkConfigPhysical(satelliteNetId, permission)
+        )
 
         val uid1 = PRIMARY_USER_HANDLE.getUid(TEST_PACKAGE_UID)
         val uid2 = PRIMARY_USER_HANDLE.getUid(TEST_PACKAGE_UID2)
@@ -115,7 +114,8 @@ class CSSatelliteNetworkTest : CSTest() {
         var uids = mutableSetOf(uid1, uid2, uid3)
         val uidRanges1 = toUidRangeStableParcels(uidRangesForUids(uids))
         val config1 = NativeUidRangeConfig(
-            satelliteNetId, uidRanges1,
+            satelliteNetId,
+            uidRanges1,
             PREFERENCE_ORDER_SATELLITE_FALLBACK
         )
         updateSatelliteNetworkFallbackUids(uids)
@@ -126,7 +126,8 @@ class CSSatelliteNetworkTest : CSTest() {
         uids = mutableSetOf(uid1)
         val uidRanges2: Array<UidRangeParcel?> = toUidRangeStableParcels(uidRangesForUids(uids))
         val config2 = NativeUidRangeConfig(
-            satelliteNetId, uidRanges2,
+            satelliteNetId,
+            uidRanges2,
             PREFERENCE_ORDER_SATELLITE_FALLBACK
         )
         updateSatelliteNetworkFallbackUids(uids)
@@ -164,7 +165,8 @@ class CSSatelliteNetworkTest : CSTest() {
     }
 
     private fun doTestUnregisterAfterReplacementSatisfier(destroyBeforeRequest: Boolean = false,
-                                                          destroyAfterRequest: Boolean = false) {
+                                                          destroyAfterRequest: Boolean = false
+    ) {
         val satelliteAgent = createSatelliteAgent("satellite0")
         satelliteAgent.connect()
 
@@ -241,11 +243,19 @@ class CSSatelliteNetworkTest : CSTest() {
     }
 
     private fun nativeNetworkConfigPhysical(netId: Int, permission: Int) =
-        NativeNetworkConfig(netId, NativeNetworkType.PHYSICAL, permission,
-            false /* secure */, VpnManager.TYPE_VPN_NONE, false /* excludeLocalRoutes */)
+        NativeNetworkConfig(
+            netId,
+            NativeNetworkType.PHYSICAL,
+            permission,
+            false /* secure */,
+            VpnManager.TYPE_VPN_NONE,
+            false /* excludeLocalRoutes */
+        )
 
     private fun createSatelliteAgent(name: String, restricted: Boolean = true): CSAgentWrapper {
-        return Agent(score = keepScore(), lp = lp(name),
+        return Agent(
+            score = keepScore(),
+            lp = lp(name),
             nc = satelliteNc(restricted)
         )
     }
@@ -289,10 +299,4 @@ class CSSatelliteNetworkTest : CSTest() {
         addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
         addRoute(RouteInfo(IpPrefix("0.0.0.0/0"), null, null))
     }
-
-    // This allows keeping all the networks connected without having to file individual requests
-    // for them.
-    private fun keepScore() = FromS(
-        NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
-    )
 }

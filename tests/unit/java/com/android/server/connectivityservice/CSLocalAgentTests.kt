@@ -35,7 +35,6 @@ import android.net.NetworkCapabilities.TRANSPORT_THREAD
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
 import android.net.NetworkScore
-import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.NetworkScore.KEEP_CONNECTED_LOCAL_NETWORK
 import android.net.RouteInfo
 import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_LOCAL_NETWORK
@@ -78,12 +77,6 @@ private fun lp(iface: String) = LinkProperties().apply {
     addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
     addRoute(RouteInfo(IpPrefix("0.0.0.0/0"), null, null))
 }
-
-// This allows keeping all the networks connected without having to file individual requests
-// for them.
-private fun keepScore() = FromS(
-        NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
-)
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
