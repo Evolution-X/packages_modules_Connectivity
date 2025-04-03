@@ -27,9 +27,11 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -102,15 +104,7 @@ public class MdnsSocketClientTests {
         when(mockWifiManager.createMulticastLock(ArgumentMatchers.anyString()))
                 .thenReturn(mockMulticastLock);
 
-        mdnsClient = new MdnsSocketClient(mContext, mockMulticastLock, sharedLog, flags) {
-                    @Override
-                    MdnsSocket createMdnsSocket(int port, SharedLog sharedLog) throws IOException {
-                        if (port == MdnsConstants.MDNS_PORT) {
-                            return mockMulticastSocket;
-                        }
-                        return mockUnicastSocket;
-                    }
-                };
+        mdnsClient = makeTestSocketClient(flags);
         mdnsClient.setCallback(mockCallback);
 
         doAnswer(
@@ -215,6 +209,18 @@ public class MdnsSocketClientTests {
                 })
                 .when(mockUnicastSocket)
                 .receive(any(DatagramPacket.class));
+    }
+
+    private MdnsSocketClient makeTestSocketClient(MdnsFeatureFlags flags) {
+        return new MdnsSocketClient(mContext, mockMulticastLock, sharedLog, flags) {
+            @Override
+            MdnsSocket createMdnsSocket(int port, SharedLog sharedLog) throws IOException {
+                if (port == MdnsConstants.MDNS_PORT) {
+                    return mockMulticastSocket;
+                }
+                return mockUnicastSocket;
+            }
+        };
     }
 
     @After
@@ -618,6 +624,26 @@ public class MdnsSocketClientTests {
             assertTrue(hasFailed.get());
             verify(mockMulticastSocket, never()).send(any());
         }, () -> Log.setWtfHandler(originalHandler));
+    }
+
+    @Test
+    public void testSetThreadStatsTag() throws IOException {
+        final MdnsFeatureFlags flags = MdnsFeatureFlags.newBuilder()
+                .setMdnsSocketThreadStatsTag(42).build();
+
+        final MdnsSocketClient socketClient = spy(makeTestSocketClient(flags));
+
+
+        doNothing().when(socketClient).setThreadStatsTag(anyInt());
+        doNothing().when(socketClient).clearThreadStatsTag();
+        final InOrder inOrder = inOrder(socketClient);
+        socketClient.startDiscovery();
+
+        testAndCleanup(() -> {
+            inOrder.verify(socketClient).setThreadStatsTag(42);
+            inOrder.verify(socketClient).createMdnsSocket(anyInt(), any());
+            inOrder.verify(socketClient).clearThreadStatsTag();
+        }, socketClient::stopDiscovery);
     }
 
     private DatagramPacket getTestDatagramPacket() {
