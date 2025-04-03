@@ -131,8 +131,13 @@ public class MdnsServiceTypeClient {
             return discoveredServiceNames.add(DnsUtils.toDnsUpperCase(serviceName));
         }
 
-        void unsetServiceDiscovered(@NonNull String serviceName) {
-            discoveredServiceNames.remove(DnsUtils.toDnsUpperCase(serviceName));
+        /**
+         * Unset the given service name as discovered.
+         *
+         * @return true if the service name was discovered before.
+         */
+        boolean unsetServiceDiscovered(@NonNull String serviceName) {
+            return discoveredServiceNames.remove(DnsUtils.toDnsUpperCase(serviceName));
         }
     }
 
@@ -613,7 +618,11 @@ public class MdnsServiceTypeClient {
             }
             final MdnsServiceBrowserListener listener = listeners.keyAt(i);
             if (response.getServiceInstanceName() != null) {
-                listeners.valueAt(i).unsetServiceDiscovered(response.getServiceInstanceName());
+                if (!listeners.valueAt(i).unsetServiceDiscovered(
+                        response.getServiceInstanceName())) {
+                    // Skip the lost callback if this service has not been notified previously
+                    continue;
+                }
                 final MdnsServiceInfo serviceInfo = buildMdnsServiceInfoFromResponse(
                         response, serviceTypeLabels, clock.elapsedRealtime());
                 if (response.isComplete()) {
