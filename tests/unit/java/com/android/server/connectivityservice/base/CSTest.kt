@@ -44,6 +44,7 @@ import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkPolicyManager
 import android.net.NetworkProvider
 import android.net.NetworkScore
+import android.net.NetworkScore.KEEP_CONNECTED_FOR_TEST
 import android.net.PacProxyManager
 import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_LOCAL_NETWORK
 import android.net.networkstack.NetworkStackClientBase
@@ -597,4 +598,10 @@ open class CSTest {
                 .build()
         return Agent(nc = nc, lp = lp)
     }
+
+    // This allows keeping all the networks connected without having to file individual requests
+    // for them.
+    fun keepScore() = FromS(
+        NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
+    )
 }
