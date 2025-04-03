@@ -40,32 +40,17 @@ import android.app.DownloadManager;
 /** Implementation for logging to statsd for Certificate Transparency. */
 class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger {
 
-    private final DataStore mDataStore;
-
-    CertificateTransparencyLoggerImpl(DataStore dataStore) {
-        mDataStore = dataStore;
-    }
-
     @Override
     public void logCTLogListUpdateStateChangedEvent(LogListUpdateStatus updateStatus) {
-        if (updateStatus.isSuccessful()) {
-            resetFailureCount();
-        } else {
-            updateFailureCount();
-        }
-
         int updateState =
                 updateStatus
                         .downloadStatus()
                         .map(s -> downloadStatusToFailureReason(s))
                         .orElseGet(() -> localEnumToStatsLogEnum(updateStatus.state()));
-        int failureCount =
-                mDataStore.getPropertyInt(
-                        Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
 
         logCTLogListUpdateStateChangedEvent(
                 updateState,
-                failureCount,
+                /* failureCount= */ updateStatus.isSuccessful() ? 0 : 1,
                 updateStatus.httpErrorStatusCode(),
                 updateStatus.signature(),
                 updateStatus.logListTimestamp());
@@ -84,27 +69,6 @@ class CertificateTransparencyLoggerImpl implements CertificateTransparencyLogger
                 httpErrorStatusCode,
                 signature,
                 logListTimestamp);
-    }
-
-    /**
-     * Resets the number of consecutive log list update failures in the data store back to zero.
-     */
-    private void resetFailureCount() {
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* value= */ 0);
-        mDataStore.store();
-    }
-
-    /**
-     * Updates the data store with the current number of consecutive log list update failures.
-     */
-    private void updateFailureCount() {
-        int failure_count =
-                mDataStore.getPropertyInt(
-                        Config.LOG_LIST_UPDATE_FAILURE_COUNT, /* defaultValue= */ 0);
-        int new_failure_count = failure_count + 1;
-
-        mDataStore.setPropertyInt(Config.LOG_LIST_UPDATE_FAILURE_COUNT, new_failure_count);
-        mDataStore.store();
     }
 
     /** Converts DownloadStatus reason into failure reason to log. */
