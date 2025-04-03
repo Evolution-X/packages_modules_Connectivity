@@ -28,6 +28,7 @@ import static android.Manifest.permission.NETWORK_SETUP_WIZARD;
 import static android.Manifest.permission.NETWORK_STACK;
 import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.TETHER_PRIVILEGED;
+import static android.content.pm.PackageManager.FEATURE_AUTOMOTIVE;
 import static android.content.pm.PackageManager.FEATURE_BLUETOOTH;
 import static android.content.pm.PackageManager.FEATURE_ETHERNET;
 import static android.content.pm.PackageManager.FEATURE_TELEPHONY;
@@ -3417,6 +3418,9 @@ public class ConnectivityManagerTest {
                 && mPackageManager.hasSystemFeature(FEATURE_TELEPHONY);
         assumeTrue("testMobileDataPreferredUidsWithCallback cannot execute"
                 + " unless device supports both WiFi and telephony", canRunTest);
+        // TODO(b/404186833): re-enable
+        assumeFalse("testMobileDataPreferredUids is broken on automotive",
+                mPackageManager.hasSystemFeature(FEATURE_AUTOMOTIVE));
 
         final int uid = mPackageManager.getPackageUid(mContext.getPackageName(), 0 /* flag */);
         final Set<Integer> mobileDataPreferredUids =
