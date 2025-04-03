@@ -76,7 +76,6 @@ public class CertificateTransparencyDownloaderTest {
     private PrivateKey mPrivateKey;
     private PublicKey mPublicKey;
     private Context mContext;
-    private DataStore mDataStore;
     private SignatureVerifier mSignatureVerifier;
     private CompatibilityVersion mCompatVersion;
     private CertificateTransparencyDownloader mCertificateTransparencyDownloader;
@@ -93,7 +92,6 @@ public class CertificateTransparencyDownloaderTest {
         mPublicKey = keyPair.getPublic();
 
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
-        mDataStore = new DataStore(File.createTempFile("datastore-test", ".properties"));
         mSignatureVerifier = new SignatureVerifier(mContext);
 
         CompatibilityVersion.setRootDirectoryForTesting(mContext.getFilesDir());
@@ -105,7 +103,6 @@ public class CertificateTransparencyDownloaderTest {
         mCertificateTransparencyDownloader =
                 new CertificateTransparencyDownloader(
                         mContext,
-                        mDataStore,
                         new DownloadHelper(mDownloadManager),
                         mSignatureVerifier,
                         mLogger,
@@ -113,14 +110,12 @@ public class CertificateTransparencyDownloaderTest {
 
         prepareDownloadManager();
         mSignatureVerifier.addAllowedKey(mPublicKey);
-        mDataStore.load();
     }
 
     @After
     public void tearDown() {
         mSignatureVerifier.resetPublicKey();
         mCompatVersion.delete();
-        mDataStore.delete();
     }
 
     @Test
