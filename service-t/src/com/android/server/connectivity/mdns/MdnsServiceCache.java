@@ -348,6 +348,7 @@ public class MdnsServiceCache {
             long now, boolean removeOnlyIfQuerySent) {
         final List<CachedService> removedServices = new ArrayList<>();
         final Iterator<CachedService> iterator = cachedServices.iterator();
+        boolean hasNewlyExpiredService = false;
         while (iterator.hasNext()) {
             final CachedService cachedService = iterator.next();
             // TODO: Check other records (A, AAAA, TXT) ttl time and remove the record if it's
@@ -358,6 +359,7 @@ public class MdnsServiceCache {
                 // early if service is not expired or no service record.
                 break;
             }
+            hasNewlyExpiredService = true;
             if (removeOnlyIfQuerySent) {
                 // Set service is expired.
                 cachedService.mServiceExpired = true;
@@ -372,7 +374,9 @@ public class MdnsServiceCache {
         }
 
         // Update next expiration time.
-        mNextExpirationTime = getNextExpirationTime(now);
+        if (hasNewlyExpiredService) {
+            mNextExpirationTime = getNextExpirationTime(now);
+        }
 
         return removedServices;
     }
