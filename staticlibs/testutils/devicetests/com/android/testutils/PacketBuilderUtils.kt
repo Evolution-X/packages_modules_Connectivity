@@ -21,6 +21,7 @@ package com.android.testutils
 
 import android.net.IpPrefix
 import android.net.MacAddress
+import com.android.net.module.util.IpUtils
 import java.io.ByteArrayOutputStream
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -31,16 +32,15 @@ class PacketBuilder(outerPacket: Packet, innerPacket: Packet) {
     private data class PacketHolder(
             /** Points to the last encapsulating packet that includes a pseudo header (IPv4 or IPv6)
              * for the purpose of checksum calculation. May be null if no such packet exists. */
-            val pseudoHeaderPacket: Packet?,
+            val pseudoHeaderPacket: PseudoHeaderPacket?,
             val packet: Packet,
     )
-    private var lastPseudoHeaderPacket: Packet? = null
+    private var lastPseudoHeaderPacket: PseudoHeaderPacket? = null
     /** Collects packets in order, where the outermost packet is at index 0. */
     private val packetCollector = ArrayList<PacketHolder>()
 
     private fun addPacket(p: Packet) {
-        // TODO: update this logic when Ip4Pkt type is added.
-        if (p is Ip6Pkt) {
+        if (p is PseudoHeaderPacket) {
             lastPseudoHeaderPacket = p
         }
         packetCollector.add(PacketHolder(lastPseudoHeaderPacket, p))
@@ -78,7 +78,15 @@ interface Packet {
     operator fun div(p: Packet): PacketBuilder {
         return PacketBuilder(this, p)
     }
-    fun build(payload: FinalizedPacket?, pseudoHeaderPacket: Packet?): FinalizedPacket
+    fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket
+}
+
+interface PseudoHeaderPacket : Packet {
+    /**
+     * Calculates the partial checksum (i.e. pseudo header checksum) to be used as a seed value for
+     * the higher layer checksum calculation.
+     */
+    fun calculatePseudoHeaderCsum(proto: Byte, length: Int): Int
 }
 
 /**
@@ -112,6 +120,30 @@ private inline fun <reified E> enumSetOfFlags(str: String): EnumSet<E>
     return result
 }
 
+/** Base class that holds the common checksum implementation */
+open class Icmp6Pkt : Packet {
+    protected val outputStream = ByteArrayOutputStream()
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        // ICMPv6 packets do not carry a payload but require the pseudo-header to calculate their
+        // checksum.
+        require(payload == null)
+        require(pseudo != null)
+
+        val packetBytes = outputStream.toByteArray()
+        val packetBuffer = ByteBuffer.wrap(packetBytes)
+        var csum = pseudo.calculatePseudoHeaderCsum(58 /* proto */, packetBytes.size)
+        csum = IpUtils.checksum(packetBuffer, csum, 0 /*start*/, packetBytes.size)
+
+        // Fixup packetBuffer
+        packetBuffer.position(2)
+        packetBuffer.putShort(csum.toShort())
+
+        // TODO: calculate checksum
+        return L4Packet(proto = 58, bytes = packetBytes)
+    }
+}
+
 /**
  * Class that facilitates the creation of NA packets.
  *
@@ -121,7 +153,7 @@ private inline fun <reified E> enumSetOfFlags(str: String): EnumSet<E>
 class NaPkt(
     target: Inet6Address,
     flags: EnumSet<NaFlags>,
-) : Packet {
+) : Icmp6Pkt() {
     /**
      * Convenience constructor accepting parameters as Strings.
      *
@@ -139,8 +171,6 @@ class NaPkt(
         /** Override flag: indicates the advertisement should override an existing cache entry. */
         O(0x20),
     }
-
-    private val outputStream = ByteArrayOutputStream()
 
     init {
         val naHeader = ByteBuffer.allocate(24)
@@ -174,17 +204,6 @@ class NaPkt(
     fun addTllaOption(lla: String): NaPkt {
         return addTllaOption(MacAddress.fromString(lla))
     }
-
-    // TODO: create a base class for both NaPkt and RaPkt
-    override fun build(payload: FinalizedPacket?, pseudoHeaderPacket: Packet?): FinalizedPacket {
-        // ICMPv6 packets do not carry a payload but require the pseudo-header to calculate their
-        // checksum.
-        require(payload == null)
-        require(pseudoHeaderPacket != null)
-
-        // TODO: calculate checksum
-        return L4Packet(proto = 58, bytes = outputStream.toByteArray())
-    }
 }
 
 /**
@@ -202,7 +221,7 @@ class RaPkt(
     private val reachableTime: Int,
     private val retransTimer: Int,
     private val flags: EnumSet<RaFlags>,
-) : Packet {
+) : Icmp6Pkt() {
     /**
      * Convenience constructor accepting flags parameter as String
      *
@@ -225,13 +244,11 @@ class RaPkt(
         O(0x40),
     }
 
-    private val outputStream = ByteArrayOutputStream()
-
     init {
         val raHeader = ByteBuffer.allocate(16)
         raHeader.put(134.toByte()) // Type = 134 (Router Advertisement)
         raHeader.put(0) // Code = 0
-        raHeader.putShort(0) // Checksum = 0 (ignored)
+        raHeader.putShort(0) // Checksum = 0 (filled in later)
         raHeader.put(255.toByte()) // Cur Hop Limit
         raHeader.put(flags.toByte())
         raHeader.putShort(routerLft)
@@ -395,24 +412,13 @@ class RaPkt(
     fun addPref64Option(prefix: String, lft: Int = 1800): RaPkt {
         return addPref64Option(IpPrefix(prefix), lft)
     }
-
-    // TODO: create a base class for both NaPkt and RaPkt
-    override fun build(payload: FinalizedPacket?, pseudoHeaderPacket: Packet?): FinalizedPacket {
-        // ICMPv6 packets do not carry a payload but require the pseudo-header to calculate their
-        // checksum.
-        require(payload == null)
-        require(pseudoHeaderPacket != null)
-
-        // TODO: calculate checksum
-        return L4Packet(proto = 58, bytes = outputStream.toByteArray())
-    }
 }
 
 /** Class that facilitates the creation of IPv6 packets. */
 class Ip6Pkt(
         private val src: Inet6Address,
         private val dst: Inet6Address,
-) : Packet {
+) : PseudoHeaderPacket {
     constructor(src: String, dst: String) : this(
             InetAddress.getByName(src) as Inet6Address,
             InetAddress.getByName(dst) as Inet6Address,
@@ -422,7 +428,7 @@ class Ip6Pkt(
     private val flowlabel = 0
     private val hlim = 255.toByte()
 
-    override fun build(payload: FinalizedPacket?, pseudoHeaderPacket: Packet?): FinalizedPacket {
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(payload != null)
         require(payload is L4Packet)
 
@@ -439,6 +445,20 @@ class Ip6Pkt(
         outputStream.write(ipv6Header.array())
         outputStream.write(payload.bytes)
         return L3Packet(etherType = 0x86dd.toShort(), bytes = outputStream.toByteArray())
+    }
+
+    override fun calculatePseudoHeaderCsum(proto: Byte, length: Int): Int {
+        // Calculates the checksum over the src and dst IPv6 addresses.
+        // TODO: assemble IPv6 header in constructor and let build() update payload length and
+        // proto instead.
+        val buffer = ByteBuffer.allocate((2 * 16) + 4 + 2)
+        buffer.put(src.address)
+        buffer.put(dst.address)
+        buffer.putInt(length)
+        buffer.putShort(proto.toShort())
+        buffer.flip()
+        // Note that IpUtils.checksum() flips the result, so it is flipped back here.
+        return IpUtils.checksum(buffer, 0 /*seed*/, 0 /*start*/, buffer.limit()) xor 0xffff
     }
 }
 
@@ -465,7 +485,7 @@ class EtherPkt(
     constructor(dst: String, src: String) :
         this(MacAddress.fromString(dst), MacAddress.fromString(src))
 
-    override fun build(payload: FinalizedPacket?, pseudoHeaderPacket: Packet?): FinalizedPacket {
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(payload != null)
         require(payload is L3Packet)
 
