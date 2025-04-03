@@ -30,9 +30,11 @@ java_defaults {
 
     srcs: [
         "src/**/*.java",
+        "src/**/*.kt",
     ],
 
     static_libs: [
+        "ConnectivityWifiP2pMultiDevicesSnippetLib",
         "TetheringCommonTests",
         "com.android.net.flags-aconfig-java",
         "compatibility-device-util-axt",
