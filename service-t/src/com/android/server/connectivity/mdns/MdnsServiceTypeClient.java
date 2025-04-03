@@ -501,7 +501,7 @@ public class MdnsServiceTypeClient {
         }
         final Pair<Set<MdnsResponse>, ArrayList<MdnsResponse>> augmentedResult =
                 responseDecoder.augmentResponses(packet, currentList,
-                        socketKey.getInterfaceIndex(), socketKey.getNetwork());
+                        socketKey.getInterfaceIndex(), socketKey.getNetwork(), featureFlags);
 
         final Set<MdnsResponse> modifiedResponse = augmentedResult.first;
         final ArrayList<MdnsResponse> allResponses = augmentedResult.second;

@@ -1949,6 +1949,8 @@ public class NsdService extends INsdManager.Stub {
                         MdnsFeatureFlags.DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS))
                 .setIsShortHostnamesEnabled(mDeps.isTetheringFeatureNotChickenedOut(
                         mContext, MdnsFeatureFlags.NSD_USE_SHORT_HOSTNAMES))
+                .setIsCacheFlushPerAddressTypeEnabled(mDeps.isTetheringFeatureNotChickenedOut(
+                        mContext, MdnsFeatureFlags.NSD_CACHE_FLUSH_PER_ADDRESS_TYPE))
                 .setOverrideProvider(new MdnsFeatureFlags.FlagOverrideProvider() {
                     @Override
                     public boolean isForceEnabledForTest(@NonNull String flag) {
