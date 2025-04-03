@@ -1913,7 +1913,7 @@ static int doLoad(char** argv, char * const envp[]) {
             createMap(BPF_MAP_TYPE_ARRAY, sizeof(key), sizeof(value), 2, 0));
     if (writeToMapEntry(map, &key, &value, BPF_ANY)) {
         ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array.");
-        return 1;
+        if (isAtLeastT) return 1;
     }
 
     // on S we haven't created this subdir yet, but we need it for 'mainline_done' flag below
