@@ -319,9 +319,7 @@ public class PermissionMonitor {
         if (hasSdkSandbox(uid)){
             // SDKs in the SDK RT cannot hold runtime permissions
             final int sdkSandboxUid = sProcessShim.toSdkSandboxUid(uid);
-            if (!mBpfNetMaps.isUidBlockedFromUsingLocalNetwork(sdkSandboxUid)) {
-                mBpfNetMaps.addUidToLocalNetBlockMap(sdkSandboxUid);
-            }
+            mBpfNetMaps.addUidToLocalNetBlockMap(sdkSandboxUid);
         }
     }
 
