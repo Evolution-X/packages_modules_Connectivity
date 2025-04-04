@@ -352,14 +352,6 @@ public class MdnsRecordTests {
 
         MdnsTextRecord record = new MdnsTextRecord(name, reader);
 
-        List<String> strings = record.getStrings();
-        assertNotNull(strings);
-        assertEquals(3, strings.size());
-
-        assertEquals("a=hello there", strings.get(0));
-        assertEquals("b=1234567890", strings.get(1));
-        assertEquals("xyz=!@#$", strings.get(2));
-
         List<TextEntry> entries = record.getEntries();
         assertNotNull(entries);
         assertEquals(3, entries.size());

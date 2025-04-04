@@ -344,10 +344,8 @@ public class MdnsUtils {
             throw new IllegalStateException(
                     "mDNS response must have non-null service instance name");
         }
-        List<String> textStrings = null;
         List<MdnsServiceInfo.TextEntry> textEntries = null;
         if (response.hasTextRecord()) {
-            textStrings = response.getTextRecord().getStrings();
             textEntries = response.getTextRecord().getEntries();
         }
         Instant now = Instant.now();
@@ -360,7 +358,6 @@ public class MdnsUtils {
                 port,
                 ipv4Addresses,
                 ipv6Addresses,
-                textStrings,
                 textEntries,
                 response.getInterfaceIndex(),
                 response.getNetwork(),
