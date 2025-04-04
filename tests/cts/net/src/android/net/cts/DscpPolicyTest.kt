@@ -70,7 +70,7 @@ import com.android.testutils.ArpResponder
 import com.android.testutils.CompatUtil
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
-import com.android.testutils.RouterAdvertisementResponder
+import com.android.testutils.NdResponder
 import com.android.testutils.SC_V2
 import com.android.testutils.PollPacketReader
 import com.android.testutils.TestableNetworkAgent
@@ -138,7 +138,7 @@ class DscpPolicyTest {
     private lateinit var tunNetworkCallback: TestNetworkCallback
     private lateinit var reader: PollPacketReader
     private lateinit var arpResponder: ArpResponder
-    private lateinit var raResponder: RouterAdvertisementResponder
+    private lateinit var ndResponder: NdResponder
 
     private fun getKernelVersion(): IntArray {
         // Example:
@@ -182,9 +182,9 @@ class DscpPolicyTest {
 
         arpResponder = ArpResponder(reader, mapOf(TEST_TARGET_IPV4_ADDR to TEST_TARGET_MAC_ADDR))
         arpResponder.start()
-        raResponder = RouterAdvertisementResponder(reader)
-        raResponder.addRouterEntry(TEST_TARGET_MAC_ADDR, TEST_ROUTER_IPV6_ADDR)
-        raResponder.start()
+        ndResponder = NdResponder(reader)
+        ndResponder.addRouterEntry(TEST_TARGET_MAC_ADDR, TEST_ROUTER_IPV6_ADDR)
+        ndResponder.start()
     }
 
     @After
@@ -192,7 +192,7 @@ class DscpPolicyTest {
         if (!kernelIsAtLeast(5, 15)) {
             return
         }
-        raResponder.stop()
+        ndResponder.stop()
         arpResponder.stop()
 
         agentsToCleanUp.forEach { it.unregister() }
@@ -226,7 +226,7 @@ class DscpPolicyTest {
     private fun waitForGlobalIpv6Address(network: Network): Inet6Address {
         // Wait for global IPv6 address to be available
         var inet6Addr: Inet6Address? = null
-        val onLinkPrefix = raResponder.prefix
+        val onLinkPrefix = ndResponder.prefix
         val startTime = SystemClock.elapsedRealtime()
         while (SystemClock.elapsedRealtime() - startTime < IPV6_ADDRESS_WAIT_TIME_MS) {
             SystemClock.sleep(50 /* ms */)
