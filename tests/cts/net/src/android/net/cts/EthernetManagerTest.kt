@@ -68,11 +68,11 @@ import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.DeviceInfoUtils.isKernelVersionAtLeast
+import com.android.testutils.NdResponder
 import com.android.testutils.RecorderCallback.CallbackEntry.Available
 import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.RecorderCallback.CallbackEntry.Lost
-import com.android.testutils.RouterAdvertisementResponder
 import com.android.testutils.PollPacketReader
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertThrows
@@ -156,10 +156,10 @@ class EthernetManagerTest {
     ) {
         private val tapInterface: TestNetworkInterface
         private val packetReader: PollPacketReader
-        private val raResponder: RouterAdvertisementResponder
+        private val ndResponder: NdResponder
         private val tnm: TestNetworkManager
         val name get() = tapInterface.interfaceName
-        val onLinkPrefix get() = raResponder.prefix
+        val onLinkPrefix get() = ndResponder.prefix
 
         init {
             tnm = runAsShell(MANAGE_TEST_NETWORKS) {
@@ -183,13 +183,13 @@ class EthernetManagerTest {
                     tapInterface.fileDescriptor.fileDescriptor,
                     mtu
             )
-            raResponder = RouterAdvertisementResponder(packetReader)
+            ndResponder = NdResponder(packetReader)
             val iidString = "fe80::${Integer.toHexString(Random().nextInt(65536))}"
             val linklocal = InetAddresses.parseNumericAddress(iidString) as Inet6Address
-            raResponder.addRouterEntry(MacAddress.fromString("01:23:45:67:89:ab"), linklocal)
+            ndResponder.addRouterEntry(MacAddress.fromString("01:23:45:67:89:ab"), linklocal)
 
             packetReader.startAsyncForTest()
-            raResponder.start()
+            ndResponder.start()
         }
 
         // WARNING: this function requires kernel support. Call assumeChangingCarrierSupported() at
@@ -201,7 +201,7 @@ class EthernetManagerTest {
         }
 
         fun destroy() {
-            raResponder.stop()
+            ndResponder.stop()
             handler.post({ packetReader.stop() })
             handler.waitForIdle(TIMEOUT_MS)
         }
