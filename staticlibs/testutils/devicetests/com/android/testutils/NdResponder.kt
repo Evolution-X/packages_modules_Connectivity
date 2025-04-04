@@ -65,7 +65,7 @@ class NdResponder(
     data class NeighborEntry(
         val macAddr: MacAddress,
         val ipAddr: Inet6Address,
-        val isRouter: Boolean,
+        val ra: RaPkt?, // null if neighbor is not a router.
     )
     private val neighborMap: MutableMap<Inet6Address, NeighborEntry> = ArrayMap()
 
@@ -77,7 +77,14 @@ class NdResponder(
      * @param ip the link-local address of the router.
      */
     fun addRouterEntry(mac: MacAddress, ip: Inet6Address) {
-        neighborMap[ip] = NeighborEntry(mac, ip, true)
+        val ra = RaPkt()
+                .addPioOption(prefix = prefix.toString(), flags = "LA")
+                .addRdnssOption(dns = "2001:4860:4860::8888,2001:4860:4860::8844")
+        addRouterEntry(mac, ip, ra)
+    }
+
+    fun addRouterEntry(mac: MacAddress, ip: Inet6Address, ra: RaPkt) {
+        neighborMap[ip] = NeighborEntry(mac, ip, ra)
     }
 
     /**
@@ -86,7 +93,7 @@ class NdResponder(
      * @param ip the link-local address of the neighbor.
      */
     fun addNeighborEntry(mac: MacAddress, ip: Inet6Address) {
-        neighborMap[ip] = NeighborEntry(mac, ip, false)
+        neighborMap[ip] = NeighborEntry(mac, ip, null)
     }
 
     private fun sendPacket(reader: PollPacketReader, packet: ByteArray) {
@@ -101,13 +108,11 @@ class NdResponder(
 
     private fun replyToRouterSolicitation(reader: PollPacketReader, dstMac: MacAddress) {
         for ((ip, neigh) in neighborMap) {
-            if (!neigh.isRouter) continue
+            val ra = neigh.ra
+            if (ra == null) continue
             // TODO: add prefix to neighborMap
             val ether = EtherPkt(src = neigh.macAddr, dst = dstMac)
             val ip6 = Ip6Pkt(src = neigh.ipAddr.hostAddress, dst = "ff02::1")
-            val ra = RaPkt()
-                    .addPioOption(prefix = prefix.toString(), flags = "LA")
-                    .addRdnssOption(dns = "2001:4860:4860::8888,2001:4860:4860::8844")
             val p = ether / ip6 / ra
             sendPacket(reader, p.build())
         }
@@ -124,7 +129,7 @@ class NdResponder(
 
         val ether = EtherPkt(dst = dstMac, src = neighbor.macAddr)
         val ipv6 = Ip6Pkt(src = neighbor.ipAddr, dst = dstIp)
-        val flags = if (neighbor.isRouter) "RSO" else "SO"
+        val flags = if (neighbor.ra == null) "SO" else "RSO"
         val na = NaPkt(targetIp.hostAddress, flags)
                 .addTllaOption(neighbor.macAddr)
         val p = ether / ipv6 / na
