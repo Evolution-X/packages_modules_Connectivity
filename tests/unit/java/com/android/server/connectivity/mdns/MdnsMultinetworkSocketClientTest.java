@@ -357,6 +357,8 @@ public class MdnsMultinetworkSocketClientTest {
         verify(mProvider).unrequestSocket(callback);
         verify(mSocketCreationCallback).onSocketDestroyed(mSocketKey);
         verify(mSocketCreationCallback).onSocketDestroyed(otherSocketKey);
+        verify(mSocket).removePacketHandler(any());
+        verify(otherSocket).removePacketHandler(any());
     }
 
     @Test
@@ -375,8 +377,10 @@ public class MdnsMultinetworkSocketClientTest {
         // Notify socket destroyed
         callback.onInterfaceDestroyed(mSocketKey, mSocket);
         verify(mSocketCreationCallback).onSocketDestroyed(mSocketKey);
+        verify(mSocket).removePacketHandler(any());
         callback.onInterfaceDestroyed(otherSocketKey, otherSocket);
         verify(mSocketCreationCallback).onSocketDestroyed(otherSocketKey);
+        verify(otherSocket).removePacketHandler(any());
     }
 
     @Test
@@ -413,6 +417,7 @@ public class MdnsMultinetworkSocketClientTest {
         verify(creationCallback2).onSocketDestroyed(mSocketKey);
         verify(creationCallback3).onSocketDestroyed(mSocketKey);
         verify(creationCallback3, never()).onSocketDestroyed(socketKey2);
+        verify(mSocket).removePacketHandler(any());
     }
 
     @Test
