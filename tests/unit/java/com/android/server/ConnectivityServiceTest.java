@@ -7611,7 +7611,7 @@ public class ConnectivityServiceTest {
         final int CALLBACKS = 88;
         final int DIFF_INTENTS = 10;
         final int SAME_INTENTS = 10;
-        final int SYSTEM_ONLY_MAX_REQUESTS = 250;
+        final int SYSTEM_ONLY_MAX_REQUESTS = 375;
         // CALLBACKS + DIFF_INTENTS + 1 (same intent)
         // = MAX_REQUESTS - 1, since the capacity is MAX_REQUEST - 1.
         assertEquals(MAX_REQUESTS - 1, CALLBACKS + DIFF_INTENTS + 1);

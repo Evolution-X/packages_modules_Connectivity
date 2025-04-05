@@ -504,8 +504,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     static final int MAX_NETWORK_REQUESTS_PER_UID = 100;
 
     // The maximum number of network request allowed for system UIDs before an exception is thrown.
+    // The point of this limit is to help developers find request leaks, so it should be
+    // appropriately low, while allowing plenty of requests for normal use cases.
+    // In the case of the system UIDs, the main consumer of such requests is JobScheduler, which
+    // at most might file one request per UID on the system. Also see b/391114053 for some context
+    // about the specific JobScheduler case and its own self-imposed limit.
     @VisibleForTesting
-    static final int MAX_NETWORK_REQUESTS_PER_SYSTEM_UID = 250;
+    static final int MAX_NETWORK_REQUESTS_PER_SYSTEM_UID = 375;
 
     @VisibleForTesting
     protected int mLingerDelayMs;  // Can't be final, or test subclass constructors can't change it.

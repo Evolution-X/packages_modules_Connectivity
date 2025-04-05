@@ -105,6 +105,13 @@ public class MdnsFeatureFlags {
     public static final int DEFAULT_CACHED_SERVICES_RETENTION_TIME_MILLISECONDS = 10000;
 
     /**
+     * Tag indicating that socket tagging should not be done.
+     *
+     * <p>Corresponds to the same value TrafficStats uses to for "no tag".
+     */
+    public static final int MDNS_SOCKET_THREAD_STATS_TAG_NONE = -1;
+
+    /**
      * A feature flag to control whether the accurate delay callback should be enabled.
      */
     public static final String NSD_ACCURATE_DELAY_CALLBACK = "nsd_accurate_delay_callback";
@@ -163,6 +170,9 @@ public class MdnsFeatureFlags {
 
     // Flag for optimized expired service removal
     public final boolean mIsOptimizedExpiredServiceRemovalEnabled;
+
+    // Thread stats tag for MdnsSocketClient
+    public final int mMdnsSocketThreadStatsTag;
 
     @Nullable
     private final FlagOverrideProvider mOverrideProvider;
@@ -299,6 +309,7 @@ public class MdnsFeatureFlags {
             boolean isSocketClientNetworkGuessingEnabled,
             boolean isCacheFlushPerAddressTypeEnabled,
             boolean isOptimizedExpiredServiceRemovalEnabled,
+            int mdnsSocketThreadStatsTag,
             @Nullable FlagOverrideProvider overrideProvider) {
         mIsMdnsOffloadFeatureEnabled = isOffloadFeatureEnabled;
         mIncludeInetAddressRecordsInProbing = includeInetAddressRecordsInProbing;
@@ -316,6 +327,7 @@ public class MdnsFeatureFlags {
         mIsSocketClientNetworkGuessingEnabled = isSocketClientNetworkGuessingEnabled;
         mIsCacheFlushPerAddressTypeEnabled = isCacheFlushPerAddressTypeEnabled;
         mIsOptimizedExpiredServiceRemovalEnabled = isOptimizedExpiredServiceRemovalEnabled;
+        mMdnsSocketThreadStatsTag = mdnsSocketThreadStatsTag;
         mOverrideProvider = overrideProvider;
     }
 
@@ -344,6 +356,7 @@ public class MdnsFeatureFlags {
         private boolean mIsSocketClientNetworkGuessingEnabled;
         private boolean mIsCacheFlushPerAddressTypeEnabled;
         private boolean mIsOptimizedExpiredServiceRemovalEnabled;
+        private int mMdnsSocketThreadStatsTag;
         private FlagOverrideProvider mOverrideProvider;
 
         /**
@@ -366,6 +379,7 @@ public class MdnsFeatureFlags {
             mIsSocketClientNetworkGuessingEnabled = false;
             mIsCacheFlushPerAddressTypeEnabled = true; // Default enabled.
             mIsOptimizedExpiredServiceRemovalEnabled = false;
+            mMdnsSocketThreadStatsTag = MDNS_SOCKET_THREAD_STATS_TAG_NONE;
             mOverrideProvider = null;
         }
 
@@ -543,6 +557,14 @@ public class MdnsFeatureFlags {
         }
 
         /**
+         * Set the thread stats tag to use in {@link MdnsSocketClient}.
+         */
+        public Builder setMdnsSocketThreadStatsTag(int mdnsSocketThreadStatsTag) {
+            mMdnsSocketThreadStatsTag = mdnsSocketThreadStatsTag;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsFeatureFlags} with the arguments supplied to this builder.
          */
         public MdnsFeatureFlags build() {
@@ -562,6 +584,7 @@ public class MdnsFeatureFlags {
                     mIsSocketClientNetworkGuessingEnabled,
                     mIsCacheFlushPerAddressTypeEnabled,
                     mIsOptimizedExpiredServiceRemovalEnabled,
+                    mMdnsSocketThreadStatsTag,
                     mOverrideProvider);
         }
     }
