@@ -19,6 +19,7 @@
 
 package android.net.cts
 
+import android.Manifest.permission
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_LEANBACK
 import android.content.pm.PackageManager.FEATURE_WIFI
@@ -88,6 +89,7 @@ import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChange
 import com.android.testutils.SkipPresubmit
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.pollingCheck
+import com.android.testutils.runAsShell
 import com.android.testutils.waitForIdle
 import com.google.common.truth.Expect
 import com.google.common.truth.Truth.assertThat
@@ -130,6 +132,8 @@ class ApfIntegrationTest {
         private val context = InstrumentationRegistry.getInstrumentation().context
         private val powerManager = context.getSystemService(PowerManager::class.java)!!
         private val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG)
+        private var isLowPowerStandbyOriginalEnabled: Boolean = false
+        private var originalPolicy: PowerManager.LowPowerStandbyPolicy? = null
 
         fun turnScreenOff() {
             if (!wakeLock.isHeld()) wakeLock.acquire()
@@ -166,6 +170,27 @@ class ApfIntegrationTest {
                     userManager.isVisibleBackgroundUsersSupported)
         }
 
+        private fun disableLowPowerStandby() {
+            runAsShell(permission.DEVICE_POWER) {
+                if (powerManager.isLowPowerStandbySupported) {
+                    isLowPowerStandbyOriginalEnabled = powerManager.isLowPowerStandbyEnabled
+                    originalPolicy = powerManager.lowPowerStandbyPolicy
+                    powerManager.isLowPowerStandbyEnabled = false
+                    Log.i(TAG, "Low power standby is supported, disabling it temporary.")
+                }
+            }
+        }
+
+        private fun restoreLowPowerStandby() {
+            runAsShell(permission.DEVICE_POWER) {
+                if (powerManager.isLowPowerStandbySupported) {
+                    powerManager.isLowPowerStandbyEnabled = isLowPowerStandbyOriginalEnabled
+                    powerManager.lowPowerStandbyPolicy = originalPolicy
+                    Log.i(TAG, "Reset Low power standby to original state.")
+                }
+            }
+        }
+
         @BeforeClass
         @JvmStatic
         @Suppress("ktlint:standard:no-multi-spaces")
@@ -180,12 +205,14 @@ class ApfIntegrationTest {
             Thread.sleep(1000)
             // TODO: check that there is no active wifi network. Otherwise, ApfFilter has already been
             // created.
+            disableLowPowerStandby()
         }
 
         @AfterClass
         @JvmStatic
         fun tearDownOnce() {
             turnScreenOn()
+            restoreLowPowerStandby()
         }
     }
 
