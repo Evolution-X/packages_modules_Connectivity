@@ -101,7 +101,7 @@ public class MdnsMultinetworkSocketClient implements MdnsSocketClientBase {
                 @NonNull MdnsInterfaceSocket socket) {
             mActiveSockets.remove(socketKey);
             mSocketCreationCallback.onSocketDestroyed(socketKey);
-            maybeCleanupPacketHandler(socketKey);
+            maybeCleanupPacketHandler(socketKey, socket);
         }
 
         private void notifySocketDestroyed(@NonNull SocketKey socketKey) {
@@ -115,8 +115,9 @@ public class MdnsMultinetworkSocketClient implements MdnsSocketClientBase {
             for (int i = mActiveSockets.size() - 1; i >= 0; i--) {
                 // Iterate from the end so the socket can be removed
                 final SocketKey socketKey = mActiveSockets.keyAt(i);
+                final MdnsInterfaceSocket socket = mActiveSockets.valueAt(i);
                 notifySocketDestroyed(socketKey);
-                maybeCleanupPacketHandler(socketKey);
+                maybeCleanupPacketHandler(socketKey, socket);
             }
         }
     }
@@ -143,9 +144,13 @@ public class MdnsMultinetworkSocketClient implements MdnsSocketClientBase {
         return null;
     }
 
-    private void maybeCleanupPacketHandler(@NonNull SocketKey socketKey) {
+    private void maybeCleanupPacketHandler(@NonNull SocketKey socketKey,
+            @NonNull MdnsInterfaceSocket socket) {
         if (isSocketActive(socketKey)) return;
-        mSocketPacketHandlers.remove(socketKey);
+        final ReadPacketHandler handler = mSocketPacketHandlers.remove(socketKey);
+        if (handler != null) {
+            socket.removePacketHandler(handler);
+        }
     }
 
     private class ReadPacketHandler implements MulticastPacketReader.PacketHandler {

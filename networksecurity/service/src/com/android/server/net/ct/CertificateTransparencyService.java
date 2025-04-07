@@ -52,7 +52,6 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
 
     /** Creates a new {@link CertificateTransparencyService} object. */
     public CertificateTransparencyService(Context context) {
-        DataStore dataStore = new DataStore(Config.PREFERENCES_FILE);
         SignatureVerifier signatureVerifier = new SignatureVerifier(context);
         Collection<CompatibilityVersion> compatVersions =
                 Arrays.asList(
@@ -68,7 +67,6 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
         mCertificateTransparencyJob =
                 new CertificateTransparencyJob(
                         context,
-                        dataStore,
                         new CertificateTransparencyDownloader(
                                 context,
                                 new DownloadHelper(context),
