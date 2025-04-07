@@ -23,6 +23,7 @@ import android.net.IpPrefix
 import android.net.MacAddress
 import com.android.net.module.util.IpUtils
 import java.io.ByteArrayOutputStream
+import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.ByteBuffer
@@ -456,6 +457,81 @@ class Ip6Pkt(
         buffer.put(dst.address)
         buffer.putInt(length)
         buffer.putShort(proto.toShort())
+        buffer.flip()
+        // Note that IpUtils.checksum() flips the result, so it is flipped back here.
+        return IpUtils.checksum(buffer, 0 /*seed*/, 0 /*start*/, buffer.limit()) xor 0xffff
+    }
+}
+
+/**
+ * Class that facilitates the creation of IPv4 packets.
+ *
+ * Options are not currently supported.
+ */
+class Ip4Pkt(
+        private val src: Inet4Address,
+        private val dst: Inet4Address,
+) : PseudoHeaderPacket {
+    constructor(src: String, dst: String) : this(
+            InetAddress.getByName(src) as Inet4Address,
+            InetAddress.getByName(dst) as Inet4Address,
+    )
+
+    private val tos: Byte = 0
+    private val identification: Short = 0
+    private val flags = 0
+    private val fragoff = 0
+    private val ttl = 255.toByte()
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(payload != null)
+        require(payload is L4Packet)
+
+        //  0                   1                   2                   3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |Version|  IHL  |Type of Service|          Total Length         |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |         Identification        |Flags|      Fragment Offset    |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |  Time to Live |    Protocol   |         Header Checksum       |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                       Source Address                          |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                    Destination Address                        |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                    Options                    |    Padding    |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        val ipv4Header = ByteBuffer.allocate(20)
+                .put(((4 /*version*/ shl 4) or 5 /*IHL*/).toByte())
+                .put(tos)
+                .putShort((20 + payload.bytes.size).toShort())
+                .putShort(identification)
+                .putShort(((flags shl 13) or fragoff).toShort())
+                .put(ttl)
+                .put(payload.proto)
+                .putShort(0 /*csum; to be filled in later*/)
+                .put(src.address)
+                .put(dst.address)
+        ipv4Header.flip()
+
+        val csum = IpUtils.checksum(ipv4Header, 0 /*seed*/, 0 /*start*/, ipv4Header.limit())
+        ipv4Header.position(10)
+        ipv4Header.putShort(csum.toShort())
+
+        val outputStream = ByteArrayOutputStream()
+        outputStream.write(ipv4Header.array())
+        outputStream.write(payload.bytes)
+        return L3Packet(etherType = 0x0800.toShort(), bytes = outputStream.toByteArray())
+    }
+
+    override fun calculatePseudoHeaderCsum(proto: Byte, length: Int): Int {
+        val buffer = ByteBuffer.allocate(12)
+                .put(src.address)
+                .put(dst.address)
+                .put(0)
+                .put(proto)
+                .putShort(length.toShort())
         buffer.flip()
         // Note that IpUtils.checksum() flips the result, so it is flipped back here.
         return IpUtils.checksum(buffer, 0 /*seed*/, 0 /*start*/, buffer.limit()) xor 0xffff
