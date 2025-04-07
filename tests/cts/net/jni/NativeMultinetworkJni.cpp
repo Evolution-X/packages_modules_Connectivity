@@ -496,10 +496,10 @@ JNIEXPORT jobject Java_android_net_cts_MultinetworkApiTest_runDatagramCheck(
         freeaddrinfo(res);
         return create_query_test_result(env, 0, 0, errno);
     }
-    freeaddrinfo(res);
 
     if (getsockname(fd, (struct sockaddr *)&src_addr, &src_addrlen) != 0) {
         close(fd);
+        freeaddrinfo(res);
         return create_query_test_result(env, 0, 0, errno);
     }
     sockaddr_ntop((const struct sockaddr *)&src_addr, sizeof(src_addr), addrstr, sizeof(addrstr));
@@ -513,8 +513,10 @@ JNIEXPORT jobject Java_android_net_cts_MultinetworkApiTest_runDatagramCheck(
     } else {
         LOGD("Invalid source address family %d", src_addr.ss_family);
         close(fd);
+        freeaddrinfo(res);
         return create_query_test_result(env, 0, 0, EAFNOSUPPORT);
     }
+    freeaddrinfo(res);
 
     // Don't let reads or writes block indefinitely.
     const struct timeval timeo = { 2, 0 };  // 2 seconds
