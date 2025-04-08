@@ -546,7 +546,6 @@ public class NsdServiceTest {
                 12345, /* port */
                 List.of(IPV4_ADDRESS),
                 List.of(IPV6_ADDRESS),
-                List.of(), /* textStrings */
                 List.of(), /* textEntries */
                 interfaceIdx, /* interfaceIndex */
                 null /* network */,
@@ -1025,7 +1024,6 @@ public class NsdServiceTest {
                 PORT,
                 List.of(IPV4_ADDRESS),
                 List.of(IPV6_ADDRESS),
-                List.of() /* textStrings */,
                 List.of() /* textEntries */,
                 1234,
                 network,
@@ -1056,7 +1054,6 @@ public class NsdServiceTest {
                 PORT,
                 List.of(v4Address),
                 List.of(v6Address),
-                List.of() /* textStrings */,
                 List.of() /* textEntries */,
                 1234,
                 network,
@@ -1189,7 +1186,6 @@ public class NsdServiceTest {
                 12345, /* port */
                 List.of(IPV4_ADDRESS),
                 List.of(IPV6_ADDRESS),
-                List.of(), /* textStrings */
                 List.of(), /* textEntries */
                 1234, /* interfaceIndex */
                 network,
@@ -1211,7 +1207,6 @@ public class NsdServiceTest {
                 0, /* port */
                 List.of(), /* ipv4Address */
                 List.of(), /* ipv6Address */
-                null, /* textStrings */
                 null, /* textEntries */
                 1234, /* interfaceIndex */
                 network,
@@ -1333,7 +1328,6 @@ public class NsdServiceTest {
                 PORT,
                 List.of(IPV4_ADDRESS),
                 List.of("2001:db8::1", "2001:db8::2"),
-                List.of() /* textStrings */,
                 List.of(MdnsServiceInfo.TextEntry.fromBytes(new byte[]{
                         'k', 'e', 'y', '=', (byte) 0xFF, (byte) 0xFE})) /* textEntries */,
                 1234,
