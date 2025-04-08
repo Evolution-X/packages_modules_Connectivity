@@ -456,20 +456,17 @@ class UdpPkt(
 ) : Packet {
     constructor(srcPort: Int, dstPort: Int) : this(srcPort.toShort(), dstPort.toShort())
 
-    val outputStream = ByteArrayOutputStream()
-    init {
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(pseudo != null)
+
         val udpHeader = ByteBuffer.allocate(8)
             .putShort(srcPort)
             .putShort(dstPort)
             .putShort(0) // length; to be filled in later.
             .putShort(0) // checksum; to be filled in later.
         udpHeader.flip()
+        val outputStream = ByteArrayOutputStream()
         outputStream.write(udpHeader.array())
-    }
-
-    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
-        require(pseudo != null)
-
         if (payload != null) {
             outputStream.write(payload.bytes)
         }
