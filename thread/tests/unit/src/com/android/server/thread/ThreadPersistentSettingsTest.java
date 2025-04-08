@@ -21,6 +21,7 @@ import static com.android.server.thread.ThreadPersistentSettings.KEY_THREAD_ENAB
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.when;
@@ -83,64 +84,46 @@ public class ThreadPersistentSettingsTest {
     }
 
     @Test
-    public void initialize_readsFromFile() throws Exception {
-        byte[] data = createXmlForParsing(KEY_THREAD_ENABLED, false);
+    public void initialize_threadEnabledInFile_enabledValueIsUsed() throws Exception {
+        byte[] data = createXmlForParsing(KEY_THREAD_ENABLED, true);
         setupAtomicFileForRead(data);
 
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, false)).isTrue();
     }
 
     @Test
-    public void initialize_ThreadDisabledInResources_returnsThreadDisabled() throws Exception {
-        when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(false);
-        mThreadPersistentSettings =
-                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
-
+    public void getBoolean_threadEnabledNotSet_defaultValueIsUsed() {
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, true)).isTrue();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, false)).isFalse();
     }
 
     @Test
-    public void initialize_ThreadEnabledInResources_returnsThreadEnabled() throws Exception {
-        when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(true);
-        mThreadPersistentSettings =
-                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
-
+    public void get_getThreadEnabled_throwsIllegalStateException() {
         mThreadPersistentSettings.initialize();
 
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
-    }
-
-    @Test
-    public void initialize_ThreadDisabledInResourcesButEnabledInXml_returnsThreadEnabled()
-            throws Exception {
-        when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(false);
-        setupAtomicFileForRead(createXmlForParsing(KEY_THREAD_ENABLED, true));
-        mThreadPersistentSettings =
-                new ThreadPersistentSettings(mAtomicFile, mConnectivityResources);
-
-        mThreadPersistentSettings.initialize();
-
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
+        assertThrows(
+                IllegalStateException.class,
+                () -> mThreadPersistentSettings.get(KEY_THREAD_ENABLED));
     }
 
     @Test
     public void put_ThreadFeatureEnabledTrue_returnsTrue() throws Exception {
         mThreadPersistentSettings.put(KEY_THREAD_ENABLED, true);
 
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, false)).isTrue();
     }
 
     @Test
     public void put_ThreadFeatureEnabledFalse_returnsFalse() throws Exception {
         mThreadPersistentSettings.put(KEY_THREAD_ENABLED, false);
 
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, true)).isFalse();
         mThreadPersistentSettings.initialize();
-        assertThat(mThreadPersistentSettings.get(KEY_THREAD_ENABLED)).isFalse();
+        assertThat(mThreadPersistentSettings.getBoolean(KEY_THREAD_ENABLED, true)).isFalse();
     }
 
     @Test
