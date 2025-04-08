@@ -23,6 +23,7 @@ import android.net.IpPrefix
 import android.net.MacAddress
 import com.android.net.module.util.IpUtils
 import java.io.ByteArrayOutputStream
+import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.ByteBuffer
@@ -120,28 +121,13 @@ private inline fun <reified E> enumSetOfFlags(str: String): EnumSet<E>
     return result
 }
 
-/** Base class that holds the common checksum implementation */
-open class Icmp6Pkt : Packet {
-    protected val outputStream = ByteArrayOutputStream()
-
-    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
-        // ICMPv6 packets do not carry a payload but require the pseudo-header to calculate their
-        // checksum.
-        require(payload == null)
-        require(pseudo != null)
-
-        val packetBytes = outputStream.toByteArray()
-        val packetBuffer = ByteBuffer.wrap(packetBytes)
-        var csum = pseudo.calculatePseudoHeaderCsum(58 /* proto */, packetBytes.size)
-        csum = IpUtils.checksum(packetBuffer, csum, 0 /*start*/, packetBytes.size)
-
-        // Fixup packetBuffer
-        packetBuffer.position(2)
-        packetBuffer.putShort(csum.toShort())
-
-        // TODO: calculate checksum
-        return L4Packet(proto = 58, bytes = packetBytes)
-    }
+private fun calculatePacketCsum(
+        packetBuffer: ByteBuffer,
+        pseudo: PseudoHeaderPacket,
+        proto: Byte,
+): Short {
+    val csum = pseudo.calculatePseudoHeaderCsum(proto, packetBuffer.limit())
+    return IpUtils.checksum(packetBuffer, csum, 0 /*start*/, packetBuffer.limit()).toShort()
 }
 
 /**
@@ -153,7 +139,7 @@ open class Icmp6Pkt : Packet {
 class NaPkt(
     target: Inet6Address,
     flags: EnumSet<NaFlags>,
-) : Icmp6Pkt() {
+) : Packet {
     /**
      * Convenience constructor accepting parameters as Strings.
      *
@@ -172,6 +158,7 @@ class NaPkt(
         O(0x20),
     }
 
+    val outputStream = ByteArrayOutputStream()
     init {
         val naHeader = ByteBuffer.allocate(24)
         naHeader.put(136.toByte()) // Type = 136 (Neighbor Advertisement)
@@ -204,6 +191,19 @@ class NaPkt(
     fun addTllaOption(lla: String): NaPkt {
         return addTllaOption(MacAddress.fromString(lla))
     }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(payload == null)
+        require(pseudo != null)
+
+        val packetBytes = outputStream.toByteArray()
+        val packetBuffer = ByteBuffer.wrap(packetBytes)
+        val proto: Byte = 58
+        val csum = calculatePacketCsum(packetBuffer, pseudo, proto)
+        packetBuffer.position(2)
+        packetBuffer.putShort(csum)
+        return L4Packet(proto = proto, bytes = packetBytes)
+    }
 }
 
 /**
@@ -221,7 +221,7 @@ class RaPkt(
     private val reachableTime: Int,
     private val retransTimer: Int,
     private val flags: EnumSet<RaFlags>,
-) : Icmp6Pkt() {
+) : Packet {
     /**
      * Convenience constructor accepting flags parameter as String
      *
@@ -244,6 +244,7 @@ class RaPkt(
         O(0x40),
     }
 
+    val outputStream = ByteArrayOutputStream()
     init {
         val raHeader = ByteBuffer.allocate(16)
         raHeader.put(134.toByte()) // Type = 134 (Router Advertisement)
@@ -412,6 +413,77 @@ class RaPkt(
     fun addPref64Option(prefix: String, lft: Int = 1800): RaPkt {
         return addPref64Option(IpPrefix(prefix), lft)
     }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(payload == null)
+        require(pseudo != null)
+
+        val packetBytes = outputStream.toByteArray()
+        val packetBuffer = ByteBuffer.wrap(packetBytes)
+        val proto: Byte = 58
+        val csum = calculatePacketCsum(packetBuffer, pseudo, proto)
+        packetBuffer.position(2)
+        packetBuffer.putShort(csum)
+        return L4Packet(proto = proto, bytes = packetBytes)
+    }
+}
+
+/** Class that facilitates the creation of generic L5 data packets. */
+class DataPkt(data: ByteArray) : Packet {
+    constructor(data: String) : this(data.toByteArray())
+
+    val outputStream = ByteArrayOutputStream()
+    init {
+        outputStream.write(data)
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        if (payload != null) {
+            outputStream.write(payload.bytes)
+        }
+        return object : FinalizedPacket { override val bytes = outputStream.toByteArray() }
+    }
+}
+
+/**
+ * Class that facilitates the creation of UDP packets.
+ *
+ * Use the {@link DataPkt} for carrying a payload.
+ */
+class UdpPkt(
+        private val srcPort: Short,
+        private val dstPort: Short,
+) : Packet {
+    constructor(srcPort: Int, dstPort: Int) : this(srcPort.toShort(), dstPort.toShort())
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(pseudo != null)
+
+        val udpHeader = ByteBuffer.allocate(8)
+            .putShort(srcPort)
+            .putShort(dstPort)
+            .putShort(0) // length; to be filled in later.
+            .putShort(0) // checksum; to be filled in later.
+        udpHeader.flip()
+        val outputStream = ByteArrayOutputStream()
+        outputStream.write(udpHeader.array())
+        if (payload != null) {
+            outputStream.write(payload.bytes)
+        }
+        val packetBytes = outputStream.toByteArray()
+        val packetBuffer = ByteBuffer.wrap(packetBytes)
+
+        // Insert length into UDP header
+        packetBuffer.position(4)
+        packetBuffer.putShort(packetBytes.size.toShort())
+
+        // Insert checksum into UDP header
+        val proto: Byte = 17
+        val csum = calculatePacketCsum(packetBuffer, pseudo, proto)
+        packetBuffer.position(6)
+        packetBuffer.putShort(csum)
+        return L4Packet(proto = proto, bytes = packetBytes)
+    }
 }
 
 /** Class that facilitates the creation of IPv6 packets. */
@@ -456,6 +528,81 @@ class Ip6Pkt(
         buffer.put(dst.address)
         buffer.putInt(length)
         buffer.putShort(proto.toShort())
+        buffer.flip()
+        // Note that IpUtils.checksum() flips the result, so it is flipped back here.
+        return IpUtils.checksum(buffer, 0 /*seed*/, 0 /*start*/, buffer.limit()) xor 0xffff
+    }
+}
+
+/**
+ * Class that facilitates the creation of IPv4 packets.
+ *
+ * Options are not currently supported.
+ */
+class Ip4Pkt(
+        private val src: Inet4Address,
+        private val dst: Inet4Address,
+) : PseudoHeaderPacket {
+    constructor(src: String, dst: String) : this(
+            InetAddress.getByName(src) as Inet4Address,
+            InetAddress.getByName(dst) as Inet4Address,
+    )
+
+    private val tos: Byte = 0
+    private val identification: Short = 0
+    private val flags = 0
+    private val fragoff = 0
+    private val ttl = 255.toByte()
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        require(payload != null)
+        require(payload is L4Packet)
+
+        //  0                   1                   2                   3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |Version|  IHL  |Type of Service|          Total Length         |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |         Identification        |Flags|      Fragment Offset    |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |  Time to Live |    Protocol   |         Header Checksum       |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                       Source Address                          |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                    Destination Address                        |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |                    Options                    |    Padding    |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        val ipv4Header = ByteBuffer.allocate(20)
+                .put(((4 /*version*/ shl 4) or 5 /*IHL*/).toByte())
+                .put(tos)
+                .putShort((20 + payload.bytes.size).toShort())
+                .putShort(identification)
+                .putShort(((flags shl 13) or fragoff).toShort())
+                .put(ttl)
+                .put(payload.proto)
+                .putShort(0 /*csum; to be filled in later*/)
+                .put(src.address)
+                .put(dst.address)
+        ipv4Header.flip()
+
+        val csum = IpUtils.checksum(ipv4Header, 0 /*seed*/, 0 /*start*/, ipv4Header.limit())
+        ipv4Header.position(10)
+        ipv4Header.putShort(csum.toShort())
+
+        val outputStream = ByteArrayOutputStream()
+        outputStream.write(ipv4Header.array())
+        outputStream.write(payload.bytes)
+        return L3Packet(etherType = 0x0800.toShort(), bytes = outputStream.toByteArray())
+    }
+
+    override fun calculatePseudoHeaderCsum(proto: Byte, length: Int): Int {
+        val buffer = ByteBuffer.allocate(12)
+                .put(src.address)
+                .put(dst.address)
+                .put(0)
+                .put(proto)
+                .putShort(length.toShort())
         buffer.flip()
         // Note that IpUtils.checksum() flips the result, so it is flipped back here.
         return IpUtils.checksum(buffer, 0 /*seed*/, 0 /*start*/, buffer.limit()) xor 0xffff

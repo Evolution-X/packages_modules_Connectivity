@@ -37,6 +37,7 @@ import android.util.ArraySet;
 import com.android.net.module.util.HexDump;
 import com.android.server.connectivity.mdns.MdnsResponseTests.MdnsInet4AddressRecord;
 import com.android.server.connectivity.mdns.MdnsResponseTests.MdnsInet6AddressRecord;
+import com.android.server.connectivity.mdns.MdnsServiceInfo.TextEntry;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 
@@ -267,15 +268,16 @@ public class MdnsResponseDecoderTests {
         assertEquals(0, serviceWeight);
 
         MdnsTextRecord textRecord = response.getTextRecord();
-        List<String> textStrings = textRecord.getStrings();
-        assertEquals(7, textStrings.size());
-        assertEquals("id=970bf547b753fc63c2d2a36bb896aba8", textStrings.get(0));
-        assertEquals("ve=02", textStrings.get(1));
-        assertEquals("md=Chromecast", textStrings.get(2));
-        assertEquals("ic=/setup/icon.png", textStrings.get(3));
-        assertEquals("fn=Johnny's Chromecast", textStrings.get(4));
-        assertEquals("ca=5", textStrings.get(5));
-        assertEquals("st=0", textStrings.get(6));
+        List<TextEntry> textEntries = textRecord.getEntries();
+        assertEquals(List.of(
+                new TextEntry("id", "970bf547b753fc63c2d2a36bb896aba8"),
+                new TextEntry("ve", "02"),
+                new TextEntry("md", "Chromecast"),
+                new TextEntry("ic", "/setup/icon.png"),
+                new TextEntry("fn", "Johnny's Chromecast"),
+                new TextEntry("ca", "5"),
+                new TextEntry("st", "0")
+        ), textEntries);
     }
 
     private void verifyResponse(ArraySet<MdnsResponse> responseArraySet) {
@@ -581,9 +583,9 @@ public class MdnsResponseDecoderTests {
                 decoder, makeResponsePacket(DATAIN_TEXT_2), List.of(response));
         assertEquals(1, updatedResponses.size());
         assertEquals(List.of(
-                new MdnsServiceInfo.TextEntry("a", "hello there"),
-                new MdnsServiceInfo.TextEntry("b", "1234567890"),
-                new MdnsServiceInfo.TextEntry("xyz", "!@#$")),
+                new TextEntry("a", "hello there"),
+                new TextEntry("b", "1234567890"),
+                new TextEntry("xyz", "!@#$")),
                 updatedResponses.valueAt(0).getTextRecord().getEntries());
     }
 

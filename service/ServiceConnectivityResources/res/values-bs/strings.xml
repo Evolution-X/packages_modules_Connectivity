@@ -36,7 +36,7 @@
     <string name="network_switch_metered_detail" msgid="1257300152739542096">"Kada <xliff:g id="PREVIOUS_NETWORK">%2$s</xliff:g> nema pristup internetu, uređaj koristi mrežu <xliff:g id="NEW_NETWORK">%1$s</xliff:g>. Moguća je naplata usluge."</string>
     <string name="network_switch_metered_toast" msgid="70691146054130335">"Prebačeno iz mreže <xliff:g id="PREVIOUS_NETWORK">%1$s</xliff:g> u <xliff:g id="NEW_NETWORK">%2$s</xliff:g> mrežu"</string>
   <string-array name="network_switch_type_name">
-    <item msgid="3004933964374161223">"prijenos podataka na mobilnoj mreži"</item>
+    <item msgid="3004933964374161223">"prenos podataka na mobilnoj mreži"</item>
     <item msgid="5624324321165953608">"WiFi"</item>
     <item msgid="5667906231066981731">"Bluetooth"</item>
     <item msgid="346574747471703768">"Ethernet"</item>
