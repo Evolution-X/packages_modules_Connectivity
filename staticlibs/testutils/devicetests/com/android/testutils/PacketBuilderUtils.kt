@@ -476,7 +476,6 @@ class UdpPkt(
         // Insert length into UDP header
         packetBuffer.position(4)
         packetBuffer.putShort(packetBytes.size.toShort())
-        packetBuffer.position(0)
 
         // Insert checksum into UDP header
         val proto: Byte = 17
