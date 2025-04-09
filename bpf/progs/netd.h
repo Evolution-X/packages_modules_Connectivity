@@ -215,16 +215,10 @@ enum UidOwnerMatchType : uint32_t {
 };
 // LINT.ThenChange(../framework/src/android/net/BpfNetMapsConstants.java)
 
-// LINT.IfChange(bpf_permission)
-// The BpfPermissionMatch values should match the traffic permissions defined in NetworkPermissions:
-// BPF_PERMISSION_<X> should have the same value that TRAFFIC_PERMISSION_<X>
 enum BpfPermissionMatch : uint8_t {
     BPF_PERMISSION_INTERNET = 1 << 2,
     BPF_PERMISSION_UPDATE_DEVICE_STATS = 1 << 3,
-    BPF_PERMISSION_SDKSANDBOX_LOCALHOST = 1 << 4,
 };
-// LINT.ThenChange(packages/modules/Connectivity/service/src/com/android/server/connectivity/NetworkPermissions.java)
-
 // In production we use two identical stats maps to record per uid stats and
 // do swap and clean based on the configuration specified here. The statsMapType
 // value in configuration map specified which map is currently in use.
@@ -298,12 +292,4 @@ static inline bool is_system_uid(uint32_t uid) {
     // MIN_SYSTEM_UID is AID_ROOT == 0, so uint32_t is *always* >= 0
     // MAX_SYSTEM_UID is AID_NOBODY == 9999, while AID_APP_START == 10000
     return ((uid % AID_USER_OFFSET) < AID_APP_START);
-}
-
-static inline bool is_sdksandbox_uid(uint32_t uid) {
-    uint32_t appid = uid % AID_USER_OFFSET;
-    // AID_SDK_SANDBOX_PROCESS_START = 20000
-    // AID_SDK_SANDBOX_PROCESS_END = 29999
-    return appid >= AID_SDK_SANDBOX_PROCESS_START &&
-           appid <= AID_SDK_SANDBOX_PROCESS_END;
 }
