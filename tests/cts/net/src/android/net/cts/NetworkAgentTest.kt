@@ -183,7 +183,6 @@ private const val DEFAULT_TIMEOUT_MS = 5000L
 private const val QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER =
     "queue_network_agent_events_in_system_server"
 
-
 // When waiting for a NetworkCallback to determine there was no timeout, waiting is the
 // only possible thing (the relevant handler is the one in the real ConnectivityService,
 // and then there is the Binder call), so have a short timeout for this as it will be
@@ -243,7 +242,6 @@ class NetworkAgentTest {
         get() = mCM.isConnectivityServiceFeatureEnabledForTesting(
             QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER
         )
-
 
     @Before
     fun setUp() {
@@ -777,9 +775,9 @@ class NetworkAgentTest {
                     expectUidsPresent = false
             )
 
-            // The tools to set the carrier service package override do not exist before U,
+            // The tools to set the carrier service package override do not exist before U QPR1,
             // so there is no way to test the rest of this test on < U.
-            if (!SdkLevel.isAtLeastU()) return@tryTest
+            if (!carrierConfigRule.isSettingCarrierServicePackageSupported()) return@tryTest
             // Acquiring carrier privilege is necessary to override the carrier service package.
             val defaultSlotIndex = SubscriptionManager.getSlotIndex(defaultSubId)
             carrierConfigRule.acquireCarrierPrivilege(defaultSubId)

@@ -25,7 +25,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.ConditionVariable
-import android.os.ParcelFileDescriptor
 import android.os.PersistableBundle
 import android.os.Process
 import android.telephony.CarrierConfigManager
@@ -38,6 +37,7 @@ import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.modules.utils.build.SdkLevel
 import com.android.testutils.runAsShell
+import com.android.testutils.runCommandInShell
 import com.android.testutils.tryTest
 import java.security.MessageDigest
 import kotlin.test.assertEquals
@@ -135,11 +135,6 @@ class CarrierConfigRule : TestRule {
         }
     }
 
-    private fun runShellCommand(cmd: String) {
-        val fd: ParcelFileDescriptor = uiAutomation.executeShellCommand(cmd)
-        fd.close() // Don't care about the output.
-    }
-
     /**
      * Converts a byte array into a String of hexadecimal characters.
      *
@@ -235,11 +230,26 @@ class CarrierConfigRule : TestRule {
     fun dropCarrierPrivilege(subId: Int) = setHoldCarrierPrivilege(false, subId)
 
     /**
+     * Setting carrier service package was added in U QPR1, so check for that.
+     *
+     * In T and below, return false. In V and above, return true as this must work.
+     * In U, test for the command presence. That means the test can be disabled by
+     * removing that command in QPR1+, but this would indicate malicious intent.
+     */
+    fun isSettingCarrierServicePackageSupported(): Boolean {
+        if (SdkLevel.isAtLeastV()) return true
+        // A T device with this command present should not be held accountable to have it work
+        if (!SdkLevel.isAtLeastU()) return false
+        return !runCommandInShell("cmd phone set-carrier-service-package-override")
+                .startsWith("Unknown command")
+    }
+
+    /**
      * Sets the carrier service package override for the given subscription ID. A null argument will
      * clear any previously-set override.
      */
     fun setCarrierServicePackageOverride(subId: Int, pkg: String?) {
-        if (!SdkLevel.isAtLeastU()) {
+        if (!isSettingCarrierServicePackageSupported()) {
             throw UnsupportedOperationException(
                 "Setting carrier service package override requires at least U SDK"
             )
@@ -275,10 +285,10 @@ class CarrierConfigRule : TestRule {
                 if (null == pkg) {
                     // There is a bug in clear-carrier-service-package-override where not adding
                     // the -s argument will use the wrong slot index : b/299604822
-                    runShellCommand("cmd phone clear-carrier-service-package-override" +
+                    runCommandInShell("cmd phone clear-carrier-service-package-override" +
                             " -s $subId")
                 } else {
-                    runShellCommand("cmd phone set-carrier-service-package-override $pkg" +
+                    runCommandInShell("cmd phone set-carrier-service-package-override $pkg" +
                             " -s $subId")
                 }
             }
