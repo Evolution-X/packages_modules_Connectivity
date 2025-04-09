@@ -16,9 +16,6 @@
 
 package com.android.server
 
-import android.net.IpPrefix
-import android.net.LinkAddress
-import android.net.LinkProperties
 import android.net.LocalNetworkConfig
 import android.net.MulticastRoutingConfig
 import android.net.MulticastRoutingConfig.CONFIG_FORWARD_NONE
@@ -36,7 +33,6 @@ import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
 import android.net.NetworkScore
 import android.net.NetworkScore.KEEP_CONNECTED_LOCAL_NETWORK
-import android.net.RouteInfo
 import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_LOCAL_NETWORK
 import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_NON_THREAD_LOCAL_NETWORKS
 import android.os.Build
@@ -72,11 +68,7 @@ private fun nc(transport: Int, vararg caps: Int) = NetworkCapabilities.Builder()
     addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
 }.build()
 
-private fun lp(iface: String) = LinkProperties().apply {
-    interfaceName = iface
-    addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
-    addRoute(RouteInfo(IpPrefix("0.0.0.0/0"), null, null))
-}
+private fun lp(iface: String) = defaultLp().apply { interfaceName = iface }
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)

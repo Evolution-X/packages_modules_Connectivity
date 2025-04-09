@@ -23,9 +23,6 @@ import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.net.CaptivePortal
 import android.net.ConnectivityManager.ACTION_CAPTIVE_PORTAL_SIGN_IN
 import android.net.ConnectivityManager.EXTRA_CAPTIVE_PORTAL
-import android.net.IpPrefix
-import android.net.LinkAddress
-import android.net.LinkProperties
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
@@ -36,7 +33,6 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
 import android.net.NetworkStack
-import android.net.RouteInfo
 import android.os.Build
 import android.os.Bundle
 import androidx.test.filters.SmallTest
@@ -61,12 +57,6 @@ private fun nc(transport: Int, vararg caps: Int) = NetworkCapabilities.Builder()
     addCapability(NET_CAPABILITY_NOT_ROAMING)
     addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
 }.build()
-
-private fun lp(iface: String) = LinkProperties().apply {
-    interfaceName = iface
-    addLinkAddress(LinkAddress(LOCAL_IPV4_ADDRESS, 32))
-    addRoute(RouteInfo(IpPrefix("0.0.0.0/0"), null, null))
-}
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
@@ -101,8 +91,8 @@ class CSCaptivePortalAppTest : CSTest() {
     private fun createWifiAgent(): CSAgentWrapper {
         return Agent(
             score = keepScore(),
-            lp = lp(WIFI_IFACE),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
+            lp = defaultLp().apply { interfaceName = WIFI_IFACE },
+            nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
         )
     }
 
