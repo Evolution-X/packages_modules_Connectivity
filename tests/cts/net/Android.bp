@@ -101,6 +101,7 @@ android_test {
         "mcts-tethering",
         "general-tests",
     ],
+    resource_zips: [":connectivity-module-version-as-resource-zip"],
 }
 
 java_defaults {

@@ -117,12 +117,13 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.os.UserManager;
+import android.provider.DeviceConfig;
 import android.util.SparseArray;
 
 import com.android.connectivity.resources.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.HandlerExecutor;
 import com.android.net.module.util.IIpv4PrefixRequest;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
@@ -192,6 +193,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
 
     private final Context mContext;
     private final Handler mHandler;
+    private final ClockSource mClockSource;
     private final MockableSystemProperties mSystemProperties;
 
     // Below member fields can only be accessed from the handler thread (`mHandler`). In
@@ -230,6 +232,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private final UserManager mUserManager;
     private boolean mUserRestricted;
     private boolean mForceStopOtDaemonEnabled;
+    private boolean mThreadDefaultEnabled;
 
     private InfraLinkState mInfraLinkState;
 
@@ -237,6 +240,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     ThreadNetworkControllerService(
             Context context,
             Handler handler,
+            ClockSource clockSource,
             MockableSystemProperties systemProperties,
             NetworkProvider networkProvider,
             Supplier<IOtDaemon> otDaemonSupplier,
@@ -252,6 +256,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             Map<Network, LinkProperties> networkToLinkProperties) {
         mContext = context;
         mHandler = handler;
+        mClockSource = clockSource;
         mSystemProperties = systemProperties;
         mNetworkProvider = networkProvider;
         mOtDaemonSupplier = otDaemonSupplier;
@@ -290,6 +295,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return new ThreadNetworkControllerService(
                 context,
                 handler,
+                new ClockSource(),
                 new MockableSystemProperties(),
                 networkProvider,
                 () -> IOtDaemon.Stub.asInterface(ServiceManagerWrapper.waitForService("ot_daemon")),
@@ -493,17 +499,21 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private void initializeInternal() {
         checkOnHandlerThread();
 
+        mUserRestricted = isThreadUserRestricted();
+        mThreadDefaultEnabled = evaluateThreadDefaultEnabled();
+        registerUserRestrictionsReceiver();
+        registerDeviceConfigListener();
+
         LOG.v(
                 "Initializing Thread system service: Thread is "
                         + (shouldEnableThread() ? "enabled" : "disabled"));
+
         try {
             mTunIfController.createTunInterface();
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create Thread tunnel interface", e);
         }
         mConnectivityManager.registerNetworkProvider(mNetworkProvider);
-        mUserRestricted = isThreadUserRestricted();
-        registerUserRestrictionsReceiver();
 
         if (isBorderRouterMode()) {
             requestUpstreamNetwork();
@@ -512,6 +522,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             cancelRequestUpstreamNetwork();
             unregisterThreadNetworkCallback();
         }
+
         maybeInitializeOtDaemon();
     }
 
@@ -773,6 +784,50 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
         return mUserManager.hasUserRestriction(DISALLOW_THREAD_NETWORK);
     }
 
+    private void registerDeviceConfigListener() {
+        DeviceConfig.addOnPropertiesChangedListener(
+                FeatureFlags.NAMESPACE_THREAD_NETWORK,
+                new HandlerExecutor(mHandler),
+                this::onDeviceConfigChanged);
+    }
+
+    private void onDeviceConfigChanged(DeviceConfig.Properties properties) {
+        boolean newThreadDefaultEnabled = evaluateThreadDefaultEnabled();
+        if (mThreadDefaultEnabled == newThreadDefaultEnabled) {
+            return;
+        }
+        LOG.i(
+                "Thread default_enabled in DeviceConfig changed: "
+                        + mThreadDefaultEnabled
+                        + " -> "
+                        + newThreadDefaultEnabled);
+        mThreadDefaultEnabled = newThreadDefaultEnabled;
+
+        final boolean shouldEnableThread = shouldEnableThread();
+        final IOperationReceiver receiver =
+                new IOperationReceiver.Stub() {
+                    @Override
+                    public void onSuccess() {
+                        LOG.v(
+                                (shouldEnableThread ? "Enabled" : "Disabled")
+                                        + " Thread due to DeviceConfig change");
+                    }
+
+                    @Override
+                    public void onError(int errorCode, String errorMessage) {
+                        LOG.e(
+                                "Failed to "
+                                        + (shouldEnableThread ? "enable" : "disable")
+                                        + " Thread for DeviceConfig change");
+                    }
+                };
+
+        // Do not save the DeviceConfig flag to persistent settings so that the user
+        // configuration won't be overwritten
+        setEnabledInternal(
+                shouldEnableThread, false /* persist */, new OperationReceiverWrapper(receiver));
+    }
+
     /**
      * Returns {@code true} if Thread should be enabled based on current settings, runtime user
      * restriction state.
@@ -780,7 +835,14 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
     private boolean shouldEnableThread() {
         return !mForceStopOtDaemonEnabled
                 && !mUserRestricted
-                && mPersistentSettings.get(ThreadPersistentSettings.KEY_THREAD_ENABLED);
+                && mPersistentSettings.getBoolean(
+                        ThreadPersistentSettings.KEY_THREAD_ENABLED, mThreadDefaultEnabled);
+    }
+
+    /** Returns {@code true} if Thread is by default enabled on this device. */
+    private boolean evaluateThreadDefaultEnabled() {
+        return FeatureFlags.isThreadDefaultEnabled(
+                mResources.get().getBoolean(R.bool.config_thread_default_enabled));
     }
 
     private void requestUpstreamNetwork() {
@@ -1061,7 +1123,8 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                                 supportedChannelMask,
                                 preferredChannelMask,
                                 new Random(),
-                                new SecureRandom());
+                                new SecureRandom(),
+                                mClockSource);
 
                 receiver.onSuccess(dataset);
             }
@@ -1078,11 +1141,12 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
             int supportedChannelMask,
             int preferredChannelMask,
             Random random,
-            SecureRandom secureRandom) {
+            SecureRandom secureRandom,
+            ClockSource clockSource) {
         boolean authoritative = false;
         Instant now = Instant.now();
         try {
-            Clock clock = SystemClock.currentNetworkTimeClock();
+            Clock clock = clockSource.currentNetworkTimeClock();
             now = clock.instant();
             authoritative = true;
         } catch (DateTimeException e) {
@@ -1761,10 +1825,23 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 // This is thrown when the client is dead, do nothing
             }
 
-            try {
-                getOtDaemon().registerStateCallback(this, callbackMetadata.id);
-            } catch (RemoteException | ThreadNetworkException e) {
-                LOG.e("otDaemon.registerStateCallback failed", e);
+            maybeRegisterStateCallback(callbackMetadata.id);
+        }
+
+        private void maybeRegisterStateCallback(long listenerId) {
+            // Do not start ot-daemon if Thread is disabled. Going forward, this check will be added
+            // into getOtDaemon()
+            if (shouldEnableThread()) {
+                try {
+                    getOtDaemon().registerStateCallback(this, listenerId);
+                } catch (RemoteException | ThreadNetworkException e) {
+                    LOG.e("otDaemon.registerStateCallback failed", e);
+                }
+            } else {
+                OtDaemonState state = new OtDaemonState();
+                state.activeDatasetTlvs = new byte[0];
+                state.pendingDatasetTlvs = new byte[0];
+                onStateChanged(state, listenerId);
             }
         }
 
@@ -1794,11 +1871,7 @@ final class ThreadNetworkControllerService extends IThreadNetworkController.Stub
                 mOpDatasetCallbacks.remove(callback);
             }
 
-            try {
-                getOtDaemon().registerStateCallback(this, callbackMetadata.id);
-            } catch (RemoteException | ThreadNetworkException e) {
-                LOG.e("otDaemon.registerStateCallback failed", e);
-            }
+            maybeRegisterStateCallback(callbackMetadata.id);
         }
 
         public void unregisterDatasetCallback(IOperationalDatasetCallback callback) {

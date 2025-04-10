@@ -46,10 +46,10 @@ class RealtimeSchedulerTest {
     private class TestHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
             val pair = msg.obj as Pair<ConditionVariable, MutableList<Long>>
-            val cv = pair.first
-            cv.open()
             val executionTimes = pair.second
             executionTimes.add(SystemClock.elapsedRealtime())
+            val cv = pair.first
+            cv.open()
         }
     }
     private val thread = HandlerThread(RealtimeSchedulerTest::class.simpleName).apply { start() }

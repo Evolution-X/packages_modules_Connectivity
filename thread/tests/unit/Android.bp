@@ -21,6 +21,7 @@ package {
 
 android_test {
     name: "ThreadNetworkUnitTests",
+    defaults: ["modules-utils-testable-device-config-defaults"],
     min_sdk_version: "33",
     sdk_version: "module_current",
     manifest: "AndroidManifest.xml",
