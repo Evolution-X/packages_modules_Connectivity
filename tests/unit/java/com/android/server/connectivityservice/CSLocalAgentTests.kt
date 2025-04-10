@@ -23,10 +23,6 @@ import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_DUN
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_THREAD
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
@@ -55,18 +51,6 @@ import org.mockito.Mockito.verify
 private const val TIMEOUT_MS = 200L
 private const val MEDIUM_TIMEOUT_MS = 1_000L
 private const val LONG_TIMEOUT_MS = 5_000
-
-private fun nc(transport: Int, vararg caps: Int) = NetworkCapabilities.Builder().apply {
-    addTransportType(transport)
-    caps.forEach {
-        addCapability(it)
-    }
-    // Useful capabilities for everybody
-    addCapability(NET_CAPABILITY_NOT_RESTRICTED)
-    addCapability(NET_CAPABILITY_NOT_SUSPENDED)
-    addCapability(NET_CAPABILITY_NOT_ROAMING)
-    addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
-}.build()
 
 private fun lp(iface: String) = defaultLp().apply { interfaceName = iface }
 
@@ -220,19 +204,11 @@ class CSLocalAgentTests : CSTest() {
     }
 
     private fun createWifiAgent(name: String): CSAgentWrapper {
-        return Agent(
-                score = keepScore(),
-                lp = lp(name),
-                nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
-        )
+        return createAgent(name, TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
     }
 
     private fun createCellAgent(name: String): CSAgentWrapper {
-        return Agent(
-                score = keepScore(),
-                lp = lp(name),
-                nc = nc(TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET)
-        )
+        return createAgent(name, TRANSPORT_CELLULAR, NET_CAPABILITY_INTERNET)
     }
 
     private fun sendLocalNetworkConfig(

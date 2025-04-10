@@ -23,13 +23,8 @@ import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.net.CaptivePortal
 import android.net.ConnectivityManager.ACTION_CAPTIVE_PORTAL_SIGN_IN
 import android.net.ConnectivityManager.EXTRA_CAPTIVE_PORTAL
-import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED
-import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
 import android.net.NetworkStack
@@ -46,18 +41,6 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 
-private fun nc(transport: Int, vararg caps: Int) = NetworkCapabilities.Builder().apply {
-    addTransportType(transport)
-    caps.forEach {
-        addCapability(it)
-    }
-    // Useful capabilities for everybody
-    addCapability(NET_CAPABILITY_NOT_RESTRICTED)
-    addCapability(NET_CAPABILITY_NOT_SUSPENDED)
-    addCapability(NET_CAPABILITY_NOT_ROAMING)
-    addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
-}.build()
-
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
@@ -73,7 +56,7 @@ class CSCaptivePortalAppTest : CSTest() {
         val captivePortalRequest = NetworkRequest.Builder()
                 .addCapability(NET_CAPABILITY_CAPTIVE_PORTAL).build()
         cm.registerNetworkCallback(captivePortalRequest, captivePortalCallback)
-        val wifiAgent = createWifiAgent()
+        val wifiAgent = createAgent(WIFI_IFACE, TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
         wifiAgent.connectWithCaptivePortal(TEST_REDIRECT_URL)
         captivePortalCallback.expectAvailableCallbacksUnvalidated(wifiAgent)
         val signInIntent = startCaptivePortalApp(wifiAgent)
@@ -86,14 +69,6 @@ class CSCaptivePortalAppTest : CSTest() {
         val captivePortal: CaptivePortal? = signInIntent.getParcelableExtra(EXTRA_CAPTIVE_PORTAL)
         captivePortal?.reevaluateNetwork()
         verify(wifiAgent.networkMonitor, never()).forceReevaluation(anyInt())
-    }
-
-    private fun createWifiAgent(): CSAgentWrapper {
-        return Agent(
-            score = keepScore(),
-            lp = defaultLp().apply { interfaceName = WIFI_IFACE },
-            nc = nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET)
-        )
     }
 
     private fun startCaptivePortalApp(networkAgent: CSAgentWrapper): Intent {
