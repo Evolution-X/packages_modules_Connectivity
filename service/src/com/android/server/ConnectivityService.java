@@ -9573,7 +9573,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         nai.notifyRegistered(networkMonitor);
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
-        updateVpnUids(nai, null, nai.networkCapabilities);
+        if (nai.isVPN()) updateVpnUids(nai, null, nai.networkCapabilities);
         nai.processEnqueuedMessages(mTrackerHandler::handleMessage);
     }
 
