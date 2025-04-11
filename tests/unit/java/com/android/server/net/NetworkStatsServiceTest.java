@@ -604,7 +604,7 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
 
         @Override
         public boolean isDebuggable() {
-            return mIsDebuggable == Boolean.TRUE;
+            return Objects.equals(mIsDebuggable, Boolean.TRUE);
         }
 
         @Override
