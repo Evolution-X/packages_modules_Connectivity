@@ -191,7 +191,6 @@ import android.os.MessageQueue;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteException;
-import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.VintfRuntimeInfo;
@@ -212,7 +211,6 @@ import androidx.test.filters.RequiresDevice;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.compatibility.common.util.DynamicConfigDeviceSide;
-import com.android.internal.util.ArrayUtils;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DnsPacket;
@@ -595,8 +593,9 @@ public class ConnectivityManagerTest {
         assertNotEquals(SubscriptionManager.INVALID_SUBSCRIPTION_ID, subId);
 
         // Get subscriber Id from telephony manager.
-        final TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
-        return runWithShellPermissionIdentity(() -> tm.getSubscriberId(subId),
+        final TelephonyManager tm = mContext.getSystemService(TelephonyManager.class)
+                .createForSubscriptionId(subId);
+        return runWithShellPermissionIdentity(() -> tm.getSubscriberId(),
                 android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE);
     }
 
@@ -1074,14 +1073,6 @@ public class ConnectivityManagerTest {
     }
 
     private boolean hasEthernetService() {
-        // On Q creating EthernetManager from a thread that does not have a looper (like the test
-        // thread) crashes because it tried to use Looper.myLooper() through the default Handler
-        // constructor to run onAvailabilityChanged callbacks. Use ServiceManager to check whether
-        // the service exists instead.
-        // TODO: remove once Q is no longer supported in MTS, as ServiceManager is hidden API
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-            return ServiceManager.getService(Context.ETHERNET_SERVICE) != null;
-        }
         return mContext.getSystemService(Context.ETHERNET_SERVICE) != null;
     }
 
@@ -2306,7 +2297,7 @@ public class ConnectivityManagerTest {
         // Ensure that CONNECTIVITY_USE_RESTRICTED_NETWORKS isn't granted to this package.
         final PackageInfo app = mPackageManager.getPackageInfo(mContext.getPackageName(),
                 GET_PERMISSIONS);
-        final int index = ArrayUtils.indexOf(
+        final int index = CollectionUtils.indexOf(
                 app.requestedPermissions, CONNECTIVITY_USE_RESTRICTED_NETWORKS);
         assertTrue(index >= 0);
         assertTrue(app.requestedPermissionsFlags[index] != PERMISSION_GRANTED);
@@ -2667,7 +2658,7 @@ public class ConnectivityManagerTest {
         final DetailedBlockedStatusCallback otherUidCallback = new DetailedBlockedStatusCallback();
 
         final int myUid = Process.myUid();
-        final int otherUid = UserHandle.getUid(5, Process.FIRST_APPLICATION_UID);
+        final int otherUid = UserHandle.of(5).getUid(Process.FIRST_APPLICATION_UID);
         final Handler handler = new Handler(Looper.getMainLooper());
 
         networkCallbackRule.registerDefaultNetworkCallback(myUidCallback, handler);
