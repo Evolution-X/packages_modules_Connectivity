@@ -9573,7 +9573,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         nai.notifyRegistered(networkMonitor);
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
-        if (nai.isVPN()) updateVpnUids(nai, null, nai.networkCapabilities);
+        maybeUpdateVpnUids(nai, null, nai.networkCapabilities);
         nai.processEnqueuedMessages(mTrackerHandler::handleMessage);
     }
 
@@ -10590,7 +10590,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         updateNetworkPermissions(nai, newNc);
         final NetworkCapabilities prevNc = nai.getAndSetNetworkCapabilities(newNc);
 
-        updateVpnUids(nai, prevNc, newNc);
+        maybeUpdateVpnUids(nai, prevNc, newNc);
         updateAllowedUids(nai, prevNc, newNc);
         nai.updateScoreForNetworkAgentUpdate();
 
@@ -10942,8 +10942,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void updateVpnUids(@NonNull NetworkAgentInfo nai, @Nullable NetworkCapabilities prevNc,
-            @Nullable NetworkCapabilities newNc) {
+    private void maybeUpdateVpnUids(@NonNull NetworkAgentInfo nai,
+            @Nullable NetworkCapabilities prevNc, @Nullable NetworkCapabilities newNc) {
+        if (!nai.isVPN()) return;
         Set<UidRange> prevRanges = null == prevNc ? null : prevNc.getUidRanges();
         Set<UidRange> newRanges = null == newNc ? null : newNc.getUidRanges();
         if (null == prevRanges) prevRanges = new ArraySet<>();
@@ -12325,9 +12326,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (!mQueueNetworkAgentEventsInSystemServer) {
                 networkAgent.disconnect();
             }
-            if (networkAgent.isVPN()) {
-                updateVpnUids(networkAgent, networkAgent.networkCapabilities, null);
-            }
+            maybeUpdateVpnUids(networkAgent, networkAgent.networkCapabilities, null);
             disconnectAndDestroyNetwork(networkAgent);
             if (networkAgent.isVPN()) {
                 // As the active or bound network changes for apps, broadcast the default proxy, as
