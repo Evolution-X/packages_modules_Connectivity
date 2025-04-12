@@ -278,8 +278,8 @@ class ArrayTrackRecord<E> : TrackRecord<E> {
         }
 
         /**
-         * Returns a list of events that were observed since the last time poll() was called on this
-         * ReadHead.
+         * Returns a list of events that were observed since before the last poll() operation on
+         * this ReadHead.
          *
          * @return list of events since poll() was called.
          */

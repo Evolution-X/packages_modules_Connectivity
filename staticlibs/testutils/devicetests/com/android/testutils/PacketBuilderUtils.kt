@@ -490,15 +490,16 @@ class UdpPkt(
 class Ip6Pkt(
         private val src: Inet6Address,
         private val dst: Inet6Address,
+        private val hlim: Byte = 255.toByte(),
 ) : PseudoHeaderPacket {
-    constructor(src: String, dst: String) : this(
+    constructor(src: String, dst: String, hlim: Int = 255) : this(
             InetAddress.getByName(src) as Inet6Address,
             InetAddress.getByName(dst) as Inet6Address,
+            hlim.toByte(),
     )
 
     private val tc = 0
     private val flowlabel = 0
-    private val hlim = 255.toByte()
 
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(payload != null)
