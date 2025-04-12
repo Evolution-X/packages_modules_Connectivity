@@ -81,6 +81,27 @@ java_library {
     },
 }
 
+// Contains staticlibs classes for use by NetworkStack
+java_library {
+    name: "net-utils-networkstack",
+    srcs: [
+        "device/com/android/net/module/util/ProcfsParsingUtils.java",
+        "framework/com/android/net/module/util/HexDump.java",
+    ],
+    sdk_version: "module_current",
+    min_sdk_version: "30",
+    target_sdk_version: "30",
+    visibility: [
+        "//packages/modules/Connectivity/tests:__subpackages__",
+        "//packages/modules/NetworkStack:__subpackages__",
+    ],
+    libs: [
+        "androidx.annotation_annotation",
+        "framework-annotations-lib",
+        "framework-connectivity.stubs.module_lib",
+    ],
+}
+
 java_library {
     name: "net-utils-dnspacket-common",
     srcs: [
