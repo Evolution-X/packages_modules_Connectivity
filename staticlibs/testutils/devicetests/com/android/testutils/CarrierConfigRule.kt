@@ -36,11 +36,11 @@ import android.telephony.TelephonyManager.CarrierPrivilegesCallback
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.modules.utils.build.SdkLevel
+import com.android.net.module.util.ArrayTrackRecord
 import com.android.testutils.runAsShell
 import com.android.testutils.runCommandInShell
 import com.android.testutils.tryTest
 import java.security.MessageDigest
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.rules.TestRule
@@ -65,6 +65,9 @@ class CarrierConfigRule : TestRule {
 
     // Map of (subId) -> (original values of overridden settings)
     private val originalConfigs = mutableMapOf<Int, PersistableBundle>()
+
+    // Map of (subId) -> (original values of carrier privilege)
+    private val originalCarrierPrivileges = mutableMapOf<Int, Boolean>()
 
     // Map of (subId) -> (original values of carrier service package)
     private val originalCarrierServicePackages = mutableMapOf<Int, String?>()
@@ -176,8 +179,7 @@ class CarrierConfigRule : TestRule {
 
         val tm = context.getSystemService(TelephonyManager::class.java)!!
 
-        val cv = ConditionVariable()
-        val cpb = PrivilegeWaiterCallback(cv)
+        val cpb = PrivilegeWaiterCallback()
         // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
         // T. This means the lambda will compile as a private method of this class taking a
         // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
@@ -189,10 +191,8 @@ class CarrierConfigRule : TestRule {
             runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
             }
-            // Wait for the callback to be registered
-            assertTrue(cv.block(CARRIER_CONFIG_CHANGE_TIMEOUT_MS),
-                "Can't register CarrierPrivilegesCallback")
-            if (cpb.hasPrivilege == hold) {
+            val currentPrivilege = cpb.expectCarrierPrivilegesChanged()
+            if (currentPrivilege == hold) {
                 if (hold) {
                     Log.w(TAG, "Package ${context.opPackageName} already is privileged")
                 } else {
@@ -200,7 +200,9 @@ class CarrierConfigRule : TestRule {
                 }
                 return@tryTest
             }
-            cv.close()
+            if (!originalCarrierPrivileges.contains(subId)) {
+                originalCarrierPrivileges.put(subId, currentPrivilege)
+            }
             if (hold) {
                 addConfigOverrides(subId, PersistableBundle().also {
                     it.putStringArray(CarrierConfigManager.KEY_CARRIER_CERTIFICATE_STRING_ARRAY,
@@ -209,9 +211,7 @@ class CarrierConfigRule : TestRule {
             } else {
                 cleanUpNow()
             }
-            assertTrue(cv.block(CARRIER_CONFIG_CHANGE_TIMEOUT_MS),
-                "Timed out waiting for CarrierPrivilegesCallback")
-            assertEquals(cpb.hasPrivilege, hold, "Couldn't set carrier privilege")
+            cpb.eventuallyExpectCarrierPrivilegesChanged(hold)
         } cleanup @JvmSerializableLambda {
             runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
                 tm.unregisterCarrierPrivilegesCallback(cpb)
@@ -301,12 +301,25 @@ class CarrierConfigRule : TestRule {
         }
     }
 
-    private class PrivilegeWaiterCallback(private val cv: ConditionVariable) :
+    private class PrivilegeWaiterCallback() :
         CarrierPrivilegesCallback {
-        var hasPrivilege = false
+        private val history = ArrayTrackRecord<Boolean>().ReadHead()
         override fun onCarrierPrivilegesChanged(p: MutableSet<String>, uids: MutableSet<Int>) {
-            hasPrivilege = uids.contains(Process.myUid())
-            cv.open()
+            history.add(uids.contains(Process.myUid()))
+        }
+
+        fun expectCarrierPrivilegesChanged(): Boolean {
+            val result = history.poll(CARRIER_CONFIG_CHANGE_TIMEOUT_MS)
+            assertNotNull(result, "onCarrierPrivilegesChanged not received!")
+            return result
+        }
+
+        fun eventuallyExpectCarrierPrivilegesChanged(privileged: Boolean) {
+            val result = history.poll(
+                CARRIER_CONFIG_CHANGE_TIMEOUT_MS,
+                { it == privileged }
+            )
+            assertNotNull(result, "Carrier privilege did not change to $privileged!")
         }
     }
 
@@ -340,6 +353,33 @@ class CarrierConfigRule : TestRule {
             }
             originalConfigs.clear()
         }
+
+        // Carrier privilege status may not be reset yet even after receiving
+        // ACTION_CARRIER_CONFIG_CHANGED, so make sure to also wait for
+        // CarrierPrivilegesCallback before proceeding.
+        val tm = context.getSystemService(TelephonyManager::class.java)!!
+        originalCarrierPrivileges.forEach { (subId, privileged) ->
+            val cpb = PrivilegeWaiterCallback()
+            // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
+            // T. This means the lambda will compile as a private method of this class taking a
+            // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
+            // including private methods, this would fail with a link error when running on S-.
+            // To solve this, make the lambda serializable, which causes the compiler to emit a
+            // synthetic class instead of a synthetic method.
+            tryTest @JvmSerializableLambda {
+                val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
+                runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+                    tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
+                }
+                cpb.eventuallyExpectCarrierPrivilegesChanged(privileged)
+            } cleanup @JvmSerializableLambda {
+                runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+                    tm.unregisterCarrierPrivilegesCallback(cpb)
+                }
+            }
+            originalCarrierPrivileges.clear()
+        }
+
         originalCarrierServicePackages.forEach { (subId, pkg) ->
             setCarrierServicePackageOverride(subId, pkg)
         }
