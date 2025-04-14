@@ -21,6 +21,7 @@ package com.android.testutils
 
 import android.net.IpPrefix
 import android.net.MacAddress
+import com.android.internal.util.HexDump
 import com.android.net.module.util.IpUtils
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
@@ -68,10 +69,8 @@ class PacketBuilder(outerPacket: Packet, innerPacket: Packet) {
         return payload!!.bytes
     }
 
-    // For ByteArray.toHexString
-    @kotlin.ExperimentalStdlibApi
     override fun toString(): String {
-        return build().toHexString()
+        return HexDump.toHexString(build())
     }
 }
 
