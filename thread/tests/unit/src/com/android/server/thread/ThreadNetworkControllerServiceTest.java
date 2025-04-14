@@ -17,6 +17,8 @@
 package com.android.server.thread;
 
 import static android.Manifest.permission.NETWORK_SETTINGS;
+import static android.Manifest.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG;
+import static android.Manifest.permission.WRITE_DEVICE_CONFIG;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
@@ -36,6 +38,7 @@ import static com.android.server.thread.ThreadNetworkControllerService.getMeshco
 import static com.android.server.thread.ThreadNetworkCountryCode.DEFAULT_COUNTRY_CODE;
 import static com.android.server.thread.ThreadPersistentSettings.KEY_THREAD_ENABLED;
 import static com.android.server.thread.openthread.IOtDaemon.ErrorCode.OT_ERROR_INVALID_STATE;
+import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
@@ -83,6 +86,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.os.UserManager;
 import android.os.test.TestLooper;
 import android.provider.DeviceConfig;
@@ -93,7 +97,7 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 
 import com.android.connectivity.resources.R;
-import com.android.modules.utils.testing.TestableDeviceConfig;
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.connectivity.MockableSystemProperties;
@@ -102,6 +106,7 @@ import com.android.server.thread.openthread.IOtStatusReceiver;
 import com.android.server.thread.openthread.MeshcopTxtAttributes;
 import com.android.server.thread.openthread.testing.FakeOtDaemon;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -114,10 +119,12 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
 
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -173,8 +180,6 @@ public final class ThreadNetworkControllerServiceTest {
     private static final String TEST_MODEL_NAME = "test model";
     private static final LinkAddress TEST_NAT64_CIDR = new LinkAddress("192.168.255.0/24");
 
-    @Mock private ClockSource mMockClockSource;
-    @Mock private Clock mMockNetworkTimeClock;
     @Mock private MockableSystemProperties mMockSystemProperties;
     @Mock private ConnectivityManager mMockConnectivityManager;
     @Mock private RoutingCoordinatorManager mMockRoutingCoordinatorManager;
@@ -197,11 +202,7 @@ public final class ThreadNetworkControllerServiceTest {
     @Captor private ArgumentCaptor<ActiveOperationalDataset> mActiveDatasetCaptor;
 
     @Rule(order = 1)
-    public final TemporaryFolder mTempFolder = new TemporaryFolder();
-
-    @Rule(order = 2)
-    public final TestableDeviceConfig.TestableDeviceConfigRule mDeviceConfig =
-            new TestableDeviceConfig.TestableDeviceConfigRule();
+    public final TemporaryFolder tempFolder = new TemporaryFolder();
 
     private final boolean mIsBorderRouterEnabled;
 
@@ -262,18 +263,14 @@ public final class ThreadNetworkControllerServiceTest {
                 .thenReturn(new String[] {});
         when(mResources.getBoolean(eq(R.bool.config_thread_country_code_enabled))).thenReturn(true);
 
-        final AtomicFile storageFile = new AtomicFile(mTempFolder.newFile("thread_settings.xml"));
+        final AtomicFile storageFile = new AtomicFile(tempFolder.newFile("thread_settings.xml"));
         mPersistentSettings = new ThreadPersistentSettings(storageFile, mConnectivityResources);
         mPersistentSettings.initialize();
-
-        when(mMockClockSource.currentNetworkTimeClock()).thenReturn(mMockNetworkTimeClock);
-        when(mMockNetworkTimeClock.instant()).thenReturn(Instant.ofEpochMilli(0));
 
         mService =
                 new ThreadNetworkControllerService(
                         mContext,
                         handler,
-                        mMockClockSource,
                         mMockSystemProperties,
                         networkProvider,
                         () -> mFakeOtDaemon,
@@ -288,6 +285,14 @@ public final class ThreadNetworkControllerServiceTest {
                         () -> DEFAULT_COUNTRY_CODE,
                         mMockNetworkToLinkProperties);
         mService.setTestNetworkAgent(mMockNetworkAgent);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                () -> DeviceConfig.deleteProperty("thread_network", "TrelFeature__enabled"));
     }
 
     @Test
@@ -377,7 +382,12 @@ public final class ThreadNetworkControllerServiceTest {
 
     @Test
     public void initialize_trelFeatureDisabled_trelDisabledAtOtDaemon() throws Exception {
-        DeviceConfig.setProperty("thread_network", "TrelFeature__enabled", "false", false);
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                () ->
+                        DeviceConfig.setProperty(
+                                "thread_network", "TrelFeature__enabled", "false", false));
 
         mService.initialize();
         mTestLooper.dispatchAll();
@@ -387,8 +397,12 @@ public final class ThreadNetworkControllerServiceTest {
 
     @Test
     public void initialize_trelFeatureEnabled_setTrelEnabledAtOtDamon() throws Exception {
-        DeviceConfig.setProperty("thread_network", "TrelFeature__enabled", "true", false);
-
+        runAsShell(
+                WRITE_DEVICE_CONFIG,
+                WRITE_ALLOWLISTED_DEVICE_CONFIG,
+                () ->
+                        DeviceConfig.setProperty(
+                                "thread_network", "TrelFeature__enabled", "true", false));
         mService.initialize();
         mTestLooper.dispatchAll();
 
@@ -606,7 +620,7 @@ public final class ThreadNetworkControllerServiceTest {
         mTestLooper.dispatchAll();
 
         assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-        assertThat(mPersistentSettings.containsKey(KEY_THREAD_ENABLED)).isFalse();
+        assertThat(mPersistentSettings.get(KEY_THREAD_ENABLED)).isTrue();
     }
 
     @Test
@@ -636,73 +650,6 @@ public final class ThreadNetworkControllerServiceTest {
         var thrown = assertThrows(ExecutionException.class, () -> setEnabledFuture.get());
         ThreadNetworkException failure = (ThreadNetworkException) thrown.getCause();
         assertThat(failure.getErrorCode()).isEqualTo(ERROR_FAILED_PRECONDITION);
-    }
-
-    @Test
-    public void deviceConfig_initWithThreadDefaultDisabled_otDaemonNotStarted() {
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "false", false);
-
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.isInitialized()).isFalse();
-    }
-
-    @Test
-    public void deviceConfig_initWithThreadDefaultEnabled_threadIsEnabled() {
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "true", false);
-
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-    }
-
-    @Test
-    public void deviceConfig_threadDefaultEnabledBecomesTrue_stateIsEnabledButNotPersisted() {
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "false", false);
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "true", true);
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-        assertThat(mPersistentSettings.containsKey(KEY_THREAD_ENABLED)).isFalse();
-    }
-
-    @Test
-    public void deviceConfig_threadThreadEnabledBecomesFalse_stateIsDisabledButNotPersisted() {
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "true", false);
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "false", false);
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-        assertThat(mPersistentSettings.containsKey(KEY_THREAD_ENABLED)).isFalse();
-    }
-
-    @Test
-    public void deviceConfig_threadDefaultDisabledButUserSetEnabled_stateIsEnabledAndPersisted() {
-        DeviceConfig.setProperty(
-                "thread_network", "ThreadEnablementFeature__default_enabled", "false", false);
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        mService.setEnabled(true, newOperationReceiver(new CompletableFuture<Void>()));
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_ENABLED);
-        assertThat(mPersistentSettings.containsKey(KEY_THREAD_ENABLED)).isTrue();
-        assertThat(mPersistentSettings.getBoolean(KEY_THREAD_ENABLED, false)).isTrue();
     }
 
     private AtomicReference<BroadcastReceiver> captureBroadcastReceiver(String action) {
@@ -741,12 +688,19 @@ public final class ThreadNetworkControllerServiceTest {
     public void
             createRandomizedDataset_noNetworkTimeClock_datasetActiveTimestampIsNotAuthoritative()
                     throws Exception {
-        var mockReceiver = mock(IActiveOperationalDatasetReceiver.class);
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
 
-        when(mMockClockSource.currentNetworkTimeClock())
-                .thenThrow(new DateTimeException("fake throw"));
-        mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
-        mTestLooper.dispatchAll();
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock())
+                    .thenThrow(new DateTimeException("fake throw"));
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
 
         verify(mockReceiver, never()).onError(anyInt(), anyString());
         verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
@@ -756,11 +710,20 @@ public final class ThreadNetworkControllerServiceTest {
 
     @Test
     public void createRandomizedDataset_zeroNanoseconds_returnsZeroTicks() throws Exception {
-        when(mMockNetworkTimeClock.instant()).thenReturn(Instant.ofEpochSecond(0, 0));
-        var mockReceiver = mock(IActiveOperationalDatasetReceiver.class);
+        Instant now = Instant.ofEpochSecond(0, 0);
+        Clock clock = Clock.fixed(now, ZoneId.systemDefault());
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
 
-        mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
-        mTestLooper.dispatchAll();
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock()).thenReturn(clock);
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
 
         verify(mockReceiver, never()).onError(anyInt(), anyString());
         verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
@@ -773,13 +736,20 @@ public final class ThreadNetworkControllerServiceTest {
         // The nanoseconds to ticks conversion is rounded in the current implementation.
         // 32767.5 / 32768 * 1000000000 = 999984741.2109375, using 999984741 to
         // produce the maximum ticks.
-        Instant maxNanos = Instant.ofEpochSecond(0, 999984741);
-        when(mMockNetworkTimeClock.instant()).thenReturn(maxNanos);
+        Instant now = Instant.ofEpochSecond(0, 999984741);
+        Clock clock = Clock.fixed(now, ZoneId.systemDefault());
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
 
-        var mockReceiver = mock(IActiveOperationalDatasetReceiver.class);
-
-        mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
-        mTestLooper.dispatchAll();
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock()).thenReturn(clock);
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
 
         verify(mockReceiver, never()).onError(anyInt(), anyString());
         verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
@@ -790,11 +760,19 @@ public final class ThreadNetworkControllerServiceTest {
     @Test
     public void createRandomizedDataset_hasNetworkTimeClock_datasetActiveTimestampIsAuthoritative()
             throws Exception {
-        when(mMockClockSource.currentNetworkTimeClock()).thenReturn(mMockNetworkTimeClock);
-        var mockReceiver = mock(IActiveOperationalDatasetReceiver.class);
+        MockitoSession session =
+                ExtendedMockito.mockitoSession().mockStatic(SystemClock.class).startMocking();
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                ExtendedMockito.mock(IActiveOperationalDatasetReceiver.class);
 
-        mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
-        mTestLooper.dispatchAll();
+        try {
+            ExtendedMockito.when(SystemClock.currentNetworkTimeClock())
+                    .thenReturn(Clock.systemUTC());
+            mService.createRandomizedDataset(DEFAULT_NETWORK_NAME, mockReceiver);
+            mTestLooper.dispatchAll();
+        } finally {
+            session.finishMocking();
+        }
 
         verify(mockReceiver, never()).onError(anyInt(), anyString());
         verify(mockReceiver, times(1)).onSuccess(mActiveDatasetCaptor.capture());
@@ -826,7 +804,8 @@ public final class ThreadNetworkControllerServiceTest {
     @Test
     public void createRandomizedDataset_otDaemonRemoteFailure_returnsPreconditionError()
             throws Exception {
-        var mockReceiver = mock(IActiveOperationalDatasetReceiver.class);
+        final IActiveOperationalDatasetReceiver mockReceiver =
+                mock(IActiveOperationalDatasetReceiver.class);
         mFakeOtDaemon.setChannelMasksReceiverOtError(OT_ERROR_INVALID_STATE);
         when(mockReceiver.asBinder()).thenReturn(mIBinder);
 
@@ -1012,17 +991,6 @@ public final class ThreadNetworkControllerServiceTest {
         assertThat(upstreamNetworkRequest.hasTransport(TRANSPORT_ETHERNET)).isTrue();
         assertThat(upstreamNetworkRequest.hasCapability(NET_CAPABILITY_NOT_VPN)).isTrue();
         assertThat(upstreamNetworkRequest.hasCapability(NET_CAPABILITY_INTERNET)).isTrue();
-    }
-
-    @Test
-    public void initialize_ThreadDisabledInResources_disabledButNotPersisted() throws Exception {
-        when(mResources.getBoolean(eq(R.bool.config_thread_default_enabled))).thenReturn(false);
-
-        mService.initialize();
-        mTestLooper.dispatchAll();
-
-        assertThat(mFakeOtDaemon.getEnabledState()).isEqualTo(STATE_DISABLED);
-        assertThat(mPersistentSettings.containsKey(KEY_THREAD_ENABLED)).isFalse();
     }
 
     @Test
