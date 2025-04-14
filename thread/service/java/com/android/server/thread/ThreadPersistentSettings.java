@@ -120,9 +120,9 @@ public class ThreadPersistentSettings {
         mAtomicFile = atomicFile;
         mResources = resources;
 
-        // The Thread default enabled state is deferred to upper layer
-        mDefaultValues.put(KEY_THREAD_ENABLED.key, null);
-
+        mDefaultValues.put(
+                KEY_THREAD_ENABLED.key,
+                mResources.get().getBoolean(R.bool.config_thread_default_enabled));
         mDefaultValues.put(
                 KEY_CONFIG_BORDER_ROUTER_ENABLED.key,
                 mResources.get().getBoolean(R.bool.config_thread_border_router_default_enabled));
@@ -161,9 +161,6 @@ public class ThreadPersistentSettings {
         Object value;
         synchronized (mLock) {
             if (defaultValue == null) {
-                if (!key.equals(KEY_COUNTRY_CODE.key)) {
-                    throw new IllegalStateException("Unexpected null defaultValue for " + key);
-                }
                 value = mSettings.getString(key, null);
             } else if (defaultValue instanceof Boolean) {
                 value = mSettings.getBoolean(key, (Boolean) defaultValue);
@@ -193,29 +190,6 @@ public class ThreadPersistentSettings {
     public <T> T get(Key<T> key) {
         T defaultValue = (T) mDefaultValues.get(key.key);
         return getObject(key.key, defaultValue);
-    }
-
-    /**
-     * Returns a {@code boolean} settings value or {@code defaultValue} if the {@code key} is
-     * missing in the persistent settings.
-     *
-     * <p>This API is useful for allowing caller to provide a custom default value which is not
-     * determined when the system initializes.
-     */
-    public boolean getBoolean(Key<Boolean> key, boolean defaultValue) {
-        synchronized (mLock) {
-            return mSettings.getBoolean(key.key, defaultValue);
-        }
-    }
-
-    /**
-     * Returns {@code true} if a value for the given {@code key} has been saved to this settings.
-     */
-    @VisibleForTesting
-    <T> boolean containsKey(Key<T> key) {
-        synchronized (mLock) {
-            return mSettings.containsKey(key.key);
-        }
     }
 
     /**
