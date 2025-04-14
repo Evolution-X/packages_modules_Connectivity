@@ -18,11 +18,13 @@ package android.tethering.cts
 
 import android.Manifest.permission.LOG_COMPAT_CHANGE
 import android.Manifest.permission.READ_COMPAT_CHANGE_CONFIG
+import android.Manifest.permission.TETHER_PRIVILEGED
 import android.app.compat.CompatChanges
 import android.content.pm.PackageManager
 import android.net.NetworkCapabilities.NET_CAPABILITY_LOCAL_NETWORK
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
+import android.net.TetheringManager
 import android.net.connectivity.ConnectivityCompatChanges
 import android.os.Build
 import android.provider.DeviceConfig
@@ -65,6 +67,7 @@ class TetheringWifiP2pTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().getTargetContext()
     private val pm = context.packageManager!!
+    private val tm = context.getSystemService(TetheringManager::class.java)
 
     private fun assumeMatchNonThreadLocalNetworksEnabled() {
         assumeTrue(runAsShell<Boolean>(READ_COMPAT_CHANGE_CONFIG, LOG_COMPAT_CHANGE) {
@@ -84,15 +87,18 @@ class TetheringWifiP2pTest {
         assumeMatchNonThreadLocalNetworksEnabled()
         assumeTrue(pm.hasSystemFeature(PackageManager.FEATURE_WIFI))
         assumeTrue(pm.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT))
+        // Wifi P2p Group Owner mode still need tethering support in order to get
+        // onLocalOnlyInterfacesChanged callbacks.
+        assumeTrue(runAsShell(TETHER_PRIVILEGED) { tm.isTetheringSupported() })
         deviceConfigRule.setConfig(
-            DeviceConfig.NAMESPACE_TETHERING,
-            TETHERING_LOCAL_NETWORK_AGENT,
-            "1"
+                DeviceConfig.NAMESPACE_TETHERING,
+                TETHERING_LOCAL_NETWORK_AGENT,
+                "1"
         )
         deviceConfigRule.setConfig(
-            DeviceConfig.NAMESPACE_TETHERING,
-            WIFIP2PGO_LOCAL_NETWORK_AGENT,
-            "1"
+                DeviceConfig.NAMESPACE_TETHERING,
+                WIFIP2PGO_LOCAL_NETWORK_AGENT,
+                "1"
         )
 
         val cb = TestableNetworkCallback()
