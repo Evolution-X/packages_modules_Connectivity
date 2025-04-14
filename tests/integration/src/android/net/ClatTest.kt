@@ -177,7 +177,7 @@ class ClatTest {
 
         val ether = EtherPkt(dst = ROUTER_MAC, src = localMac)
         val ipv6 = Ip6Pkt(src = clatV6Addr.hostAddress!!, dst = "64:ff9b::1.2.3.4", hlim = 64)
-        val udp = UdpPkt(srcPort = localPort, dstPort = 12345)
+        val udp = UdpPkt(sport = localPort, dport = 12345)
         val payload = DataPkt(buf.array())
         val pkt = ether / ipv6 / udp / payload
         expectPacket(pkt.build())
@@ -193,7 +193,7 @@ class ClatTest {
 
         val ether = EtherPkt(dst = localMac, src = ROUTER_MAC)
         val ipv6 = Ip6Pkt(src = "64:ff9b::1.2.3.4", dst = clatV6Addr.hostAddress!!)
-        val udp = UdpPkt(srcPort = 12345, dstPort = localPort)
+        val udp = UdpPkt(sport = 12345, dport = localPort)
         val data = "more test data"
         val payload = DataPkt(data)
         val pkt = ether / ipv6 / udp / payload

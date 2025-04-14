@@ -28,6 +28,7 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.util.EnumSet
+import kotlin.random.Random
 
 class PacketBuilder(outerPacket: Packet, innerPacket: Packet) {
     private data class PacketHolder(
@@ -451,17 +452,18 @@ class DataPkt(data: ByteArray) : Packet {
  * Use the {@link DataPkt} for carrying a payload.
  */
 class UdpPkt(
-        private val srcPort: Short,
-        private val dstPort: Short,
+        private val sport: Short,
+        private val dport: Short,
 ) : Packet {
-    constructor(srcPort: Int, dstPort: Int) : this(srcPort.toShort(), dstPort.toShort())
+    constructor(sport: Int = Random.nextInt(1, 65536), dport: Int = Random.nextInt(1, 65536)) :
+        this(sport.toShort(), dport.toShort())
 
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(pseudo != null)
 
         val udpHeader = ByteBuffer.allocate(8)
-            .putShort(srcPort)
-            .putShort(dstPort)
+            .putShort(sport)
+            .putShort(dport)
             .putShort(0) // length; to be filled in later.
             .putShort(0) // checksum; to be filled in later.
         udpHeader.flip()
