@@ -409,6 +409,26 @@ class RaPkt(
         return addPref64Option(IpPrefix(prefix), lft)
     }
 
+    /** Add Source Link-Layer Address Option */
+    fun addSllaOption(lla: MacAddress): RaPkt {
+        val llao = ByteBuffer.allocate(8)
+        llao.put(1) // Type = 1 (Source Link-layer Address)
+        llao.put(1) // Length in units of 8 octets
+        llao.put(lla.toByteArray())
+        llao.flip()
+        outputStream.write(llao.array())
+        return this
+    }
+
+    /**
+     * Add Source Link-Layer Address Option
+     *
+     * @param lla Link-Layer Address as a String; e.g. {@code "0:0:5e:0:53:0"}
+     */
+    fun addSllaOption(lla: String): RaPkt {
+        return addSllaOption(MacAddress.fromString(lla))
+    }
+
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(payload == null)
         require(pseudo != null)
