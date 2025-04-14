@@ -212,13 +212,13 @@ class NaPkt(
  *
  * Default argument values reflect the rfc4861 defaults where applicable.
  *
- * @param routerLft lifetime of the default router in seconds.
+ * @param lft lifetime of the default router in seconds.
  * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
  * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
  * @param flags The Router Advertisement flags.
  */
 class RaPkt(
-    private val routerLft: Short,
+    private val lft: Short,
     private val reachableTime: Int,
     private val retransTimer: Int,
     private val flags: EnumSet<RaFlags>,
@@ -226,17 +226,17 @@ class RaPkt(
     /**
      * Convenience constructor accepting flags parameter as String
      *
-     * @param routerLft lifetime of the default router in seconds.
+     * @param lft lifetime of the default router in seconds.
      * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
      * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
      * @param flags The Router Advertisement flags as a String; e.g. {@code "MO"}. Defaults to "".
      */
     constructor(
-        routerLft: Short = 1800,
+        lft: Short = 1800,
         reachableTime: Int = 0,
         retransTimer: Int = 0,
         flags: String = "",
-    ) : this(routerLft, reachableTime, retransTimer, enumSetOfFlags<RaFlags>(flags))
+    ) : this(lft, reachableTime, retransTimer, enumSetOfFlags<RaFlags>(flags))
 
     enum class RaFlags(override val value: Int) : Flags {
         /** Managed address configuration: indicates addresses are available via DHCPv6. */
@@ -253,7 +253,7 @@ class RaPkt(
         raHeader.putShort(0) // Checksum = 0 (filled in later)
         raHeader.put(255.toByte()) // Cur Hop Limit
         raHeader.put(flags.toByte())
-        raHeader.putShort(routerLft)
+        raHeader.putShort(lft)
         raHeader.putInt(reachableTime)
         raHeader.putInt(retransTimer)
         raHeader.flip()
@@ -275,14 +275,14 @@ class RaPkt(
      * Add a Prefix Information Option
      *
      * @param prefix The prefix of an IPv6 address.
-     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
-     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param valid The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferred The time, in seconds, that SLAAC-generated addresses remain preferred.
      * @param flags The Prefix Information Option flags.
      */
     fun addPioOption(
             prefix: IpPrefix,
-            validLft: Int,
-            preferredLft: Int,
+            valid: Int,
+            preferred: Int,
             flags: EnumSet<PioFlags>,
     ): RaPkt {
         if (!prefix.isIPv6()) throw IllegalArgumentException("Invalid prefix")
@@ -291,8 +291,8 @@ class RaPkt(
         pio.put(4) // Length = 4 (*8)
         pio.put(prefix.prefixLength.toByte()) // Prefix Length
         pio.put(flags.toByte()) // Flags
-        pio.putInt(validLft) // Valid Lifetime
-        pio.putInt(preferredLft) // Preferred Lifetime
+        pio.putInt(valid) // Valid Lifetime
+        pio.putInt(preferred) // Preferred Lifetime
         pio.putInt(0) // Reserved2
         pio.put(prefix.rawAddress)
         pio.flip()
@@ -304,22 +304,17 @@ class RaPkt(
      * Add a Prefix Information Option
      *
      * @param prefix The IPv6 prefix as a String; e.g. {@code "2001:db8::/64"}
-     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
-     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param valid The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferred The time, in seconds, that SLAAC-generated addresses remain preferred.
      * @param flags The PIO flags as a String; e.g. {@code "LA"}
      */
     fun addPioOption(
             prefix: String,
-            validLft: Int = 2592000,
-            preferredLft: Int = 604800,
+            valid: Int = 2592000,
+            preferred: Int = 604800,
             flags: String = "L",
     ): RaPkt {
-        return addPioOption(
-                IpPrefix(prefix),
-                validLft,
-                preferredLft,
-                enumSetOfFlags<PioFlags>(flags)
-        )
+        return addPioOption(IpPrefix(prefix), valid, preferred, enumSetOfFlags<PioFlags>(flags))
     }
 
     /** Add a Recursive DNS Server Option
@@ -621,7 +616,7 @@ class Ip4Pkt(
  * {@code
  * val ether = EtherPkt(src = "1:2:3:4:5:6", dst = "1:1:1:1:1:1")
  * val ipv6 = Ip6Pkt(src = "fe80::1", dst = "fe80::2")
- * val ra = RaPkt(routerLft = 50, reachableTime = 100, flags = "O")
+ * val ra = RaPkt(lft = 50, reachableTime = 100, flags = "O")
  *         .addPioOption(prefix = "2001:db8::1/64", flags = "LA")
  * val p = ether / ipv6 / ra
  * val bytes = p.bytes
