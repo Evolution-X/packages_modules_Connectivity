@@ -124,13 +124,17 @@ class ClatTest {
     @Before
     fun setUp() {
         val cb = requestNetwork(REQUEST)
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead, use
-        // eventuallyExpect(LinkProperties::class) instead.
-        cb.eventuallyExpect(LinkPropertiesChanged::class)
-        val linkPropertiesChanged = cb.eventuallyExpect(LinkPropertiesChanged::class)
+
+        // Wait for the clat interface to be created.
+        var linkPropertiesChanged: LinkPropertiesChanged
+        do {
+            // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead, use
+            // eventuallyExpect(LinkProperties::class) instead.
+            linkPropertiesChanged = cb.eventuallyExpect(LinkPropertiesChanged::class)
+        } while (linkPropertiesChanged.lp.stackedLinks.isEmpty())
+
         network = linkPropertiesChanged.network
         lp = linkPropertiesChanged.lp
-        assertThat(lp.getStackedLinks()).isNotEmpty()
 
         clatV6Addr = ProcfsParsingUtils.getAnycast6Addresses(iface.name).get(0)
     }
@@ -177,7 +181,7 @@ class ClatTest {
 
         val ether = EtherPkt(dst = ROUTER_MAC, src = localMac)
         val ipv6 = Ip6Pkt(src = clatV6Addr.hostAddress!!, dst = "64:ff9b::1.2.3.4", hlim = 64)
-        val udp = UdpPkt(srcPort = localPort, dstPort = 12345)
+        val udp = UdpPkt(sport = localPort, dport = 12345)
         val payload = DataPkt(buf.array())
         val pkt = ether / ipv6 / udp / payload
         expectPacket(pkt.build())
@@ -193,7 +197,7 @@ class ClatTest {
 
         val ether = EtherPkt(dst = localMac, src = ROUTER_MAC)
         val ipv6 = Ip6Pkt(src = "64:ff9b::1.2.3.4", dst = clatV6Addr.hostAddress!!)
-        val udp = UdpPkt(srcPort = 12345, dstPort = localPort)
+        val udp = UdpPkt(sport = 12345, dport = localPort)
         val data = "more test data"
         val payload = DataPkt(data)
         val pkt = ether / ipv6 / udp / payload

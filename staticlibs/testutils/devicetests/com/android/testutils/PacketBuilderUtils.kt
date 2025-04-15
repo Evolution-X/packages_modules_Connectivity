@@ -21,6 +21,7 @@ package com.android.testutils
 
 import android.net.IpPrefix
 import android.net.MacAddress
+import com.android.internal.util.HexDump
 import com.android.net.module.util.IpUtils
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
@@ -28,6 +29,7 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.util.EnumSet
+import kotlin.random.Random
 
 class PacketBuilder(outerPacket: Packet, innerPacket: Packet) {
     private data class PacketHolder(
@@ -67,10 +69,8 @@ class PacketBuilder(outerPacket: Packet, innerPacket: Packet) {
         return payload!!.bytes
     }
 
-    // For ByteArray.toHexString
-    @kotlin.ExperimentalStdlibApi
     override fun toString(): String {
-        return build().toHexString()
+        return HexDump.toHexString(build())
     }
 }
 
@@ -211,13 +211,13 @@ class NaPkt(
  *
  * Default argument values reflect the rfc4861 defaults where applicable.
  *
- * @param routerLft lifetime of the default router in seconds.
+ * @param lft lifetime of the default router in seconds.
  * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
  * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
  * @param flags The Router Advertisement flags.
  */
 class RaPkt(
-    private val routerLft: Short,
+    private val lft: Short,
     private val reachableTime: Int,
     private val retransTimer: Int,
     private val flags: EnumSet<RaFlags>,
@@ -225,17 +225,17 @@ class RaPkt(
     /**
      * Convenience constructor accepting flags parameter as String
      *
-     * @param routerLft lifetime of the default router in seconds.
+     * @param lft lifetime of the default router in seconds.
      * @param reachableTime The time, in milliseconds, that a node assumes a neighbor is reachable.
      * @param retransTimer The time, in milliseconds, between retransmitted NS messages.
      * @param flags The Router Advertisement flags as a String; e.g. {@code "MO"}. Defaults to "".
      */
     constructor(
-        routerLft: Short = 1800,
+        lft: Short = 1800,
         reachableTime: Int = 0,
         retransTimer: Int = 0,
         flags: String = "",
-    ) : this(routerLft, reachableTime, retransTimer, enumSetOfFlags<RaFlags>(flags))
+    ) : this(lft, reachableTime, retransTimer, enumSetOfFlags<RaFlags>(flags))
 
     enum class RaFlags(override val value: Int) : Flags {
         /** Managed address configuration: indicates addresses are available via DHCPv6. */
@@ -252,7 +252,7 @@ class RaPkt(
         raHeader.putShort(0) // Checksum = 0 (filled in later)
         raHeader.put(255.toByte()) // Cur Hop Limit
         raHeader.put(flags.toByte())
-        raHeader.putShort(routerLft)
+        raHeader.putShort(lft)
         raHeader.putInt(reachableTime)
         raHeader.putInt(retransTimer)
         raHeader.flip()
@@ -274,14 +274,14 @@ class RaPkt(
      * Add a Prefix Information Option
      *
      * @param prefix The prefix of an IPv6 address.
-     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
-     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param valid The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferred The time, in seconds, that SLAAC-generated addresses remain preferred.
      * @param flags The Prefix Information Option flags.
      */
     fun addPioOption(
             prefix: IpPrefix,
-            validLft: Int,
-            preferredLft: Int,
+            valid: Int,
+            preferred: Int,
             flags: EnumSet<PioFlags>,
     ): RaPkt {
         if (!prefix.isIPv6()) throw IllegalArgumentException("Invalid prefix")
@@ -290,8 +290,8 @@ class RaPkt(
         pio.put(4) // Length = 4 (*8)
         pio.put(prefix.prefixLength.toByte()) // Prefix Length
         pio.put(flags.toByte()) // Flags
-        pio.putInt(validLft) // Valid Lifetime
-        pio.putInt(preferredLft) // Preferred Lifetime
+        pio.putInt(valid) // Valid Lifetime
+        pio.putInt(preferred) // Preferred Lifetime
         pio.putInt(0) // Reserved2
         pio.put(prefix.rawAddress)
         pio.flip()
@@ -303,22 +303,17 @@ class RaPkt(
      * Add a Prefix Information Option
      *
      * @param prefix The IPv6 prefix as a String; e.g. {@code "2001:db8::/64"}
-     * @param validLft The time, in seconds, that the prefix is valid for on-link determination.
-     * @param preferredLft The time, in seconds, that SLAAC-generated addresses remain preferred.
+     * @param valid The time, in seconds, that the prefix is valid for on-link determination.
+     * @param preferred The time, in seconds, that SLAAC-generated addresses remain preferred.
      * @param flags The PIO flags as a String; e.g. {@code "LA"}
      */
     fun addPioOption(
             prefix: String,
-            validLft: Int = 2592000,
-            preferredLft: Int = 604800,
+            valid: Int = 2592000,
+            preferred: Int = 604800,
             flags: String = "L",
     ): RaPkt {
-        return addPioOption(
-                IpPrefix(prefix),
-                validLft,
-                preferredLft,
-                enumSetOfFlags<PioFlags>(flags)
-        )
+        return addPioOption(IpPrefix(prefix), valid, preferred, enumSetOfFlags<PioFlags>(flags))
     }
 
     /** Add a Recursive DNS Server Option
@@ -414,6 +409,26 @@ class RaPkt(
         return addPref64Option(IpPrefix(prefix), lft)
     }
 
+    /** Add Source Link-Layer Address Option */
+    fun addSllaOption(lla: MacAddress): RaPkt {
+        val llao = ByteBuffer.allocate(8)
+        llao.put(1) // Type = 1 (Source Link-layer Address)
+        llao.put(1) // Length in units of 8 octets
+        llao.put(lla.toByteArray())
+        llao.flip()
+        outputStream.write(llao.array())
+        return this
+    }
+
+    /**
+     * Add Source Link-Layer Address Option
+     *
+     * @param lla Link-Layer Address as a String; e.g. {@code "0:0:5e:0:53:0"}
+     */
+    fun addSllaOption(lla: String): RaPkt {
+        return addSllaOption(MacAddress.fromString(lla))
+    }
+
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(payload == null)
         require(pseudo != null)
@@ -451,17 +466,18 @@ class DataPkt(data: ByteArray) : Packet {
  * Use the {@link DataPkt} for carrying a payload.
  */
 class UdpPkt(
-        private val srcPort: Short,
-        private val dstPort: Short,
+        private val sport: Short,
+        private val dport: Short,
 ) : Packet {
-    constructor(srcPort: Int, dstPort: Int) : this(srcPort.toShort(), dstPort.toShort())
+    constructor(sport: Int = Random.nextInt(1, 65536), dport: Int = Random.nextInt(1, 65536)) :
+        this(sport.toShort(), dport.toShort())
 
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         require(pseudo != null)
 
         val udpHeader = ByteBuffer.allocate(8)
-            .putShort(srcPort)
-            .putShort(dstPort)
+            .putShort(sport)
+            .putShort(dport)
             .putShort(0) // length; to be filled in later.
             .putShort(0) // checksum; to be filled in later.
         udpHeader.flip()
@@ -619,7 +635,7 @@ class Ip4Pkt(
  * {@code
  * val ether = EtherPkt(src = "1:2:3:4:5:6", dst = "1:1:1:1:1:1")
  * val ipv6 = Ip6Pkt(src = "fe80::1", dst = "fe80::2")
- * val ra = RaPkt(routerLft = 50, reachableTime = 100, flags = "O")
+ * val ra = RaPkt(lft = 50, reachableTime = 100, flags = "O")
  *         .addPioOption(prefix = "2001:db8::1/64", flags = "LA")
  * val p = ether / ipv6 / ra
  * val bytes = p.bytes
