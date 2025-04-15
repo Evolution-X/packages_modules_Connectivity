@@ -1816,12 +1816,6 @@ static int doLoad(char** argv, char * const envp[]) {
         }
     }
 
-    // On handheld, 6.6 is highest version supported by Android V (sdk=35), so this is for sdk=36+
-    if (!isArm() && isUserspace32bit() && isAtLeastKernelVersion(6, 7, 0)) {
-        ALOGE("64-bit userspace required on 6.7+ kernels.");
-        return 1;
-    }
-
     if (isAtLeast25Q2) {
         FILE * f = fopen("/system/etc/init/netbpfload.rc", "re");
         if (!f) {
