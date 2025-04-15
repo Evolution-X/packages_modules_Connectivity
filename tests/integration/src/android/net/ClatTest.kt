@@ -124,13 +124,17 @@ class ClatTest {
     @Before
     fun setUp() {
         val cb = requestNetwork(REQUEST)
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead, use
-        // eventuallyExpect(LinkProperties::class) instead.
-        cb.eventuallyExpect(LinkPropertiesChanged::class)
-        val linkPropertiesChanged = cb.eventuallyExpect(LinkPropertiesChanged::class)
+
+        // Wait for the clat interface to be created.
+        var linkPropertiesChanged: LinkPropertiesChanged
+        do {
+            // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead, use
+            // eventuallyExpect(LinkProperties::class) instead.
+            linkPropertiesChanged = cb.eventuallyExpect(LinkPropertiesChanged::class)
+        } while (linkPropertiesChanged.lp.stackedLinks.isEmpty())
+
         network = linkPropertiesChanged.network
         lp = linkPropertiesChanged.lp
-        assertThat(lp.getStackedLinks()).isNotEmpty()
 
         clatV6Addr = ProcfsParsingUtils.getAnycast6Addresses(iface.name).get(0)
     }
