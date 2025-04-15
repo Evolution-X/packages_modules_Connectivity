@@ -186,6 +186,7 @@ java_library {
     static_libs: [
         // Do not add libs here if they are already included
         // in framework-connectivity
+        "android.net.platform.flags-aconfig-java-export",
         "androidx.annotation_annotation",
         "connectivity-net-module-utils-bpf",
         "connectivity_native_aidl_interface-lateststable-java",
