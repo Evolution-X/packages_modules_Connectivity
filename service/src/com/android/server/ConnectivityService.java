@@ -549,6 +549,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     // Flag to delay callbacks for frozen apps, suppressing duplicate and stale callbacks.
     private final boolean mQueueCallbacksForFrozenApps;
+    // Flag for early link properties update
+    private final boolean mSupportEarlyLinkPropertiesUpdateForVPN;
 
     /**
      * Uids ConnectivityService tracks blocked status of to send blocked status callbacks.
@@ -1973,6 +1975,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mQueueNetworkAgentEventsInSystemServer = mDeps.isAtLeastB()
                 && mDeps.isFeatureNotChickenedOut(context,
                         ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER);
+        mSupportEarlyLinkPropertiesUpdateForVPN = mDeps.isFeatureNotChickenedOut(context,
+                ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
                 && mDeps.isFeatureNotChickenedOut(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
@@ -5530,6 +5534,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 // but other local agents (tethering, P2P) require this to function.
                 || (caps.hasCapability(NET_CAPABILITY_LOCAL_NETWORK)
                 && !caps.hasTransport(TRANSPORT_THREAD));
+    }
+
+    private boolean shouldUpdateLinkPropertiesEarlyForVPNNetwork(@NonNull NetworkAgentInfo nai) {
+        return mSupportEarlyLinkPropertiesUpdateForVPN && nai.isVPN();
     }
 
     private boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
@@ -12218,7 +12226,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // interfaces and routing rules have been added, DNS servers programmed, etc.
             // For VPNs, this must be done before the capabilities are updated, because as soon as
             // that happens, UIDs are routed to the network.
-            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
+            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())
+                    || shouldUpdateLinkPropertiesEarlyForVPNNetwork(networkAgent)) {
                 applyInitialLinkProperties(networkAgent);
             }
 
@@ -12243,7 +12252,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
             networkAgent.getAndSetNetworkCapabilities(networkAgent.networkCapabilities);
 
             handlePerNetworkPrivateDnsConfig(networkAgent, mDnsManager.getPrivateDnsConfig());
-            if (!shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
+            if (!(shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())
+                    || shouldUpdateLinkPropertiesEarlyForVPNNetwork(networkAgent))) {
                 applyInitialLinkProperties(networkAgent);
             } else {
                 // The network was created when the agent registered, and the LinkProperties are

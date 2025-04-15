@@ -70,6 +70,15 @@ public final class ConnectivityFlags {
     public static final String CONSTRAINED_DATA_SATELLITE_OPTIN =
             "constrained_data_satellite_optin";
 
+    /**
+     * A feature flag to control whether the early link properties update for vpn should be enabled.
+     *
+     * Note: This feature is automatically enabled if the flag
+     *       QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER is enabled.
+     */
+    public static final String EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN =
+            "early_link_properties_update_for_vpn";
+
     private boolean mNoRematchAllRequestsOnRegister;
 
     /**
