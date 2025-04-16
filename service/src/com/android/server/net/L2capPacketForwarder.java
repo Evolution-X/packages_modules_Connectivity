@@ -131,10 +131,10 @@ public class L2capPacketForwarder {
     }
 
     @VisibleForTesting
-    public static class FdWrapper implements IReadWriteFd {
+    public static class TunWrapper implements IReadWriteFd {
         private final ParcelFileDescriptor mFd;
 
-        public FdWrapper(ParcelFileDescriptor fd) {
+        public TunWrapper(ParcelFileDescriptor fd) {
             mFd = fd;
         }
 
@@ -243,7 +243,7 @@ public class L2capPacketForwarder {
 
     public L2capPacketForwarder(Handler handler, ParcelFileDescriptor tunFd, BluetoothSocket socket,
             boolean compressHdrs, ICallback cb) {
-        this(handler, new FdWrapper(tunFd), new BluetoothSocketWrapper(socket), compressHdrs, cb);
+        this(handler, new TunWrapper(tunFd), new BluetoothSocketWrapper(socket), compressHdrs, cb);
     }
 
     @VisibleForTesting

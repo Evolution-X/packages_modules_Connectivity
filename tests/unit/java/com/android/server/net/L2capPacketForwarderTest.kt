@@ -32,7 +32,7 @@ import android.system.OsConstants.SO_RCVTIMEO
 import android.system.OsConstants.SO_SNDTIMEO
 import android.system.StructTimeval
 import com.android.server.net.L2capPacketForwarder.BluetoothSocketWrapper
-import com.android.server.net.L2capPacketForwarder.FdWrapper
+import com.android.server.net.L2capPacketForwarder.TunWrapper
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
@@ -181,10 +181,10 @@ class L2capPacketForwarderTest {
             }
         }).`when`(bluetoothSocket).close()
 
-        // FdWrapper does not shutdown fd as tun is not a connected socket, i.e. closing interrupts
+        // TunWrapper does not shutdown fd as tun is not a connected socket, i.e. closing interrupts
         // blocking operations.
         val parcelFd = ParcelFileDescriptor(tunFds[0])
-        val fdWrapper = object : FdWrapper(parcelFd) {
+        val tunWrapper = object : TunWrapper(parcelFd) {
             override fun close() {
                 Os.shutdown(parcelFd.fileDescriptor, SHUT_RDWR)
                 parcelFd.close()
@@ -193,7 +193,7 @@ class L2capPacketForwarderTest {
 
         forwarder = L2capPacketForwarder(
                 handler,
-                fdWrapper,
+                tunWrapper,
                 BluetoothSocketWrapper(bluetoothSocket),
                 false /* compressHeaders */,
                 callback
