@@ -180,15 +180,9 @@ class CarrierConfigRule : TestRule {
         val tm = context.getSystemService(TelephonyManager::class.java)!!
 
         val cpb = PrivilegeWaiterCallback()
-        // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
-        // T. This means the lambda will compile as a private method of this class taking a
-        // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
-        // including private methods, this would fail with a link error when running on S-.
-        // To solve this, make the lambda serializable, which causes the compiler to emit a
-        // synthetic class instead of a synthetic method.
-        tryTest @JvmSerializableLambda {
+        tryTest {
             val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                 tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
             }
             val currentPrivilege = cpb.expectCarrierPrivilegesChanged()
@@ -212,8 +206,8 @@ class CarrierConfigRule : TestRule {
                 cleanUpNow()
             }
             cpb.eventuallyExpectCarrierPrivilegesChanged(hold)
-        } cleanup @JvmSerializableLambda {
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+        } cleanup {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                 tm.unregisterCarrierPrivilegesCallback(cpb)
             }
         }
@@ -259,15 +253,9 @@ class CarrierConfigRule : TestRule {
 
         val cv = ConditionVariable()
         val cpb = CarrierServiceChangedWaiterCallback(cv)
-        // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
-        // T. This means the lambda will compile as a private method of this class taking a
-        // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
-        // including private methods, this would fail with a link error when running on S-.
-        // To solve this, make the lambda serializable, which causes the compiler to emit a
-        // synthetic class instead of a synthetic method.
-        tryTest @JvmSerializableLambda {
+        tryTest {
             val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                 tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
             }
             // Wait for the callback to be registered
@@ -294,8 +282,8 @@ class CarrierConfigRule : TestRule {
             }
             assertTrue(cv.block(CARRIER_CONFIG_CHANGE_TIMEOUT_MS),
                 "Can't modify carrier service package")
-        } cleanup @JvmSerializableLambda {
-            runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+        } cleanup {
+            runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                 tm.unregisterCarrierPrivilegesCallback(cpb)
             }
         }
@@ -360,20 +348,14 @@ class CarrierConfigRule : TestRule {
         val tm = context.getSystemService(TelephonyManager::class.java)!!
         originalCarrierPrivileges.forEach { (subId, privileged) ->
             val cpb = PrivilegeWaiterCallback()
-            // The lambda below is capturing |cpb|, whose type inherits from a class that appeared in
-            // T. This means the lambda will compile as a private method of this class taking a
-            // PrivilegeWaiterCallback argument. As JUnit uses reflection to enumerate all methods
-            // including private methods, this would fail with a link error when running on S-.
-            // To solve this, make the lambda serializable, which causes the compiler to emit a
-            // synthetic class instead of a synthetic method.
-            tryTest @JvmSerializableLambda {
+            tryTest {
                 val slotIndex = SubscriptionManager.getSlotIndex(subId)!!
-                runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+                runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                     tm.registerCarrierPrivilegesCallback(slotIndex, { it.run() }, cpb)
                 }
                 cpb.eventuallyExpectCarrierPrivilegesChanged(privileged)
-            } cleanup @JvmSerializableLambda {
-                runAsShell(READ_PRIVILEGED_PHONE_STATE) @JvmSerializableLambda {
+            } cleanup {
+                runAsShell(READ_PRIVILEGED_PHONE_STATE) {
                     tm.unregisterCarrierPrivilegesCallback(cpb)
                 }
             }
