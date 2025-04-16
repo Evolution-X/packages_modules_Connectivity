@@ -7731,6 +7731,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
         mPermissionMonitor.onUserRemoved(user);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onUserRemoved(user);
+        }
     }
 
     @Override

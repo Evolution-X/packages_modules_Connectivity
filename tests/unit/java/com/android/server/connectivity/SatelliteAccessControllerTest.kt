@@ -18,10 +18,7 @@ package com.android.server.connectivity
 import android.Manifest
 import android.app.role.OnRoleHoldersChangedListener
 import android.app.role.RoleManager
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,6 +29,7 @@ import android.os.UserManager
 import android.util.ArraySet
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
 import java.util.function.Consumer
 import org.junit.Before
@@ -41,7 +39,6 @@ import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.eq
-import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -87,7 +84,6 @@ class SatelliteAccessControllerTest {
     private var mSatelliteAccessController =
         SatelliteAccessController(context, mDeps, mCallback, mHandler)
     private lateinit var mRoleHolderChangedListener: OnRoleHoldersChangedListener
-    private lateinit var mUserRemovedReceiver: BroadcastReceiver
 
     private fun <T> mockService(name: String, clazz: Class<T>, service: T) {
         doReturn(name).`when`(context).getSystemServiceName(clazz)
@@ -290,11 +286,16 @@ class SatelliteAccessControllerTest {
         )
         mRoleHolderChangedListener.onRoleHoldersChanged(RoleManager.ROLE_SMS, SECONDARY_USER_HANDLE)
         verify(mCallback).accept(setOf(PRIMARY_USER_SMS_APP_UID2, SECONDARY_USER_SMS_APP_UID1))
-
-        val userRemovalIntent = Intent(Intent.ACTION_USER_REMOVED)
-        userRemovalIntent.putExtra(Intent.EXTRA_USER, SECONDARY_USER_HANDLE)
-        mUserRemovedReceiver.onReceive(context, userRemovalIntent)
+        processOnHandlerThread {
+            mSatelliteAccessController.onUserRemoved(SECONDARY_USER_HANDLE)
+        }
         verify(mCallback, times(2)).accept(setOf(PRIMARY_USER_SMS_APP_UID2))
+    }
+
+    private fun <T : Any> processOnHandlerThread(function: () -> T): T {
+        val future = CompletableFuture<T>()
+        mHandler.post { future.complete(function()) }
+        return future.get()
     }
 
     @Test
@@ -320,15 +321,5 @@ class SatelliteAccessControllerTest {
             any(UserHandle::class.java)
         )
         mRoleHolderChangedListener = listenerCaptor.value
-
-        // Get registered receiver using captor
-        val userRemovedReceiverCaptor = ArgumentCaptor.forClass(BroadcastReceiver::class.java)
-        verify(context).registerReceiver(
-            userRemovedReceiverCaptor.capture(),
-            any(IntentFilter::class.java),
-            isNull(),
-            any(Handler::class.java)
-        )
-         mUserRemovedReceiver = userRemovedReceiverCaptor.value
     }
 }

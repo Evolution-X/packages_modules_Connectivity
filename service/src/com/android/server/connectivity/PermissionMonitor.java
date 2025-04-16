@@ -87,8 +87,6 @@ import java.util.Set;
 /**
  * A utility class to inform Netd of UID permissions.
  * Does a mass update at boot and then monitors for app install/remove.
- *
- * @hide
  */
 public class PermissionMonitor {
     private static final String TAG = "PermissionMonitor";
@@ -553,9 +551,7 @@ public class PermissionMonitor {
     /**
      * Called when a user is added. See {link #ACTION_USER_ADDED}.
      *
-     * @param user The integer userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
-     *
-     * @hide
+     * @param user The userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
      */
     public synchronized void onUserAdded(@NonNull UserHandle user) {
         ensureRunningOnHandlerThread();
@@ -585,9 +581,7 @@ public class PermissionMonitor {
     /**
      * Called when an user is removed. See {link #ACTION_USER_REMOVED}.
      *
-     * @param user The integer userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
-     *
-     * @hide
+     * @param user The userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
      */
     public synchronized void onUserRemoved(@NonNull UserHandle user) {
         ensureRunningOnHandlerThread();
@@ -772,8 +766,6 @@ public class PermissionMonitor {
      *
      * @param packageName The name of the new package.
      * @param uid The uid of the new package.
-     *
-     * @hide
      */
     public synchronized void onPackageAdded(@NonNull final String packageName, final int uid) {
         ensureRunningOnHandlerThread();
@@ -837,8 +829,6 @@ public class PermissionMonitor {
      *
      * @param packageName The name of the removed package or null.
      * @param uid containing the integer uid previously assigned to the package.
-     *
-     * @hide
      */
     public synchronized void onPackageRemoved(@NonNull final String packageName, final int uid) {
         ensureRunningOnHandlerThread();
@@ -1117,8 +1107,6 @@ public class PermissionMonitor {
      *
      * @param appId the appId of the package installed
      * @param permissions the permissions the app requested and netd cares about.
-     *
-     * @hide
      */
     @VisibleForTesting
     void sendPackagePermissionsForAppId(int appId, int permissions) {
@@ -1136,8 +1124,6 @@ public class PermissionMonitor {
      *
      * @param netdPermissionsAppIds integer pairs of appIds and the permission granted to it. If the
      * permission is 0, revoke all permissions of that appId.
-     *
-     * @hide
      */
     @VisibleForTesting
     void sendAppIdsTrafficPermission(SparseIntArray netdPermissionsAppIds) {
