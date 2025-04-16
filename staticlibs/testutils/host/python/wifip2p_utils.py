@@ -57,28 +57,11 @@ def setup_wifi_p2p_server_and_client(
   # Server creates a Wi-Fi P2P group
   server.createGroup(group_name, group_passphrase)
 
-  # Start Wi-Fi P2p peers discovery on both devices
-  server.startPeersDiscovery()
-  client.startPeersDiscovery()
-
-  # Ensure the target device has been discovered
-  server_address = client.ensureDeviceDiscovered(server_name)
-  client_address = server.ensureDeviceDiscovered(client_name)
-
-  # Server invites the device to the group
-  server.inviteDeviceToGroup(group_name, group_passphrase, client_address)
-
-  # Wait for a p2p connection changed intent to ensure the invitation has been
-  # received.
-  client.waitForP2pConnectionChanged(True, group_name)
-  # Accept the group invitation
-  client.acceptGroupInvitation(server_address)
-
-  # Server waits for connection request from client and accept joining
-  server.waitForPeerConnectionRequestAndAcceptJoining(client_address)
+  # Client connects to the group
+  client.connectToGroup(group_name, group_passphrase)
 
   # Wait for a p2p connection changed intent to ensure joining the group
-  client.waitForP2pConnectionChanged(False, group_name)
+  client.waitForP2pConnectionChanged(group_name)
 
   # Ensure Wi-Fi P2P connected on both devices
   client.ensureDeviceConnected(server_name)
