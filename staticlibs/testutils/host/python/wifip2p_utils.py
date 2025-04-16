@@ -51,7 +51,10 @@ def setup_wifi_p2p_server_and_client(
   client_name = client.getDeviceName()
 
   # Generate Wi-Fi P2P group passphrase with random characters.
-  group_name = "DIRECT-" + tether_utils.generate_uuid32_base64()
+  # network name must starts with prefix "DIRECT-", followed by any two
+  # random chars from the set ('A' - 'Z', 'a' - 'z', '0' - '9')
+  # This follows the documentation on WifiP2pConfig.Builder#setNetworkName.
+  group_name = "DIRECT-XY" + tether_utils.generate_uuid32_base64()
   group_passphrase = tether_utils.generate_uuid32_base64()
 
   # Server creates a Wi-Fi P2P group
