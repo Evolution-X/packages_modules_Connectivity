@@ -605,13 +605,6 @@ open class CSTest {
         NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
     )
 
-    fun nc(transport: Int, vararg caps: Int) = defaultNc().apply {
-        addTransportType(transport)
-        caps.forEach {
-            addCapability(it)
-        }
-    }
-
     // Create a network agent with the given parameters.
     fun createAgent(interfaceName: String, transport: Int, vararg caps: Int): CSAgentWrapper {
         return Agent(
