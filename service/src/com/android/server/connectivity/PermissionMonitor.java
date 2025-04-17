@@ -60,7 +60,6 @@ import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemConfigManager;
 import android.os.UserHandle;
-import android.os.UserManager;
 import android.permission.PermissionManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
@@ -94,7 +93,6 @@ public class PermissionMonitor {
     private static final int VERSION_Q = Build.VERSION_CODES.Q;
 
     private final PackageManager mPackageManager;
-    private final UserManager mUserManager;
     private final SystemConfigManager mSystemConfigManager;
     private final PermissionManager mPermissionManager;
     private final PermissionChangeListener mPermissionChangeListener;
@@ -237,7 +235,6 @@ public class PermissionMonitor {
             @NonNull final Dependencies deps,
             @NonNull final HandlerThread thread) {
         mPackageManager = context.getPackageManager();
-        mUserManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
         mSystemConfigManager = context.getSystemService(SystemConfigManager.class);
         mPermissionManager = context.getSystemService(PermissionManager.class);
         mPermissionChangeListener = new PermissionChangeListener();
@@ -297,10 +294,6 @@ public class PermissionMonitor {
         // This is relied on strict order of network permissions (SYSTEM > NETWORK > NONE), and it
         // is enforced in tests.
         return targetPermission > currentPermission;
-    }
-
-    private List<PackageInfo> getInstalledPackagesAsUser(final UserHandle user) {
-        return mPackageManager.getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
     }
 
     private synchronized void updateAllApps(final List<PackageInfo> apps) {
@@ -407,10 +400,14 @@ public class PermissionMonitor {
         return appIdsPerm;
     }
 
-    // Intended to be called only once at startup, after the system is ready. Installs a broadcast
-    // receiver to monitor ongoing UID changes, so this shouldn't/needn't be called again.
-    public synchronized void startMonitoring() {
-        log("Monitoring");
+    /**
+     * Initializer of this class.
+     *
+     * Intended to be called only once at startup, in the systemReady phase.
+     * This shouldn't/needn't be called again.
+     */
+    public synchronized void initialize() {
+        log("Initialize");
 
         final Handler handler = new Handler(mThread.getLooper());
         final Context userAllContext = mContext.createContextAsUser(UserHandle.ALL, 0 /* flags */);
@@ -435,12 +432,7 @@ public class PermissionMonitor {
         // are not specific to any particular user.
         mUsersTrafficPermissions.put(UserHandle.ALL, getSystemTrafficPerm());
 
-        final List<UserHandle> usrs = mUserManager.getUserHandles(true /* excludeDying */);
-        // Update netd permissions for all users.
-        for (UserHandle user : usrs) {
-            onUserAdded(user);
-        }
-        log("Users: " + mUsers.size() + ", UidToNetworkPerm: " + mUidToNetworkPerm.size());
+        log("UidToNetworkPerm: " + mUidToNetworkPerm.size());
     }
 
     @VisibleForTesting
@@ -552,12 +544,12 @@ public class PermissionMonitor {
      * Called when a user is added. See {link #ACTION_USER_ADDED}.
      *
      * @param user The userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
+     * @param apps The list of packages which is installed on the user.
      */
-    public synchronized void onUserAdded(@NonNull UserHandle user) {
+    public synchronized void onUserAddedWithInstalledPackageList(@NonNull UserHandle user,
+            @NonNull List<PackageInfo> apps) {
         ensureRunningOnHandlerThread();
         mUsers.add(user);
-
-        final List<PackageInfo> apps = getInstalledPackagesAsUser(user);
 
         // Save all apps in mAllApps
         updateAllApps(apps);

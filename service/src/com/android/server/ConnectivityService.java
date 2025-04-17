@@ -23,6 +23,7 @@ import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.FEATURE_WATCH;
 import static android.content.pm.PackageManager.FEATURE_WIFI;
 import static android.content.pm.PackageManager.FEATURE_WIFI_DIRECT;
+import static android.content.pm.PackageManager.GET_PERMISSIONS;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.net.BpfNetMapsConstants.METERED_ALLOW_CHAINS;
 import static android.net.BpfNetMapsConstants.METERED_DENY_CHAINS;
@@ -186,6 +187,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.XmlResourceParser;
 import android.database.ContentObserver;
@@ -4166,7 +4168,20 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // to ensure the tracking will be initialized correctly.
         final ConditionVariable startMonitoringDone = new ConditionVariable();
         mHandler.post(() -> {
-            mPermissionMonitor.startMonitoring();
+            mPermissionMonitor.initialize();
+            // Calling mBroadcastReceiveHelper.callCallbackForInitialUsers() after
+            // PermissionMonitor.startMonitoring() ensures that the internal lists
+            // (mUidsAllowedOnRestrictedNetworks and mUsersTrafficPermissions) in
+            // PermissionMonitor are prepared before processing initial users.
+            // While technically the onUserAdded callback (triggered by
+            // callCallbackForInitialUsers) handles sending network and traffic
+            // permissions to netd and bpf, which depend on these lists, moving
+            // this call before startMonitoring would necessitate performing these
+            // actions again within startMonitoring, leading to redundant work.
+            // Therefore, keeping callCallbackForInitialUsers() in this order is the
+            // safest approach to avoid duplicated operations and ensure the
+            // permission lists are ready when the initial user callbacks are invoked.
+            mBroadcastReceiveHelper.callOnUserAddedForExistingUsers();
             startMonitoringDone.open();
         });
         mProxyTracker.loadGlobalProxy();
@@ -7717,7 +7732,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
         updateProfileAllowedNetworks();
-        mPermissionMonitor.onUserAdded(user);
+        final List<PackageInfo> apps = mContext.getPackageManager()
+                .getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
+        mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
     }
 
     @Override
