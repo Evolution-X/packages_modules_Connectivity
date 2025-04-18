@@ -14370,14 +14370,20 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         );
     }
 
-    ArraySet<NetworkRequestInfo> createMultiLayerNrisFromSatelliteNetworkFallbackUids(
-            @NonNull final Set<Integer> uids) {
+    ArraySet<NetworkRequestInfo> createNrisForFallbackDefault(
+            @NonNull final Set<Integer> uids, NetworkCapabilities cap, int preferenceOrder) {
         final List<NetworkRequest> requests = new ArrayList<>();
 
         // request: track default(unrestricted internet network)
         requests.add(createDefaultInternetRequestForTransport(
                 TYPE_NONE, NetworkRequest.Type.TRACK_DEFAULT));
 
+        requests.add(createNetworkRequest(NetworkRequest.Type.REQUEST, cap));
+        return createNrisForPreferenceOrder(uids, requests, preferenceOrder);
+    }
+
+    ArraySet<NetworkRequestInfo> createMultiLayerNrisFromSatelliteNetworkFallbackUids(
+            @NonNull final Set<Integer> uids) {
         // request: Satellite internet, satellite network could be restricted or constrained
         final NetworkCapabilities cap = new NetworkCapabilities.Builder()
                 .addCapability(NET_CAPABILITY_INTERNET)
@@ -14386,9 +14392,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
                 .addTransportType(NetworkCapabilities.TRANSPORT_SATELLITE)
                 .build();
-        requests.add(createNetworkRequest(NetworkRequest.Type.REQUEST, cap));
-
-        return createNrisForPreferenceOrder(uids, requests, PREFERENCE_ORDER_SATELLITE_FALLBACK);
+        return createNrisForFallbackDefault(uids, cap,
+                PREFERENCE_ORDER_SATELLITE_FALLBACK);
     }
 
     private void handleMobileDataPreferredUidsChanged() {
@@ -14598,14 +14603,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
+    private void removeDefaultNetworkRequests(Predicate<NetworkRequestInfo> filter) {
         // Skip the requests which are set by other network preference. Because the uid range rules
         // should stay in netd.
         final Set<NetworkRequestInfo> requests = new ArraySet<>(mDefaultNetworkRequests);
-        requests.removeIf(request -> request.mPreferenceOrder != preferenceOrder);
+        requests.removeIf(filter.negate());
         handleRemoveNetworkRequests(requests);
     }
 
+    private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
+        removeDefaultNetworkRequests((nri) -> nri.mPreferenceOrder == preferenceOrder);
+    }
     private void addPerAppDefaultNetworkRequests(@NonNull final Set<NetworkRequestInfo> nris) {
         ensureRunningOnConnectivityServiceThread();
         mDefaultNetworkRequests.addAll(nris);
