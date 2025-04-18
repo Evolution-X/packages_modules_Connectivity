@@ -84,6 +84,13 @@ internal fun defaultNc() = NetworkCapabilities.Builder()
         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED)
         .build()
 
+internal fun nc(transport: Int, vararg caps: Int) = defaultNc().apply {
+    addTransportType(transport)
+    caps.forEach {
+        addCapability(it)
+    }
+}
+
 internal fun defaultScore() = FromS(NetworkScore.Builder().build())
 
 internal fun keepConnectedScore() = FromS(NetworkScore.Builder()

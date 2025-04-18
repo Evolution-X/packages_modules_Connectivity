@@ -598,26 +598,15 @@ open class CSTest {
                 .build()
         return Agent(nc = nc, lp = lp)
     }
+    fun Agent(interfaceName: String, transport: Int, vararg caps: Int) = Agent(
+        nc = nc(transport, *caps),
+        lp = defaultLp().apply { this.interfaceName = interfaceName },
+        score = keepScore()
+    )
 
     // This allows keeping all the networks connected without having to file individual requests
     // for them.
     fun keepScore() = FromS(
         NetworkScore.Builder().setKeepConnectedReason(KEEP_CONNECTED_FOR_TEST).build()
     )
-
-    fun nc(transport: Int, vararg caps: Int) = defaultNc().apply {
-        addTransportType(transport)
-        caps.forEach {
-            addCapability(it)
-        }
-    }
-
-    // Create a network agent with the given parameters.
-    fun createAgent(interfaceName: String, transport: Int, vararg caps: Int): CSAgentWrapper {
-        return Agent(
-                score = keepScore(),
-                lp = defaultLp().apply { this.interfaceName = interfaceName },
-                nc = nc(transport, *caps)
-        )
-    }
 }

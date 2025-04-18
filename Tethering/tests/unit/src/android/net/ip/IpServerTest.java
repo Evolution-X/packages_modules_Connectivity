@@ -40,8 +40,8 @@ import static android.net.ip.IpServer.getTetherableIpv6Prefixes;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastT;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastV;
 import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTH;
-import static com.android.networkstack.tethering.TetheringConfiguration.TETHERING_LOCAL_NETWORK_AGENT;
-import static com.android.networkstack.tethering.TetheringConfiguration.WIFIP2PGO_LOCAL_NETWORK_AGENT;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.TETHERING_LOCAL_NETWORK_AGENT;
+import static com.android.networkstack.tethering.TetheringFeatureFlags.WIFIP2PGO_LOCAL_NETWORK_AGENT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

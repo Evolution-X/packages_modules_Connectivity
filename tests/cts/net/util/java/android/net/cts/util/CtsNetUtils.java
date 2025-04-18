@@ -512,12 +512,15 @@ public final class CtsNetUtils {
         final NetworkCallback callback = new NetworkCallback() {
             @Override
             public void onLinkPropertiesChanged(Network n, LinkProperties lp) {
-                Log.i(TAG, "Link properties of network " + n + " changed to " + lp);
+                Log.i(TAG,  "Waiting for the private DNS server to change to " + server + " on "
+                        + network + ": Link properties of network " + n
+                        + " changed with private DNS server " + lp.getPrivateDnsServerName()
+                        + ", full LinkProperties: " + lp);
                 if (requiresValidatedServer && lp.getValidatedPrivateDnsServers().isEmpty()) {
                     return;
                 }
-                Log.i(TAG, "Set private DNS server to " + server);
                 if (network.equals(n) && Objects.equals(server, lp.getPrivateDnsServerName())) {
+                    Log.i(TAG, "Set private DNS server to " + server + " on " + network);
                     latch.countDown();
                 }
             }

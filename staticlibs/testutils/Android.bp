@@ -60,10 +60,12 @@ java_library {
         "hostdevice/**/*.kt",
     ],
     host_supported: true,
+    sdk_version: "module_current",
     visibility: [
         "//packages/modules/Connectivity/staticlibs/tests:__subpackages__",
         "//packages/modules/Connectivity/staticlibs/client-libs/tests:__subpackages__",
         "//packages/modules/Connectivity/tests/cts/hostside",
+        "//external/cronet:__subpackages__",
     ],
     // There are downstream branches using an old version of Kotlin
     // that used to reserve the right to make breaking changes to the

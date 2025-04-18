@@ -857,7 +857,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
     if (ret) return ret;
 
     struct btf *btf = NULL;
-    auto scopeGuard = base::make_scope_guard([btf] { if (btf) btf__free(btf); });
+    auto btfGuard = base::make_scope_guard([&btf] { if (btf) btf__free(btf); });
     if (isAtLeastKernelVersion(5, 10, 0)) {
         // Untested on Linux Kernel 5.4, but likely compatible.
         // On Linux Kernels older than 4.18 BPF_BTF_LOAD command doesn't exist.

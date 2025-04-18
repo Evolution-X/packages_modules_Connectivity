@@ -210,6 +210,7 @@ public class DnsResolverTest {
         // In order to test query with null network, add null as an element.
         // Test cases which query with null network will go on default network.
         testableNetworks.add(null);
+        Log.i(TAG, "Using testable networks: " + testableNetworks);
         return testableNetworks.toArray(new Network[0]);
     }
 
@@ -505,6 +506,8 @@ public class DnsResolverTest {
             final Network networkForPrivateDns =
                     (network != null) ? network : mCM.getActiveNetwork();
             assertNotNull("Can't find network to await private DNS on", networkForPrivateDns);
+            Log.i(TAG, "Waiting for private DNS setting on " + networkForPrivateDns
+                    + " (testable network: " + network + ")");
             mCtsNetUtils.awaitPrivateDnsSetting(msg + " wait private DNS setting timeout",
                     networkForPrivateDns, GOOGLE_PRIVATE_DNS_SERVER, true);
             final VerifyCancelCallback callback = new VerifyCancelCallback(msg);
