@@ -654,6 +654,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     // As a security feature, VPNs have the top priority.
     static final int PREFERENCE_ORDER_VPN = 0; // Netd supports only 0 for VPN.
     // Shell command has the next highest priority.
+    @VisibleForTesting
     static final int PREFERENCE_ORDER_DEBUG_FALLBACK = 3;
     // Order of per-app OEM preference. See {@link #setOemNetworkPreference}.
     @VisibleForTesting

@@ -17,6 +17,9 @@
 package com.android.server
 
 import android.annotation.SuppressLint
+import android.net.INetd
+import android.net.NativeNetworkConfig
+import android.net.NativeNetworkType
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED
@@ -27,10 +30,14 @@ import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
+import android.net.UidRangeParcel
+import android.net.VpnManager
+import android.net.netd.aidl.NativeUidRangeConfig
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import androidx.test.filters.SmallTest
+import com.android.server.ConnectivityService.PREFERENCE_ORDER_DEBUG_FALLBACK
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
@@ -42,6 +49,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.inOrder
 
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
@@ -70,11 +78,35 @@ class CSShellCommandsTest : CSTest() {
         }.build()
     }
 
+    private fun nativeNetworkConfigPhysical(netId: Int) =
+        NativeNetworkConfig(
+            netId,
+            NativeNetworkType.PHYSICAL,
+            INetd.PERMISSION_NONE,
+            false, // secure
+            VpnManager.TYPE_VPN_NONE,
+            false // excludeLocalRoutes
+        )
+
+    private fun uidRangeConfig(netId: Int, uid: Int) = NativeUidRangeConfig(
+        netId,
+        arrayOf(UidRangeParcel(uid, uid)),
+        PREFERENCE_ORDER_DEBUG_FALLBACK
+    )
+
+    private fun createSatelliteNetwork() = Agent(
+        lp = defaultLp().apply{ interfaceName = "satellite0" },
+        nc = ncForTransport(TRANSPORT_SATELLITE),
+        score = defaultScore() // Do not keep connected if there are no requests.
+    ).apply { connect() }.network
+
     @SuppressLint("MissingPermission")
     @Test @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     fun testDebugFallbackNetwork() {
         assumeTrue(Build.isDebuggable())
 
+        val myUid = Process.myUid()
+        val inOrder = inOrder(netd)
         val cb = TestableNetworkCallback()
         cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), cb)
 
@@ -83,14 +115,17 @@ class CSShellCommandsTest : CSTest() {
 
         // Set myUid to default to satellite.
         handleShellCommand(
-            "set-debug-fallback-network-for-uid ${Process.myUid()} $TRANSPORT_SATELLITE"
+            "set-debug-fallback-network-for-uid $myUid $TRANSPORT_SATELLITE"
         )
 
         // When satellite connects, it becomes the default network for myUid.
-        val satelliteAgent = Agent(ncForTransport(TRANSPORT_SATELLITE))
-        satelliteAgent.connect()
-        cb.expectAvailableCallbacks(satelliteAgent.network, validated = false)
-        defaultCb.expectAvailableCallbacks(satelliteAgent.network, validated = false)
+        val satelliteNetwork = createSatelliteNetwork()
+        val satelliteNetId = satelliteNetwork.netId
+        cb.expectAvailableCallbacks(satelliteNetwork, validated = false)
+        defaultCb.expectAvailableCallbacks(satelliteNetwork, validated = false)
+
+        inOrder.verify(netd).networkCreate(nativeNetworkConfigPhysical(satelliteNetId))
+        inOrder.verify(netd).networkAddUidRangesParcel(uidRangeConfig(satelliteNetId, myUid))
 
         // When wifi connects, satellite is no longer myUid's default and gets torn down.
         val wifiAgent = Agent(ncForTransport(
@@ -101,23 +136,33 @@ class CSShellCommandsTest : CSTest() {
         cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
         defaultCb.expectAvailableCallbacks(wifiAgent.network, validated = false)
 
-        cb.expect<Losing>(satelliteAgent.network)
-        cb.expect<Lost>(satelliteAgent.network)
+        cb.expect<Losing>(satelliteNetwork)
+        cb.expect<Lost>(satelliteNetwork)
+        inOrder.verify(netd).networkRemoveUidRangesParcel(uidRangeConfig(satelliteNetId, myUid))
+        waitForIdle() // Network teardown is not guaranteed to have happened when onLost fires.
+        inOrder.verify(netd).networkDestroy(satelliteNetId)
 
         // When wifi disconnects, satellite becomes the default again.
         wifiAgent.disconnect()
         cb.expect<Lost>(wifiAgent.network)
         defaultCb.expect<Lost>(wifiAgent.network)
 
-        val satelliteAgent2 = Agent(ncForTransport(TRANSPORT_SATELLITE))
-        satelliteAgent2.connect()
-        cb.expectAvailableCallbacks(satelliteAgent2.network, validated = false)
-        defaultCb.expectAvailableCallbacks(satelliteAgent2.network, validated = false)
+        val satelliteNetwork2 = createSatelliteNetwork()
+        val satelliteNetId2 = satelliteNetwork2.netId
+        cb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
+        defaultCb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
+
+        inOrder.verify(netd).networkCreate(nativeNetworkConfigPhysical(satelliteNetId2))
+        inOrder.verify(netd).networkAddUidRangesParcel(uidRangeConfig(satelliteNetId2, myUid))
 
         // Set myUid to no longer default to satellite, and expect satellite to disconnect.
         // It cannot be the system default network because it's bandwidth constrained.
         handleShellCommand("clear-debug-fallback-network-for-uid ${Process.myUid()}")
-        cb.expect<Lost>(satelliteAgent2.network)
-        defaultCb.expect<Lost>(satelliteAgent2.network)
+        cb.expect<Lost>(satelliteNetwork2)
+        defaultCb.expect<Lost>(satelliteNetwork2)
+
+        inOrder.verify(netd).networkRemoveUidRangesParcel(uidRangeConfig(satelliteNetId2, myUid))
+        waitForIdle() // Network teardown is not guaranteed to have happened when onLost fires.
+        inOrder.verify(netd).networkDestroy(satelliteNetId2)
     }
 }
