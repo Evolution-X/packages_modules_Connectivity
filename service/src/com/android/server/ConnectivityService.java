@@ -653,6 +653,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     static final int PREFERENCE_ORDER_INVALID = Integer.MAX_VALUE;
     // As a security feature, VPNs have the top priority.
     static final int PREFERENCE_ORDER_VPN = 0; // Netd supports only 0 for VPN.
+    // Shell command has the next highest priority.
+    static final int PREFERENCE_ORDER_DEBUG_FALLBACK = 3;
     // Order of per-app OEM preference. See {@link #setOemNetworkPreference}.
     @VisibleForTesting
     static final int PREFERENCE_ORDER_OEM = 10;
@@ -12754,6 +12756,32 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
 
+        private void setDebugFallbackNetworkForUid(int uid, int transportType) {
+            final NetworkCapabilities nc = new NetworkCapabilities()
+                    .addTransportType(transportType)
+                    .addCapability(NET_CAPABILITY_INTERNET)
+                    .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
+                    .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED);
+            Set<Integer> uids = Set.of(uid);
+            Set<NetworkRequestInfo> nris = createNrisForFallbackDefault(uids, nc,
+                    PREFERENCE_ORDER_DEBUG_FALLBACK);
+            addPerAppDefaultNetworkRequests(nris);
+        }
+
+        private void clearDebugFallbackNetworkForUid(int uid) {
+            removeDefaultNetworkRequests((nri) ->
+                    nri.getPreferenceOrderForNetd() == PREFERENCE_ORDER_DEBUG_FALLBACK
+                    && nri.getUids().equals(Set.of(new UidRange(uid, uid))));
+            // Calling addPerAppDefaultNetworkRequests with an empty set here is necessary to
+            // make sure that the default network callbacks filed by this UID track the
+            // correct default network request.
+            // ConnectivityService makes sure that default network callbacks filed by UIDs track
+            // the correct default requests by removing and re-filing all of these requests
+            // whenever any of the default requests change. This work is done by
+            // addPerAppDefaultNetworkRequests. See its implementation for details.
+            addPerAppDefaultNetworkRequests(new ArraySet<>());
+        }
+
         @Override
         public int onCommand(String cmd) {
             if (cmd == null) {
@@ -12902,6 +12930,24 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         pw.println(ret);
                         return 0;
                     }
+                    case "set-debug-fallback-network-for-uid":
+                    case "clear-debug-fallback-network-for-uid": {
+                        if (!Build.isDebuggable()) {
+                            throw new SecurityException(
+                                    "Setting per-UID fallback network requires debuggable build");
+                        }
+                        final int uid = Integer.parseInt(getNextArg());
+                        boolean set = cmd.startsWith("set");
+                        final int transportType = set ? Integer.parseInt(getNextArg()) : TYPE_NONE;
+                        mHandler.post(() -> {
+                            clearDebugFallbackNetworkForUid(uid);
+                            if (set) {
+                                setDebugFallbackNetworkForUid(uid, transportType);
+                            }
+                            rematchAllNetworksAndRequests();
+                        });
+                        return 0;
+                    }
                     default:
                         return handleDefaultCommands(cmd);
                 }
@@ -12934,6 +12980,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             pw.println("    Set the allow bit in FIREWALL_CHAIN_BACKGROUND for the given uid.");
             pw.println("  get-background-networking-enabled-for-uid [uid]");
             pw.println("    Get the allow bit in FIREWALL_CHAIN_BACKGROUND for the given uid.");
+            if (Build.isDebuggable()) {
+                pw.println("  set-debug-fallback-network-for-uid [uid] [transport]");
+                pw.println("    Sets [uid] to use [transport] as its default network when there is"
+                        + " no system default network.");
+                pw.println("  clear-per-debug-fallback-network-for-uid [uid]");
+                pw.println("    Clears a previous set-debug-fallback-network-for-uid command");
+            }
         }
     }
 
@@ -14612,9 +14665,28 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
         removeDefaultNetworkRequests((nri) -> nri.mPreferenceOrder == preferenceOrder);
     }
+
+    /**
+     * Add a list of NRIs as default requests, and update per-app callbacks that track them.
+     */
+    // TODO : this method gathers and updates the callbacks tracking the per-app NRIs, which
+    // is confusing for a method called "add". Importantly, callers of the
+    // removeDefaultNetworkRequest* methods above must call this after they call the remove
+    // method, or any callback tracking a removed method will not be updated.
+    // Adding the defaults to mDefaultNetworkRequests must happen before gathering the callbacks
+    // to update, but registering the nris in the argument must happen after doing so.
     private void addPerAppDefaultNetworkRequests(@NonNull final Set<NetworkRequestInfo> nris) {
         ensureRunningOnConnectivityServiceThread();
         mDefaultNetworkRequests.addAll(nris);
+        // getPerAppCallbackRequestsToUpdate gathers all the per-app callbacks that either
+        // - have been tracking a per-app default nri so far (see isPerAppTrackedNri), or
+        // - should now be tracking a per-app default nri (which is why mDefaultNetworkRequests
+        //   need to be updated before calling it).
+        // All of these requests will be removed below and re-created in such a way as to
+        // now track the new default nri for this UID (including if this is the system
+        // default nri), by copying the list of requests in the default nri, but copying
+        // the callbackForRequest (so it can continue updating the same callback) and the
+        // current satisfier (so the rematch will know what the old satisfier was).
         final ArraySet<NetworkRequestInfo> perAppCallbackRequestsToUpdate =
                 getPerAppCallbackRequestsToUpdate();
         final ArraySet<NetworkRequestInfo> nrisToRegister = new ArraySet<>(nris);
