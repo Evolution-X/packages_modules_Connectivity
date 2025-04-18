@@ -135,6 +135,14 @@ android_test {
     target_sdk_version: "33",
     package_name: "android.net.cts.maxtargetsdk33",
     instrumentation_target_package: "android.net.cts.maxtargetsdk33",
+    test_options: {
+        test_runner_options: [
+            {
+                name: "include-annotation",
+                value: "com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk33",
+            },
+        ],
+    },
 }
 
 android_test {
@@ -143,6 +151,14 @@ android_test {
     target_sdk_version: "31",
     package_name: "android.net.cts.maxtargetsdk31", // CTS package names must be unique.
     instrumentation_target_package: "android.net.cts.maxtargetsdk31",
+    test_options: {
+        test_runner_options: [
+            {
+                name: "include-annotation",
+                value: "com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk31",
+            },
+        ],
+    },
 }
 
 android_test {
@@ -151,6 +167,14 @@ android_test {
     target_sdk_version: "30",
     package_name: "android.net.cts.maxtargetsdk30", // CTS package names must be unique.
     instrumentation_target_package: "android.net.cts.maxtargetsdk30",
+    test_options: {
+        test_runner_options: [
+            {
+                name: "include-annotation",
+                value: "com.android.testutils.filters.CtsNetTestCasesMaxTargetSdk30",
+            },
+        ],
+    },
 }
 
 android_test_helper_app {
