@@ -16,6 +16,8 @@
 
 package com.android.server.connectivity.mdns;
 
+import static android.system.OsConstants.IFA_F_TEMPORARY;
+
 import static com.android.server.connectivity.mdns.MdnsConstants.IPV4_SOCKET_ADDR;
 import static com.android.server.connectivity.mdns.MdnsConstants.IPV6_SOCKET_ADDR;
 import static com.android.server.connectivity.mdns.MdnsConstants.NO_PACKET;
@@ -414,6 +416,11 @@ public class MdnsRecordRepository {
     public void updateAddresses(@NonNull List<LinkAddress> newAddresses) {
         mGeneralRecords.clear();
         for (LinkAddress addr : newAddresses) {
+            if (mMdnsFeatureFlags.mIsIgnoreTemporaryIPv6AddressesEnabled && addr.isIpv6()
+                    && (addr.getFlags() & IFA_F_TEMPORARY) != 0) {
+                // Ignore temporary IPv6 addresses
+                continue;
+            }
             final String[] revDnsAddr = getReverseDnsAddress(addr.getAddress());
             mGeneralRecords.add(new RecordInfo<>(
                     null /* serviceInfo */,
