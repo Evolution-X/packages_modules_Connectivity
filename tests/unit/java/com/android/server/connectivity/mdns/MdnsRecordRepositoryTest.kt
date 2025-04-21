@@ -21,6 +21,7 @@ import android.net.LinkAddress
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import android.os.HandlerThread
+import android.system.OsConstants
 import com.android.net.module.util.HexDump.hexStringToByteArray
 import com.android.server.connectivity.mdns.MdnsAnnouncer.AnnouncementInfo
 import com.android.server.connectivity.mdns.MdnsInterfaceAdvertiser.CONFLICT_HOST
@@ -76,6 +77,12 @@ private val TEST_ADDRESSES = listOf(
         LinkAddress(parseNumericAddress("192.0.2.111"), 24),
         LinkAddress(parseNumericAddress("2001:db8::111"), 64),
         LinkAddress(parseNumericAddress("2001:db8::222"), 64)
+)
+private val TEST_TEMPORARY_IPV6_ADDRESS = LinkAddress(
+    parseNumericAddress("2001:db8::333"),
+    64,
+    OsConstants.IFA_F_TEMPORARY /* flags */,
+    0 /* lifetime */
 )
 
 private val TEST_SERVICE_1 = NsdServiceInfo().apply {
@@ -567,7 +574,13 @@ class MdnsRecordRepositoryTest {
     @Test
     fun testGetOffloadPacket() {
         val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
-        repository.initWithService(TEST_SERVICE_ID_1, TEST_SERVICE_1)
+        val ipAddress = TEST_ADDRESSES.toMutableList()
+        ipAddress.add(TEST_TEMPORARY_IPV6_ADDRESS)
+        repository.initWithService(
+            TEST_SERVICE_ID_1,
+            TEST_SERVICE_1,
+            addresses = ipAddress
+        )
         val serviceName = arrayOf("MyTestService", "_testservice", "_tcp", "local")
         val serviceType = arrayOf("_testservice", "_tcp", "local")
         val offloadPacket = repository.getOffloadPacket(TEST_SERVICE_ID_1)

@@ -1951,6 +1951,8 @@ public class NsdService extends INsdManager.Stub {
                         mContext, MdnsFeatureFlags.NSD_USE_SHORT_HOSTNAMES))
                 .setIsCacheFlushPerAddressTypeEnabled(mDeps.isTetheringFeatureNotChickenedOut(
                         mContext, MdnsFeatureFlags.NSD_CACHE_FLUSH_PER_ADDRESS_TYPE))
+                .setIsIgnoreTemporaryIPv6AddressesEnabled(mDeps.isTetheringFeatureNotChickenedOut(
+                        mContext, MdnsFeatureFlags.NSD_IGNORE_TEMPORARY_IPV6_ADDRESSES))
                 .setOverrideProvider(new MdnsFeatureFlags.FlagOverrideProvider() {
                     @Override
                     public boolean isForceEnabledForTest(@NonNull String flag) {

@@ -87,6 +87,12 @@ public class MdnsFeatureFlags {
     public static final String NSD_USE_SHORT_HOSTNAMES = "nsd_use_short_hostnames";
 
     /**
+     * A feature flag to control whether to advertise the temporary IPv6 addresses should be
+     */
+    public static final String NSD_IGNORE_TEMPORARY_IPV6_ADDRESSES =
+            "nsd_ignore_temporary_ipv6_addresses";
+
+    /**
 
      * A feature flag to control whether to only flush address records when another address record
      * with the same name, rrtype and rrclass is received (as per RFC6762 10.2), instead of flushing
@@ -170,6 +176,9 @@ public class MdnsFeatureFlags {
 
     // Flag for optimized expired service removal
     public final boolean mIsOptimizedExpiredServiceRemovalEnabled;
+
+    // Flag for ignoring temporary IPv6 addresses in advertising
+    public final boolean mIsIgnoreTemporaryIPv6AddressesEnabled;
 
     // Thread stats tag for MdnsSocketClient
     public final int mMdnsSocketThreadStatsTag;
@@ -309,6 +318,7 @@ public class MdnsFeatureFlags {
             boolean isSocketClientNetworkGuessingEnabled,
             boolean isCacheFlushPerAddressTypeEnabled,
             boolean isOptimizedExpiredServiceRemovalEnabled,
+            boolean isIgnoreTemporaryIPv6AddressesEnabled,
             int mdnsSocketThreadStatsTag,
             @Nullable FlagOverrideProvider overrideProvider) {
         mIsMdnsOffloadFeatureEnabled = isOffloadFeatureEnabled;
@@ -328,6 +338,7 @@ public class MdnsFeatureFlags {
         mIsCacheFlushPerAddressTypeEnabled = isCacheFlushPerAddressTypeEnabled;
         mIsOptimizedExpiredServiceRemovalEnabled = isOptimizedExpiredServiceRemovalEnabled;
         mMdnsSocketThreadStatsTag = mdnsSocketThreadStatsTag;
+        mIsIgnoreTemporaryIPv6AddressesEnabled = isIgnoreTemporaryIPv6AddressesEnabled;
         mOverrideProvider = overrideProvider;
     }
 
@@ -356,6 +367,7 @@ public class MdnsFeatureFlags {
         private boolean mIsSocketClientNetworkGuessingEnabled;
         private boolean mIsCacheFlushPerAddressTypeEnabled;
         private boolean mIsOptimizedExpiredServiceRemovalEnabled;
+        private boolean mIsIgnoreTemporaryIPv6AddressesEnabled;
         private int mMdnsSocketThreadStatsTag;
         private FlagOverrideProvider mOverrideProvider;
 
@@ -379,8 +391,20 @@ public class MdnsFeatureFlags {
             mIsSocketClientNetworkGuessingEnabled = false;
             mIsCacheFlushPerAddressTypeEnabled = true; // Default enabled.
             mIsOptimizedExpiredServiceRemovalEnabled = false;
+            mIsIgnoreTemporaryIPv6AddressesEnabled = true; // Default enabled.
             mMdnsSocketThreadStatsTag = MDNS_SOCKET_THREAD_STATS_TAG_NONE;
             mOverrideProvider = null;
+        }
+
+        /**
+         * Set whether the temporary IPv6 addresses should be ignored.
+         *
+         * @see #NSD_IGNORE_TEMPORARY_IPV6_ADDRESSES
+         */
+        public Builder setIsIgnoreTemporaryIPv6AddressesEnabled(
+                boolean isIgnoreTemporaryIPv6AddressesEnabled) {
+            mIsIgnoreTemporaryIPv6AddressesEnabled = isIgnoreTemporaryIPv6AddressesEnabled;
+            return this;
         }
 
         /**
@@ -584,6 +608,7 @@ public class MdnsFeatureFlags {
                     mIsSocketClientNetworkGuessingEnabled,
                     mIsCacheFlushPerAddressTypeEnabled,
                     mIsOptimizedExpiredServiceRemovalEnabled,
+                    mIsIgnoreTemporaryIPv6AddressesEnabled,
                     mMdnsSocketThreadStatsTag,
                     mOverrideProvider);
         }
