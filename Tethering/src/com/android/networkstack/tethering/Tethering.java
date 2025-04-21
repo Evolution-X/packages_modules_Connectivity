@@ -704,6 +704,7 @@ public class Tethering {
     void startTethering(final TetheringRequest request, final String callerPkg,
             final IIntResultListener listener) {
         mHandler.post(() -> {
+            mLog.i("startTethering: " + request);
             final int type = request.getTetheringType();
             RequestTracker.AddResult result = mRequestTracker.addPendingRequest(request);
             // If tethering is already pending with a conflicting request, stop tethering before
@@ -733,6 +734,7 @@ public class Tethering {
 
     void stopTethering(int type) {
         mHandler.post(() -> {
+            mLog.i("stopTethering: " + type);
             stopTetheringInternal(type);
         });
     }
@@ -742,6 +744,7 @@ public class Tethering {
         if (!isTetheringWithSoftApConfigEnabled()) return;
         final boolean hasNetworkSettings = hasCallingPermission(NETWORK_SETTINGS);
         mHandler.post(() -> {
+            mLog.i("stopTetheringRequest: " + request);
             if (mRequestTracker.findFuzzyMatchedRequest(request, !hasNetworkSettings) != null) {
                 final int type = request.getTetheringType();
                 stopTetheringInternal(type);
