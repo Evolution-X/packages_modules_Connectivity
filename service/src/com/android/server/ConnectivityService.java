@@ -4680,7 +4680,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void dumpAllRequestInfoLogsToLogcat() {
+    @VisibleForTesting
+    protected void dumpAllRequestInfoLogsToLogcat() {
         try (PrintWriter logPw = new PrintWriter(new Writer() {
             @Override
             public void write(final char[] cbuf, final int off, final int len) {
