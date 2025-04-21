@@ -6018,46 +6018,48 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         // For example, declaring it a potential satisfier would keep an unvalidated destroyed
         // candidate after it's been replaced by another unvalidated network.
         if (candidate.isDestroyed()) return false;
-        // Listen requests won't keep up a network satisfying it. If this is not a multilayer
-        // request, return immediately. For multilayer requests, check to see if any of the
-        // multilayer requests may have a potential satisfier.
-        if (!nri.isMultilayerRequest() && (nri.mRequests.get(0).isListen()
-                || nri.mRequests.get(0).isListenForBest())) {
-            return false;
-        }
+
         for (final NetworkRequest req : nri.mRequests) {
-            // This multilayer listen request is satisfied therefore no further requests need to be
-            // evaluated deeming this network not a potential satisfier.
-            if ((req.isListen() || req.isListenForBest()) && nri.getActiveRequest() == req) {
+            // If the active request is of a type that does not cause the network to be kept up,
+            // the network cannot be a potential satisfier: even if there are requests after this
+            // request in the list, they cannot become the active request, and therefore, cannot
+            // cause this network to be kept up.
+            // Note that this determination can only be made after evaluating previous requests in
+            // the array, because those requests might make the network a potential satisfier even
+            // if they are not currently active (e.g., they might currently be satisfied by another
+            // network with a higher score than this one).
+            if (!req.isRequest() && nri.getActiveRequest() == req) {
                 return false;
             }
-            // As non-multilayer listen requests have already returned, the below would only happen
-            // for a multilayer request therefore continue to the next request if available.
-            if (req.isListen() || req.isListenForBest()) {
-                continue;
-            }
-            // If there is hope for this network might validate and subsequently become the best
-            // network for that request, then it is needed. Note that this network can't already
-            // be the best for this request, or it would be the current satisfier, and therefore
-            // there would be no need to call this method to find out if it is a *potential*
-            // satisfier ("unneeded", the only caller, only calls this if this network currently
-            // satisfies no request).
-            if (candidate.satisfies(req)) {
-                // As soon as a network is found that satisfies a request, return. Specifically for
-                // multilayer requests, returning as soon as a NetworkAgentInfo satisfies a request
-                // is important so as to not evaluate lower priority requests further in
-                // nri.mRequests.
-                final NetworkAgentInfo champion = req.equals(nri.getActiveRequest())
-                        ? nri.getSatisfier() : null;
-                // Note that this catches two important cases:
-                // 1. Unvalidated cellular will not be reaped when unvalidated WiFi
-                //    is currently satisfying the request.  This is desirable when
-                //    cellular ends up validating but WiFi does not.
-                // 2. Unvalidated WiFi will not be reaped when validated cellular
-                //    is currently satisfying the request.  This is desirable when
-                //    WiFi ends up validating and out scoring cellular.
-                return mNetworkRanker.mightBeat(req, champion, candidate.getValidatedScoreable());
-            }
+
+            // This request type does not cause the network to be kept up and therefore does not
+            // cause the network to be a potential satisfier. Later requests in the list might.
+            if (!req.isRequest()) continue;
+
+            // The network can never be a potential satisfier for the request because it does not
+            // satisfy it. Later requests in the list might.
+            if (!candidate.satisfies(req)) continue;
+
+            // This request could cause the network to be kept up if and only if it could become the
+            // best network for the request by validating.
+            // Note that this network can't already be the best for this request, or it would be the
+            // current satisfier. Because this code is only called if the candidate network is
+            // satisfying zero requests, there are only two cases here:
+            // - The request is not being satisfied by any network (i.e., getActiveRequest() is not
+            //   this request).
+            // - The request is satisfied by another network and this network might (or might not)
+            //   beat it by validating.
+            // Note that this catches two important cases:
+            // 1. Unvalidated cellular will not be reaped when unvalidated WiFi
+            //    is currently satisfying the request.  This is desirable when
+            //    cellular ends up validating but WiFi does not.
+            // 2. Unvalidated WiFi will not be reaped when validated cellular
+            //    is currently satisfying the request.  This is desirable when
+            //    WiFi ends up validating and out scoring cellular.
+            if (req != nri.getActiveRequest()) return true;
+
+            final NetworkAgentInfo champion = nri.getSatisfier();
+            return mNetworkRanker.mightBeat(req, champion, candidate.getValidatedScoreable());
         }
 
         return false;

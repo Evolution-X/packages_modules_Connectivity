@@ -271,10 +271,8 @@ class CSSatelliteNetworkTest : CSTest() {
         allNetworksCb.expectAvailableCallbacks(wifiNetwork, validated = false)
         defaultCb.expectAvailableCallbacks(wifiNetwork, validated = false)
         otherUidCb.expectAvailableCallbacks(wifiNetwork, validated = false)
-        // BUG: satellite should disconnect because there are no requests for it.
-        // cb.expect<Losing>(satelliteNetwork)
-        // cb.expect<Lost>(satelliteNetwork)
-        allNetworksCb.assertNoCallback()
+        allNetworksCb.expect<Losing>(satelliteNetwork)
+        allNetworksCb.expect<Lost>(satelliteNetwork)
 
         wifiAgent.disconnect()
         allNetworksCb.expect<Lost>(wifiNetwork)
@@ -290,17 +288,12 @@ class CSSatelliteNetworkTest : CSTest() {
         val satelliteNetwork2 = satelliteAgent2.network
 
         allNetworksCb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
-        // BUG: this should be satelliteNetwork2, because satelliteNetwork should have gone down.
-        defaultCb.expectAvailableCallbacks(satelliteNetwork, validated = false)
+        defaultCb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
 
         updateSatelliteNetworkFallbackUids(setOf())
 
-        // BUG: satelliteNetwork2 should disconnect because there are no requests for it.
-        // cb.expect<Lost>(satelliteNetwork2)
-        // defaultCb.expect<Lost>(satelliteNetwork2)
-        allNetworksCb.expect<Lost>(satelliteNetwork)
-        defaultCb.expect<Lost>(satelliteNetwork)
-
+        allNetworksCb.expect<Lost>(satelliteNetwork2)
+        defaultCb.expect<Lost>(satelliteNetwork2)
         otherUidCb.assertNoCallback()
     }
 
