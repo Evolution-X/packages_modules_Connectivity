@@ -1880,9 +1880,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mNetworkRequestStateStatsMetrics = mDeps.makeNetworkRequestStateStatsMetrics(mContext);
         final NetworkRequest defaultInternetRequest = createDefaultRequest();
         mDefaultRequest = new NetworkRequestInfo(
-                Process.myUid(), defaultInternetRequest, null,
-                null /* binder */, NetworkCallback.FLAG_INCLUDE_LOCATION_INFO,
-                null /* attributionTags */, DECLARED_METHODS_NONE);
+                Process.myUid(), Collections.singletonList(defaultInternetRequest),
+                PREFERENCE_ORDER_INVALID);
         mNetworkRequests.put(defaultInternetRequest, mDefaultRequest);
         mDefaultNetworkRequests.add(mDefaultRequest);
         mNetworkRequestInfoLogs.log("REGISTER " + mDefaultRequest);
@@ -2291,10 +2290,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
 
         if (enable) {
-            handleRegisterNetworkRequest(new NetworkRequestInfo(
-                    Process.myUid(), networkRequest, null /* messenger */, null /* binder */,
-                    NetworkCallback.FLAG_INCLUDE_LOCATION_INFO,
-                    null /* attributionTags */, DECLARED_METHODS_NONE));
+            handleRegisterNetworkRequest(new NetworkRequestInfo(Process.myUid(),
+                    Collections.singletonList(networkRequest), PREFERENCE_ORDER_INVALID));
         } else {
             handleReleaseNetworkRequest(networkRequest, Process.SYSTEM_UID,
                     /* callOnUnavailable */ false);
@@ -8009,69 +8006,68 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             return (null == uids) ? new ArraySet<>() : uids;
         }
 
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r,
-                @Nullable final PendingIntent pi, @Nullable String callingAttributionTag) {
-            this(asUid, Collections.singletonList(r), r, pi, callingAttributionTag,
-                    PREFERENCE_ORDER_INVALID);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
+        /** Internal-only constructor, used by the other constructors. */
+        private NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
                 @NonNull final NetworkRequest requestForCallback, @Nullable final PendingIntent pi,
+                @Nullable Messenger messenger, @Nullable IBinder binder,
+                @NetworkCallback.Flag int callbackFlags, int declaredMethodsFlags,
                 @Nullable String callingAttributionTag, final int preferenceOrder) {
+            if (pi != null) {
+                // Got passed a PendingIntent.
+                if (messenger != null || binder != null
+                        || callbackFlags != NetworkCallback.FLAG_NONE
+                        || declaredMethodsFlags != DECLARED_METHODS_NONE) {
+                    throw new IllegalArgumentException(
+                            "NRI with PendingIntent cannot pass in callback parameters");
+                }
+            }
             ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = requestForCallback;
             mPendingIntent = pi;
-            mMessenger = null;
-            mBinder = null;
-            mPid = getCallingPid();
-            mUid = mDeps.getCallingUid();
-            mAsUid = asUid;
-            mPerUidCounter = getRequestCounter(this);
-            /**
-             * Location sensitive data not included in pending intent. Only included in
-             * {@link NetworkCallback}.
-             */
-            mCallbackFlags = NetworkCallback.FLAG_NONE;
-            mCallingAttributionTag = callingAttributionTag;
-            mPreferenceOrder = preferenceOrder;
-            mDeclaredMethodsFlags = DECLARED_METHODS_NONE;
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r, @Nullable final Messenger m,
-                @Nullable final IBinder binder,
-                @NetworkCallback.Flag int callbackFlags,
-                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
-            this(asUid, Collections.singletonList(r), r, m, binder, callbackFlags,
-                    callingAttributionTag, declaredMethodsFlags);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
-                @NonNull final NetworkRequest requestForCallback, @Nullable final Messenger m,
-                @Nullable final IBinder binder,
-                @NetworkCallback.Flag int callbackFlags,
-                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
-            super();
-            ensureAllNetworkRequestsHaveSupportedType(r);
-            mRequests = initializeRequests(r);
-            mNetworkRequestForCallback = requestForCallback;
-            mMessenger = m;
+            mMessenger = messenger;
             mBinder = binder;
             mPid = getCallingPid();
             mUid = mDeps.getCallingUid();
             mAsUid = asUid;
-            mPendingIntent = null;
             mPerUidCounter = getRequestCounter(this);
             mCallbackFlags = callbackFlags;
             mCallingAttributionTag = callingAttributionTag;
-            mPreferenceOrder = PREFERENCE_ORDER_INVALID;
+            mPreferenceOrder = preferenceOrder;
             mDeclaredMethodsFlags = declaredMethodsFlags;
             linkDeathRecipient();
         }
 
+        /** Constructs a NetworkRequestInfo for a PendingIntent-based API */
+        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest request,
+                @Nullable final PendingIntent pi, @Nullable String callingAttributionTag) {
+            this(asUid, Collections.singletonList(request), request, pi, null /* messenger */,
+                    null /* binder */, NetworkCallback.FLAG_NONE, DECLARED_METHODS_NONE,
+                    callingAttributionTag, PREFERENCE_ORDER_INVALID);
+        }
+
+        /* Constructs a NetworkRequestInfo for a NetworkCallback-based API */
+        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
+                @NonNull final NetworkRequest requestForCallback, @Nullable final Messenger m,
+                @Nullable final IBinder b,
+                @NetworkCallback.Flag int callbackFlags,
+                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
+            // In multilayer request, or for a TRACK_DEFAULT request that tracks a per-app default
+            // network, requestForCallback is not the same as the first request.
+            this(asUid, r, requestForCallback, null /* pi */, m, b, callbackFlags,
+                    declaredMethodsFlags, callingAttributionTag, PREFERENCE_ORDER_INVALID);
+        }
+
+        /* Constructs a NetworkRequestInfo for internal system usage */
+        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r, int preferenceOrder) {
+            this(asUid, r, r.get(0), null /* pi */, null /* messenger */,
+                    null /* binder */, NetworkCallback.FLAG_NONE, DECLARED_METHODS_NONE,
+                    null /* callingAttributionTag */, preferenceOrder);
+
+        }
+
         NetworkRequestInfo(@NonNull final NetworkRequestInfo nri,
                 @NonNull final List<NetworkRequest> r) {
-            super();
             ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = nri.getNetworkRequestForCallback();
@@ -8110,16 +8106,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             mPreferenceOrder = PREFERENCE_ORDER_INVALID;
             mDeclaredMethodsFlags = nri.mDeclaredMethodsFlags;
             linkDeathRecipient();
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r) {
-            this(asUid, Collections.singletonList(r), PREFERENCE_ORDER_INVALID);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
-                final int preferenceOrder) {
-            this(asUid, r, r.get(0), null /* pi */, null /* callingAttributionTag */,
-                    preferenceOrder);
         }
 
         // True if this NRI is being satisfied. It also accounts for if the nri has its satisifer
@@ -9033,7 +9019,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         NetworkRequest networkRequest = new NetworkRequest(nc, TYPE_NONE, nextNetworkRequestId(),
                 NetworkRequest.Type.LISTEN);
         NetworkRequestInfo nri =
-                new NetworkRequestInfo(callingUid, networkRequest, messenger, binder, callbackFlags,
+                new NetworkRequestInfo(callingUid, Collections.singletonList(networkRequest),
+                        networkRequest, messenger, binder, callbackFlags,
                         callingAttributionTag, declaredMethodsFlag);
         if (VDBG) log("listenForNetwork for " + nri);
 
@@ -10772,10 +10759,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             final NetworkRequest nr = new NetworkRequest(newCaps, ConnectivityManager.TYPE_NONE,
                     nextNetworkRequestId(), LISTEN_FOR_BEST);
             configBuilder.setUpstreamSelector(nr);
-            final NetworkRequestInfo nri = new NetworkRequestInfo(
-                    nai.creatorUid, nr, null /* messenger */, null /* binder */,
-                    0 /* callbackFlags */, null /* attributionTag */,
-                    DECLARED_METHODS_NONE);
+            final NetworkRequestInfo nri = new NetworkRequestInfo(nai.creatorUid,
+                    Collections.singletonList(nr), PREFERENCE_ORDER_INVALID);
             if (null != oldSatisfier) {
                 // Set the old satisfier in the new NRI so that the rematch will see any changes
                 nri.setSatisfier(oldSatisfier, nr);
@@ -13519,7 +13504,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         // nri is not bound to the death of callback. Instead, callback.bindToDeath() is set in
         // handleRegisterConnectivityDiagnosticsCallback(). nri will be cleaned up as part of the
         // callback's binder death.
-        final NetworkRequestInfo nri = new NetworkRequestInfo(callingUid, requestWithId);
+        final NetworkRequestInfo nri = new NetworkRequestInfo(callingUid /* asUid */,
+                Collections.singletonList(requestWithId), PREFERENCE_ORDER_INVALID);
         nri.mPerUidCounter.incrementCountOrThrow(nri.mUid);
         final ConnectivityDiagnosticsCallbackInfo cbInfo =
                 new ConnectivityDiagnosticsCallbackInfo(callback, nri, callingPackageName);
