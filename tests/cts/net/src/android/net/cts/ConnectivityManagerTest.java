@@ -98,7 +98,6 @@ import static android.net.cts.util.CtsNetUtils.TEST_HOST;
 import static android.net.cts.util.CtsTetheringUtils.TestTetheringEventCallback;
 import static android.os.MessageQueue.OnFileDescriptorEventListener.EVENT_INPUT;
 import static android.os.Process.INVALID_UID;
-import static android.provider.Settings.Global.NETWORK_METERED_MULTIPATH_PREFERENCE;
 import static android.system.OsConstants.AF_INET;
 import static android.system.OsConstants.AF_INET6;
 import static android.system.OsConstants.AF_UNSPEC;
@@ -345,6 +344,8 @@ public class ConnectivityManagerTest {
     public static final int MIN_SUPPORTED_CELLULAR_KEEPALIVE_COUNT = 1;
     public static final int MIN_SUPPORTED_WIFI_KEEPALIVE_COUNT = 3;
 
+    private static final String NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING =
+            "network_metered_multipath_preference";
     private static final String NETWORK_METERED_MULTIPATH_PREFERENCE_RES_NAME =
             "config_networkMeteredMultipathPreference";
     private static final String KEEPALIVE_ALLOWED_UNPRIVILEGED_RES_NAME =
@@ -1653,7 +1654,7 @@ public class ConnectivityManagerTest {
 
     private int getCurrentMeteredMultipathPreference(ContentResolver resolver) {
         final String rawMeteredPref = Settings.Global.getString(resolver,
-                NETWORK_METERED_MULTIPATH_PREFERENCE);
+                NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING);
         return TextUtils.isEmpty(rawMeteredPref)
             ? getIntResourceForName(NETWORK_METERED_MULTIPATH_PREFERENCE_RES_NAME)
             : Integer.parseInt(rawMeteredPref);
@@ -1684,11 +1685,11 @@ public class ConnectivityManagerTest {
         final String ssid = unquoteSSID(getSSID());
         final String oldMeteredSetting = getWifiMeteredStatus(ssid);
         final String oldMeteredMultipathPreference = Settings.Global.getString(
-                resolver, NETWORK_METERED_MULTIPATH_PREFERENCE);
+                resolver, NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING);
         try {
             final int initialMeteredPreference = getCurrentMeteredMultipathPreference(resolver);
             int newMeteredPreference = findNextPrefValue(resolver);
-            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE,
+            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING,
                     Integer.toString(newMeteredPreference));
             // Wifi meteredness changes from unmetered to metered will disconnect and reconnect
             // since R.
@@ -1702,7 +1703,7 @@ public class ConnectivityManagerTest {
 
             final int oldMeteredPreference = newMeteredPreference;
             newMeteredPreference = findNextPrefValue(resolver);
-            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE,
+            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING,
                     Integer.toString(newMeteredPreference));
             assertEquals(mCm.getNetworkCapabilities(network).hasCapability(
                     NET_CAPABILITY_NOT_METERED), false);
@@ -1716,7 +1717,7 @@ public class ConnectivityManagerTest {
             assertMultipathPreferenceIsEventually(network, newMeteredPreference,
                     ConnectivityManager.MULTIPATH_PREFERENCE_UNMETERED);
         } finally {
-            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE,
+            Settings.Global.putString(resolver, NETWORK_METERED_MULTIPATH_PREFERENCE_SETTING,
                     oldMeteredMultipathPreference);
             setWifiMeteredStatus(ssid, oldMeteredSetting);
         }
