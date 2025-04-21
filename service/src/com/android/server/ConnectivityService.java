@@ -8850,10 +8850,21 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // Policy already enforced.
             return;
         }
-        final boolean isRestrictedOnMeteredNetworks = mDeps.isAtLeastV()
-                ? mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid)
-                : BinderUtils.withCleanCallingIdentity(() ->
-                        mPolicyManager.isUidRestrictedOnMeteredNetworks(uid));
+        final boolean isRestrictedOnMeteredNetworks;
+        if (mDeps.isAtLeastV()) {
+            if (mDeps.isChangeEnabled(NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION, uid)) {
+                isRestrictedOnMeteredNetworks =
+                        mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid);
+            } else {
+                // If the change is disabled and the uid does not have Internet permission,
+                // uid is considered to be allowed to bring up metered networks.
+                isRestrictedOnMeteredNetworks = hasInternetPermission(uid)
+                        && mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid);
+            }
+        } else {
+            isRestrictedOnMeteredNetworks = BinderUtils.withCleanCallingIdentity(() ->
+                    mPolicyManager.isUidRestrictedOnMeteredNetworks(uid));
+        }
         if (isRestrictedOnMeteredNetworks) {
             // If UID is restricted, don't allow them to bring up metered APNs.
             networkCapabilities.addCapability(NET_CAPABILITY_NOT_METERED);
