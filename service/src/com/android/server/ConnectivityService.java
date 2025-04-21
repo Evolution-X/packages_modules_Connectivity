@@ -4680,7 +4680,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void dumpAllRequestInfoLogsToLogcat() {
+    @VisibleForTesting
+    protected void dumpAllRequestInfoLogsToLogcat() {
         try (PrintWriter logPw = new PrintWriter(new Writer() {
             @Override
             public void write(final char[] cbuf, final int off, final int len) {
@@ -8849,10 +8850,21 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             // Policy already enforced.
             return;
         }
-        final boolean isRestrictedOnMeteredNetworks = mDeps.isAtLeastV()
-                ? mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid)
-                : BinderUtils.withCleanCallingIdentity(() ->
-                        mPolicyManager.isUidRestrictedOnMeteredNetworks(uid));
+        final boolean isRestrictedOnMeteredNetworks;
+        if (mDeps.isAtLeastV()) {
+            if (mDeps.isChangeEnabled(NETWORK_BLOCKED_WITHOUT_INTERNET_PERMISSION, uid)) {
+                isRestrictedOnMeteredNetworks =
+                        mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid);
+            } else {
+                // If the change is disabled and the uid does not have Internet permission,
+                // uid is considered to be allowed to bring up metered networks.
+                isRestrictedOnMeteredNetworks = hasInternetPermission(uid)
+                        && mBpfNetMaps.isUidRestrictedOnMeteredNetworks(uid);
+            }
+        } else {
+            isRestrictedOnMeteredNetworks = BinderUtils.withCleanCallingIdentity(() ->
+                    mPolicyManager.isUidRestrictedOnMeteredNetworks(uid));
+        }
         if (isRestrictedOnMeteredNetworks) {
             // If UID is restricted, don't allow them to bring up metered APNs.
             networkCapabilities.addCapability(NET_CAPABILITY_NOT_METERED);
@@ -9573,7 +9585,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         nai.notifyRegistered(networkMonitor);
         NetworkInfo networkInfo = nai.networkInfo;
         updateNetworkInfo(nai, networkInfo);
-        if (nai.isVPN()) updateVpnUids(nai, null, nai.networkCapabilities);
+        maybeUpdateVpnUids(nai, null, nai.networkCapabilities);
         nai.processEnqueuedMessages(mTrackerHandler::handleMessage);
     }
 
@@ -10590,7 +10602,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         updateNetworkPermissions(nai, newNc);
         final NetworkCapabilities prevNc = nai.getAndSetNetworkCapabilities(newNc);
 
-        updateVpnUids(nai, prevNc, newNc);
+        maybeUpdateVpnUids(nai, prevNc, newNc);
         updateAllowedUids(nai, prevNc, newNc);
         nai.updateScoreForNetworkAgentUpdate();
 
@@ -10942,8 +10954,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void updateVpnUids(@NonNull NetworkAgentInfo nai, @Nullable NetworkCapabilities prevNc,
-            @Nullable NetworkCapabilities newNc) {
+    private void maybeUpdateVpnUids(@NonNull NetworkAgentInfo nai,
+            @Nullable NetworkCapabilities prevNc, @Nullable NetworkCapabilities newNc) {
+        if (!nai.isVPN()) return;
         Set<UidRange> prevRanges = null == prevNc ? null : prevNc.getUidRanges();
         Set<UidRange> newRanges = null == newNc ? null : newNc.getUidRanges();
         if (null == prevRanges) prevRanges = new ArraySet<>();
@@ -12325,9 +12338,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (!mQueueNetworkAgentEventsInSystemServer) {
                 networkAgent.disconnect();
             }
-            if (networkAgent.isVPN()) {
-                updateVpnUids(networkAgent, networkAgent.networkCapabilities, null);
-            }
+            maybeUpdateVpnUids(networkAgent, networkAgent.networkCapabilities, null);
             disconnectAndDestroyNetwork(networkAgent);
             if (networkAgent.isVPN()) {
                 // As the active or bound network changes for apps, broadcast the default proxy, as
@@ -14369,14 +14380,20 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         );
     }
 
-    ArraySet<NetworkRequestInfo> createMultiLayerNrisFromSatelliteNetworkFallbackUids(
-            @NonNull final Set<Integer> uids) {
+    ArraySet<NetworkRequestInfo> createNrisForFallbackDefault(
+            @NonNull final Set<Integer> uids, NetworkCapabilities cap, int preferenceOrder) {
         final List<NetworkRequest> requests = new ArrayList<>();
 
         // request: track default(unrestricted internet network)
         requests.add(createDefaultInternetRequestForTransport(
                 TYPE_NONE, NetworkRequest.Type.TRACK_DEFAULT));
 
+        requests.add(createNetworkRequest(NetworkRequest.Type.REQUEST, cap));
+        return createNrisForPreferenceOrder(uids, requests, preferenceOrder);
+    }
+
+    ArraySet<NetworkRequestInfo> createMultiLayerNrisFromSatelliteNetworkFallbackUids(
+            @NonNull final Set<Integer> uids) {
         // request: Satellite internet, satellite network could be restricted or constrained
         final NetworkCapabilities cap = new NetworkCapabilities.Builder()
                 .addCapability(NET_CAPABILITY_INTERNET)
@@ -14385,9 +14402,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
                 .addTransportType(NetworkCapabilities.TRANSPORT_SATELLITE)
                 .build();
-        requests.add(createNetworkRequest(NetworkRequest.Type.REQUEST, cap));
-
-        return createNrisForPreferenceOrder(uids, requests, PREFERENCE_ORDER_SATELLITE_FALLBACK);
+        return createNrisForFallbackDefault(uids, cap,
+                PREFERENCE_ORDER_SATELLITE_FALLBACK);
     }
 
     private void handleMobileDataPreferredUidsChanged() {
@@ -14597,14 +14613,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
-        // Skip the requests which are set by other network preference. Because the uid range rules
-        // should stay in netd.
-        final Set<NetworkRequestInfo> requests = new ArraySet<>(mDefaultNetworkRequests);
-        requests.removeIf(request -> request.mPreferenceOrder != preferenceOrder);
-        handleRemoveNetworkRequests(requests);
+    /** Removes all default network requests matching the specified filter. */
+    private void removeDefaultNetworkRequests(Predicate<NetworkRequestInfo> filter) {
+        // Remove all requests in mDefaultNetworkRequests except the ones that match the filter.
+        final Set<NetworkRequestInfo> toRemove = new ArraySet<>(mDefaultNetworkRequests);
+        toRemove.removeIf(filter.negate());
+        handleRemoveNetworkRequests(toRemove);
     }
 
+    private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
+        removeDefaultNetworkRequests((nri) -> nri.mPreferenceOrder == preferenceOrder);
+    }
     private void addPerAppDefaultNetworkRequests(@NonNull final Set<NetworkRequestInfo> nris) {
         ensureRunningOnConnectivityServiceThread();
         mDefaultNetworkRequests.addAll(nris);

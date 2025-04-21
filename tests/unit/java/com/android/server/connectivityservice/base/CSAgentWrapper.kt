@@ -191,6 +191,7 @@ class CSAgentWrapper(
             agent.unregister()
             cb.assertNoCallback()
         }
+        mgr.unregisterNetworkCallback(cb)
     }
 
     fun setTeardownDelayMillis(delayMillis: Int) = agent.setTeardownDelayMillis(delayMillis)

@@ -22,10 +22,10 @@ import static android.net.DnsResolver.FLAG_NO_CACHE_LOOKUP;
 import static android.net.DnsResolver.TYPE_A;
 import static android.net.DnsResolver.TYPE_AAAA;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
-import static android.net.cts.util.CtsNetUtils.TestNetworkCallback;
 import static android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY;
 import static android.system.OsConstants.ETIMEDOUT;
 
+import static com.android.testutils.Cleanup.testAndCleanup;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertEquals;
@@ -38,12 +38,10 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.DnsResolver;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.NetworkRequest;
 import android.net.ParseException;
 import android.net.cts.util.CtsNetUtils;
 import android.os.CancellationSignal;
@@ -52,18 +50,22 @@ import android.os.Looper;
 import android.platform.test.annotations.AppModeFull;
 import android.provider.Settings;
 import android.system.ErrnoException;
+import android.util.ArraySet;
 import android.util.Log;
 
 import androidx.test.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.net.module.util.DnsPacket;
+import com.android.testutils.AutoReleaseNetworkCallbackRule;
 import com.android.testutils.ConnectivityDiagnosticsCollector;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DeviceConfigRule;
 import com.android.testutils.DnsResolverModuleTest;
+import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.SkipPresubmit;
+import com.android.testutils.TestableNetworkCallback;
 
 import org.junit.After;
 import org.junit.Before;
@@ -78,6 +80,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -89,6 +92,8 @@ public class DnsResolverTest {
     public static final DeviceConfigRule DEVICE_CONFIG_CLASS_RULE = new DeviceConfigRule();
     @Rule
     public final DevSdkIgnoreRule ignoreRule = new DevSdkIgnoreRule();
+    @Rule
+    public final AutoReleaseNetworkCallbackRule callbackRule = new AutoReleaseNetworkCallbackRule();
 
     private static final String TAG = "DnsResolverTest";
     private static final char[] HEX_CHARS = {
@@ -122,13 +127,10 @@ public class DnsResolverTest {
     private Context mContext;
     private ContentResolver mCR;
     private ConnectivityManager mCM;
-    private PackageManager mPackageManager;
     private CtsNetUtils mCtsNetUtils;
     private Executor mExecutor;
     private Executor mExecutorInline;
     private DnsResolver mDns;
-
-    private TestNetworkCallback mWifiRequestCallback = null;
 
     /**
      * @see BeforeClass
@@ -154,15 +156,13 @@ public class DnsResolverTest {
         mCR = mContext.getContentResolver();
         mCtsNetUtils = new CtsNetUtils(mContext);
         mCtsNetUtils.storePrivateDnsSetting();
-        mPackageManager = mContext.getPackageManager();
+        callbackRule.requestCellIfSupported();
+        callbackRule.requestWifiIfSupported();
     }
 
     @After
     public void tearDown() throws Exception {
         mCtsNetUtils.restorePrivateDnsSetting();
-        if (mWifiRequestCallback != null) {
-            mCM.unregisterNetworkCallback(mWifiRequestCallback);
-        }
     }
 
     private static void maybeToggleWifiAndCell() throws Exception {
@@ -181,37 +181,21 @@ public class DnsResolverTest {
         return new String(hexChars);
     }
 
-    private Network[] getTestableNetworks() {
-        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_WIFI)) {
-            // File a NetworkRequest for Wi-Fi, so it connects even if a higher-scoring
-            // network, such as Ethernet, is already connected.
-            final NetworkRequest request = new NetworkRequest.Builder()
-                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .build();
-            mWifiRequestCallback = new TestNetworkCallback();
-            mCM.requestNetwork(request, mWifiRequestCallback);
-            mCtsNetUtils.ensureWifiConnected();
-        }
-        final ArrayList<Network> testableNetworks = new ArrayList<Network>();
-        for (Network network : mCM.getAllNetworks()) {
-            final NetworkCapabilities nc = mCM.getNetworkCapabilities(network);
-            if (nc != null
-                    && nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-                    && nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                testableNetworks.add(network);
-            }
-        }
+    /**
+     * Get all testable networks, and null to represent the default network.
+     */
+    private Set<Network> getTestableNetworksAndNull() {
+        final Set<Network> networks = new ArraySet<>();
+        networks.addAll(mCtsNetUtils.getTestableNetworks());
+        networks.add(null);
+        return networks;
+    }
 
-        assertTrue(
-                "This test requires that at least one network be connected. " +
-                        "Please ensure that the device is connected to a network.",
-                testableNetworks.size() >= 1);
-        // In order to test query with null network, add null as an element.
-        // Test cases which query with null network will go on default network.
-        testableNetworks.add(null);
-        Log.i(TAG, "Using testable networks: " + testableNetworks);
-        return testableNetworks.toArray(new Network[0]);
+    private Network getDefaultNetwork() {
+        final TestableNetworkCallback cb = callbackRule.registerDefaultNetworkCallback();
+        return testAndCleanup(
+                () -> cb.eventuallyExpect(CallbackEntry.AVAILABLE, TIMEOUT_MS).getNetwork(),
+                () -> callbackRule.unregisterNetworkCallback(cb));
     }
 
     static private void assertGreaterThan(String msg, int first, int second) {
@@ -422,7 +406,7 @@ public class DnsResolverTest {
 
     public void doTestRawQuery(Executor executor) throws InterruptedException {
         final String msg = "RawQuery " + TEST_DOMAIN;
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelCallback callback = new VerifyCancelCallback(msg);
             mDns.rawQuery(network, TEST_DOMAIN, CLASS_IN, TYPE_AAAA, FLAG_NO_CACHE_LOOKUP,
                     executor, null, callback);
@@ -449,7 +433,7 @@ public class DnsResolverTest {
                 0x00, 0x01  /* Class */
         };
         final String msg = "RawQuery blob " + byteArrayToHexString(blob);
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelCallback callback = new VerifyCancelCallback(msg);
             mDns.rawQuery(network, blob, FLAG_NO_CACHE_LOOKUP, executor, null, callback);
 
@@ -462,7 +446,7 @@ public class DnsResolverTest {
     public void doTestRawQueryRoot(Executor executor) throws InterruptedException {
         final String dname = "";
         final String msg = "RawQuery empty dname(ROOT) ";
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelCallback callback = new VerifyCancelCallback(msg);
             mDns.rawQuery(network, dname, CLASS_IN, TYPE_AAAA, FLAG_NO_CACHE_LOOKUP,
                     executor, null, callback);
@@ -477,10 +461,10 @@ public class DnsResolverTest {
     public void doTestRawQueryNXDomain(Executor executor) throws InterruptedException {
         final String msg = "RawQuery " + TEST_NX_DOMAIN;
 
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final NetworkCapabilities nc = (network != null)
                     ? mCM.getNetworkCapabilities(network)
-                    : mCM.getNetworkCapabilities(mCM.getActiveNetwork());
+                    : mCM.getNetworkCapabilities(getDefaultNetwork());
             assertNotNull("Couldn't determine NetworkCapabilities for " + network, nc);
             // Some cellular networks configure their DNS servers never to return NXDOMAIN, so don't
             // test NXDOMAIN on these DNS servers.
@@ -502,9 +486,8 @@ public class DnsResolverTest {
         // Enable private DNS strict mode and set server to dns.google before doing NxDomain test.
         // b/144521720
         mCtsNetUtils.setPrivateDnsStrictMode(GOOGLE_PRIVATE_DNS_SERVER);
-        for (Network network :  getTestableNetworks()) {
-            final Network networkForPrivateDns =
-                    (network != null) ? network : mCM.getActiveNetwork();
+        for (Network network : getTestableNetworksAndNull()) {
+            final Network networkForPrivateDns = (network != null) ? network : getDefaultNetwork();
             assertNotNull("Can't find network to await private DNS on", networkForPrivateDns);
             Log.i(TAG, "Waiting for private DNS setting on " + networkForPrivateDns
                     + " (testable network: " + network + ")");
@@ -526,7 +509,7 @@ public class DnsResolverTest {
         // Start a DNS query and the cancel it immediately. Use VerifyCancelCallback to expect
         // that the query is cancelled before it succeeds. If it is not cancelled before it
         // succeeds, retry the test until it is.
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             boolean retry = false;
             int round = 0;
             do {
@@ -556,7 +539,7 @@ public class DnsResolverTest {
         // Start a DNS query and the cancel it immediately. Use VerifyCancelCallback to expect
         // that the query is cancelled before it succeeds. If it is not cancelled before it
         // succeeds, retry the test until it is.
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             boolean retry = false;
             int round = 0;
             do {
@@ -582,7 +565,7 @@ public class DnsResolverTest {
     @Test
     public void testCancelBeforeQuery() throws InterruptedException {
         final String msg = "Test cancelled RawQuery " + TEST_DOMAIN;
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelCallback callback = new VerifyCancelCallback(msg);
             final CancellationSignal cancelSignal = new CancellationSignal();
             cancelSignal.cancel();
@@ -716,7 +699,7 @@ public class DnsResolverTest {
 
     public void doTestQueryForInetAddress(Executor executor) throws InterruptedException {
         final String msg = "Test query for InetAddress " + TEST_DOMAIN;
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelInetAddressCallback callback =
                     new VerifyCancelInetAddressCallback(msg, null);
             mDns.query(network, TEST_DOMAIN, FLAG_NO_CACHE_LOOKUP, executor, null, callback);
@@ -734,7 +717,7 @@ public class DnsResolverTest {
         // Start a DNS query and the cancel it immediately. Use VerifyCancelInetAddressCallback to
         // expect that the query is cancelled before it succeeds. If it is not cancelled before it
         // succeeds, retry the test until it is.
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             boolean retry = false;
             int round = 0;
             do {
@@ -760,7 +743,7 @@ public class DnsResolverTest {
 
     public void doTestQueryForInetAddressIpv4(Executor executor) throws InterruptedException {
         final String msg = "Test query for IPv4 InetAddress " + TEST_DOMAIN;
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelInetAddressCallback callback =
                     new VerifyCancelInetAddressCallback(msg, null);
             mDns.query(network, TEST_DOMAIN, TYPE_A, FLAG_NO_CACHE_LOOKUP,
@@ -776,7 +759,7 @@ public class DnsResolverTest {
 
     public void doTestQueryForInetAddressIpv6(Executor executor) throws InterruptedException {
         final String msg = "Test query for IPv6 InetAddress " + TEST_DOMAIN;
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             final VerifyCancelInetAddressCallback callback =
                     new VerifyCancelInetAddressCallback(msg, null);
             mDns.query(network, TEST_DOMAIN, TYPE_AAAA, FLAG_NO_CACHE_LOOKUP,
@@ -804,7 +787,7 @@ public class DnsResolverTest {
     }
 
     private void doTestPrivateDnsBypass() throws InterruptedException {
-        final Network[] testNetworks = getTestableNetworks();
+        final Set<Network> testNetworks = getTestableNetworksAndNull();
 
         // Set an invalid private DNS server
         mCtsNetUtils.setPrivateDnsStrictMode(INVALID_PRIVATE_DNS_SERVER);
@@ -871,7 +854,7 @@ public class DnsResolverTest {
     }
 
     public void doTestContinuousQueries(Executor executor) throws InterruptedException {
-        for (Network network : getTestableNetworks()) {
+        for (Network network : getTestableNetworksAndNull()) {
             for (int i = 0; i < QUERY_TIMES ; ++i) {
                 // query v6/v4 in turn
                 boolean queryV6 = (i % 2 == 0);
