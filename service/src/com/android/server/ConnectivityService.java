@@ -14603,12 +14603,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
+    /** Removes all default network requests matching the specified filter. */
     private void removeDefaultNetworkRequests(Predicate<NetworkRequestInfo> filter) {
-        // Skip the requests which are set by other network preference. Because the uid range rules
-        // should stay in netd.
-        final Set<NetworkRequestInfo> requests = new ArraySet<>(mDefaultNetworkRequests);
-        requests.removeIf(filter.negate());
-        handleRemoveNetworkRequests(requests);
+        // Remove all requests in mDefaultNetworkRequests except the ones that match the filter.
+        final Set<NetworkRequestInfo> toRemove = new ArraySet<>(mDefaultNetworkRequests);
+        toRemove.removeIf(filter.negate());
+        handleRemoveNetworkRequests(toRemove);
     }
 
     private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
