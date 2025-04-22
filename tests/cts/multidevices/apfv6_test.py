@@ -129,8 +129,14 @@ class ApfV6Test(apf_test_base.ApfTestBase):
             echo_request, "DROPPED_IPV6_ICMP6_ECHO_REQUEST_REPLIED", expected_echo_reply
         )
 
+    def is_running_as_root(self):
+        uid = adb_utils.adb_shell(self.clientDevice, "id -u")
+        return uid == "0"
+
     @apf_utils.at_least_B()
     def test_igmpv3_general_query_offload(self):
+        if not self.is_running_as_root():
+            return
         # use unicast to replace multicast ether dst to prevent flaky due to DTIM skip
         ether = Ether(src=self.server_mac_address, dst=self.client_mac_address)
         ip = IP(
