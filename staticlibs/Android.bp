@@ -484,6 +484,9 @@ java_library {
         "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
     ],
+    static_libs: [
+        "net-utils-framework-common",
+    ],
     lint: {
         strict_updatability_linting: true,
         error_checks: ["NewApi"],
