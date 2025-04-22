@@ -60,6 +60,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val TAG = "ClatTest"
+private const val SHORT_TIMEOUT_MS = 200L
 private const val TIMEOUT_MS = 2000L
 
 private val REQUEST: NetworkRequest = NetworkRequest.Builder()
@@ -169,6 +170,19 @@ class ClatTest {
         assertThat(p).isNotNull()
     }
 
+    /** Assert that no packet from the clat source address was received */
+    fun expectNoClatPacket() {
+        val p = iface.packetReader.poll(SHORT_TIMEOUT_MS) {
+            val src = ByteArray(16)
+            val buf = ByteBuffer.wrap(it)
+            buf.position(14 + 8)
+            buf.get(src)
+            val srcAddr = Inet6Address.getByAddress(src)
+            clatV6Addr.equals(srcAddr)
+        }
+        assertThat(p).isNull()
+    }
+
     @Test
     fun testClatEgress() {
         socket = Os.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
@@ -206,5 +220,16 @@ class ClatTest {
         val buf = ByteBuffer.allocate(data.length)
         Os.read(socket, buf)
         assertThat(buf.array()).isEqualTo(data.toByteArray())
+    }
+
+    @Test
+    fun testEgressDropsMulticast() {
+        socket = Os.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        network.bindSocket(socket)
+
+        val buf = ByteBuffer.wrap("test".toByteArray())
+        Os.sendto(socket, buf, 0 /*flags*/, InetAddress.getByName("224.0.0.251"), 12345 /*port*/)
+        Os.sendto(socket, buf, 0 /*flags*/, InetAddress.getByName("234.42.42.42"), 123 /*port*/)
+        expectNoClatPacket()
     }
 }
