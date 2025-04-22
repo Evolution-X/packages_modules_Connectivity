@@ -22,8 +22,8 @@ import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 import static android.net.cts.util.CtsNetUtils.TestNetworkCallback;
 
 import static com.android.compatibility.common.util.SystemUtil.runWithShellPermissionIdentity;
-import static com.android.modules.utils.build.SdkLevel.isAtLeastU;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastT;
+import static com.android.modules.utils.build.SdkLevel.isAtLeastU;
 import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -34,12 +34,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import android.Manifest;
 import android.annotation.NonNull;
-import android.app.AppOpsManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -98,6 +97,10 @@ import javax.security.auth.x500.X500Principal;
 @AppModeFull(reason = "Appops state changes disallowed for instant apps (OP_ACTIVATE_PLATFORM_VPN)")
 public class Ikev2VpnTest {
     private static final String TAG = Ikev2VpnTest.class.getSimpleName();
+
+    // TODO: make AppOpsManager.OP_ACTIVATE_VPN API
+    private static final int OP_ACTIVATE_VPN = 47;
+    private static final int OP_ACTIVATE_PLATFORM_VPN = 94;
 
     @Rule
     public final DevSdkIgnoreRule ignoreRule = new DevSdkIgnoreRule();
@@ -219,8 +222,8 @@ public class Ikev2VpnTest {
         for (TestableNetworkCallback callback : mCallbacksToUnregister) {
             sCM.unregisterNetworkCallback(callback);
         }
-        setAppop(AppOpsManager.OP_ACTIVATE_VPN, false);
-        setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, false);
+        setAppop(OP_ACTIVATE_VPN, false);
+        setAppop(OP_ACTIVATE_PLATFORM_VPN, false);
 
         // Make sure the VpnProfile is not provisioned already.
         sVpnMgr.stopProvisionedVpnProfile();
@@ -265,12 +268,20 @@ public class Ikev2VpnTest {
             builder.setAutomaticNattKeepaliveTimerEnabled(automaticNattKeepaliveTimerEnabled);
         }
 
-        // TODO: replace it in alternative way to remove the hidden method usage
         if (isRestrictedToTestNetworks) {
-            builder.restrictToTestNetworks();
+            restrictToTestNetworks(builder);
         }
 
         return builder.build();
+    }
+
+    private void restrictToTestNetworks(@NonNull Ikev2VpnProfile.Builder builder) {
+        try {
+            // TODO: replace it in alternative way to remove the hidden method usage
+            builder.getClass().getMethod("restrictToTestNetworks").invoke(builder);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private Ikev2VpnProfile buildIkev2VpnProfileIkeTunConnParams(
@@ -288,9 +299,8 @@ public class Ikev2VpnTest {
                         .setMaxMtu(TEST_MTU)
                         .setMetered(false);
 
-        // TODO: replace it in alternative way to remove the hidden method usage
         if (isRestrictedToTestNetworks) {
-            builder.restrictToTestNetworks();
+            restrictToTestNetworks(builder);
         }
         return builder.build();
     }
@@ -335,7 +345,8 @@ public class Ikev2VpnTest {
         assertTrue(profile.isBypassable());
         assertFalse(profile.isMetered());
         assertEquals(TEST_MTU, profile.getMaxMtu());
-        assertFalse(profile.isRestrictedToTestNetworks());
+        assertFalse((boolean) profile.getClass().getMethod("isRestrictedToTestNetworks")
+                .invoke(profile));
     }
 
     public void doTestBuildIkev2VpnProfilePsk(final boolean requiresValidation) throws Exception {
@@ -427,8 +438,8 @@ public class Ikev2VpnTest {
             throws Exception {
         assumeTrue(mCtsNetUtils.hasIpsecTunnelsFeature());
 
-        setAppop(AppOpsManager.OP_ACTIVATE_VPN, hasActivateVpn);
-        setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, hasActivatePlatformVpn);
+        setAppop(OP_ACTIVATE_VPN, hasActivateVpn);
+        setAppop(OP_ACTIVATE_PLATFORM_VPN, hasActivatePlatformVpn);
 
         final Ikev2VpnProfile profile = buildIkev2VpnProfilePsk(TEST_SERVER_ADDR_V6,
                 false /* isRestrictedToTestNetworks */, false /* requiresValidation */);
@@ -472,19 +483,19 @@ public class Ikev2VpnTest {
     public void testDeleteVpnProfile() throws Exception {
         assumeTrue(mCtsNetUtils.hasIpsecTunnelsFeature());
 
-        setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, true);
+        setAppop(OP_ACTIVATE_PLATFORM_VPN, true);
 
         final Ikev2VpnProfile profile = buildIkev2VpnProfilePsk(TEST_SERVER_ADDR_V6,
                 false /* isRestrictedToTestNetworks */, false /* requiresValidation */);
         assertNull(sVpnMgr.provisionVpnProfile(profile));
 
         // Verify that deleting the profile works (even without the appop)
-        setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, false);
+        setAppop(OP_ACTIVATE_PLATFORM_VPN, false);
         sVpnMgr.deleteProvisionedVpnProfile();
 
         // Test that the profile was deleted - starting it should throw an IAE.
         try {
-            setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, true);
+            setAppop(OP_ACTIVATE_PLATFORM_VPN, true);
             sVpnMgr.startProvisionedVpnProfile();
             fail("Expected IllegalArgumentException due to missing profile");
         } catch (IllegalArgumentException expected) {
@@ -495,8 +506,8 @@ public class Ikev2VpnTest {
     public void testStartVpnProfileNoPreviousConsent() throws Exception {
         assumeTrue(mCtsNetUtils.hasIpsecTunnelsFeature());
 
-        setAppop(AppOpsManager.OP_ACTIVATE_VPN, false);
-        setAppop(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, false);
+        setAppop(OP_ACTIVATE_VPN, false);
+        setAppop(OP_ACTIVATE_PLATFORM_VPN, false);
 
         // Make sure the VpnProfile is not provisioned already.
         sVpnMgr.stopProvisionedVpnProfile();
@@ -518,7 +529,7 @@ public class Ikev2VpnTest {
         boolean hasNat = !testIpv6;
 
         // Requires MANAGE_TEST_NETWORKS to provision a test-mode profile.
-        mCtsNetUtils.setAppopPrivileged(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN, true);
+        mCtsNetUtils.setAppopPrivileged(OP_ACTIVATE_PLATFORM_VPN, true);
 
         final Ikev2VpnProfile profile = testIkeTunConnParams
                 ? buildIkev2VpnProfileIkeTunConnParams(true /* isRestrictedToTestNetworks */,
