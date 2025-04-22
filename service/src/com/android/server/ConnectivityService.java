@@ -653,6 +653,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     static final int PREFERENCE_ORDER_INVALID = Integer.MAX_VALUE;
     // As a security feature, VPNs have the top priority.
     static final int PREFERENCE_ORDER_VPN = 0; // Netd supports only 0 for VPN.
+    // Shell command has the next highest priority.
+    static final int PREFERENCE_ORDER_DEBUG_FALLBACK = 3;
     // Order of per-app OEM preference. See {@link #setOemNetworkPreference}.
     @VisibleForTesting
     static final int PREFERENCE_ORDER_OEM = 10;
@@ -1880,9 +1882,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mNetworkRequestStateStatsMetrics = mDeps.makeNetworkRequestStateStatsMetrics(mContext);
         final NetworkRequest defaultInternetRequest = createDefaultRequest();
         mDefaultRequest = new NetworkRequestInfo(
-                Process.myUid(), defaultInternetRequest, null,
-                null /* binder */, NetworkCallback.FLAG_INCLUDE_LOCATION_INFO,
-                null /* attributionTags */, DECLARED_METHODS_NONE);
+                Process.myUid(), Collections.singletonList(defaultInternetRequest),
+                PREFERENCE_ORDER_INVALID);
         mNetworkRequests.put(defaultInternetRequest, mDefaultRequest);
         mDefaultNetworkRequests.add(mDefaultRequest);
         mNetworkRequestInfoLogs.log("REGISTER " + mDefaultRequest);
@@ -2291,10 +2292,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
 
         if (enable) {
-            handleRegisterNetworkRequest(new NetworkRequestInfo(
-                    Process.myUid(), networkRequest, null /* messenger */, null /* binder */,
-                    NetworkCallback.FLAG_INCLUDE_LOCATION_INFO,
-                    null /* attributionTags */, DECLARED_METHODS_NONE));
+            handleRegisterNetworkRequest(new NetworkRequestInfo(Process.myUid(),
+                    Collections.singletonList(networkRequest), PREFERENCE_ORDER_INVALID));
         } else {
             handleReleaseNetworkRequest(networkRequest, Process.SYSTEM_UID,
                     /* callOnUnavailable */ false);
@@ -6021,46 +6020,48 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         // For example, declaring it a potential satisfier would keep an unvalidated destroyed
         // candidate after it's been replaced by another unvalidated network.
         if (candidate.isDestroyed()) return false;
-        // Listen requests won't keep up a network satisfying it. If this is not a multilayer
-        // request, return immediately. For multilayer requests, check to see if any of the
-        // multilayer requests may have a potential satisfier.
-        if (!nri.isMultilayerRequest() && (nri.mRequests.get(0).isListen()
-                || nri.mRequests.get(0).isListenForBest())) {
-            return false;
-        }
+
         for (final NetworkRequest req : nri.mRequests) {
-            // This multilayer listen request is satisfied therefore no further requests need to be
-            // evaluated deeming this network not a potential satisfier.
-            if ((req.isListen() || req.isListenForBest()) && nri.getActiveRequest() == req) {
+            // If the active request is of a type that does not cause the network to be kept up,
+            // the network cannot be a potential satisfier: even if there are requests after this
+            // request in the list, they cannot become the active request, and therefore, cannot
+            // cause this network to be kept up.
+            // Note that this determination can only be made after evaluating previous requests in
+            // the array, because those requests might make the network a potential satisfier even
+            // if they are not currently active (e.g., they might currently be satisfied by another
+            // network with a higher score than this one).
+            if (!req.isRequest() && nri.getActiveRequest() == req) {
                 return false;
             }
-            // As non-multilayer listen requests have already returned, the below would only happen
-            // for a multilayer request therefore continue to the next request if available.
-            if (req.isListen() || req.isListenForBest()) {
-                continue;
-            }
-            // If there is hope for this network might validate and subsequently become the best
-            // network for that request, then it is needed. Note that this network can't already
-            // be the best for this request, or it would be the current satisfier, and therefore
-            // there would be no need to call this method to find out if it is a *potential*
-            // satisfier ("unneeded", the only caller, only calls this if this network currently
-            // satisfies no request).
-            if (candidate.satisfies(req)) {
-                // As soon as a network is found that satisfies a request, return. Specifically for
-                // multilayer requests, returning as soon as a NetworkAgentInfo satisfies a request
-                // is important so as to not evaluate lower priority requests further in
-                // nri.mRequests.
-                final NetworkAgentInfo champion = req.equals(nri.getActiveRequest())
-                        ? nri.getSatisfier() : null;
-                // Note that this catches two important cases:
-                // 1. Unvalidated cellular will not be reaped when unvalidated WiFi
-                //    is currently satisfying the request.  This is desirable when
-                //    cellular ends up validating but WiFi does not.
-                // 2. Unvalidated WiFi will not be reaped when validated cellular
-                //    is currently satisfying the request.  This is desirable when
-                //    WiFi ends up validating and out scoring cellular.
-                return mNetworkRanker.mightBeat(req, champion, candidate.getValidatedScoreable());
-            }
+
+            // This request type does not cause the network to be kept up and therefore does not
+            // cause the network to be a potential satisfier. Later requests in the list might.
+            if (!req.isRequest()) continue;
+
+            // The network can never be a potential satisfier for the request because it does not
+            // satisfy it. Later requests in the list might.
+            if (!candidate.satisfies(req)) continue;
+
+            // This request could cause the network to be kept up if and only if it could become the
+            // best network for the request by validating.
+            // Note that this network can't already be the best for this request, or it would be the
+            // current satisfier. Because this code is only called if the candidate network is
+            // satisfying zero requests, there are only two cases here:
+            // - The request is not being satisfied by any network (i.e., getActiveRequest() is not
+            //   this request).
+            // - The request is satisfied by another network and this network might (or might not)
+            //   beat it by validating.
+            // Note that this catches two important cases:
+            // 1. Unvalidated cellular will not be reaped when unvalidated WiFi
+            //    is currently satisfying the request.  This is desirable when
+            //    cellular ends up validating but WiFi does not.
+            // 2. Unvalidated WiFi will not be reaped when validated cellular
+            //    is currently satisfying the request.  This is desirable when
+            //    WiFi ends up validating and out scoring cellular.
+            if (req != nri.getActiveRequest()) return true;
+
+            final NetworkAgentInfo champion = nri.getSatisfier();
+            return mNetworkRanker.mightBeat(req, champion, candidate.getValidatedScoreable());
         }
 
         return false;
@@ -8009,69 +8010,68 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             return (null == uids) ? new ArraySet<>() : uids;
         }
 
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r,
-                @Nullable final PendingIntent pi, @Nullable String callingAttributionTag) {
-            this(asUid, Collections.singletonList(r), r, pi, callingAttributionTag,
-                    PREFERENCE_ORDER_INVALID);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
+        /** Internal-only constructor, used by the other constructors. */
+        private NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
                 @NonNull final NetworkRequest requestForCallback, @Nullable final PendingIntent pi,
+                @Nullable Messenger messenger, @Nullable IBinder binder,
+                @NetworkCallback.Flag int callbackFlags, int declaredMethodsFlags,
                 @Nullable String callingAttributionTag, final int preferenceOrder) {
+            if (pi != null) {
+                // Got passed a PendingIntent.
+                if (messenger != null || binder != null
+                        || callbackFlags != NetworkCallback.FLAG_NONE
+                        || declaredMethodsFlags != DECLARED_METHODS_NONE) {
+                    throw new IllegalArgumentException(
+                            "NRI with PendingIntent cannot pass in callback parameters");
+                }
+            }
             ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = requestForCallback;
             mPendingIntent = pi;
-            mMessenger = null;
-            mBinder = null;
-            mPid = getCallingPid();
-            mUid = mDeps.getCallingUid();
-            mAsUid = asUid;
-            mPerUidCounter = getRequestCounter(this);
-            /**
-             * Location sensitive data not included in pending intent. Only included in
-             * {@link NetworkCallback}.
-             */
-            mCallbackFlags = NetworkCallback.FLAG_NONE;
-            mCallingAttributionTag = callingAttributionTag;
-            mPreferenceOrder = preferenceOrder;
-            mDeclaredMethodsFlags = DECLARED_METHODS_NONE;
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r, @Nullable final Messenger m,
-                @Nullable final IBinder binder,
-                @NetworkCallback.Flag int callbackFlags,
-                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
-            this(asUid, Collections.singletonList(r), r, m, binder, callbackFlags,
-                    callingAttributionTag, declaredMethodsFlags);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
-                @NonNull final NetworkRequest requestForCallback, @Nullable final Messenger m,
-                @Nullable final IBinder binder,
-                @NetworkCallback.Flag int callbackFlags,
-                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
-            super();
-            ensureAllNetworkRequestsHaveSupportedType(r);
-            mRequests = initializeRequests(r);
-            mNetworkRequestForCallback = requestForCallback;
-            mMessenger = m;
+            mMessenger = messenger;
             mBinder = binder;
             mPid = getCallingPid();
             mUid = mDeps.getCallingUid();
             mAsUid = asUid;
-            mPendingIntent = null;
             mPerUidCounter = getRequestCounter(this);
             mCallbackFlags = callbackFlags;
             mCallingAttributionTag = callingAttributionTag;
-            mPreferenceOrder = PREFERENCE_ORDER_INVALID;
+            mPreferenceOrder = preferenceOrder;
             mDeclaredMethodsFlags = declaredMethodsFlags;
             linkDeathRecipient();
         }
 
+        /** Constructs a NetworkRequestInfo for a PendingIntent-based API */
+        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest request,
+                @Nullable final PendingIntent pi, @Nullable String callingAttributionTag) {
+            this(asUid, Collections.singletonList(request), request, pi, null /* messenger */,
+                    null /* binder */, NetworkCallback.FLAG_NONE, DECLARED_METHODS_NONE,
+                    callingAttributionTag, PREFERENCE_ORDER_INVALID);
+        }
+
+        /* Constructs a NetworkRequestInfo for a NetworkCallback-based API */
+        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
+                @NonNull final NetworkRequest requestForCallback, @Nullable final Messenger m,
+                @Nullable final IBinder b,
+                @NetworkCallback.Flag int callbackFlags,
+                @Nullable String callingAttributionTag, int declaredMethodsFlags) {
+            // In multilayer request, or for a TRACK_DEFAULT request that tracks a per-app default
+            // network, requestForCallback is not the same as the first request.
+            this(asUid, r, requestForCallback, null /* pi */, m, b, callbackFlags,
+                    declaredMethodsFlags, callingAttributionTag, PREFERENCE_ORDER_INVALID);
+        }
+
+        /* Constructs a NetworkRequestInfo for internal system usage */
+        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r, int preferenceOrder) {
+            this(asUid, r, r.get(0), null /* pi */, null /* messenger */,
+                    null /* binder */, NetworkCallback.FLAG_NONE, DECLARED_METHODS_NONE,
+                    null /* callingAttributionTag */, preferenceOrder);
+
+        }
+
         NetworkRequestInfo(@NonNull final NetworkRequestInfo nri,
                 @NonNull final List<NetworkRequest> r) {
-            super();
             ensureAllNetworkRequestsHaveSupportedType(r);
             mRequests = initializeRequests(r);
             mNetworkRequestForCallback = nri.getNetworkRequestForCallback();
@@ -8110,16 +8110,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             mPreferenceOrder = PREFERENCE_ORDER_INVALID;
             mDeclaredMethodsFlags = nri.mDeclaredMethodsFlags;
             linkDeathRecipient();
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final NetworkRequest r) {
-            this(asUid, Collections.singletonList(r), PREFERENCE_ORDER_INVALID);
-        }
-
-        NetworkRequestInfo(int asUid, @NonNull final List<NetworkRequest> r,
-                final int preferenceOrder) {
-            this(asUid, r, r.get(0), null /* pi */, null /* callingAttributionTag */,
-                    preferenceOrder);
         }
 
         // True if this NRI is being satisfied. It also accounts for if the nri has its satisifer
@@ -9033,7 +9023,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         NetworkRequest networkRequest = new NetworkRequest(nc, TYPE_NONE, nextNetworkRequestId(),
                 NetworkRequest.Type.LISTEN);
         NetworkRequestInfo nri =
-                new NetworkRequestInfo(callingUid, networkRequest, messenger, binder, callbackFlags,
+                new NetworkRequestInfo(callingUid, Collections.singletonList(networkRequest),
+                        networkRequest, messenger, binder, callbackFlags,
                         callingAttributionTag, declaredMethodsFlag);
         if (VDBG) log("listenForNetwork for " + nri);
 
@@ -10772,10 +10763,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             final NetworkRequest nr = new NetworkRequest(newCaps, ConnectivityManager.TYPE_NONE,
                     nextNetworkRequestId(), LISTEN_FOR_BEST);
             configBuilder.setUpstreamSelector(nr);
-            final NetworkRequestInfo nri = new NetworkRequestInfo(
-                    nai.creatorUid, nr, null /* messenger */, null /* binder */,
-                    0 /* callbackFlags */, null /* attributionTag */,
-                    DECLARED_METHODS_NONE);
+            final NetworkRequestInfo nri = new NetworkRequestInfo(nai.creatorUid,
+                    Collections.singletonList(nr), PREFERENCE_ORDER_INVALID);
             if (null != oldSatisfier) {
                 // Set the old satisfier in the new NRI so that the rematch will see any changes
                 nri.setSatisfier(oldSatisfier, nr);
@@ -12767,6 +12756,32 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
 
+        private void setDebugFallbackNetworkForUid(int uid, int transportType) {
+            final NetworkCapabilities nc = new NetworkCapabilities()
+                    .addTransportType(transportType)
+                    .addCapability(NET_CAPABILITY_INTERNET)
+                    .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
+                    .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED);
+            Set<Integer> uids = Set.of(uid);
+            Set<NetworkRequestInfo> nris = createNrisForFallbackDefault(uids, nc,
+                    PREFERENCE_ORDER_DEBUG_FALLBACK);
+            addPerAppDefaultNetworkRequests(nris);
+        }
+
+        private void clearDebugFallbackNetworkForUid(int uid) {
+            removeDefaultNetworkRequests((nri) ->
+                    nri.getPreferenceOrderForNetd() == PREFERENCE_ORDER_DEBUG_FALLBACK
+                    && nri.getUids().equals(Set.of(new UidRange(uid, uid))));
+            // Calling addPerAppDefaultNetworkRequests with an empty set here is necessary to
+            // make sure that the default network callbacks filed by this UID track the
+            // correct default network request.
+            // ConnectivityService makes sure that default network callbacks filed by UIDs track
+            // the correct default requests by removing and re-filing all of these requests
+            // whenever any of the default requests change. This work is done by
+            // addPerAppDefaultNetworkRequests. See its implementation for details.
+            addPerAppDefaultNetworkRequests(new ArraySet<>());
+        }
+
         @Override
         public int onCommand(String cmd) {
             if (cmd == null) {
@@ -12915,6 +12930,24 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         pw.println(ret);
                         return 0;
                     }
+                    case "set-debug-fallback-network-for-uid":
+                    case "clear-debug-fallback-network-for-uid": {
+                        if (!Build.isDebuggable()) {
+                            throw new SecurityException(
+                                    "Setting per-UID fallback network requires debuggable build");
+                        }
+                        final int uid = Integer.parseInt(getNextArg());
+                        boolean set = cmd.startsWith("set");
+                        final int transportType = set ? Integer.parseInt(getNextArg()) : TYPE_NONE;
+                        mHandler.post(() -> {
+                            clearDebugFallbackNetworkForUid(uid);
+                            if (set) {
+                                setDebugFallbackNetworkForUid(uid, transportType);
+                            }
+                            rematchAllNetworksAndRequests();
+                        });
+                        return 0;
+                    }
                     default:
                         return handleDefaultCommands(cmd);
                 }
@@ -12947,6 +12980,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             pw.println("    Set the allow bit in FIREWALL_CHAIN_BACKGROUND for the given uid.");
             pw.println("  get-background-networking-enabled-for-uid [uid]");
             pw.println("    Get the allow bit in FIREWALL_CHAIN_BACKGROUND for the given uid.");
+            if (Build.isDebuggable()) {
+                pw.println("  set-debug-fallback-network-for-uid [uid] [transport]");
+                pw.println("    Sets [uid] to use [transport] as its default network when there is"
+                        + " no system default network.");
+                pw.println("  clear-per-debug-fallback-network-for-uid [uid]");
+                pw.println("    Clears a previous set-debug-fallback-network-for-uid command");
+            }
         }
     }
 
@@ -13519,7 +13559,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         // nri is not bound to the death of callback. Instead, callback.bindToDeath() is set in
         // handleRegisterConnectivityDiagnosticsCallback(). nri will be cleaned up as part of the
         // callback's binder death.
-        final NetworkRequestInfo nri = new NetworkRequestInfo(callingUid, requestWithId);
+        final NetworkRequestInfo nri = new NetworkRequestInfo(callingUid /* asUid */,
+                Collections.singletonList(requestWithId), PREFERENCE_ORDER_INVALID);
         nri.mPerUidCounter.incrementCountOrThrow(nri.mUid);
         final ConnectivityDiagnosticsCallbackInfo cbInfo =
                 new ConnectivityDiagnosticsCallbackInfo(callback, nri, callingPackageName);
@@ -14624,9 +14665,28 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private void removeDefaultNetworkRequestsForPreference(final int preferenceOrder) {
         removeDefaultNetworkRequests((nri) -> nri.mPreferenceOrder == preferenceOrder);
     }
+
+    /**
+     * Add a list of NRIs as default requests, and update per-app callbacks that track them.
+     */
+    // TODO : this method gathers and updates the callbacks tracking the per-app NRIs, which
+    // is confusing for a method called "add". Importantly, callers of the
+    // removeDefaultNetworkRequest* methods above must call this after they call the remove
+    // method, or any callback tracking a removed method will not be updated.
+    // Adding the defaults to mDefaultNetworkRequests must happen before gathering the callbacks
+    // to update, but registering the nris in the argument must happen after doing so.
     private void addPerAppDefaultNetworkRequests(@NonNull final Set<NetworkRequestInfo> nris) {
         ensureRunningOnConnectivityServiceThread();
         mDefaultNetworkRequests.addAll(nris);
+        // getPerAppCallbackRequestsToUpdate gathers all the per-app callbacks that either
+        // - have been tracking a per-app default nri so far (see isPerAppTrackedNri), or
+        // - should now be tracking a per-app default nri (which is why mDefaultNetworkRequests
+        //   need to be updated before calling it).
+        // All of these requests will be removed below and re-created in such a way as to
+        // now track the new default nri for this UID (including if this is the system
+        // default nri), by copying the list of requests in the default nri, but copying
+        // the callbackForRequest (so it can continue updating the same callback) and the
+        // current satisfier (so the rematch will know what the old satisfier was).
         final ArraySet<NetworkRequestInfo> perAppCallbackRequestsToUpdate =
                 getPerAppCallbackRequestsToUpdate();
         final ArraySet<NetworkRequestInfo> nrisToRegister = new ArraySet<>(nris);
