@@ -279,6 +279,9 @@ class BroadcastReceiveHelperTest {
 
     private fun processOnHandlerThread(function: Runnable) {
         handler.post { function.run() }
+        // Wait twice since the onReceive defers actual handling logic to another message.
+        // See BroadcastReceiveHelper#HandlerPostReceiver.
+        handler.waitForIdle(HANDLER_TIMEOUT_MS)
         handler.waitForIdle(HANDLER_TIMEOUT_MS)
     }
 }

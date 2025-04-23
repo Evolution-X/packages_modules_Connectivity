@@ -29,6 +29,8 @@ import android.util.Log;
 
 import com.android.net.module.util.HandlerUtils;
 
+import java.util.function.Consumer;
+
 /**
  * Helper class for ConnectivityService to listen for broadcast intents and
  * provide callbacks on a given {@link HandlerThread}.
@@ -38,6 +40,9 @@ public class BroadcastReceiveHelper {
     private final Context mContext;
     private final Handler mHandler;
     private final Delegate mCallback;
+    private final DeferredBroadcastReceiver mPackageIntentReceiver;
+    private final DeferredBroadcastReceiver mUserIntentReceiver;
+    private final DeferredBroadcastReceiver mExternalAppIntentReceiver;
 
     /**
      * Interface defining the callback methods for package and user related events.
@@ -98,9 +103,13 @@ public class BroadcastReceiveHelper {
      */
     public BroadcastReceiveHelper(@NonNull Context context,
             @NonNull final Handler handler, @NonNull Delegate callback) {
-        this.mContext = context;
-        this.mHandler = handler;
-        this.mCallback = callback;
+        mContext = context;
+        mHandler = handler;
+        mCallback = callback;
+        mPackageIntentReceiver = new DeferredBroadcastReceiver(mHandler, this::handlePackageIntent);
+        mExternalAppIntentReceiver =
+                new DeferredBroadcastReceiver(mHandler, this::handleExternalAppIntent);
+        mUserIntentReceiver = new DeferredBroadcastReceiver(mHandler, this::handleUserIntent);
     }
 
     /**
@@ -112,7 +121,6 @@ public class BroadcastReceiveHelper {
         final Context userAllContext = mContext.createContextAsUser(UserHandle.ALL, 0 /* flags */);
 
         // Listen to user events.
-        // TODO: Receive intents inline and post them to the handler.
         final IntentFilter userIntentFilter = new IntentFilter();
         userIntentFilter.addAction(Intent.ACTION_USER_ADDED);
         userIntentFilter.addAction(Intent.ACTION_USER_REMOVED);
@@ -153,78 +161,93 @@ public class BroadcastReceiveHelper {
         }
     }
 
-    private final BroadcastReceiver mPackageIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+    /**
+     * A light-weighted {@link BroadcastReceiver} that dispatches the
+     * received {@link Intent} handling using a {@link Handler}.
+     *
+     * <p>This class is for offloading potentially time-consuming or blocking
+     * operations triggered by broadcast events, preventing Application Not Responding
+     * (ANR) errors.</p>
+     */
+    private static class DeferredBroadcastReceiver extends BroadcastReceiver {
+        private final Handler mHandler;
+        private final Consumer<Intent> mIntentConsumer;
 
-            final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
-            final Uri packageData = intent.getData();
-            // AOSP never sends null data in the intent (see
-            // BroadcastHelper#sendPostInstallBroadcasts)
-            // but OEMs may have modified this code.
-            if (packageData == null) {
-                Log.wtf(TAG, "Intent received with null data: " + intent);
-                return;
-            }
-            final String packageName = packageData.getSchemeSpecificPart();
-
-            switch (intent.getAction()) {
-                case Intent.ACTION_PACKAGE_ADDED: {
-                    mCallback.onPackageAdded(packageName, uid);
-                    break;
-                }
-                case Intent.ACTION_PACKAGE_REMOVED: {
-                    mCallback.onPackageRemoved(packageName, uid);
-                    break;
-                }
-                case Intent.ACTION_PACKAGE_REPLACED: {
-                    mCallback.onPackageReplaced(packageName, uid);
-                    break;
-                }
-                default:
-                    Log.wtf(TAG, "received unexpected intent: " + intent.getAction());
-            }
+        DeferredBroadcastReceiver(@NonNull Handler handler,
+                @NonNull Consumer<Intent> intentConsumer) {
+            mHandler = handler;
+            mIntentConsumer = intentConsumer;
         }
-    };
 
-    private final BroadcastReceiver mExternalAppIntentReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(Context context, @NonNull Intent intent) {
             HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-            switch (intent.getAction()) {
-                case Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE: {
-                    final String[] pkgList =
-                            intent.getStringArrayExtra(Intent.EXTRA_CHANGED_PACKAGE_LIST);
-                    mCallback.onExternalApplicationsAvailable(pkgList);
-                    break;
-                }
-                default:
-                    Log.wtf(TAG, "received unexpected intent: " + intent.getAction());
-            }
+            mHandler.post(() -> mIntentConsumer.accept(intent));
         }
-    };
+    }
 
-    private final BroadcastReceiver mUserIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            HandlerUtils.ensureRunningOnHandlerThread(mHandler);
-            final String action = intent.getAction();
-            final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
-
-            // User should be filled for below intents, check the existence.
-            if (user == null) {
-                Log.wtf(TAG, intent.getAction() + " broadcast without EXTRA_USER");
-                return;
-            }
-
-            if (Intent.ACTION_USER_ADDED.equals(action)) {
-                mCallback.onUserAdded(user);
-            } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
-                mCallback.onUserRemoved(user);
-            }  else {
-                Log.wtf(TAG, "received unexpected intent: " + action);
-            }
+    private void handlePackageIntent(Intent intent) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
+        final Uri packageData = intent.getData();
+        // AOSP never sends null data in the intent (see
+        // BroadcastHelper#sendPostInstallBroadcasts)
+        // but OEMs may have modified this code.
+        if (packageData == null) {
+            Log.wtf(TAG, "Intent received with null data: " + intent);
+            return;
         }
-    };
+        final String packageName = packageData.getSchemeSpecificPart();
+
+        switch (intent.getAction()) {
+            case Intent.ACTION_PACKAGE_ADDED: {
+                mCallback.onPackageAdded(packageName, uid);
+                break;
+            }
+            case Intent.ACTION_PACKAGE_REMOVED: {
+                mCallback.onPackageRemoved(packageName, uid);
+                break;
+            }
+            case Intent.ACTION_PACKAGE_REPLACED: {
+                mCallback.onPackageReplaced(packageName, uid);
+                break;
+            }
+            default:
+                Log.wtf(TAG, "received unexpected intent: " + intent.getAction());
+        }
+    }
+
+    private void handleExternalAppIntent(Intent intent) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        switch (intent.getAction()) {
+            case Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE: {
+                final String[] pkgList =
+                        intent.getStringArrayExtra(Intent.EXTRA_CHANGED_PACKAGE_LIST);
+                mCallback.onExternalApplicationsAvailable(pkgList);
+                break;
+            }
+            default:
+                Log.wtf(TAG, "received unexpected intent: " + intent.getAction());
+        }
+    }
+
+    private void handleUserIntent(Intent intent) {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        final String action = intent.getAction();
+        final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
+
+        // User should be filled for below intents, check the existence.
+        if (user == null) {
+            Log.wtf(TAG, intent.getAction() + " broadcast without EXTRA_USER");
+            return;
+        }
+
+        if (Intent.ACTION_USER_ADDED.equals(action)) {
+            mCallback.onUserAdded(user);
+        } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
+            mCallback.onUserRemoved(user);
+        }  else {
+            Log.wtf(TAG, "received unexpected intent: " + action);
+        }
+    }
 }
