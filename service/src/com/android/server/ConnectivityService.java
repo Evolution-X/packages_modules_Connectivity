@@ -362,6 +362,7 @@ import com.android.server.connectivity.ApplicationSelfCertifiedNetworkCapabiliti
 import com.android.server.connectivity.AutodestructReference;
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker;
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker.AutomaticOnOffKeepalive;
+import com.android.server.connectivity.BroadcastReceiveHelper;
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator;
 import com.android.server.connectivity.ClatCoordinator;
 import com.android.server.connectivity.ConnectivityFlags;
@@ -439,7 +440,8 @@ import java.util.function.Predicate;
  * @hide
  */
 @TargetApi(Build.VERSION_CODES.S)
-public class ConnectivityService extends IConnectivityManager.Stub {
+public class ConnectivityService extends IConnectivityManager.Stub
+        implements BroadcastReceiveHelper.Delegate {
     private static final String TAG = ConnectivityService.class.getSimpleName();
 
     private static final String DIAG_ARG = "--diag";
@@ -527,6 +529,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private final MockableSystemProperties mSystemProperties;
 
     private final PermissionMonitor mPermissionMonitor;
+
+    private final BroadcastReceiveHelper mBroadcastReceiveHelper;
 
     @VisibleForTesting
     final RequestInfoPerUidCounter mNetworkRequestCounter;
@@ -1944,6 +1948,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mTrackerHandler = new NetworkStateTrackerHandler(mHandlerThread.getLooper());
         mConnectivityDiagnosticsHandler =
                 new ConnectivityDiagnosticsHandler(mHandlerThread.getLooper());
+        mBroadcastReceiveHelper = new BroadcastReceiveHelper(mContext, mHandler, this);
 
         mReleasePendingIntentDelayMs = Settings.Secure.getInt(context.getContentResolver(),
                 ConnectivitySettingsManager.CONNECTIVITY_RELEASE_PENDING_INTENT_DELAY_MS, 5_000);
@@ -2011,22 +2016,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mUserManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
 
         mUserAllContext = mContext.createContextAsUser(UserHandle.ALL, 0 /* flags */);
-        // Listen for user add/removes to inform PermissionMonitor.
-        // Should run on mHandler to avoid any races.
-        final IntentFilter userIntentFilter = new IntentFilter();
-        userIntentFilter.addAction(Intent.ACTION_USER_ADDED);
-        userIntentFilter.addAction(Intent.ACTION_USER_REMOVED);
-        mUserAllContext.registerReceiver(mUserIntentReceiver, userIntentFilter,
-                null /* broadcastPermission */, mHandler);
-
-        // Listen to package add/removes for netd
-        final IntentFilter packageIntentFilter = new IntentFilter();
-        packageIntentFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
-        packageIntentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        packageIntentFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
-        packageIntentFilter.addDataScheme("package");
-        mUserAllContext.registerReceiver(mPackageIntentReceiver, packageIntentFilter,
-                null /* broadcastPermission */, mHandler);
+        // TODO: Move all intent receivers to the helper class.
+        mBroadcastReceiveHelper.registerReceivers();
 
         // This is needed for pre-V devices to propagate the data saver status
         // to the BPF map. This isn't supported before Android T because BPF maps are
@@ -7723,14 +7714,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         }
     }
 
-    private void onUserAdded(@NonNull final UserHandle user) {
+    @Override
+    public void onUserAdded(@NonNull final UserHandle user) {
         if (mOemNetworkPreferences.getNetworkPreferences().size() > 0) {
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
         updateProfileAllowedNetworks();
+        mPermissionMonitor.onUserAdded(user);
     }
 
-    private void onUserRemoved(@NonNull final UserHandle user) {
+    @Override
+    public void onUserRemoved(@NonNull final UserHandle user) {
         // If there was a network preference for this user, remove it.
         handleSetProfileNetworkPreference(
                 List.of(new ProfileNetworkPreferenceInfo(user, null, true,
@@ -7739,9 +7733,35 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         if (mOemNetworkPreferences.getNetworkPreferences().size() > 0) {
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
+        mPermissionMonitor.onUserRemoved(user);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onUserRemoved(user);
+        }
     }
 
-    private void onPackageChanged(@NonNull final String packageName) {
+    @Override
+    public void onPackageAdded(@NonNull final String packageName, final int uid) {
+        handlePackageChanged(packageName);
+        mPermissionMonitor.onPackageAdded(packageName, uid);
+    }
+
+    @Override
+    public void onPackageRemoved(@NonNull final String packageName, final int uid) {
+        handlePackageChanged(packageName);
+        mPermissionMonitor.onPackageRemoved(packageName, uid);
+    }
+
+    @Override
+    public void onPackageReplaced(@NonNull final String packageName, final int uid) {
+        handlePackageChanged(packageName);
+    }
+
+    @Override
+    public void onExternalApplicationsAvailable(@Nullable String[] pkgList) {
+        mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+    }
+
+    private void handlePackageChanged(@NonNull final String packageName) {
         // This is necessary in case a package is added or removed, but also when it's replaced to
         // run as a new UID by its manifest rules. Also, if a separate package shares the same UID
         // as one in the preferences, then it should follow the same routing as that other package,
@@ -7756,45 +7776,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             mSelfCertifiedCapabilityCache.remove(packageName);
         }
     }
-
-    private final BroadcastReceiver mUserIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            ensureRunningOnConnectivityServiceThread();
-            final String action = intent.getAction();
-            final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
-
-            // User should be filled for below intents, check the existence.
-            if (user == null) {
-                Log.wtf(TAG, intent.getAction() + " broadcast without EXTRA_USER");
-                return;
-            }
-
-            if (Intent.ACTION_USER_ADDED.equals(action)) {
-                onUserAdded(user);
-            } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
-                onUserRemoved(user);
-            }  else {
-                Log.wtf(TAG, "received unexpected intent: " + action);
-            }
-        }
-    };
-
-    private final BroadcastReceiver mPackageIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            ensureRunningOnConnectivityServiceThread();
-            switch (intent.getAction()) {
-                case Intent.ACTION_PACKAGE_ADDED:
-                case Intent.ACTION_PACKAGE_REMOVED:
-                case Intent.ACTION_PACKAGE_REPLACED:
-                    onPackageChanged(intent.getData().getSchemeSpecificPart());
-                    break;
-                default:
-                    Log.wtf(TAG, "received unexpected intent: " + intent.getAction());
-            }
-        }
-    };
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private final BroadcastReceiver mDataSaverReceiver = new BroadcastReceiver() {

@@ -20,10 +20,7 @@ import android.Manifest;
 import android.annotation.NonNull;
 import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Handler;
@@ -45,7 +42,6 @@ import java.util.function.Consumer;
  * Tracks the uid of all the default messaging application which are role_sms role and
  * satellite_communication permission complaint and requests ConnectivityService to create multi
  * layer request with satellite internet access support for the default message application.
- * @hide
  */
 public class SatelliteAccessController {
     private static final String TAG = SatelliteAccessController.class.getSimpleName();
@@ -217,23 +213,6 @@ public class SatelliteAccessController {
 
         // register sms OnRoleHoldersChangedListener
         mDefaultMessageRoleListener.register();
-
-        // Monitor for User removal intent, to update satellite fallback uids.
-        IntentFilter userRemovedFilter = new IntentFilter(Intent.ACTION_USER_REMOVED);
-        mContext.registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                final String action = intent.getAction();
-                if (Intent.ACTION_USER_REMOVED.equals(action)) {
-                    final UserHandle userHandle = intent.getParcelableExtra(Intent.EXTRA_USER);
-                    if (userHandle == null) return;
-                    updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
-                } else {
-                    Log.wtf(TAG, "received unexpected intent: " + action);
-                }
-            }
-        }, userRemovedFilter, null, mConnectivityServiceHandler);
-
     }
 
     private void updateAllUserRoleSmsUids() {
@@ -247,6 +226,15 @@ public class SatelliteAccessController {
         for (UserHandle userHandle : existingUsers) {
             onRoleSmsChanged(userHandle);
         }
+    }
+
+    /**
+     * Called when a user is removed. See {link #ACTION_USER_REMOVED}.
+     *
+     * @param userHandle The userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
+     */
+    public void onUserRemoved(@NonNull UserHandle userHandle) {
+        updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
     }
 
     private void updateSatelliteFallbackUidListOnUserRemoval(int userIdRemoved) {
