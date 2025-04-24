@@ -17,6 +17,7 @@
 package com.android.server.connectivity;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -25,10 +26,12 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.util.Log;
 
 import com.android.net.module.util.HandlerUtils;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -81,6 +84,12 @@ public class BroadcastReceiveHelper {
 
         /**
          * Called when a new user has been added to the device.
+         *
+         * Note that {@link #callOnUserAddedForExistingUsers} will iterate through all
+         * existing users on the device and triggers the {@link Delegate#onUserAdded(UserHandle)}
+         * callback inline for each user.
+         * This is needed to ensure the callback is invoked for users
+         * that were present before this listener was started.
          *
          * @param userHandle The {@link UserHandle} of the user that was added.
          */
@@ -144,6 +153,22 @@ public class BroadcastReceiveHelper {
                 new IntentFilter(Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE);
         userAllContext.registerReceiver(mExternalAppIntentReceiver, externalIntentFilter,
                 null /* broadcastPermission */, mHandler);
+    }
+
+    /**
+     * Iterates through all existing users on the device and trigger the
+     * {@link Delegate#onUserAdded(UserHandle)} callback inline for each user.
+     * This method should be called to ensure the callback is invoked for users
+     * that were present before this listener was started.
+     */
+    @SuppressLint("MissingPermission")
+    public void callOnUserAddedForExistingUsers() {
+        HandlerUtils.ensureRunningOnHandlerThread(mHandler);
+        final UserManager userManager = mContext.getSystemService(UserManager.class);
+        final List<UserHandle> users = userManager.getUserHandles(true /* excludeDying */);
+        for (final UserHandle user : users) {
+            mCallback.onUserAdded(user);
+        }
     }
 
     /**

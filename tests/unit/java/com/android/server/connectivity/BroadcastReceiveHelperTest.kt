@@ -32,6 +32,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.UserHandle
+import android.os.UserManager
 import com.android.compatibility.common.util.MoreMatchers.anyOrNull
 import com.android.server.connectivity.BroadcastReceiveHelper.Delegate
 import com.android.testutils.DevSdkIgnoreRunner
@@ -57,9 +58,9 @@ private inline fun <reified T> any() = org.mockito.Mockito.any(T::class.java)
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
 class BroadcastReceiveHelperTest {
-
     private val mockContext = mock(Context::class.java)
     private val mockDelegate = mock(Delegate::class.java)
+    private val mockUserManager = mock(UserManager::class.java)
 
     // Create an InOrder object to verify the sequence of delegate calls.
     private val delegateInOrderVerifier = org.mockito.Mockito.inOrder(mockDelegate)
@@ -81,6 +82,7 @@ class BroadcastReceiveHelperTest {
         broadcastReceiveHelper = BroadcastReceiveHelper(mockContext, handler, mockDelegate)
 
         // Capture intent receivers.
+        doReturn(mockUserManager).`when`(mockContext).getSystemService(UserManager::class.java)
         doReturn(mockContext).`when`(mockContext).createContextAsUser(UserHandle.ALL, 0)
         broadcastReceiveHelper.registerReceivers()
         userReceiver = captureIntentReceiver(ACTION_USER_ADDED)
@@ -283,5 +285,22 @@ class BroadcastReceiveHelperTest {
         // See BroadcastReceiveHelper#HandlerPostReceiver.
         handler.waitForIdle(HANDLER_TIMEOUT_MS)
         handler.waitForIdle(HANDLER_TIMEOUT_MS)
+    }
+
+    @Test
+    fun testCallOnUserAddedForInitialUsers() {
+        // Mock existing users.
+        val existingUser1 = mock(UserHandle::class.java)
+        val existingUser2 = mock(UserHandle::class.java)
+        val existingUsers = listOf(existingUser1, existingUser2)
+        doReturn(existingUsers).`when`(mockUserManager).getUserHandles(any())
+        // Make sure there is no interactions.
+        delegateInOrderVerifier.verifyNoMoreInteractions()
+
+        // Verify that onUserAdded is called for each existing user.
+        processOnHandlerThread { broadcastReceiveHelper.callOnUserAddedForExistingUsers() }
+        delegateInOrderVerifier.verify(mockDelegate).onUserAdded(existingUser1)
+        delegateInOrderVerifier.verify(mockDelegate).onUserAdded(existingUser2)
+        delegateInOrderVerifier.verifyNoMoreInteractions()
     }
 }
