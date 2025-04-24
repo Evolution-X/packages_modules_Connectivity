@@ -42,10 +42,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.compat.CompatChanges;
 import android.content.AttributionSource;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -63,7 +60,6 @@ import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemConfigManager;
 import android.os.UserHandle;
-import android.os.UserManager;
 import android.permission.PermissionManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
@@ -90,8 +86,6 @@ import java.util.Set;
 /**
  * A utility class to inform Netd of UID permissions.
  * Does a mass update at boot and then monitors for app install/remove.
- *
- * @hide
  */
 public class PermissionMonitor {
     private static final String TAG = "PermissionMonitor";
@@ -99,7 +93,6 @@ public class PermissionMonitor {
     private static final int VERSION_Q = Build.VERSION_CODES.Q;
 
     private final PackageManager mPackageManager;
-    private final UserManager mUserManager;
     private final SystemConfigManager mSystemConfigManager;
     private final PermissionManager mPermissionManager;
     private final PermissionChangeListener mPermissionChangeListener;
@@ -163,49 +156,6 @@ public class PermissionMonitor {
 
     private static final int MAX_PERMISSION_UPDATE_LOGS = 40;
     private final SharedLog mPermissionUpdateLogs = new SharedLog(MAX_PERMISSION_UPDATE_LOGS, TAG);
-
-    private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-
-            if (Intent.ACTION_PACKAGE_ADDED.equals(action)) {
-                final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
-                final Uri packageData = intent.getData();
-                final String packageName =
-                        packageData != null ? packageData.getSchemeSpecificPart() : null;
-                onPackageAdded(packageName, uid);
-            } else if (Intent.ACTION_PACKAGE_REMOVED.equals(action)) {
-                final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
-                final Uri packageData = intent.getData();
-                final String packageName =
-                        packageData != null ? packageData.getSchemeSpecificPart() : null;
-                onPackageRemoved(packageName, uid);
-            } else if (Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE.equals(action)) {
-                final String[] pkgList =
-                        intent.getStringArrayExtra(Intent.EXTRA_CHANGED_PACKAGE_LIST);
-                onExternalApplicationsAvailable(pkgList);
-            } else if (Intent.ACTION_USER_ADDED.equals(action)) {
-                final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
-                // User should be filled for below intents, check the existence.
-                if (user == null) {
-                    Log.wtf(TAG, action + " broadcast without EXTRA_USER");
-                    return;
-                }
-                onUserAdded(user);
-            } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
-                final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
-                // User should be filled for below intents, check the existence.
-                if (user == null) {
-                    Log.wtf(TAG, action + " broadcast without EXTRA_USER");
-                    return;
-                }
-                onUserRemoved(user);
-            } else {
-                Log.wtf(TAG, "received unexpected intent: " + action);
-            }
-        }
-    };
 
     /**
      * Dependencies of PermissionMonitor, for injection in tests.
@@ -285,7 +235,6 @@ public class PermissionMonitor {
             @NonNull final Dependencies deps,
             @NonNull final HandlerThread thread) {
         mPackageManager = context.getPackageManager();
-        mUserManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
         mSystemConfigManager = context.getSystemService(SystemConfigManager.class);
         mPermissionManager = context.getSystemService(PermissionManager.class);
         mPermissionChangeListener = new PermissionChangeListener();
@@ -345,10 +294,6 @@ public class PermissionMonitor {
         // This is relied on strict order of network permissions (SYSTEM > NETWORK > NONE), and it
         // is enforced in tests.
         return targetPermission > currentPermission;
-    }
-
-    private List<PackageInfo> getInstalledPackagesAsUser(final UserHandle user) {
-        return mPackageManager.getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
     }
 
     private synchronized void updateAllApps(final List<PackageInfo> apps) {
@@ -455,35 +400,17 @@ public class PermissionMonitor {
         return appIdsPerm;
     }
 
-    // Intended to be called only once at startup, after the system is ready. Installs a broadcast
-    // receiver to monitor ongoing UID changes, so this shouldn't/needn't be called again.
-    public synchronized void startMonitoring() {
-        log("Monitoring");
+    /**
+     * Initializer of this class.
+     *
+     * Intended to be called only once at startup, in the systemReady phase.
+     * This shouldn't/needn't be called again.
+     */
+    public synchronized void initialize() {
+        log("Initialize");
 
         final Handler handler = new Handler(mThread.getLooper());
         final Context userAllContext = mContext.createContextAsUser(UserHandle.ALL, 0 /* flags */);
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
-        intentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        intentFilter.addDataScheme("package");
-        userAllContext.registerReceiver(
-                mIntentReceiver, intentFilter, null /* broadcastPermission */, handler);
-
-        // Listen to EXTERNAL_APPLICATIONS_AVAILABLE is that an app becoming available means it may
-        // need to gain a permission. But an app that becomes unavailable can neither gain nor lose
-        // permissions on that account, it just can no longer run. Thus, doesn't need to listen to
-        // EXTERNAL_APPLICATIONS_UNAVAILABLE.
-        final IntentFilter externalIntentFilter =
-                new IntentFilter(Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE);
-        userAllContext.registerReceiver(
-                mIntentReceiver, externalIntentFilter, null /* broadcastPermission */, handler);
-
-        // Listen for user add/remove.
-        final IntentFilter userIntentFilter = new IntentFilter();
-        userIntentFilter.addAction(Intent.ACTION_USER_ADDED);
-        userIntentFilter.addAction(Intent.ACTION_USER_REMOVED);
-        userAllContext.registerReceiver(
-                mIntentReceiver, userIntentFilter, null /* broadcastPermission */, handler);
 
         // Register UIDS_ALLOWED_ON_RESTRICTED_NETWORKS setting observer
         mDeps.registerContentObserver(
@@ -505,12 +432,7 @@ public class PermissionMonitor {
         // are not specific to any particular user.
         mUsersTrafficPermissions.put(UserHandle.ALL, getSystemTrafficPerm());
 
-        final List<UserHandle> usrs = mUserManager.getUserHandles(true /* excludeDying */);
-        // Update netd permissions for all users.
-        for (UserHandle user : usrs) {
-            onUserAdded(user);
-        }
-        log("Users: " + mUsers.size() + ", UidToNetworkPerm: " + mUidToNetworkPerm.size());
+        log("UidToNetworkPerm: " + mUidToNetworkPerm.size());
     }
 
     @VisibleForTesting
@@ -621,15 +543,13 @@ public class PermissionMonitor {
     /**
      * Called when a user is added. See {link #ACTION_USER_ADDED}.
      *
-     * @param user The integer userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
-     *
-     * @hide
+     * @param user The userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
+     * @param apps The list of packages which is installed on the user.
      */
-    @VisibleForTesting
-    synchronized void onUserAdded(@NonNull UserHandle user) {
+    public synchronized void onUserAddedWithInstalledPackageList(@NonNull UserHandle user,
+            @NonNull List<PackageInfo> apps) {
+        ensureRunningOnHandlerThread();
         mUsers.add(user);
-
-        final List<PackageInfo> apps = getInstalledPackagesAsUser(user);
 
         // Save all apps in mAllApps
         updateAllApps(apps);
@@ -653,12 +573,10 @@ public class PermissionMonitor {
     /**
      * Called when an user is removed. See {link #ACTION_USER_REMOVED}.
      *
-     * @param user The integer userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
-     *
-     * @hide
+     * @param user The userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
      */
-    @VisibleForTesting
-    synchronized void onUserRemoved(@NonNull UserHandle user) {
+    public synchronized void onUserRemoved(@NonNull UserHandle user) {
+        ensureRunningOnHandlerThread();
         mUsers.remove(user);
 
         // Remove uids network permissions that belongs to the user.
@@ -840,11 +758,9 @@ public class PermissionMonitor {
      *
      * @param packageName The name of the new package.
      * @param uid The uid of the new package.
-     *
-     * @hide
      */
-    @VisibleForTesting
-    synchronized void onPackageAdded(@NonNull final String packageName, final int uid) {
+    public synchronized void onPackageAdded(@NonNull final String packageName, final int uid) {
+        ensureRunningOnHandlerThread();
         // Update uid permission.
         updateAppIdTrafficPermission(uid);
         // Get the appId permission from all users then send the latest permission to netd.
@@ -905,11 +821,9 @@ public class PermissionMonitor {
      *
      * @param packageName The name of the removed package or null.
      * @param uid containing the integer uid previously assigned to the package.
-     *
-     * @hide
      */
-    @VisibleForTesting
-    synchronized void onPackageRemoved(@NonNull final String packageName, final int uid) {
+    public synchronized void onPackageRemoved(@NonNull final String packageName, final int uid) {
+        ensureRunningOnHandlerThread();
         // Update uid permission.
         updateAppIdTrafficPermission(uid);
         if (BpfNetMaps.isAtLeast25Q2()) {
@@ -1185,8 +1099,6 @@ public class PermissionMonitor {
      *
      * @param appId the appId of the package installed
      * @param permissions the permissions the app requested and netd cares about.
-     *
-     * @hide
      */
     @VisibleForTesting
     void sendPackagePermissionsForAppId(int appId, int permissions) {
@@ -1204,8 +1116,6 @@ public class PermissionMonitor {
      *
      * @param netdPermissionsAppIds integer pairs of appIds and the permission granted to it. If the
      * permission is 0, revoke all permissions of that appId.
-     *
-     * @hide
      */
     @VisibleForTesting
     void sendAppIdsTrafficPermission(SparseIntArray netdPermissionsAppIds) {
@@ -1307,7 +1217,13 @@ public class PermissionMonitor {
                 + ", remove=" + removedUids);
     }
 
-    private synchronized void onExternalApplicationsAvailable(String[] pkgList) {
+    /**
+     * Called when external applications are available.
+     *
+     * @param pkgList The package names of the external applications.
+     */
+    public synchronized void onExternalApplicationsAvailable(String[] pkgList) {
+        ensureRunningOnHandlerThread();
         if (CollectionUtils.isEmpty(pkgList)) {
             Log.e(TAG, "No available external application.");
             return;
