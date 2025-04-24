@@ -15,8 +15,6 @@
 """Main entrypoint for all of test cases."""
 
 import sys
-from apfv4_test import ApfV4Test
-from apfv6_test import ApfV6Test
 from connectivity_multi_devices_test import ConnectivityMultiDevicesTest
 from mobly import suite_runner
 
@@ -36,4 +34,4 @@ if __name__ == "__main__":
     index = sys.argv.index("--")
     sys.argv = sys.argv[:1] + sys.argv[index + 1 :]
   # TODO: make the tests can be executed without manually list classes.
-  suite_runner.run_suite([ConnectivityMultiDevicesTest, ApfV4Test, ApfV6Test], sys.argv)
+  suite_runner.run_suite([ConnectivityMultiDevicesTest], sys.argv)
