@@ -43,6 +43,8 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 
+import javax.annotation.CheckReturnValue;
+
 /**
  * Tracks the uid of all the default messaging application which are role_sms role and
  * satellite_communication permission complaint and requests ConnectivityService to create multi
@@ -145,6 +147,8 @@ public class SatelliteAccessController {
         mSupportConstrainedDataSatelliteOptIn = mDeps.supportConstrainedDataSatelliteOptIn(c);
     }
 
+    // TODO: Rename to updateSatelliteSmsRoleUidListCache since Opt-In apps are also
+    //  fallback uids.
     private Set<Integer> updateSatelliteNetworkFallbackUidListCache(List<String> packageNames,
             @NonNull UserHandle userHandle) {
         Set<Integer> fallbackUids = new ArraySet<>();
@@ -229,11 +233,13 @@ public class SatelliteAccessController {
             mergedSatelliteNetworkFallbackUidCache.addAll(
                     mAllUsersSatelliteNetworkFallbackUidCache.valueAt(i));
         }
-        Log.i(TAG, "merged uid list for multi layer request : "
-                + mergedSatelliteNetworkFallbackUidCache);
+        Log.i(TAG, "SmsRoleUids: " + mergedSatelliteNetworkFallbackUidCache
+                + " Opt-InUids:" + mSatelliteDataOptimizedUids);
 
         // trigger multiple layer request for satellite network fallback of multi user uids
-        mCallback.accept(mergedSatelliteNetworkFallbackUidCache, Set.of());
+        final ArraySet<Integer> optimizedApps = new ArraySet(mSatelliteDataOptimizedUids);
+        optimizedApps.removeAll(mergedSatelliteNetworkFallbackUidCache);
+        mCallback.accept(mergedSatelliteNetworkFallbackUidCache, optimizedApps);
     }
 
     public void start() {
@@ -241,12 +247,14 @@ public class SatelliteAccessController {
         mDefaultMessageRoleListener.register();
     }
 
-    private void updateSatelliteFallbackUidListOnUserRemoval(int userIdRemoved) {
+    @CheckReturnValue
+    private boolean updateSatelliteFallbackUidListOnUserRemoval(int userIdRemoved) {
         Log.i(TAG, "user id removed:" + userIdRemoved);
         if (mAllUsersSatelliteNetworkFallbackUidCache.contains(userIdRemoved)) {
             mAllUsersSatelliteNetworkFallbackUidCache.remove(userIdRemoved);
-            reportSatelliteNetworkFallbackUids();
+            return true; // Changed.
         }
+        return false; // Unchanged.
     }
 
     /**
@@ -269,7 +277,10 @@ public class SatelliteAccessController {
                 getSatelliteDataOptimizedAppsForUser(apps);
         Log.i(TAG, "Add SatelliteDataOptimizedApps + for user " + userHandle + ": "
                 + satelliteDataOptimizedAppsForUser);
-        mSatelliteDataOptimizedUids.addAll(satelliteDataOptimizedAppsForUser);
+        if (satelliteDataOptimizedAppsForUser.size() > 0) {
+            mSatelliteDataOptimizedUids.addAll(satelliteDataOptimizedAppsForUser);
+            reportSatelliteNetworkFallbackUids();
+        }
     }
 
     /**
@@ -278,9 +289,17 @@ public class SatelliteAccessController {
      * @param userHandle The integer userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
      */
     public void onUserRemoved(@NonNull UserHandle userHandle) {
-        updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
+        final boolean smsRoleUidsChanged =
+                updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
+        final boolean mDataOptimizedUidChanged;
         if (mSupportConstrainedDataSatelliteOptIn) {
-            removeSatelliteDataOptimizedAppsForUser(userHandle.getIdentifier());
+            mDataOptimizedUidChanged =
+                    removeSatelliteDataOptimizedUidsForUser(userHandle.getIdentifier());
+        } else {
+            mDataOptimizedUidChanged = false;
+        }
+        if (smsRoleUidsChanged || mDataOptimizedUidChanged) {
+            reportSatelliteNetworkFallbackUids();
         }
     }
 
@@ -293,6 +312,7 @@ public class SatelliteAccessController {
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
         if (mSupportConstrainedDataSatelliteOptIn && isSatelliteDataOptimizedApp(packageName)) {
             mSatelliteDataOptimizedUids.add(uid);
+            reportSatelliteNetworkFallbackUids();
         }
     }
 
@@ -317,18 +337,7 @@ public class SatelliteAccessController {
         // If the loop completes without returning, it means no other
         // satellite-optimized app shares the UID.
         mSatelliteDataOptimizedUids.remove(uid);
-    }
-
-    /** Checks if the given UID is in the set of satellite data optimized UIDs. */
-    @VisibleForTesting
-    public boolean isSatelliteDataOptimizedUid(int uid) {
-        return mSatelliteDataOptimizedUids.contains(uid);
-    }
-
-    /** Gets the number of satellite data optimized UIDs being tracked. */
-    @VisibleForTesting
-    public int getSatelliteDataOptimizedUidCount() {
-        return mSatelliteDataOptimizedUids.size();
+        reportSatelliteNetworkFallbackUids();
     }
 
     @NonNull
@@ -351,7 +360,9 @@ public class SatelliteAccessController {
         }
     }
 
-    private void removeSatelliteDataOptimizedAppsForUser(int userIdToRemove) {
-        mSatelliteDataOptimizedUids.removeIf(uid -> uid / PER_USER_RANGE == userIdToRemove);
+    // Return true if changed.
+    @CheckReturnValue
+    private boolean removeSatelliteDataOptimizedUidsForUser(int userIdToRemove) {
+        return mSatelliteDataOptimizedUids.removeIf(uid -> uid / PER_USER_RANGE == userIdToRemove);
     }
 }
