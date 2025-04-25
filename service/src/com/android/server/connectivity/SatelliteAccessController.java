@@ -16,22 +16,27 @@
 
 package com.android.server.connectivity;
 
+import static android.os.Process.INVALID_UID;
+
+import static com.android.server.connectivity.ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_OPTIN;
+
 import android.Manifest;
 import android.annotation.NonNull;
 import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Handler;
-import android.os.Process;
 import android.os.UserHandle;
-import android.os.UserManager;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.net.module.util.DeviceConfigUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -45,16 +50,31 @@ import java.util.function.Consumer;
  */
 public class SatelliteAccessController {
     private static final String TAG = SatelliteAccessController.class.getSimpleName();
+    // Shamelessly copied from telephony/satellite/SatelliteManager.java.
+    @VisibleForTesting
+    public static final String PROPERTY_SATELLITE_DATA_OPTIMIZED =
+            "android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED";
+    // This value is taken from android.os.UserHandle#PER_USER_RANGE.
+    @VisibleForTesting
+    public static final int PER_USER_RANGE = 100000;
     private final Context mContext;
     private final Dependencies mDeps;
     private final DefaultMessageRoleListener mDefaultMessageRoleListener;
     private final Consumer<Set<Integer>> mCallback;
     private final Handler mConnectivityServiceHandler;
+    private final PackageManager mPackageManager;
+    private final boolean mSupportConstrainedDataSatelliteOptIn;
 
     // At this sparseArray, Key is userId and values are uids of SMS apps that are allowed
     // to use satellite network as fallback.
     private final SparseArray<Set<Integer>> mAllUsersSatelliteNetworkFallbackUidCache =
             new SparseArray<>();
+
+    // Set of UIDs that have declared the
+    // {@code android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED} property
+    // with a value of package name in their manifest file. This variable will only be
+    // accessed on the handler thread.
+    private final Set<Integer> mSatelliteDataOptimizedUids = new ArraySet<>();
 
     /**
      *  Monitor {@link android.app.role.OnRoleHoldersChangedListener#onRoleHoldersChanged(String,
@@ -104,6 +124,12 @@ public class SatelliteAccessController {
                 @NonNull OnRoleHoldersChangedListener listener, UserHandle user) {
             mRoleManager.addOnRoleHoldersChangedListenerAsUser(executor, listener, user);
         }
+
+        /** Return whether constrained data satellite opt-in is supported. */
+        public boolean supportConstrainedDataSatelliteOptIn(Context context) {
+            return DeviceConfigUtils.isTetheringFeatureNotChickenedOut(context,
+                    CONSTRAINED_DATA_SATELLITE_OPTIN);
+        }
     }
 
     @VisibleForTesting
@@ -115,6 +141,8 @@ public class SatelliteAccessController {
         mDefaultMessageRoleListener = new DefaultMessageRoleListener();
         mCallback = callback;
         mConnectivityServiceHandler = connectivityServiceInternalHandler;
+        mPackageManager = mContext.getPackageManager();
+        mSupportConstrainedDataSatelliteOptIn = mDeps.supportConstrainedDataSatelliteOptIn(c);
     }
 
     private Set<Integer> updateSatelliteNetworkFallbackUidListCache(List<String> packageNames,
@@ -129,7 +157,7 @@ public class SatelliteAccessController {
                 // cache list.
                 if (isSatellitePermissionEnabled(pm, packageName)) {
                     int uid = getUidForPackage(pm, packageName);
-                    if (uid != Process.INVALID_UID) {
+                    if (uid != INVALID_UID) {
                         fallbackUids.add(uid);
                     }
                 }
@@ -150,7 +178,7 @@ public class SatelliteAccessController {
 
     private int getUidForPackage(PackageManager packageManager, String pkgName) {
         if (pkgName == null) {
-            return Process.INVALID_UID;
+            return INVALID_UID;
         }
         try {
             ApplicationInfo applicationInfo = packageManager.getApplicationInfo(pkgName, 0);
@@ -158,13 +186,13 @@ public class SatelliteAccessController {
         } catch (PackageManager.NameNotFoundException exception) {
             Log.e(TAG, "Unable to find uid for package: " + pkgName);
         }
-        return Process.INVALID_UID;
+        return INVALID_UID;
     }
 
     // on Role sms change triggered by OnRoleHoldersChangedListener()
     private void onRoleSmsChanged(@NonNull UserHandle userHandle) {
         int userId = userHandle.getIdentifier();
-        if (userId == Process.INVALID_UID) {
+        if (userId == INVALID_UID) {
             Log.wtf(TAG, "Invalid User Id");
             return;
         }
@@ -209,32 +237,8 @@ public class SatelliteAccessController {
     }
 
     public void start() {
-        mConnectivityServiceHandler.post(this::updateAllUserRoleSmsUids);
-
         // register sms OnRoleHoldersChangedListener
         mDefaultMessageRoleListener.register();
-    }
-
-    private void updateAllUserRoleSmsUids() {
-        UserManager userManager = mContext.getSystemService(UserManager.class);
-        // get existing user handles of available users
-        List<UserHandle> existingUsers = userManager.getUserHandles(true /*excludeDying*/);
-
-        // Iterate through the user handles and obtain their uids with role sms and satellite
-        // communication permission
-        Log.i(TAG, "existing users: " + existingUsers);
-        for (UserHandle userHandle : existingUsers) {
-            onRoleSmsChanged(userHandle);
-        }
-    }
-
-    /**
-     * Called when a user is removed. See {link #ACTION_USER_REMOVED}.
-     *
-     * @param userHandle The userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
-     */
-    public void onUserRemoved(@NonNull UserHandle userHandle) {
-        updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
     }
 
     private void updateSatelliteFallbackUidListOnUserRemoval(int userIdRemoved) {
@@ -243,5 +247,111 @@ public class SatelliteAccessController {
             mAllUsersSatelliteNetworkFallbackUidCache.remove(userIdRemoved);
             reportSatelliteNetworkFallbackUids();
         }
+    }
+
+    /**
+     * Called when a user is added. See {link #ACTION_USER_ADDED}.
+     *
+     * Note that this method will also be called at start up once on the handler thread
+     * to iterate through all existing users.
+     *
+     * @param userHandle The userHandle of the added user. See {@link #EXTRA_USER_HANDLE}.
+     * @param apps The list of packages which is installed on the user.
+     */
+    public void onUserAddedWithInstalledPackageList(@NonNull UserHandle userHandle,
+            @NonNull List<PackageInfo> apps) {
+        // Obtain uids with role sms and satellite communication permission for the added user.
+        onRoleSmsChanged(userHandle);
+
+        if (!mSupportConstrainedDataSatelliteOptIn) return;
+
+        final Set<Integer> satelliteDataOptimizedAppsForUser =
+                getSatelliteDataOptimizedAppsForUser(apps);
+        Log.i(TAG, "Add SatelliteDataOptimizedApps + for user " + userHandle + ": "
+                + satelliteDataOptimizedAppsForUser);
+        mSatelliteDataOptimizedUids.addAll(satelliteDataOptimizedAppsForUser);
+    }
+
+    /**
+     * Called when a user is removed. See {link #ACTION_USER_REMOVED}.
+     *
+     * @param userHandle The integer userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
+     */
+    public void onUserRemoved(@NonNull UserHandle userHandle) {
+        updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
+        if (mSupportConstrainedDataSatelliteOptIn) {
+            removeSatelliteDataOptimizedAppsForUser(userHandle.getIdentifier());
+        }
+    }
+
+    /**
+     * Called when a package is added.
+     *
+     * @param packageName The name of the new package.
+     * @param uid The uid of the new package.
+     */
+    public void onPackageAdded(@NonNull final String packageName, final int uid) {
+        if (mSupportConstrainedDataSatelliteOptIn && isSatelliteDataOptimizedApp(packageName)) {
+            mSatelliteDataOptimizedUids.add(uid);
+        }
+    }
+
+    /**
+     * Called when a package is removed.
+     *
+     * @param packageName The name of the removed package or null.
+     * @param uid containing the integer uid previously assigned to the package.
+     */
+    public void onPackageRemoved(@NonNull final String packageName, final int uid) {
+        if (!mSupportConstrainedDataSatelliteOptIn) return;
+
+        // Scan for all apps sharing the same uid.
+        final String [] pkgs = mPackageManager.getPackagesForUid(uid);
+        if (pkgs != null) {
+            for (String pkg : pkgs) {
+                if (!pkg.equals(packageName) && isSatelliteDataOptimizedApp(pkg)) {
+                    return; // Early return if another satellite-optimized app shares the UID
+                }
+            }
+        }
+        // If the loop completes without returning, it means no other
+        // satellite-optimized app shares the UID.
+        mSatelliteDataOptimizedUids.remove(uid);
+    }
+
+    /** Checks if the given UID is in the set of satellite data optimized UIDs. */
+    @VisibleForTesting
+    public boolean isSatelliteDataOptimizedUid(int uid) {
+        return mSatelliteDataOptimizedUids.contains(uid);
+    }
+
+    /** Gets the number of satellite data optimized UIDs being tracked. */
+    @VisibleForTesting
+    public int getSatelliteDataOptimizedUidCount() {
+        return mSatelliteDataOptimizedUids.size();
+    }
+
+    @NonNull
+    private Set<Integer> getSatelliteDataOptimizedAppsForUser(@NonNull List<PackageInfo> apps) {
+        final ArraySet<Integer> uids = new ArraySet<>();
+        for (PackageInfo app : apps) {
+            if (null == app.applicationInfo || app.applicationInfo.uid < 0) continue;
+            if (isSatelliteDataOptimizedApp(app.packageName)) uids.add(app.applicationInfo.uid);
+        }
+        return uids;
+    }
+
+    private boolean isSatelliteDataOptimizedApp(@NonNull String packageName) {
+        try {
+            final PackageManager.Property property = mPackageManager
+                    .getProperty(PROPERTY_SATELLITE_DATA_OPTIMIZED, packageName);
+            return property.isString() && TextUtils.equals(property.getString(), packageName);
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    private void removeSatelliteDataOptimizedAppsForUser(int userIdToRemove) {
+        mSatelliteDataOptimizedUids.removeIf(uid -> uid / PER_USER_RANGE == userIdToRemove);
     }
 }
