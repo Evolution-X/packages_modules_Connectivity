@@ -36,7 +36,7 @@ import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
 import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
-import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.OnNetworkNeeded
+import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Needed
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import org.junit.Before
@@ -134,7 +134,7 @@ class CSNetworkReservationTest : CSTest() {
 
         // validate the offer does not receive onNetworkNeeded for reservation request
         offerCb.expectNoCallbackWhere {
-            it is OnNetworkNeeded && it.request.type == NetworkRequest.Type.RESERVATION
+            it is Needed && it.request.type == NetworkRequest.Type.RESERVATION
         }
     }
 
