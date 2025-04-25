@@ -18,18 +18,25 @@ package com.android.server
 
 import android.Manifest.permission.NETWORK_SETTINGS
 import android.annotation.SuppressLint
+import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED
 import android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED
 import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
+import android.net.NetworkCapabilities.TRANSPORT_TEST
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkProvider
 import android.net.NetworkScore
+import android.net.OemNetworkPreferences
+import android.net.OemNetworkPreferences.OEM_NETWORK_PREFERENCE_TEST
 import android.os.Build
+import android.os.ConditionVariable
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
+import android.os.UserHandle
 import androidx.test.filters.SmallTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
@@ -44,6 +51,9 @@ import com.android.testutils.runAsShell
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.any
+import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.eq
 
 const val UID1 = 184
 const val UID2 = 10184
@@ -71,6 +81,48 @@ class CSPreferenceTest : CSTest() {
     val ignoreRule = DevSdkIgnoreRule()
 
     val handler = Handler(Looper.getMainLooper())
+
+    @Test
+    fun testBasicOemPreference() {
+        val myAppId = UserHandle.getAppId(Process.myUid())
+        doAnswer { invocation ->
+            val handle = invocation.getArgument<UserHandle>(2)
+            ApplicationInfo().apply { uid = handle.getUid(myAppId) }
+        }.`when`(packageManager).getApplicationInfoAsUser(
+            eq(context.packageName),
+            eq(0), // flags
+            any<UserHandle>()
+        )
+
+        val wifiAgent = Agent(nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
+        wifiAgent.connect()
+        val testAgent = Agent(TRANSPORT_TEST)
+        testAgent.connect()
+
+        val cb = TestableNetworkCallback()
+        cm.registerDefaultNetworkCallback(cb)
+        cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
+
+        val pr = OemNetworkPreferences.Builder()
+            .addNetworkPreference(context.packageName, OEM_NETWORK_PREFERENCE_TEST)
+            .build()
+        val cv = ConditionVariable()
+        cm.setOemNetworkPreference(pr, Runnable::run) { cv.open() }
+        cv.block()
+
+        cb.expectAvailableCallbacks(testAgent.network, validated = false)
+
+        cv.close()
+        cm.setOemNetworkPreference(
+            OemNetworkPreferences.Builder().build(),
+            Runnable::run
+        ) {
+            cv.open()
+        }
+        cv.block()
+
+        cb.expectAvailableCallbacks(wifiAgent.network, validated = false)
+    }
 
     private fun ConnectivityManager.registerDefaultNetworkCallbackForUid(
         uid: Int,
