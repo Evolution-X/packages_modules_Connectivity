@@ -430,6 +430,9 @@ public class MdnsRecordRepository {
             this.isProbing = probing;
         }
 
+        boolean isActive() {
+            return !exiting && !mAdvertisingOptions.isOffloadOnly();
+        }
     }
 
     /**
@@ -609,7 +612,7 @@ public class MdnsRecordRepository {
     public MdnsAnnouncer.ExitAnnouncementInfo exitService(int id) {
         final ServiceRegistration registration = mServices.get(id);
         if (registration == null) return null;
-        if (registration.exiting) return null;
+        if (!registration.isActive()) return null;
 
         registration.exiting = true;
         final List<RecordInfo<MdnsPointerRecord>> filteredRecords = CollectionUtils.filter(
@@ -721,7 +724,9 @@ public class MdnsRecordRepository {
             // Add answers from each service
             for (int i = 0; i < mServices.size(); i++) {
                 final ServiceRegistration registration = mServices.valueAt(i);
-                if (registration.exiting || registration.isProbing) continue;
+                if (!registration.isActive() || registration.isProbing) {
+                    continue;
+                }
                 if (addReplyFromService(question, registration.allRecords, registration.ptrRecords,
                         registration.srvRecord, registration.txtRecord,
                         registration.serviceInfo.getHostname(),
@@ -1243,7 +1248,7 @@ public class MdnsRecordRepository {
             SparseIntArray conflictingWithRecord = new SparseIntArray();
             for (int i = 0; i < mServices.size(); i++) {
                 final ServiceRegistration registration = mServices.valueAt(i);
-                if (registration.exiting) continue;
+                if (!registration.isActive()) continue;
 
                 final RecordConflictType conflictForService =
                         conflictForService(record, registration);
@@ -1409,7 +1414,7 @@ public class MdnsRecordRepository {
         for (int i = 0; i < mServices.size(); ++i) {
             int id = mServices.keyAt(i);
             ServiceRegistration service = mServices.valueAt(i);
-            if (service.exiting) continue;
+            if (!service.isActive()) continue;
             if (DnsUtils.equalsIgnoreDnsCase(service.serviceInfo.getHostname(), hostname)) {
                 consumer.accept(id, service);
             }

@@ -285,7 +285,7 @@ public class MdnsInterfaceAdvertiser implements MulticastPacketReader.PacketHand
             mAnnouncer.stop(replacedExitingService);
         }
         final MdnsProber.ProbingInfo probingInfo = mRecordRepository.setServiceProbing(id);
-        if (advertisingOptions.skipProbing()) {
+        if (advertisingOptions.skipProbing() || advertisingOptions.isOffloadOnly()) {
             handleProbingFinished(probingInfo);
         } else {
             mProber.startProbing(probingInfo);

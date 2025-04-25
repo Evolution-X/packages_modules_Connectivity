@@ -36,16 +36,18 @@ public class MdnsAdvertisingOptions {
     private final Duration mTtl;
     private final boolean mSkipProbing;
     private final boolean mSkipSubtypeAnnouncements;
+    private final boolean mIsOffloadOnly;
 
     /**
      * Parcelable constructs for a {@link MdnsAdvertisingOptions}.
      */
     MdnsAdvertisingOptions(boolean isOnlyUpdate, @Nullable Duration ttl, boolean skipProbing,
-            boolean skipSubtypeAnnouncements) {
+            boolean skipSubtypeAnnouncements, boolean isOffloadOnly) {
         this.mIsOnlyUpdate = isOnlyUpdate;
         this.mTtl = ttl;
         this.mSkipProbing = skipProbing;
         this.mSkipSubtypeAnnouncements = skipSubtypeAnnouncements;
+        this.mIsOffloadOnly = isOffloadOnly;
     }
 
     /**
@@ -80,6 +82,13 @@ public class MdnsAdvertisingOptions {
     }
 
     /**
+     * @return {@code true} if this request is an offload only request.
+     */
+    public boolean isOffloadOnly() {
+        return mIsOffloadOnly;
+    }
+
+    /**
      * Returns the TTL for all records in a service.
      */
     @Nullable
@@ -105,13 +114,15 @@ public class MdnsAdvertisingOptions {
             return mIsOnlyUpdate == otherOptions.mIsOnlyUpdate
                     && mSkipProbing == otherOptions.mSkipProbing
                     && mSkipSubtypeAnnouncements == otherOptions.mSkipSubtypeAnnouncements
+                    && mIsOffloadOnly == otherOptions.mIsOffloadOnly
                     && Objects.equals(mTtl, otherOptions.mTtl);
         }
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mIsOnlyUpdate, mTtl, mSkipProbing, mSkipSubtypeAnnouncements);
+        return Objects.hash(mIsOnlyUpdate, mTtl, mSkipProbing, mSkipSubtypeAnnouncements,
+                mIsOffloadOnly);
     }
 
     @Override
@@ -131,6 +142,9 @@ public class MdnsAdvertisingOptions {
             sb.append(" ttl=");
             sb.append(mTtl);
         }
+        if (mIsOffloadOnly) {
+            sb.append(" isOffloadOnly");
+        }
         sb.append(" }");
         return sb.toString();
     }
@@ -142,6 +156,7 @@ public class MdnsAdvertisingOptions {
         private boolean mIsOnlyUpdate = false;
         private boolean mSkipProbing = false;
         private boolean mSkipSubtypeAnnouncements = false;
+        private boolean mIsOffloadOnly = false;
         @Nullable
         private Duration mTtl;
 
@@ -181,11 +196,19 @@ public class MdnsAdvertisingOptions {
         }
 
         /**
+         * Sets whether the request is offload only request or not.
+         */
+        public Builder setOffloadOnly(boolean isOffloadOnly) {
+            this.mIsOffloadOnly = isOffloadOnly;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsAdvertisingOptions} with the arguments supplied to this builder.
          */
         public MdnsAdvertisingOptions build() {
             return new MdnsAdvertisingOptions(mIsOnlyUpdate, mTtl, mSkipProbing,
-                    mSkipSubtypeAnnouncements);
+                    mSkipSubtypeAnnouncements, mIsOffloadOnly);
         }
     }
 }
