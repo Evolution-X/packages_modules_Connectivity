@@ -233,7 +233,7 @@ public class MdnsServiceTypeClient {
                         // then remove expired services, and notify listeners.
                         if (scheduler != null) {
                             scheduler.sendDelayedMessage(
-                                    handler.obtainMessage(EVENT_REMOVE_EXPIRED_SERVICES),
+                                    EVENT_REMOVE_EXPIRED_SERVICES, 0, 0, null /* obj */,
                                     REMOVE_SERVICE_AFTER_QUERY_SENT_TIME);
                         } else {
                             dependencies.sendMessageDelayed(
@@ -387,8 +387,8 @@ public class MdnsServiceTypeClient {
 
     private void setDelayedTask(ScheduledQueryTaskArgs args, long timeToNextTaskMs) {
         scheduler.removeDelayedMessage(EVENT_START_QUERYTASK);
-        scheduler.sendDelayedMessage(
-                handler.obtainMessage(EVENT_START_QUERYTASK, args), timeToNextTaskMs);
+        scheduler.sendDelayedMessage(EVENT_START_QUERYTASK, 0, 0, args,
+                timeToNextTaskMs);
     }
 
     /**

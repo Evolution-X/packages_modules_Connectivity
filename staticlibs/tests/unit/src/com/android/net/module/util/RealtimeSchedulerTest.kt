@@ -109,20 +109,15 @@ class RealtimeSchedulerTest {
             val cv = ConditionVariable()
             handler.post {
                 scheduler.sendDelayedMessage(
-                    Message.obtain(handler, MSG_ID_0, Pair(ConditionVariable(), executionTimes)), 0)
+                    MSG_ID_0, 0, 0, Pair(ConditionVariable(), executionTimes), 0)
                 scheduler.sendDelayedMessage(
-                    Message.obtain(handler, MSG_ID_1, Pair(ConditionVariable(), executionTimes)),
-                    200)
+                    MSG_ID_1, 0, 0, Pair(ConditionVariable(), executionTimes), 200)
                 scheduler.sendDelayedMessage(
-                    Message.obtain(handler, MSG_ID_4, Pair(ConditionVariable(), executionTimes)),
-                    250)
+                    MSG_ID_4, 0, 0, Pair(ConditionVariable(), executionTimes), 250)
                 scheduler.removeDelayedMessage(MSG_ID_4)
                 scheduler.sendDelayedMessage(
-                    Message.obtain(handler, MSG_ID_2, Pair(ConditionVariable(), executionTimes)),
-                    100)
-                scheduler.sendDelayedMessage(
-                    Message.obtain(handler, MSG_ID_3, Pair(cv, executionTimes)),
-                    300)
+                    MSG_ID_2, 0, 0, Pair(ConditionVariable(), executionTimes), 100)
+                scheduler.sendDelayedMessage(MSG_ID_3, 0, 0, Pair(cv, executionTimes), 300)
             }
             cv.block(TIMEOUT_MS)
             assertEquals(4, executionTimes.size)
