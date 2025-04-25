@@ -36,6 +36,7 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.IndentingPrintWriter;
 import com.android.net.module.util.DeviceConfigUtils;
 
 import java.util.List;
@@ -364,5 +365,19 @@ public class SatelliteAccessController {
     @CheckReturnValue
     private boolean removeSatelliteDataOptimizedUidsForUser(int userIdToRemove) {
         return mSatelliteDataOptimizedUids.removeIf(uid -> uid / PER_USER_RANGE == userIdToRemove);
+    }
+
+    /** Dump info to dumpsys */
+    public void dump(@NonNull IndentingPrintWriter pw) {
+        pw.println("SatelliteAccessController:");
+        pw.increaseIndent();
+        pw.print("Sms-Role Uids: ");
+        pw.print(mAllUsersSatelliteNetworkFallbackUidCache);
+        pw.println();
+        pw.print("Opt-In Uids: ");
+        pw.print(mSatelliteDataOptimizedUids);
+        pw.println();
+        pw.decreaseIndent();
+        pw.println();
     }
 }

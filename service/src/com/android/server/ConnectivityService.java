@@ -4558,6 +4558,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
         pw.decreaseIndent();
 
         pw.println();
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.dump(pw);
+        }
+
+        pw.println();
         pw.println("Legacy network activity:");
         pw.increaseIndent();
         mNetworkActivityTracker.dump(pw);
