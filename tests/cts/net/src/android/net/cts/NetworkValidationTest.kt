@@ -177,10 +177,11 @@ class NetworkValidationTest {
             cm.registerNetworkCallback(ethRequest, testCb)
 
             try {
-                val ncCb = testCb.eventuallyExpect<CallbackEntry.CapabilitiesChanged> {
+                val mark = testCb.mark
+                val ncCb = testCb.eventuallyExpect<CallbackEntry.CapabilitiesChanged>(from = mark) {
                     it.caps.hasCapability(NET_CAPABILITY_CAPTIVE_PORTAL)
                 }
-                testCb.eventuallyExpect<CallbackEntry.LinkPropertiesChanged> {
+                testCb.eventuallyExpect<CallbackEntry.LinkPropertiesChanged>(from = mark) {
                     it.network == ncCb.network && it.lp.captivePortalData != null
                 }.lp
             } finally {
