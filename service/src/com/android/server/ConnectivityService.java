@@ -7738,6 +7738,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         final List<PackageInfo> apps = mContext.getPackageManager()
                 .getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
         mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onUserAddedWithInstalledPackageList(user, apps);
+        }
     }
 
     @Override
@@ -7760,12 +7763,18 @@ public class ConnectivityService extends IConnectivityManager.Stub
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
         mPermissionMonitor.onPackageAdded(packageName, uid);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onPackageAdded(packageName, uid);
+        }
     }
 
     @Override
     public void onPackageRemoved(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
         mPermissionMonitor.onPackageRemoved(packageName, uid);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onPackageRemoved(packageName, uid);
+        }
     }
 
     @Override

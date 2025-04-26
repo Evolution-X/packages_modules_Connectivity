@@ -643,7 +643,7 @@ public class MdnsAdvertiser {
         public final @NonNull OffloadServiceInfo mOffloadServiceInfo;
         public final int mServiceId;
 
-        OffloadServiceInfoWrapper(int serviceId, OffloadServiceInfo offloadServiceInfo) {
+        public OffloadServiceInfoWrapper(int serviceId, OffloadServiceInfo offloadServiceInfo) {
             mOffloadServiceInfo = offloadServiceInfo;
             mServiceId = serviceId;
         }

@@ -257,13 +257,14 @@ public class MdnsServiceTypeClientTests {
         }).when(mockDeps).createScheduler(any(Handler.class));
 
         doAnswer(inv -> {
-            final Message temp = (Message) inv.getArguments()[0];
-            if (temp.what == EVENT_START_QUERYTASK) {
-                message = (Message) inv.getArguments()[0];
+            final int what = (int) inv.getArguments()[0];
+            if (what == EVENT_START_QUERYTASK) {
+                final Object obj = inv.getArguments()[3];
+                message = realHandler.obtainMessage(what, obj);
             }
-            latestDelayMs = (long) inv.getArguments()[1];
+            latestDelayMs = (long) inv.getArguments()[4];
             return null;
-        }).when(mockScheduler).sendDelayedMessage(any(), anyLong());
+        }).when(mockScheduler).sendDelayedMessage(anyInt(), anyInt(), anyInt(), any(), anyLong());
 
         client = makeMdnsServiceTypeClient(featureFlags);
     }
@@ -2208,9 +2209,9 @@ public class MdnsServiceTypeClientTests {
         verify(mockDeps, times(count)).sendMessage(
                 any(Handler.class), argThat(message -> message.what == EVENT_QUERY_RESULT));
         verify(mockScheduler, times(count)).sendDelayedMessage(
-                argThat(message -> message.what == EVENT_REMOVE_EXPIRED_SERVICES), anyLong());
+                eq(EVENT_REMOVE_EXPIRED_SERVICES), eq(0), eq(0), any(), anyLong());
         verify(mockScheduler, times(count)).sendDelayedMessage(
-                argThat(message -> message.what == EVENT_START_QUERYTASK), anyLong());
+                eq(EVENT_START_QUERYTASK), eq(0), eq(0), any(), anyLong());
     }
 
     @Test
@@ -2375,7 +2376,8 @@ public class MdnsServiceTypeClientTests {
                 .sendMessage(any(Handler.class), any(Message.class));
         // Verify the task has been scheduled.
         if (useAccurateDelayCallback) {
-            verify(mockScheduler, times(scheduledCount)).sendDelayedMessage(any(), anyLong());
+            verify(mockScheduler, times(scheduledCount)).sendDelayedMessage(
+                    anyInt(), anyInt(), anyInt(), any(), anyLong());
         } else {
             verify(mockDeps, times(scheduledCount))
                     .sendMessageDelayed(any(Handler.class), any(Message.class), anyLong());

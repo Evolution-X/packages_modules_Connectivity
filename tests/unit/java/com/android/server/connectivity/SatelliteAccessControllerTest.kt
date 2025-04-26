@@ -20,6 +20,7 @@ import android.app.role.OnRoleHoldersChangedListener
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -27,12 +28,21 @@ import android.os.Looper
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.ArraySet
+import com.android.server.connectivity.ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_OPTIN
+import com.android.server.connectivity.SatelliteAccessController.PER_USER_RANGE
+import com.android.server.connectivity.SatelliteAccessController.PROPERTY_SATELLITE_DATA_OPTIMIZED
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule.FeatureFlag
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
 import java.util.function.Consumer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -42,9 +52,9 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
-import org.mockito.Mockito.timeout
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 
 private const val PRIMARY_USER = 0
 private const val SECONDARY_USER = 10
@@ -69,21 +79,37 @@ private val PRIMARY_USER_SMS_APP_UID2 = UserHandle.getUid(PRIMARY_USER, SMS_APP_
 private val SECONDARY_USER_SMS_APP_UID1 = UserHandle.getUid(SECONDARY_USER, SMS_APP_ID1)
 private val SECONDARY_USER_SMS_APP_UID2 = UserHandle.getUid(SECONDARY_USER, SMS_APP_ID2)
 
+private const val TEST_PACKAGE1 = "com.android.package1"
+private const val TEST_PACKAGE2 = "com.android.package2"
+private const val TEST_UID1 = 2001
+private const val TEST_UID2 = 2002 + SECONDARY_USER * PER_USER_RANGE // Under 2nd user.
+
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
 class SatelliteAccessControllerTest {
     private val context = mock(Context::class.java)
     private val primaryUserContext = mock(Context::class.java)
     private val secondaryUserContext = mock(Context::class.java)
+    private val packageManager = mock(PackageManager::class.java)
     private val mPackageManagerPrimaryUser = mock(PackageManager::class.java)
     private val mPackageManagerSecondaryUser = mock(PackageManager::class.java)
     private val mDeps = mock(SatelliteAccessController.Dependencies::class.java)
     private val mCallback = mock(Consumer::class.java) as Consumer<Set<Int>>
     private val userManager = mock(UserManager::class.java)
     private val mHandler = Handler(Looper.getMainLooper())
-    private var mSatelliteAccessController =
-        SatelliteAccessController(context, mDeps, mCallback, mHandler)
+    private lateinit var mSatelliteAccessController: SatelliteAccessController
     private lateinit var mRoleHolderChangedListener: OnRoleHoldersChangedListener
+
+    private val featureFlags = HashSet<String>()
+
+    // This will set feature flags from @FeatureFlag annotations
+    // into the map before setUp() runs.
+    @get:Rule
+    val setFeatureFlagsRule = SetFeatureFlagsRule(
+            { name, enabled ->
+                if (enabled == true) featureFlags.add(name) else featureFlags.remove(name) },
+            { name -> featureFlags.contains(name) }
+    )
 
     private fun <T> mockService(name: String, clazz: Class<T>, service: T) {
         doReturn(name).`when`(context).getSystemServiceName(clazz)
@@ -99,6 +125,10 @@ class SatelliteAccessControllerTest {
     fun setup() {
         doReturn(emptyList<UserHandle>()).`when`(userManager).getUserHandles(true)
         mockService(Context.USER_SERVICE, UserManager::class.java, userManager)
+        doReturn(packageManager).`when`(context).packageManager
+        doReturn(featureFlags.contains(CONSTRAINED_DATA_SATELLITE_OPTIN))
+                .`when`(mDeps).supportConstrainedDataSatelliteOptIn(any())
+        mSatelliteAccessController = SatelliteAccessController(context, mDeps, mCallback, mHandler)
 
         doReturn(primaryUserContext).`when`(context).createContextAsUser(PRIMARY_USER_HANDLE, 0)
         doReturn(mPackageManagerPrimaryUser).`when`(primaryUserContext).packageManager
@@ -298,19 +328,6 @@ class SatelliteAccessControllerTest {
         return future.get()
     }
 
-    @Test
-    fun testOnStartUpCallbackSatelliteFallbackUidWithExistingUsers() {
-        doReturn(
-            listOf(PRIMARY_USER_HANDLE)
-        ).`when`(userManager).getUserHandles(true)
-        doReturn(listOf(SMS_APP1))
-            .`when`(mDeps).getRoleHoldersAsUser(RoleManager.ROLE_SMS, PRIMARY_USER_HANDLE)
-        // At start up, SatelliteAccessController must call CS callback with existing users'
-        // default messaging apps uids.
-        startSatelliteAccessController()
-        verify(mCallback, timeout(500)).accept(setOf(PRIMARY_USER_SMS_APP_UID1))
-    }
-
     private fun startSatelliteAccessController() {
         mSatelliteAccessController.start()
         // Get registered listener using captor
@@ -321,5 +338,124 @@ class SatelliteAccessControllerTest {
             any(UserHandle::class.java)
         )
         mRoleHolderChangedListener = listenerCaptor.value
+    }
+
+    private fun makePackageInfo(packageName: String, uid: Int) = PackageInfo().apply {
+        this.packageName = packageName
+        applicationInfo = ApplicationInfo().apply { this.uid = uid }
+    }
+
+    private fun mockGetPackagesForUid(uid: Int, pkgs: Array<String>?) {
+        `when`(packageManager.getPackagesForUid(uid)).thenReturn(pkgs)
+    }
+
+    private fun mockIsSatelliteDataOptimizedApp(packageName: String, isOptimized: Boolean) {
+        val property = mock(PackageManager.Property::class.java)
+        `when`(property.isString).thenReturn(isOptimized)
+        if (isOptimized) {
+            `when`(property.string).thenReturn(packageName)
+        }
+        `when`(packageManager.getProperty(
+                eq(PROPERTY_SATELLITE_DATA_OPTIMIZED),
+                eq(packageName)
+        )).thenReturn(property)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun testSatelliteOptimizedUids_onPackageAdded() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 1)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun testSatelliteOptimizedUids_onPackageAdded_ignoresIfNotSatelliteOptimized() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, false)
+        mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        assertFalse(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun testSatelliteOptimizedUids_onPackageRemoved_noOtherShareUid() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        mockGetPackagesForUid(TEST_UID1, arrayOf(TEST_PACKAGE1))
+
+        mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 1)
+        mSatelliteAccessController.onPackageRemoved(TEST_PACKAGE1, TEST_UID1)
+        assertFalse(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun testSatelliteOptimizedUids_onPackageRemoved_otherShareUid() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE2, true)
+        mockGetPackagesForUid(TEST_UID1, arrayOf(TEST_PACKAGE1, TEST_PACKAGE2))
+
+        // Verify uid is not removed if there is still another package shares the same uid.
+        mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 1)
+        mSatelliteAccessController.onPackageRemoved(TEST_PACKAGE1, TEST_UID1)
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 1)
+
+        // Verify uid is removed if there is no other package with shared uid.
+        mockGetPackagesForUid(TEST_UID1, null)
+        mSatelliteAccessController.onPackageRemoved(TEST_PACKAGE2, TEST_UID1)
+        assertFalse(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun testSatelliteOptimizedUids_onUserAddedRemoved() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE2, true)
+        val packageInfo1 = makePackageInfo(TEST_PACKAGE1, TEST_UID1)
+        val packageInfo2 = makePackageInfo(TEST_PACKAGE2, TEST_UID2)
+
+        mSatelliteAccessController
+                .onUserAddedWithInstalledPackageList(PRIMARY_USER_HANDLE, listOf(packageInfo1))
+        mSatelliteAccessController
+                .onUserAddedWithInstalledPackageList(SECONDARY_USER_HANDLE, listOf(packageInfo2))
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID2))
+
+        mSatelliteAccessController.onUserRemoved(SECONDARY_USER_HANDLE)
+        // Verify that the app associated with the non-removed user is not removed.
+        assertTrue(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID1))
+        // Verify that the app associated with the removed user is removed.
+        assertFalse(mSatelliteAccessController.isSatelliteDataOptimizedUid(TEST_UID2))
+
+        mSatelliteAccessController.onUserRemoved(PRIMARY_USER_HANDLE)
+        // Verify everything is removed.
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN, enabled = false)
+    @Test
+    fun testSatelliteOptimizedUids_featureDisabled() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        val packageInfo1 = makePackageInfo(TEST_PACKAGE1, TEST_UID1)
+
+        // Verify nothing changes and nothing crashes.
+        mSatelliteAccessController
+                .onUserAddedWithInstalledPackageList(PRIMARY_USER_HANDLE, listOf(packageInfo1))
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+        mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+        mSatelliteAccessController.onPackageRemoved(TEST_PACKAGE1, TEST_UID1)
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
+        mSatelliteAccessController.onUserRemoved(PRIMARY_USER_HANDLE)
+        assertEquals(mSatelliteAccessController.satelliteDataOptimizedUidCount, 0)
     }
 }
