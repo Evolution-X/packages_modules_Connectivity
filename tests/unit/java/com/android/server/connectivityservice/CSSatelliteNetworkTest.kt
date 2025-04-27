@@ -68,6 +68,7 @@ private val SECONDARY_USER_HANDLE = UserHandle(SECONDARY_USER)
 private const val TEST_PACKAGE_UID = 123
 private const val TEST_PACKAGE_UID2 = 321
 
+@SuppressLint("VisibleForTests", "MissingPermission")
 @DevSdkIgnoreRunner.MonitorThreadLeak
 @RunWith(DevSdkIgnoreRunner::class)
 @IgnoreUpTo(Build.VERSION_CODES.TIRAMISU)
@@ -82,7 +83,10 @@ class CSSatelliteNetworkTest : CSTest() {
     @Test
     fun testCreateMultiLayerNrisFromSatelliteNetworkPreferredUids() {
         // Verify that empty uid set should not create any NRI for it.
-        val nrisNoUid = service.createMultiLayerNrisFromSatelliteNetworkFallbackUids(emptySet())
+        val nrisNoUid = service.createMultiLayerNrisFromSatelliteNetworkFallbackUids(
+            emptySet(),
+            emptySet()
+        )
         Assert.assertEquals(0, nrisNoUid.size.toLong())
         val uid1 = PRIMARY_USER_HANDLE.getUid(TEST_PACKAGE_UID)
         val uid2 = PRIMARY_USER_HANDLE.getUid(TEST_PACKAGE_UID2)
@@ -103,7 +107,7 @@ class CSSatelliteNetworkTest : CSTest() {
         satelliteAgent.connect()
 
         val satelliteNetId = satelliteAgent.network.netId
-        val permission = if (restricted) {INetd.PERMISSION_SYSTEM} else {INetd.PERMISSION_NONE}
+        val permission = if (restricted) INetd.PERMISSION_SYSTEM else INetd.PERMISSION_NONE
         netdInOrder.verify(netd).networkCreate(
             nativeNetworkConfigPhysical(satelliteNetId, permission)
         )
@@ -113,7 +117,7 @@ class CSSatelliteNetworkTest : CSTest() {
         val uid3 = SECONDARY_USER_HANDLE.getUid(TEST_PACKAGE_UID)
 
         // Initial satellite network fallback uids status.
-        updateSatelliteNetworkFallbackUids(setOf())
+        updateSatelliteNetworkFallbackUids(emptySet(), emptySet())
         netdInOrder.verify(netd, never()).networkAddUidRangesParcel(any())
         netdInOrder.verify(netd, never()).networkRemoveUidRangesParcel(any())
 
@@ -125,7 +129,7 @@ class CSSatelliteNetworkTest : CSTest() {
             uidRanges1,
             PREFERENCE_ORDER_SATELLITE_FALLBACK
         )
-        updateSatelliteNetworkFallbackUids(uids)
+        updateSatelliteNetworkFallbackUids(uids, emptySet())
         netdInOrder.verify(netd).networkAddUidRangesParcel(config1)
         netdInOrder.verify(netd, never()).networkRemoveUidRangesParcel(any())
 
@@ -137,7 +141,7 @@ class CSSatelliteNetworkTest : CSTest() {
             uidRanges2,
             PREFERENCE_ORDER_SATELLITE_FALLBACK
         )
-        updateSatelliteNetworkFallbackUids(uids)
+        updateSatelliteNetworkFallbackUids(uids, emptySet())
         netdInOrder.verify(netd).networkRemoveUidRangesParcel(config1)
         netdInOrder.verify(netd).networkAddUidRangesParcel(config2)
     }
@@ -183,7 +187,7 @@ class CSSatelliteNetworkTest : CSTest() {
         }
 
         val uids = setOf(TEST_PACKAGE_UID)
-        updateSatelliteNetworkFallbackUids(uids)
+        updateSatelliteNetworkFallbackUids(uids, emptySet())
 
         if (destroyBeforeRequest) {
             verify(netd, never()).networkAddUidRangesParcel(any())
@@ -201,7 +205,7 @@ class CSSatelliteNetworkTest : CSTest() {
             satelliteAgent.unregisterAfterReplacement(timeoutMs = 5000)
         }
 
-        updateSatelliteNetworkFallbackUids(setOf())
+        updateSatelliteNetworkFallbackUids(setOf(), emptySet())
         if (destroyBeforeRequest || destroyAfterRequest) {
             // If the network is already destroyed, networkRemoveUidRangesParcel should not be
             // called.
@@ -248,7 +252,7 @@ class CSSatelliteNetworkTest : CSTest() {
             cm.registerNetworkCallback(NetworkRequest.Builder().clearCapabilities().build(), it)
         }
 
-        updateSatelliteNetworkFallbackUids(setOf(myUid))
+        updateSatelliteNetworkFallbackUids(setOf(myUid), emptySet())
         defaultCb.assertNoCallback()
 
         val satelliteAgent = createSatelliteAgent(
@@ -290,7 +294,7 @@ class CSSatelliteNetworkTest : CSTest() {
         allNetworksCb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
         defaultCb.expectAvailableCallbacks(satelliteNetwork2, validated = false)
 
-        updateSatelliteNetworkFallbackUids(setOf())
+        updateSatelliteNetworkFallbackUids(emptySet(), emptySet())
 
         allNetworksCb.expect<Lost>(satelliteNetwork2)
         defaultCb.expect<Lost>(satelliteNetwork2)
@@ -298,8 +302,8 @@ class CSSatelliteNetworkTest : CSTest() {
     }
 
     private fun assertCreateMultiLayerNrisFromSatelliteNetworkPreferredUids(uids: Set<Int>) {
-        val nris: Set<ConnectivityService.NetworkRequestInfo> =
-            service.createMultiLayerNrisFromSatelliteNetworkFallbackUids(uids)
+        val nris =
+            service.createMultiLayerNrisFromSatelliteNetworkFallbackUids(uids, emptySet())
         val nri = nris.iterator().next()
         // Verify that one NRI is created with multilayer requests. Because one NRI can contain
         // multiple uid ranges, so it only need create one NRI here.
@@ -309,9 +313,9 @@ class CSSatelliteNetworkTest : CSTest() {
         assertEquals(PREFERENCE_ORDER_SATELLITE_FALLBACK, nri.mPreferenceOrder)
     }
 
-    private fun updateSatelliteNetworkFallbackUids(uids: Set<Int>) {
+    private fun updateSatelliteNetworkFallbackUids(messagingUids: Set<Int>, optinUids: Set<Int>) {
         visibleOnHandlerThread(csHandler) {
-            deps.satelliteNetworkFallbackUidUpdate!!.accept(uids)
+            deps.satelliteNetworkFallbackUidUpdate!!.accept(messagingUids, optinUids)
         }
     }
 

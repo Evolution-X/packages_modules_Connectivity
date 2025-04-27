@@ -690,7 +690,7 @@ public class ConnectivityServiceTest {
         // Map of permission name -> PermissionManager.Permission_{GRANTED|DENIED} constant
         // For permissions granted across the board, the key is only the permission name.
         // For permissions only granted to a combination of uid/pid, the key
-        // is "<permission name>,<pid>,<uid>". PID+UID permissons have priority over generic ones.
+        // is "<permission name>,<pid>,<uid>". PID+UID permissions have priority over generic ones.
         private final HashMap<String, Integer> mMockedPermissions = new HashMap<>();
 
         private void mockStringResource(int resId) {
@@ -2090,7 +2090,7 @@ public class ConnectivityServiceTest {
         @Override
         public SatelliteAccessController makeSatelliteAccessController(
                 @NonNull final Context context,
-                Consumer<Set<Integer>> updateSatelliteNetworkFallbackUidCallback,
+                BiConsumer<Set<Integer>, Set<Integer>> updateSatelliteNetworkFallbackUidCallback,
                 @NonNull final Handler connectivityServiceInternalHandler) {
             return mSatelliteAccessController;
         }

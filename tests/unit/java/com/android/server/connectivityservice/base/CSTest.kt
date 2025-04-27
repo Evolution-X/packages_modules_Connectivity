@@ -16,6 +16,7 @@
 
 package com.android.server
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.bluetooth.BluetoothManager
@@ -86,7 +87,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.function.BiConsumer
-import java.util.function.Consumer
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.FUNCTION
 import kotlin.test.assertNotNull
@@ -139,6 +139,7 @@ private fun NetworkCapabilities.getLegacyType() =
  */
 // TODO (b/272685721) : make ConnectivityServiceTest smaller and faster by moving the setup
 // parts into this class and moving the individual tests to multiple separate classes.
+@SuppressLint("VisibleForTests", "MissingPermission")
 open class CSTest {
     @get:Rule
     val testNameRule = TestName()
@@ -312,10 +313,10 @@ open class CSTest {
                 handler: Handler
         ) = if (SdkLevel.isAtLeastT()) mock<CarrierPrivilegeAuthenticator>() else null
 
-        var satelliteNetworkFallbackUidUpdate: Consumer<Set<Int>>? = null
+        var satelliteNetworkFallbackUidUpdate = BiConsumer<Set<Int>, Set<Int>> {_, _ -> }
         override fun makeSatelliteAccessController(
             context: Context,
-            updateSatelliteNetworkFallackUid: Consumer<Set<Int>>?,
+            updateSatelliteNetworkFallackUid: BiConsumer<Set<Int>, Set<Int>>,
             csHandlerThread: Handler
         ): SatelliteAccessController? {
             satelliteNetworkFallbackUidUpdate = updateSatelliteNetworkFallackUid

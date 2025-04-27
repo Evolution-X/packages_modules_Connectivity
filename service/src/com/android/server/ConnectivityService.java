@@ -1656,7 +1656,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         @Nullable
         public SatelliteAccessController makeSatelliteAccessController(
                 @NonNull final Context context,
-                Consumer<Set<Integer>> updateSatelliteNetworkFallbackUidCallback,
+                BiConsumer<Set<Integer>, Set<Integer>> updateSatelliteNetworkFallbackUidCallback,
                 @NonNull final Handler connectivityServiceInternalHandler) {
             return new SatelliteAccessController(context, updateSatelliteNetworkFallbackUidCallback,
                     connectivityServiceInternalHandler);
@@ -2261,15 +2261,21 @@ public class ConnectivityService extends IConnectivityManager.Stub
     }
 
     /**
-     * Called when satellite network fallback uids at {@link SatelliteAccessController}
+     * Called when satellite network fallback uids from the {@link SatelliteAccessController}
      * cache was updated based on {@link
-     * android.app.role.OnRoleHoldersChangedListener#onRoleHoldersChanged(String, UserHandle)},
-     * to create multilayer request with preference order
-     * {@link #PREFERENCE_ORDER_SATELLITE_FALLBACK} there on.
-     *
+     * android.app.role.OnRoleHoldersChangedListener#onRoleHoldersChanged(String, UserHandle)}
+     * and self-certified applications, to create multilayer request with preference order
+     * {@link #PREFERENCE_ORDER_SATELLITE_FALLBACK}.
      */
-    private void updateSatelliteNetworkPreferenceUids(Set<Integer> satelliteNetworkFallbackUids) {
-        handleSetSatelliteNetworkPreference(satelliteNetworkFallbackUids);
+    private void updateSatelliteNetworkPreferenceUids(
+            @NonNull final Set<Integer> messagingRoleUids,
+            @NonNull final Set<Integer> optinUids
+    ) {
+        if (CollectionUtils.containsAny(messagingRoleUids, optinUids)) {
+            throw new IllegalArgumentException("There can be no overlap between the "
+                    + "messagingRoleUids and the optinUids for satellite");
+        }
+        handleSetSatelliteNetworkPreference(messagingRoleUids, optinUids);
     }
 
     private void handleAlwaysOnNetworkRequest(
@@ -14442,17 +14448,32 @@ public class ConnectivityService extends IConnectivityManager.Stub
     }
 
     ArraySet<NetworkRequestInfo> createMultiLayerNrisFromSatelliteNetworkFallbackUids(
-            @NonNull final Set<Integer> uids) {
-        // request: Satellite internet, satellite network could be restricted or constrained
-        final NetworkCapabilities cap = new NetworkCapabilities.Builder()
+            @NonNull final Set<Integer> messagingRoleUids,
+            @NonNull final Set<Integer> optinUids
+    ) {
+        // The messaging role UIDs should use any Internet-providing satellite network as
+        // a fallback, even if it is restricted.
+        final NetworkCapabilities messagingCap = new NetworkCapabilities.Builder()
                 .addCapability(NET_CAPABILITY_INTERNET)
                 .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
                 .removeCapability(NET_CAPABILITY_NOT_RESTRICTED)
                 .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
                 .addTransportType(NetworkCapabilities.TRANSPORT_SATELLITE)
                 .build();
-        return createNrisForFallbackDefault(uids, cap,
-                PREFERENCE_ORDER_SATELLITE_FALLBACK);
+        final ArraySet<NetworkRequestInfo> requests = createNrisForFallbackDefault(
+                messagingRoleUids, messagingCap, PREFERENCE_ORDER_SATELLITE_FALLBACK);
+
+        // The apps that have opt-in should use any Internet-providing satellite network
+        // as a fallback, but not if it is restricted.
+        final NetworkCapabilities optinCap = new NetworkCapabilities.Builder()
+                .addCapability(NET_CAPABILITY_INTERNET)
+                .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
+                .removeCapability(NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED)
+                .addTransportType(NetworkCapabilities.TRANSPORT_SATELLITE)
+                .build();
+        requests.addAll(createNrisForFallbackDefault(
+                optinUids, optinCap, PREFERENCE_ORDER_SATELLITE_FALLBACK));
+        return requests;
     }
 
     private void handleMobileDataPreferredUidsChanged() {
@@ -14465,10 +14486,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
     }
 
     private void handleSetSatelliteNetworkPreference(
-            @NonNull final Set<Integer> satelliteNetworkPreferredUids) {
+            @NonNull final Set<Integer> messagingRoleUids,
+            @NonNull final Set<Integer> optinUids
+    ) {
         removeDefaultNetworkRequestsForPreference(PREFERENCE_ORDER_SATELLITE_FALLBACK);
         addPerAppDefaultNetworkRequests(
-                createMultiLayerNrisFromSatelliteNetworkFallbackUids(satelliteNetworkPreferredUids)
+                createMultiLayerNrisFromSatelliteNetworkFallbackUids(messagingRoleUids, optinUids)
         );
         // Finally, rematch.
         rematchAllNetworksAndRequests();
