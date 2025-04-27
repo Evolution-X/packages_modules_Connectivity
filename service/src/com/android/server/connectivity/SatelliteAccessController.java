@@ -41,7 +41,7 @@ import com.android.net.module.util.DeviceConfigUtils;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /**
  * Tracks the uid of all the default messaging application which are role_sms role and
@@ -60,7 +60,7 @@ public class SatelliteAccessController {
     private final Context mContext;
     private final Dependencies mDeps;
     private final DefaultMessageRoleListener mDefaultMessageRoleListener;
-    private final Consumer<Set<Integer>> mCallback;
+    private final BiConsumer<Set<Integer>, Set<Integer>> mCallback;
     private final Handler mConnectivityServiceHandler;
     private final PackageManager mPackageManager;
     private final boolean mSupportConstrainedDataSatelliteOptIn;
@@ -102,7 +102,7 @@ public class SatelliteAccessController {
     }
 
     public SatelliteAccessController(@NonNull final Context c,
-            Consumer<Set<Integer>> callback,
+            BiConsumer<Set<Integer>, Set<Integer>> callback,
             @NonNull final Handler connectivityServiceInternalHandler) {
         this(c, new Dependencies(c), callback, connectivityServiceInternalHandler);
     }
@@ -134,7 +134,7 @@ public class SatelliteAccessController {
 
     @VisibleForTesting
     SatelliteAccessController(@NonNull final Context c, @NonNull final Dependencies deps,
-            Consumer<Set<Integer>> callback,
+            BiConsumer<Set<Integer>, Set<Integer>> callback,
             @NonNull final Handler connectivityServiceInternalHandler) {
         mContext = c;
         mDeps = deps;
@@ -233,7 +233,7 @@ public class SatelliteAccessController {
                 + mergedSatelliteNetworkFallbackUidCache);
 
         // trigger multiple layer request for satellite network fallback of multi user uids
-        mCallback.accept(mergedSatelliteNetworkFallbackUidCache);
+        mCallback.accept(mergedSatelliteNetworkFallbackUidCache, Set.of());
     }
 
     public void start() {
