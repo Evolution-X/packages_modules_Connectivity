@@ -56,12 +56,6 @@ class TestableNetworkOfferCallback(
         history.add(CallbackEntry.Unneeded(request))
     }
 
-    // TODO : move to some utility, this is copied from TestableNetworkCallback
-    fun failWithErrorReason(errorMsg: String?, errorReason: String): Nothing {
-        val message = if (errorMsg != null) "$errorMsg : $errorReason" else errorReason
-        fail(message)
-    }
-
     inline fun <reified T : CallbackEntry> expect(
         errorMsg: String? = null,
         predicate: (T) -> Boolean = { true }

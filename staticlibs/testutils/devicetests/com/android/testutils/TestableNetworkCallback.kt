@@ -70,7 +70,7 @@ open class RecorderCallback private constructor(
         data class Reserved private constructor(
                 override val network: Network,
                 val caps: NetworkCapabilities
-        ): CallbackEntry() {
+        ) : CallbackEntry() {
             constructor(caps: NetworkCapabilities) : this(NULL_NETWORK, caps)
         }
         data class Available(override val network: Network) : CallbackEntry()
@@ -398,12 +398,6 @@ open class TestableNetworkCallback private constructor(
                     failWithErrorReason(errorMsg, "Callback doesn't match predicate : $it")
                 }
             } as T
-
-    // "Nothing" is the return type to declare a function never returns a value.
-    fun failWithErrorReason(errorMsg: String?, errorReason: String): Nothing {
-        val message = if (errorMsg != null) "$errorMsg : $errorReason" else errorReason
-        fail(message)
-    }
 
     inline fun <reified T : CallbackEntry> expect(
         network: HasNetwork,
