@@ -76,8 +76,8 @@ import com.android.testutils.NdResponder
 import com.android.testutils.PollPacketReader
 import com.android.testutils.SC_V2
 import com.android.testutils.TestableNetworkAgent
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnDscpPolicyStatusUpdated
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
+import com.android.testutils.TestableNetworkAgent.Event.OnDscpPolicyStatusUpdated
+import com.android.testutils.TestableNetworkAgent.Event.OnNetworkCreated
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertParcelingIsLossless
 import com.android.testutils.runAsShell

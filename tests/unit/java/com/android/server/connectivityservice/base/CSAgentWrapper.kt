@@ -37,9 +37,9 @@ import android.net.NetworkScore
 import android.net.NetworkTestResultParcelable
 import android.net.networkstack.NetworkStackClientBase
 import android.os.HandlerThread
-import com.android.testutils.RecorderCallback.CallbackEntry.Available
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Available
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.fail

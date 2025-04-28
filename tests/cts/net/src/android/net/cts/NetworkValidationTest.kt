@@ -47,9 +47,10 @@ import com.android.testutils.AutoCloseTestInterfaceRule
 import com.android.testutils.DhcpClientPacketFilter
 import com.android.testutils.DhcpOptionFilter
 import com.android.testutils.PollPacketReader
-import com.android.testutils.RecorderCallback.CallbackEntry
 import com.android.testutils.TestHttpServer
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
 import com.android.testutils.runAsShell
 import fi.iki.elonen.NanoHTTPD.Response.Status
 import java.net.Inet4Address
@@ -181,10 +182,10 @@ class NetworkValidationTest {
 
             try {
                 val mark = testCb.mark
-                val ncCb = testCb.eventuallyExpect<CallbackEntry.CapabilitiesChanged>(from = mark) {
+                val ncCb = testCb.eventuallyExpect<CapabilitiesChanged>(from = mark) {
                     it.caps.hasCapability(NET_CAPABILITY_CAPTIVE_PORTAL)
                 }
-                testCb.eventuallyExpect<CallbackEntry.LinkPropertiesChanged>(from = mark) {
+                testCb.eventuallyExpect<LinkPropertiesChanged>(from = mark) {
                     it.network == ncCb.network && it.lp.captivePortalData != null
                 }.lp
             } finally {

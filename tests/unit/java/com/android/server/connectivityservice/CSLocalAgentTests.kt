@@ -34,9 +34,9 @@ import android.net.connectivity.ConnectivityCompatChanges.ENABLE_MATCH_NON_THREA
 import android.os.Build
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
-import com.android.testutils.RecorderCallback.CallbackEntry.LocalInfoChanged
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.LocalInfoChanged
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import kotlin.test.assertFailsWith
 import org.junit.Test
 import org.junit.runner.RunWith

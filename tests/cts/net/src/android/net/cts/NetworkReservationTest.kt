@@ -47,9 +47,9 @@ import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
-import com.android.testutils.RecorderCallback.CallbackEntry.Reserved
-import com.android.testutils.RecorderCallback.CallbackEntry.Unavailable
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Reserved
+import com.android.testutils.TestableNetworkCallback.Event.Unavailable
 import com.android.testutils.TestableNetworkOfferCallback
 import com.android.testutils.pollingCheck
 import com.android.testutils.runAsShell

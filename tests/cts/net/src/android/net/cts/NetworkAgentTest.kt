@@ -75,9 +75,9 @@ import android.net.TransportInfo
 import android.net.Uri
 import android.net.VpnManager
 import android.net.VpnTransportInfo
-import android.net.cts.NetworkAgentTest.TestableQosCallback.CallbackEntry.OnError
-import android.net.cts.NetworkAgentTest.TestableQosCallback.CallbackEntry.OnQosSessionAvailable
-import android.net.cts.NetworkAgentTest.TestableQosCallback.CallbackEntry.OnQosSessionLost
+import android.net.cts.NetworkAgentTest.TestableQosCallback.Event.OnError
+import android.net.cts.NetworkAgentTest.TestableQosCallback.Event.OnQosSessionAvailable
+import android.net.cts.NetworkAgentTest.TestableQosCallback.Event.OnQosSessionLost
 import android.net.wifi.WifiInfo
 import android.os.Build
 import android.os.Handler
@@ -111,27 +111,27 @@ import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.PollPacketReader
-import com.android.testutils.RecorderCallback.CallbackEntry.Available
-import com.android.testutils.RecorderCallback.CallbackEntry.BlockedStatus
-import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
-import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
-import com.android.testutils.RecorderCallback.CallbackEntry.Losing
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkAgent
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnAddKeepalivePacketFilter
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnAutomaticReconnectDisabled
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnBandwidthUpdateRequested
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkDestroyed
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkUnwanted
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnRegisterQosCallback
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnRemoveKeepalivePacketFilter
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnSaveAcceptUnvalidated
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnStartSocketKeepalive
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnStopSocketKeepalive
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnUnregisterQosCallback
-import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnValidationStatus
+import com.android.testutils.TestableNetworkAgent.Event.OnAddKeepalivePacketFilter
+import com.android.testutils.TestableNetworkAgent.Event.OnAutomaticReconnectDisabled
+import com.android.testutils.TestableNetworkAgent.Event.OnBandwidthUpdateRequested
+import com.android.testutils.TestableNetworkAgent.Event.OnNetworkCreated
+import com.android.testutils.TestableNetworkAgent.Event.OnNetworkDestroyed
+import com.android.testutils.TestableNetworkAgent.Event.OnNetworkUnwanted
+import com.android.testutils.TestableNetworkAgent.Event.OnRegisterQosCallback
+import com.android.testutils.TestableNetworkAgent.Event.OnRemoveKeepalivePacketFilter
+import com.android.testutils.TestableNetworkAgent.Event.OnSaveAcceptUnvalidated
+import com.android.testutils.TestableNetworkAgent.Event.OnStartSocketKeepalive
+import com.android.testutils.TestableNetworkAgent.Event.OnStopSocketKeepalive
+import com.android.testutils.TestableNetworkAgent.Event.OnUnregisterQosCallback
+import com.android.testutils.TestableNetworkAgent.Event.OnValidationStatus
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Available
+import com.android.testutils.TestableNetworkCallback.Event.BlockedStatus
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.Losing
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import com.android.testutils.assertThrows
 import com.android.testutils.com.android.testutils.CarrierConfigRule
 import com.android.testutils.runAsShell
@@ -1310,13 +1310,13 @@ class NetworkAgentTest {
     }
 
     private class TestableQosCallback : QosCallback() {
-        val history = ArrayTrackRecord<CallbackEntry>().newReadHead()
+        val history = ArrayTrackRecord<Event>().newReadHead()
 
-        sealed class CallbackEntry {
+        sealed class Event {
             data class OnQosSessionAvailable(val sess: QosSession, val attr: QosSessionAttributes) :
-                CallbackEntry()
-            data class OnQosSessionLost(val sess: QosSession) : CallbackEntry()
-            data class OnError(val ex: QosCallbackException) : CallbackEntry()
+                Event()
+            data class OnQosSessionLost(val sess: QosSession) : Event()
+            data class OnError(val ex: QosCallbackException) : Event()
         }
 
         override fun onQosSessionAvailable(sess: QosSession, attr: QosSessionAttributes) {
@@ -1331,13 +1331,13 @@ class NetworkAgentTest {
             history.add(OnError(ex))
         }
 
-        inline fun <reified T : CallbackEntry> expectCallback(): T {
+        inline fun <reified T : Event> expectCallback(): T {
             val foundCallback = history.poll(DEFAULT_TIMEOUT_MS)
             assertTrue(foundCallback is T, "Expected ${T::class} but found $foundCallback")
             return foundCallback
         }
 
-        inline fun <reified T : CallbackEntry> expectCallback(valid: (T) -> Boolean) {
+        inline fun <reified T : Event> expectCallback(valid: (T) -> Boolean) {
             val foundCallback = history.poll(DEFAULT_TIMEOUT_MS)
             assertTrue(foundCallback is T, "Expected ${T::class} but found $foundCallback")
             assertTrue(valid(foundCallback), "Unexpected callback : $foundCallback")

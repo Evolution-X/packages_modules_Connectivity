@@ -93,8 +93,8 @@ import com.android.testutils.DeviceInfoUtils;
 import com.android.testutils.DumpTestUtils;
 import com.android.testutils.NetworkStackModuleTest;
 import com.android.testutils.PollPacketReader;
-import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.TestableNetworkCallback;
+import com.android.testutils.TestableNetworkCallback.Event;
 
 import org.junit.After;
 import org.junit.Rule;
@@ -1297,16 +1297,16 @@ public class EthernetTetheringTest extends EthernetTetheringTestBase {
             }
 
             // Verify NetworkCallback works accordingly.
-            final Network network = networkCallback.expect(CallbackEntry.AVAILABLE).getNetwork();
-            final CallbackEntry.CapabilitiesChanged capEvent =
-                    networkCallback.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED);
+            final Network network = networkCallback.expect(Event.AVAILABLE).getNetwork();
+            final Event.CapabilitiesChanged capEvent =
+                    networkCallback.eventuallyExpect(Event.NETWORK_CAPS_UPDATED);
             assertEquals(network, capEvent.getNetwork());
             assertTrue(capEvent.getCaps().hasTransport(TRANSPORT_ETHERNET));
             assertTrue(capEvent.getCaps().hasCapability(NET_CAPABILITY_LOCAL_NETWORK));
 
             // Verify details in the LinkPropertiesChanged event.
-            final CallbackEntry.LinkPropertiesChanged lpEvent =
-                    networkCallback.eventuallyExpect(CallbackEntry.LINK_PROPERTIES_CHANGED);
+            final Event.LinkPropertiesChanged lpEvent =
+                    networkCallback.eventuallyExpect(Event.LINK_PROPERTIES_CHANGED);
             assertEquals(network, lpEvent.getNetwork());
             assertEquals(iface, lpEvent.getLp().getInterfaceName());
             assertTrue(lpEvent.getLp().hasIPv4Address());
