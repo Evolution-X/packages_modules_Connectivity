@@ -44,8 +44,8 @@ import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.TestableNetworkOfferCallback
-import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.OnNetworkNeeded
-import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.OnNetworkUnneeded
+import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Needed
+import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Unneeded
 import com.android.testutils.postAndWait
 import com.android.testutils.runAsShell
 import org.junit.Rule
@@ -276,9 +276,9 @@ class CSPreferenceTest : CSTest() {
     fun testOptInSatellitePreference_NetworkConnectedFirst_RestrictedSatellite() =
         doTestSatellitePreference_NetworkConnectedFirst(satelliteRestricted = true)
 
-    private val OnNetworkNeeded.isRestricted
+    private val Needed.isRestricted
         get() = !request.hasCapability(NET_CAPABILITY_NOT_RESTRICTED)
-    private val OnNetworkUnneeded.isRestricted
+    private val Unneeded.isRestricted
         get() = !request.hasCapability(NET_CAPABILITY_NOT_RESTRICTED)
 
     /**
@@ -297,20 +297,14 @@ class CSPreferenceTest : CSTest() {
         val provider = NetworkProvider(context, csHandlerThread.looper, "Test provider")
         cm.registerNetworkProvider(provider)
 
-        val satelliteCallback = TestableNetworkOfferCallback(
-            DEFAULT_TIMEOUT_MS,
-            DEFAULT_NO_CALLBACK_TIMEOUT_MS
-        )
+        val satelliteCallback = TestableNetworkOfferCallback()
         provider.registerNetworkOffer(
             NetworkScore.Builder().build(),
             satelliteNc(restricted = false),
             Runnable::run,
             satelliteCallback
         )
-        val restrictedSatelliteCallback = TestableNetworkOfferCallback(
-            DEFAULT_TIMEOUT_MS,
-            DEFAULT_NO_CALLBACK_TIMEOUT_MS
-        )
+        val restrictedSatelliteCallback = TestableNetworkOfferCallback()
         provider.registerNetworkOffer(
             NetworkScore.Builder().build(),
             satelliteNc(restricted = true),
@@ -320,18 +314,18 @@ class CSPreferenceTest : CSTest() {
         satelliteCallback.assertNoCallback()
 
         updateSatellitePreference(emptySet(), setOf(UID1))
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { true }
+        satelliteCallback.expect<Needed>()
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         updateSatellitePreference(emptySet(), emptySet())
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { true }
+        satelliteCallback.expect<Unneeded>()
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         updateSatellitePreference(setOf(SMSUID), emptySet())
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
+        satelliteCallback.expect<Needed> { it.isRestricted }
+        restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
@@ -346,39 +340,39 @@ class CSPreferenceTest : CSTest() {
         // happening because updating the preferences removes the requests, which causes a
         // rematch (where the requests are not registered), then adds the requests again, which
         // causes another rematch.
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { !it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { it.isRestricted }
+        restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
+        satelliteCallback.expect<Needed> { !it.isRestricted }
+        satelliteCallback.expect<Needed> { it.isRestricted }
+        restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         updateSatellitePreference(emptySet(), setOf(UID1))
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { !it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { !it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { !it.isRestricted }
+        satelliteCallback.expect<Needed> { !it.isRestricted }
+        restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         updateSatellitePreference(setOf(SMSUID), setOf(UID1))
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
+        restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         val wifiAgent = Agent(TRANSPORT_WIFI)
         wifiAgent.connect()
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkUnneeded> { !it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkUnneeded> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { !it.isRestricted }
+        restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         wifiAgent.disconnect()
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
-        satelliteCallback.expectCallbackThat<OnNetworkNeeded> { !it.isRestricted }
-        restrictedSatelliteCallback.expectCallbackThat<OnNetworkNeeded> { it.isRestricted }
+        satelliteCallback.expect<Needed> { it.isRestricted }
+        satelliteCallback.expect<Needed> { !it.isRestricted }
+        restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
     }
