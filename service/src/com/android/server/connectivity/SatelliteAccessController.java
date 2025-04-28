@@ -31,12 +31,14 @@ import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DeviceConfigUtils;
 
 import java.util.List;
@@ -78,6 +80,8 @@ public class SatelliteAccessController {
     // with a value of package name in their manifest file. This variable will only be
     // accessed on the handler thread.
     private final Set<Integer> mSatelliteDataOptimizedUids = new ArraySet<>();
+
+    private final ArrayMap<UserHandle, PackageManager> mUserPackageManagers = new ArrayMap<>();
 
     /**
      *  Monitor {@link android.app.role.OnRoleHoldersChangedListener#onRoleHoldersChanged(String,
@@ -272,6 +276,11 @@ public class SatelliteAccessController {
         // Obtain uids with role sms and satellite communication permission for the added user.
         onRoleSmsChanged(userHandle);
 
+        // Store PackageManager for user for later use.
+        final PackageManager pmForUser =
+                mContext.createContextAsUser(userHandle, 0 /* flag */).getPackageManager();
+        mUserPackageManagers.put(userHandle, pmForUser);
+
         if (!mSupportConstrainedDataSatelliteOptIn) return;
 
         final Set<Integer> satelliteDataOptimizedAppsForUser =
@@ -293,6 +302,7 @@ public class SatelliteAccessController {
         final boolean smsRoleUidsChanged =
                 updateSatelliteFallbackUidListOnUserRemoval(userHandle.getIdentifier());
         final boolean mDataOptimizedUidChanged;
+        mUserPackageManagers.remove(userHandle);
         if (mSupportConstrainedDataSatelliteOptIn) {
             mDataOptimizedUidChanged =
                     removeSatelliteDataOptimizedUidsForUser(userHandle.getIdentifier());
@@ -311,8 +321,43 @@ public class SatelliteAccessController {
      * @param uid The uid of the new package.
      */
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
+        if (!mSupportConstrainedDataSatelliteOptIn) return;
+        if (addSatelliteDataOptimizedUid(packageName, uid)) {
+            reportSatelliteNetworkFallbackUids();
+        }
+    }
+
+    @CheckReturnValue
+    private boolean addSatelliteDataOptimizedUid(@NonNull final String packageName, final int uid) {
         if (mSupportConstrainedDataSatelliteOptIn && isSatelliteDataOptimizedApp(packageName)) {
             mSatelliteDataOptimizedUids.add(uid);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Called when the availability of external applications changes.
+     *
+     * @param pkgList An array of package names that have become available.
+     */
+    public void onExternalApplicationsAvailable(String[] pkgList) {
+        if (!mSupportConstrainedDataSatelliteOptIn) return;
+        if (CollectionUtils.isEmpty(pkgList)) {
+            Log.e(TAG, "No available external application.");
+            return;
+        }
+
+        boolean added = false;
+        for (String app : pkgList) {
+            for (final PackageManager pm : mUserPackageManagers.values()) {
+                final int uid = getUidForPackage(pm, app);
+                if (uid != INVALID_UID && addSatelliteDataOptimizedUid(app, uid)) {
+                    added = true;
+                }
+            }
+        }
+        if (added) {
             reportSatelliteNetworkFallbackUids();
         }
     }
@@ -337,8 +382,10 @@ public class SatelliteAccessController {
         }
         // If the loop completes without returning, it means no other
         // satellite-optimized app shares the UID.
-        mSatelliteDataOptimizedUids.remove(uid);
-        reportSatelliteNetworkFallbackUids();
+        final boolean removed = mSatelliteDataOptimizedUids.remove(uid);
+        if (removed) {
+            reportSatelliteNetworkFallbackUids();
+        }
     }
 
     @NonNull

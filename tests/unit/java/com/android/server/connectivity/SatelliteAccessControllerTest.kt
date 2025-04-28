@@ -433,6 +433,7 @@ class SatelliteAccessControllerTest {
                 .onUserAddedWithInstalledPackageList(PRIMARY_USER_HANDLE, listOf(packageInfo1))
         mSatelliteAccessController.onPackageAdded(TEST_PACKAGE1, TEST_UID1)
         mSatelliteAccessController.onPackageRemoved(TEST_PACKAGE1, TEST_UID1)
+        mSatelliteAccessController.onExternalApplicationsAvailable(arrayOf(SMS_APP1, SMS_APP2))
         mSatelliteAccessController.onUserRemoved(PRIMARY_USER_HANDLE)
         verify(mCallback, never()).accept(any(), any())
     }
@@ -482,5 +483,30 @@ class SatelliteAccessControllerTest {
                 .`when`(mDeps).getRoleHoldersAsUser(RoleManager.ROLE_SMS, PRIMARY_USER_HANDLE)
         mRoleHolderChangedListener.onRoleHoldersChanged(RoleManager.ROLE_SMS, PRIMARY_USER_HANDLE)
         inOrder.verify(mCallback).accept(emptySet(), setOf(TEST_UID1, smsUid))
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
+    fun test_onExternalApplicationsAvailable() {
+        // Mock the sms apps as general opt-in apps without setting sms-role.
+        mockIsSatelliteDataOptimizedApp(SMS_APP1, true)
+        mockIsSatelliteDataOptimizedApp(SMS_APP2, true)
+
+        val inOrder = inOrder(mCallback)
+        mSatelliteAccessController
+                .onUserAddedWithInstalledPackageList(PRIMARY_USER_HANDLE, emptyList<PackageInfo>())
+        mSatelliteAccessController
+                .onUserAddedWithInstalledPackageList(
+                        SECONDARY_USER_HANDLE,
+                    emptyList<PackageInfo>()
+                )
+        mSatelliteAccessController.onExternalApplicationsAvailable(arrayOf(SMS_APP1, SMS_APP2))
+        inOrder.verify(mCallback).accept(emptySet(), setOf(
+                SMS_APP_ID1.toUid(PRIMARY_USER),
+                SMS_APP_ID1.toUid(SECONDARY_USER),
+                SMS_APP_ID2.toUid(PRIMARY_USER),
+                SMS_APP_ID2.toUid(SECONDARY_USER)
+        ))
+        inOrder.verifyNoMoreInteractions()
     }
 }

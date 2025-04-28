@@ -7799,6 +7799,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onExternalApplicationsAvailable(@Nullable String[] pkgList) {
         mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onExternalApplicationsAvailable((pkgList));
+        }
     }
 
     private void handlePackageChanged(@NonNull final String packageName) {
