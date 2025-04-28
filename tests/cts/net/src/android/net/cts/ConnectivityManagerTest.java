@@ -4358,8 +4358,11 @@ public class ConnectivityManagerTest {
         });
     }
 
+    // This test is skipped on U and older releases because QUIC connection close can be triggered
+    // by the freezer (U+) or the background firewall chain (V+), but the freezer cannot be tested.
+    // TODO: Enable this test on T+ once other firewall chains can trigger QUIC connection close.
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @ConnectivityModuleTest
     @AppModeFull(reason = "Cannot create test network in instant app mode")
     public void testRegisterQuicConnectionClosePayload_blockNetwork() throws Exception {
@@ -4384,8 +4387,9 @@ public class ConnectivityManagerTest {
                 true /* blockNetwork */, false /* expectPacketSent */);
     }
 
+    // TODO: Enable this test on T+ once other firewall chains can trigger QUIC connection close.
     @Test
-    @IgnoreUpTo(Build.VERSION_CODES.R)
+    @IgnoreUpTo(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @ConnectivityModuleTest
     @AppModeFull(reason = "Cannot create test network in instant app mode")
     public void testRegisterQuicConnectionClosePayload_closeSocket() throws Exception {

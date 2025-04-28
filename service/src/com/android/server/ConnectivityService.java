@@ -2152,7 +2152,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         mL2capNetworkProvider = mDeps.makeL2capNetworkProvider(mContext);
 
-        mCloseQuicConnection = mDeps.isFeatureEnabled(context, CLOSE_QUIC_CONNECTION);
+        // QUIC connection close is triggered by freezer (U+) or background firewall chain (V+).
+        // TODO: Allow other firewall chains to close QUIC connection and enable this flag on T+
+        mCloseQuicConnection = mDeps.isAtLeastU()
+                && mDeps.isFeatureNotChickenedOut(context, CLOSE_QUIC_CONNECTION);
         if (mCloseQuicConnection) {
             mQuicConnectionCloser = mDeps.makeQuicConnectionCloser(mNetworkForNetId, mHandler);
         } else {
@@ -4556,6 +4559,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
         pw.increaseIndent();
         mPermissionMonitor.dump(pw);
         pw.decreaseIndent();
+
+        pw.println();
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.dump(pw);
+        }
 
         pw.println();
         pw.println("Legacy network activity:");
@@ -7791,6 +7799,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onExternalApplicationsAvailable(@Nullable String[] pkgList) {
         mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        if (mSatelliteAccessController != null) {
+            mSatelliteAccessController.onExternalApplicationsAvailable((pkgList));
+        }
     }
 
     private void handlePackageChanged(@NonNull final String packageName) {

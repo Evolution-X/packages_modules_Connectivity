@@ -2188,7 +2188,6 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                 case ConnectivityFlags.BACKGROUND_FIREWALL_CHAIN:
-                case ConnectivityFlags.CLOSE_QUIC_CONNECTION:
                 case ConnectivityService.KEY_DESTROY_FROZEN_SOCKETS_VERSION:
                     return true;
                 default:
@@ -2209,6 +2208,7 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.USE_DECLARED_METHODS_FOR_CALLBACKS:
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                 case ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
+                case ConnectivityFlags.CLOSE_QUIC_CONNECTION:
                     return true;
                 default:
                     throw new UnsupportedOperationException("Unknown flag " + name
