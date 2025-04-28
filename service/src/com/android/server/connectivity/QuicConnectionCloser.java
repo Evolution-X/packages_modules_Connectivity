@@ -254,8 +254,14 @@ public class QuicConnectionCloser {
 
         Log.d(TAG, "Close QUIC socket for " + info + ", destroySocket=" + destroySocket);
         final NetworkAgentInfo nai = getNetworkAgentInfoForNetId(info.netId);
-        if (nai == null || !nai.linkProperties.getAddresses().contains(info.src.getAddress())) {
+        if (nai == null) return; // The network has gone away already
+
+        final boolean isLoopbackConnection = info.dst.getAddress().isLoopbackAddress();
+        final boolean lpContainsSourceAddress =
+                nai.linkProperties.getAddresses().contains(info.src.getAddress());
+        if (!isLoopbackConnection && !lpContainsSourceAddress) {
             // The device should not send a packet with an unused source address.
+            // Loopback connections are closed exceptionally to simplify device local testing.
             return;
         }
 
