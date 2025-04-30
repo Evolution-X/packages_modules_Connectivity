@@ -32,7 +32,6 @@ import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.app.compat.CompatChanges;
-import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
@@ -1354,10 +1353,8 @@ public final class NsdManager {
      * @param listener The listener notifies of a successful registration and is used to
      * unregister this service through a call on {@link #unregisterService}. Cannot be null.
      *
-     * @hide
      */
-//    @FlaggedApi(Flags.ADVERTISE_REQUEST_API)
-    @UnsupportedAppUsage
+    @FlaggedApi(Flags.FLAG_MDNS_ADVERTISING_IMPROVEMENT)
     public void registerService(@NonNull AdvertisingRequest advertisingRequest,
             @NonNull Executor executor,
             @NonNull RegistrationListener listener) {
