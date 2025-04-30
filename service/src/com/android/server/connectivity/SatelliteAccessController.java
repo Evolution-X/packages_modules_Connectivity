@@ -91,9 +91,9 @@ public class SatelliteAccessController {
             implements OnRoleHoldersChangedListener {
         @Override
         public void onRoleHoldersChanged(String role, UserHandle userHandle) {
-            if (RoleManager.ROLE_SMS.equals(role)) {
+            if (RoleManager.ROLE_SMS.equals(role) && updateSatelliteRoleSmsUids(userHandle)) {
                 Log.i(TAG, "ROLE_SMS Change detected ");
-                updateSatelliteRoleSmsUids(userHandle);
+                reportSatelliteNetworkFallbackUids();
             }
         }
 
@@ -195,11 +195,12 @@ public class SatelliteAccessController {
         return INVALID_UID;
     }
 
-    private void updateSatelliteRoleSmsUids(@NonNull UserHandle userHandle) {
+    @CheckReturnValue
+    private boolean updateSatelliteRoleSmsUids(@NonNull UserHandle userHandle) {
         int userId = userHandle.getIdentifier();
         if (userId == INVALID_UID) {
             Log.wtf(TAG, "Invalid User Id");
-            return;
+            return false;
         }
 
         //Returns empty list if no package exists
@@ -214,13 +215,11 @@ public class SatelliteAccessController {
         // on Role change, update the multilayer request at ConnectivityService with updated
         // satellite network role-sms uid cache list of multiple users as applicable
         if (newUidsForUser.equals(prevUidsForUser)) {
-            return;
+            return false;
         }
 
         mSatelliteRoleSmsUids.put(userId, newUidsForUser);
-
-        // Update all users fallback cache for user, send cs fallback to update ML request
-        reportSatelliteNetworkFallbackUids();
+        return true;
     }
 
     private void reportSatelliteNetworkFallbackUids() {
@@ -267,20 +266,25 @@ public class SatelliteAccessController {
     public void onUserAddedWithInstalledPackageList(@NonNull UserHandle userHandle,
             @NonNull List<PackageInfo> apps) {
         // Obtain uids with role sms and satellite communication permission for the added user.
-        updateSatelliteRoleSmsUids(userHandle);
+        final boolean roleSmsUidsChanged = updateSatelliteRoleSmsUids(userHandle);
 
         // Store PackageManager for user for later use.
         final PackageManager pmForUser =
                 mContext.createContextAsUser(userHandle, 0 /* flag */).getPackageManager();
         mUserPackageManagers.put(userHandle, pmForUser);
 
-        if (!mSupportConstrainedDataSatelliteOptIn) return;
-
-        final Set<Integer> satelliteDataOptInUidsForUser = getSatelliteDataOptInUidsForUser(apps);
-        Log.i(TAG, "Add SatelliteDataOptInUids for user " + userHandle + ": "
-                + satelliteDataOptInUidsForUser);
-        if (satelliteDataOptInUidsForUser.size() > 0) {
-            mSatelliteDataOptInUids.addAll(satelliteDataOptInUidsForUser);
+        boolean optInUidsChanged = false;
+        if (mSupportConstrainedDataSatelliteOptIn) {
+            final Set<Integer> satelliteDataOptInUidsForUser =
+                    getSatelliteDataOptInUidsForUser(apps);
+            if (satelliteDataOptInUidsForUser.size() > 0) {
+                Log.i(TAG, "Add SatelliteDataOptInUids for user " + userHandle + ": "
+                        + satelliteDataOptInUidsForUser);
+                mSatelliteDataOptInUids.addAll(satelliteDataOptInUidsForUser);
+                optInUidsChanged = true;
+            }
+        }
+        if (roleSmsUidsChanged || optInUidsChanged) {
             reportSatelliteNetworkFallbackUids();
         }
     }

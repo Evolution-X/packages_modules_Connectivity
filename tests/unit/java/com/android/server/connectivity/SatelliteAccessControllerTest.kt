@@ -456,6 +456,24 @@ class SatelliteAccessControllerTest {
 
     @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
     @Test
+    fun testSatelliteOptInUids_onUserAddedWithRoleSmsUids() {
+        mockIsSatelliteDataOptimizedApp(TEST_PACKAGE1, true)
+        val packageInfo1 = makePackageInfo(TEST_PACKAGE1, TEST_UID1)
+        doReturn(listOf(SMS_APP1))
+                .`when`(deps).getRoleHoldersAsUser(RoleManager.ROLE_SMS, PRIMARY_USER_HANDLE)
+
+        val inOrder = inOrder(callback)
+        satelliteAccessController
+                .onUserAddedWithInstalledPackageList(PRIMARY_USER_HANDLE, listOf(packageInfo1))
+        // Verify the callback only fired once after both lists are ready.
+        inOrder.verify(callback, never())
+                .accept(setOf(SMS_APP_ID1.toUid(PRIMARY_USER)), emptySet())
+        inOrder.verify(callback).accept(setOf(SMS_APP_ID1.toUid(PRIMARY_USER)), setOf(TEST_UID1))
+        inOrder.verifyNoMoreInteractions()
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
     fun testSatelliteOptInUids_withRoleSmsUids_overlappedUid() {
         startSatelliteAccessController()
         val smsUid = SMS_APP_ID1.toUid(PRIMARY_USER)
