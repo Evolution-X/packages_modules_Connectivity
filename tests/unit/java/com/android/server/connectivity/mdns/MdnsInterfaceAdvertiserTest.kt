@@ -575,7 +575,11 @@ class MdnsInterfaceAdvertiserTest {
         doReturn(testProbingInfo).`when`(repository).setServiceProbing(serviceId)
 
         advertiser.addService(serviceId, serviceInfo, MdnsAdvertisingOptions.getDefaultOptions())
-        verify(repository).addService(serviceId, serviceInfo, null /* ttl */)
+        verify(repository).addService(
+            serviceId,
+            serviceInfo,
+            MdnsAdvertisingOptions.newBuilder().build()
+        )
         verify(prober).startProbing(testProbingInfo)
 
         return testProbingInfo

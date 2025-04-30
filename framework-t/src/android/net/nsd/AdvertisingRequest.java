@@ -52,6 +52,12 @@ public final class AdvertisingRequest implements Parcelable {
      */
     public static final long FLAG_SKIP_PROBING = 1 << 1;
 
+    /**
+     * Don't announce the subtype of the service.
+     * @hide
+     */
+    public static final long FLAG_SKIP_SUBTYPE_ANNOUNCEMENTS = 1L << 63;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @LongDef(flag = true, prefix = {"FLAG_"}, value = {

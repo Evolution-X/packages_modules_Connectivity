@@ -35,14 +35,17 @@ public class MdnsAdvertisingOptions {
     @Nullable
     private final Duration mTtl;
     private final boolean mSkipProbing;
+    private final boolean mSkipSubtypeAnnouncements;
 
     /**
      * Parcelable constructs for a {@link MdnsAdvertisingOptions}.
      */
-    MdnsAdvertisingOptions(boolean isOnlyUpdate, @Nullable Duration ttl, boolean skipProbing) {
+    MdnsAdvertisingOptions(boolean isOnlyUpdate, @Nullable Duration ttl, boolean skipProbing,
+            boolean skipSubtypeAnnouncements) {
         this.mIsOnlyUpdate = isOnlyUpdate;
         this.mTtl = ttl;
         this.mSkipProbing = skipProbing;
+        this.mSkipSubtypeAnnouncements = skipSubtypeAnnouncements;
     }
 
     /**
@@ -84,6 +87,13 @@ public class MdnsAdvertisingOptions {
         return mTtl;
     }
 
+    /**
+     * Returns {@code true} if subtype announcements should be skipped.
+     */
+    public boolean skipSubtypeAnnouncements() {
+        return mSkipSubtypeAnnouncements;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -93,19 +103,36 @@ public class MdnsAdvertisingOptions {
         } else {
             final MdnsAdvertisingOptions otherOptions = (MdnsAdvertisingOptions) other;
             return mIsOnlyUpdate == otherOptions.mIsOnlyUpdate
+                    && mSkipProbing == otherOptions.mSkipProbing
+                    && mSkipSubtypeAnnouncements == otherOptions.mSkipSubtypeAnnouncements
                     && Objects.equals(mTtl, otherOptions.mTtl);
         }
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mIsOnlyUpdate, mTtl);
+        return Objects.hash(mIsOnlyUpdate, mTtl, mSkipProbing, mSkipSubtypeAnnouncements);
     }
 
     @Override
     public String toString() {
-        return "MdnsAdvertisingOptions{" + "mIsOnlyUpdate=" + mIsOnlyUpdate + ", mTtl=" + mTtl
-                + '}';
+        final StringBuilder sb = new StringBuilder();
+        sb.append("MdnsAdvertisingOptions{");
+        if (mIsOnlyUpdate) {
+            sb.append(" isOnlyUpdate");
+        }
+        if (mSkipProbing) {
+            sb.append(" skipProbing");
+        }
+        if (mSkipSubtypeAnnouncements) {
+            sb.append(" skipSubtypeAnnouncements");
+        }
+        if (mTtl != null) {
+            sb.append(" ttl=");
+            sb.append(mTtl);
+        }
+        sb.append(" }");
+        return sb.toString();
     }
 
     /**
@@ -114,6 +141,7 @@ public class MdnsAdvertisingOptions {
     public static final class Builder {
         private boolean mIsOnlyUpdate = false;
         private boolean mSkipProbing = false;
+        private boolean mSkipSubtypeAnnouncements = false;
         @Nullable
         private Duration mTtl;
 
@@ -145,10 +173,19 @@ public class MdnsAdvertisingOptions {
         }
 
         /**
+         * Sets whether to skip subtype announcements.
+         */
+        public Builder setSkipSubtypeAnnouncements(boolean skipSubtypeAnnouncements) {
+            this.mSkipSubtypeAnnouncements = skipSubtypeAnnouncements;
+            return this;
+        }
+
+        /**
          * Builds a {@link MdnsAdvertisingOptions} with the arguments supplied to this builder.
          */
         public MdnsAdvertisingOptions build() {
-            return new MdnsAdvertisingOptions(mIsOnlyUpdate, mTtl, mSkipProbing);
+            return new MdnsAdvertisingOptions(mIsOnlyUpdate, mTtl, mSkipProbing,
+                    mSkipSubtypeAnnouncements);
         }
     }
 }
