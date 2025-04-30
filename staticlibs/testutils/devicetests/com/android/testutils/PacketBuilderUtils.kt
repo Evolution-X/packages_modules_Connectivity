@@ -460,6 +460,48 @@ class DataPkt(data: ByteArray) : Packet {
     }
 }
 
+/** Class that facilitates the creation of DHCPv6 packets. */
+class Dhcp6Pkt(
+        private val type: Type,
+        private val transId: Int,
+) : Packet {
+    enum class Type(val value: Byte) {
+        SOLICIT(1),
+        ADVERTISE(2),
+        REQUEST(3),
+        CONFIRM(4),
+        RENEW(5),
+        REBIND(6),
+        REPLY(7),
+        RELEASE(8),
+        DECLINE(9),
+        RECONFIGURE(10),
+        INFORMATION_REQUEST(11), // INFORMATION-REQUEST
+        RELAY_FORW(12),          // RELAY-FORW
+        RELAY_REPL(13);          // RELAY-REPL
+
+        companion object {
+            fun fromString(str: String) = valueOf(str.replace('-', '_'))
+        }
+    }
+
+    constructor(type: String, transId: Int) : this(Type.fromString(type), transId)
+
+    init {
+        require(transId <= 0xffffff)
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        val dhcp6Header = ByteBuffer.allocate(4)
+            .putInt((type.value.toInt() shl 24) or transId)
+        dhcp6Header.flip()
+
+        return object : FinalizedPacket {
+            override val bytes = dhcp6Header.array()
+        }
+    }
+}
+
 /**
  * Class that facilitates the creation of UDP packets.
  *
