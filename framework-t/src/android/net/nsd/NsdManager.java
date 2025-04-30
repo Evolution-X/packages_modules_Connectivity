@@ -32,6 +32,7 @@ import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.app.compat.CompatChanges;
+import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
@@ -1356,6 +1357,7 @@ public final class NsdManager {
      * @hide
      */
 //    @FlaggedApi(Flags.ADVERTISE_REQUEST_API)
+    @UnsupportedAppUsage
     public void registerService(@NonNull AdvertisingRequest advertisingRequest,
             @NonNull Executor executor,
             @NonNull RegistrationListener listener) {
