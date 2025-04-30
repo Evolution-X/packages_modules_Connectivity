@@ -156,7 +156,6 @@ import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
 import com.android.net.module.util.SharedLog;
-import com.android.net.module.util.TerribleErrorLog;
 import com.android.networkstack.apishim.common.BluetoothPanShim;
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceCallbackShim;
 import com.android.networkstack.apishim.common.BluetoothPanShim.TetheredInterfaceRequestShim;
@@ -1144,25 +1143,25 @@ public class Tethering {
         int result = tetherInternal(request, iface);
         switch (type) {
             case TETHERING_WIFI:
-                TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                        "Legacy tether API called on Wifi iface " + iface,
+                Log.i(TAG, "Legacy tether API called on Wifi iface " + iface);
+                TetheringStatsLog.write(
                         CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
                         CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI);
                 if (result == TETHER_ERROR_NO_ERROR) {
-                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                            "Legacy tether API succeeded on Wifi iface " + iface,
+                    Log.i(TAG, "Legacy tether API succeeded on Wifi iface " + iface);
+                    TetheringStatsLog.write(
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS);
                 }
                 break;
             case TETHERING_WIFI_P2P:
-                TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                        "Legacy tether API called on Wifi P2P iface " + iface,
+                Log.i(TAG, "Legacy tether API called on Wifi P2P iface " + iface);
+                TetheringStatsLog.write(
                         CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
                         CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P);
                 if (result == TETHER_ERROR_NO_ERROR) {
-                    TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                            "Legacy tether API succeeded on Wifi P2P iface " + iface,
+                    Log.i(TAG, "Legacy tether API succeeded on Wifi P2P iface " + iface);
+                    TetheringStatsLog.write(
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
                             CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS);
                 }
@@ -1209,8 +1208,8 @@ public class Tethering {
         // processed, this will be a no-op and it will not return an error.
         tetherState.ipServer.enable(request);
         if (request.getRequestType() == REQUEST_TYPE_PLACEHOLDER) {
-            TerribleErrorLog.logTerribleError(TetheringStatsLog::write,
-                    "Started tethering with placeholder request: " + request,
+            Log.i(TAG, "Started tethering with placeholder request: " + request);
+            TetheringStatsLog.write(
                     CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
                     CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WITH_PLACEHOLDER_REQUEST);
         }
