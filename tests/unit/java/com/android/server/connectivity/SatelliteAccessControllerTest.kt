@@ -24,6 +24,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
@@ -356,15 +357,13 @@ class SatelliteAccessControllerTest {
     }
 
     private fun mockIsSatelliteDataOptimizedApp(packageName: String, isOptimized: Boolean) {
-        val property = mock(PackageManager.Property::class.java)
-        `when`(property.isString).thenReturn(isOptimized)
+        val appInfo = ApplicationInfo()
         if (isOptimized) {
-            `when`(property.string).thenReturn(packageName)
+            appInfo.metaData = Bundle()
+            appInfo.metaData.putString(PROPERTY_SATELLITE_DATA_OPTIMIZED, packageName)
         }
-        `when`(packageManager.getProperty(
-                eq(PROPERTY_SATELLITE_DATA_OPTIMIZED),
-                eq(packageName)
-        )).thenReturn(property)
+        doReturn(appInfo).`when`(packageManager)
+                .getApplicationInfo(packageName, PackageManager.GET_META_DATA)
     }
 
     @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
