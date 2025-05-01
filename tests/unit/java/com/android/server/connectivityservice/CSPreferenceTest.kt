@@ -48,6 +48,7 @@ import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Needed
 import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Unneeded
 import com.android.testutils.postAndWait
 import com.android.testutils.runAsShell
+import kotlin.test.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -329,12 +330,6 @@ class CSPreferenceTest : CSTest() {
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
-        // TODO : the test below cannot be stabilized because the order of the callbacks
-        // (which request is needed first) is not guaranteed and actually changes across
-        // invocations, and TestableNetworkOfferCallback does not yet offer the tooling
-        // to check the track record from a mark.
-        return
-
         updateSatellitePreference(setOf(SMSUID), setOf(UID1))
         // TODO : ideally ConnectivityService would not send unneeded then needed. This is
         // happening because updating the preferences removes the requests, which causes a
@@ -342,15 +337,20 @@ class CSPreferenceTest : CSTest() {
         // causes another rematch.
         satelliteCallback.expect<Unneeded> { it.isRestricted }
         restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
-        satelliteCallback.expect<Needed> { !it.isRestricted }
-        satelliteCallback.expect<Needed> { it.isRestricted }
+
+        val mark1 = satelliteCallback.mark
+        satelliteCallback.eventuallyExpect<Needed>(from = mark1) { !it.isRestricted }
+        satelliteCallback.eventuallyExpect<Needed>(from = mark1) { it.isRestricted }
+        assertEquals(2, satelliteCallback.mark - mark1)
         restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         updateSatellitePreference(emptySet(), setOf(UID1))
-        satelliteCallback.expect<Unneeded> { it.isRestricted }
-        satelliteCallback.expect<Unneeded> { !it.isRestricted }
+        val mark2 = satelliteCallback.mark
+        satelliteCallback.eventuallyExpect<Unneeded>(from = mark2) { it.isRestricted }
+        satelliteCallback.eventuallyExpect<Unneeded>(from = mark2) { !it.isRestricted }
+        assertEquals(2, satelliteCallback.mark - mark2)
         satelliteCallback.expect<Needed> { !it.isRestricted }
         restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
         satelliteCallback.assertNoCallback()
@@ -358,20 +358,29 @@ class CSPreferenceTest : CSTest() {
 
         updateSatellitePreference(setOf(SMSUID), setOf(UID1))
         restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
+        satelliteCallback.expect<Unneeded> { !it.isRestricted }
+        val mark3 = satelliteCallback.mark
+        satelliteCallback.eventuallyExpect<Needed>(from = mark3) { it.isRestricted }
+        satelliteCallback.eventuallyExpect<Needed>(from = mark3) { !it.isRestricted }
+        assertEquals(2, satelliteCallback.mark - mark3)
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
-        val wifiAgent = Agent(TRANSPORT_WIFI)
+        val wifiAgent = Agent(nc(TRANSPORT_WIFI, NET_CAPABILITY_INTERNET))
         wifiAgent.connect()
-        satelliteCallback.expect<Unneeded> { it.isRestricted }
-        satelliteCallback.expect<Unneeded> { !it.isRestricted }
+        val mark4 = satelliteCallback.mark
+        satelliteCallback.eventuallyExpect<Unneeded>(from = mark4) { it.isRestricted }
+        satelliteCallback.eventuallyExpect<Unneeded>(from = mark4) { !it.isRestricted }
+        assertEquals(2, satelliteCallback.mark - mark4)
         restrictedSatelliteCallback.expect<Unneeded> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
 
         wifiAgent.disconnect()
-        satelliteCallback.expect<Needed> { it.isRestricted }
-        satelliteCallback.expect<Needed> { !it.isRestricted }
+        val mark5 = satelliteCallback.mark
+        satelliteCallback.eventuallyExpect<Needed>(from = mark5) { it.isRestricted }
+        satelliteCallback.eventuallyExpect<Needed>(from = mark5) { !it.isRestricted }
+        assertEquals(2, satelliteCallback.mark - mark5)
         restrictedSatelliteCallback.expect<Needed> { it.isRestricted }
         satelliteCallback.assertNoCallback()
         restrictedSatelliteCallback.assertNoCallback()
