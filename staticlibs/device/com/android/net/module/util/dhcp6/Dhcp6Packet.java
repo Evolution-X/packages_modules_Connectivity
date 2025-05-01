@@ -200,6 +200,11 @@ public class Dhcp6Packet {
         return mSolMaxRt;
     }
 
+    /** Returns the OPTION_STATUS_CODE value as defined in rfc8415#section-21.13 */
+    public Short getStatusCode() {
+        return mStatusCode;
+    }
+
     /**
      * A class to take DHCPv6 IA_PD option allocated from server.
      * https://www.rfc-editor.org/rfc/rfc8415.html#section-21.21
