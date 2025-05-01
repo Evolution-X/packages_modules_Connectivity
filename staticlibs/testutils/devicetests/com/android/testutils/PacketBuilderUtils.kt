@@ -638,7 +638,7 @@ class Ip4Pkt(
  * val ra = RaPkt(lft = 50, reachableTime = 100, flags = "O")
  *         .addPioOption(prefix = "2001:db8::1/64", flags = "LA")
  * val p = ether / ipv6 / ra
- * val bytes = p.bytes
+ * val bytes = p.build()
  * }
  * </pre>
  **/
