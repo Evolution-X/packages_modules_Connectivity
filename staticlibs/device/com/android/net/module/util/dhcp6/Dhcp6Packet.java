@@ -166,7 +166,6 @@ public class Dhcp6Packet {
     /**
      * Returns decoded IA_PD options associated with IA_ID.
      */
-    @VisibleForTesting
     public PrefixDelegation getPrefixDelegation() {
         return mPrefixDelegation;
     }
