@@ -172,6 +172,7 @@ public final class CtsNetUtils {
                 new NetworkRequest.Builder()
                         .clearCapabilities()
                         .addTransportType(TRANSPORT_TEST)
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
                         .setNetworkSpecifier(ifname)
                         .build();
 
