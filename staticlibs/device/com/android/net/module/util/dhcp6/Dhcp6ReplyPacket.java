@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package android.net.dhcp6;
-
-import static com.android.net.module.util.NetworkStackConstants.DHCP_MAX_LENGTH;
+package com.android.net.module.util.dhcp6;
 
 import androidx.annotation.NonNull;
 

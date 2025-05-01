@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package android.net.dhcp6;
-
-import static com.android.net.module.util.NetworkStackConstants.DHCP_MAX_OPTION_LEN;
+package com.android.net.module.util.dhcp6;
 
 import android.net.MacAddress;
 import android.util.Log;
@@ -24,7 +22,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.util.HexDump;
+import com.android.net.module.util.HexDump;
 import com.android.net.module.util.Struct;
 import com.android.net.module.util.structs.IaPdOption;
 import com.android.net.module.util.structs.IaPrefixOption;
@@ -47,6 +45,10 @@ import java.util.OptionalInt;
  */
 public class Dhcp6Packet {
     private static final String TAG = Dhcp6Packet.class.getSimpleName();
+    /** DHCP constants copied from NetworkStackConstants.java */
+    protected static final int DHCP_MAX_LENGTH = 1500;
+    protected static final int DHCP_MAX_OPTION_LEN = 255;
+
     /**
      * DHCPv6 Message Type.
      */
