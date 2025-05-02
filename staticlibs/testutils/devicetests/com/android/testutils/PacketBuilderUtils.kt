@@ -487,17 +487,50 @@ class Dhcp6Pkt(
 
     constructor(type: String, transId: Int) : this(Type.fromString(type), transId)
 
+    private val outputStream = ByteArrayOutputStream()
     init {
         require(transId <= 0xffffff)
-    }
-
-    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         val dhcp6Header = ByteBuffer.allocate(4)
             .putInt((type.value.toInt() shl 24) or transId)
         dhcp6Header.flip()
+        outputStream.write(dhcp6Header.array())
+    }
 
+    fun addClientIdentifierOption(duid: ByteArray): Dhcp6Pkt {
+        require(duid.size <= 0xffff)
+        val bb = ByteBuffer.allocate(4 + duid.size)
+                .putShort(1) // OPTION_CLIENTID
+                .putShort(duid.size.toShort())
+                .put(duid)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addServerIdentifierOption(duid: ByteArray): Dhcp6Pkt {
+        require(duid.size <= 0xffff)
+        val bb = ByteBuffer.allocate(4 + duid.size)
+                .putShort(2) // OPTION_SERVERID
+                .putShort(duid.size.toShort())
+                .put(duid)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addSolMaxRtOption(solMaxRt: Int): Dhcp6Pkt {
+        val bb = ByteBuffer.allocate(8)
+                .putShort(82) // OPTION_SOL_MAX_RT
+                .putShort(4)
+                .putInt(solMaxRt)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         return object : FinalizedPacket {
-            override val bytes = dhcp6Header.array()
+            override val bytes = outputStream.toByteArray()
         }
     }
 }
