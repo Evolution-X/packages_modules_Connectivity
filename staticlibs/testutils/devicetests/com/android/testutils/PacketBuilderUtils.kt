@@ -460,6 +460,59 @@ class DataPkt(data: ByteArray) : Packet {
     }
 }
 
+class Dhcp6IaPdOpt(
+    private val iaid: Int,
+    private val t1: Int = 0,
+    private val t2: Int = 0,
+) : Packet {
+
+    private val outputStream = ByteArrayOutputStream()
+    init {
+        val bb = ByteBuffer.allocate(16)
+                .putShort(25) // OPTION_IA_PD
+                .putShort(0) // Length filled in later
+                .putInt(iaid)
+                .putInt(t1)
+                .putInt(t2)
+        bb.flip()
+        outputStream.write(bb.array())
+    }
+
+    fun addIaPrefixOption(prefix: IpPrefix, preferred: Int, valid: Int): Dhcp6IaPdOpt {
+        val bb = ByteBuffer.allocate(29)
+                .putShort(26) // OPTION_IAPREFIX
+                .putShort(25) // Length without IAprefix-options
+                .putInt(preferred)
+                .putInt(valid)
+                .put(prefix.prefixLength.toByte())
+                .put(prefix.rawAddress)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addIaPrefixOption(prefix: String, preferred: Int = 900, valid: Int = 1800): Dhcp6IaPdOpt {
+        return addIaPrefixOption(IpPrefix(prefix), preferred, valid)
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        // Fix up the length *before* appending payload.
+        val bytes = outputStream.toByteArray()
+        val bb = ByteBuffer.wrap(bytes)
+        bb.position(2)
+        // Note that option-len does not include the type (2 bytes) and len (2 bytes) fields
+        bb.putShort((bytes.size - 4).toShort())
+
+        val tempStream = ByteArrayOutputStream()
+        tempStream.write(bytes)
+        if (payload != null) tempStream.write(payload.bytes)
+
+        return object : FinalizedPacket {
+            override val bytes = tempStream.toByteArray()
+        }
+    }
+}
+
 /** Class that facilitates the creation of DHCPv6 packets. */
 class Dhcp6Pkt(
         private val type: Type,
