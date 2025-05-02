@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -82,9 +83,10 @@ public class SatelliteAccessController {
     private final SparseArray<Set<Integer>> mSatelliteRoleSmsUids = new SparseArray<>();
 
     // Set of UIDs that have declared the
-    // {@code android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED} property
+    // {@code android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED} meta-data
     // with a value of package name in their manifest file. This variable will only be
     // accessed on the handler thread.
+    // See {@link SatelliteManager#PROPERTY_SATELLITE_DATA_OPTIMIZED}.
     private final Set<Integer> mSatelliteDataOptInUids = new ArraySet<>();
 
     private final ArrayMap<UserHandle, PackageManager> mUserPackageManagers = new ArrayMap<>();
@@ -402,16 +404,23 @@ public class SatelliteAccessController {
         final ArraySet<Integer> uids = new ArraySet<>();
         for (PackageInfo app : apps) {
             if (null == app.applicationInfo || app.applicationInfo.uid < 0) continue;
-            if (isSatelliteDataOptimizedApp(app.packageName)) uids.add(app.applicationInfo.uid);
+            if (isSatelliteDataOptimizedApp(app.packageName)) {
+                uids.add(app.applicationInfo.uid);
+            }
         }
         return uids;
     }
 
     private boolean isSatelliteDataOptimizedApp(@NonNull String packageName) {
         try {
-            final PackageManager.Property property = mPackageManager
-                    .getProperty(PROPERTY_SATELLITE_DATA_OPTIMIZED, packageName);
-            return property.isString() && TextUtils.equals(property.getString(), packageName);
+            final ApplicationInfo applicationInfo = mPackageManager.getApplicationInfo(
+                    packageName, PackageManager.GET_META_DATA);
+            final Bundle metaData = applicationInfo.metaData;
+            if (metaData != null) {
+                final String value = metaData.getString(PROPERTY_SATELLITE_DATA_OPTIMIZED);
+                return TextUtils.equals(value, packageName);
+            }
+            return false;
         } catch (PackageManager.NameNotFoundException e) {
             return false;
         }
