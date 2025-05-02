@@ -581,6 +581,15 @@ class Dhcp6Pkt(
         return this
     }
 
+    fun addRapidCommitOption(): Dhcp6Pkt {
+        val bb = ByteBuffer.allocate(4)
+                .putShort(14) // OPTION_RAPID_COMMIT
+                .putShort(0)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
         if (payload != null) outputStream.write(payload.bytes)
         return object : FinalizedPacket {
