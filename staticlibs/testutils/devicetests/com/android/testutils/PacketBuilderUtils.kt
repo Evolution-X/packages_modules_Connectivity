@@ -529,6 +529,7 @@ class Dhcp6Pkt(
     }
 
     override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        if (payload != null) outputStream.write(payload.bytes)
         return object : FinalizedPacket {
             override val bytes = outputStream.toByteArray()
         }
