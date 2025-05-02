@@ -39,6 +39,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DeviceConfigUtils;
+import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.SharedLog;
 
 import java.util.List;
@@ -52,10 +53,14 @@ import javax.annotation.CheckReturnValue;
  * Tracks the uid of all the default messaging application which are role_sms role and
  * satellite_communication permission complaint and requests ConnectivityService to create multi
  * layer request with satellite internet access support for the default message application.
+ *
+ * Note that this class is not thread safe and should only be accessed on the handler
+ * thread, except {@link #start()}.
  */
 public class SatelliteAccessController {
     private static final String TAG = SatelliteAccessController.class.getSimpleName();
     // Shamelessly copied from telephony/satellite/SatelliteManager.java.
+    // TODO: Import from SatelliteManager when it is available.
     @VisibleForTesting
     public static final String PROPERTY_SATELLITE_DATA_OPTIMIZED =
             "android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED";
@@ -93,6 +98,7 @@ public class SatelliteAccessController {
             implements OnRoleHoldersChangedListener {
         @Override
         public void onRoleHoldersChanged(String role, UserHandle userHandle) {
+            HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
             if (RoleManager.ROLE_SMS.equals(role) && updateSatelliteRoleSmsUids(userHandle)) {
                 mLog.i("ROLE_SMS Change detected ");
                 reportSatelliteNetworkFallbackUids();
@@ -267,6 +273,7 @@ public class SatelliteAccessController {
      */
     public void onUserAddedWithInstalledPackageList(@NonNull UserHandle userHandle,
             @NonNull List<PackageInfo> apps) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         // Obtain uids with role sms and satellite communication permission for the added user.
         final boolean roleSmsUidsChanged = updateSatelliteRoleSmsUids(userHandle);
 
@@ -297,6 +304,7 @@ public class SatelliteAccessController {
      * @param userHandle The integer userHandle of the removed user. See {@link #EXTRA_USER_HANDLE}.
      */
     public void onUserRemoved(@NonNull UserHandle userHandle) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         final boolean smsRoleUidsChanged =
                 updateSatelliteRoleSmsUidListOnUserRemoval(userHandle.getIdentifier());
         final boolean satelliteOptInUidsChanged;
@@ -319,6 +327,7 @@ public class SatelliteAccessController {
      * @param uid The uid of the new package.
      */
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!mSupportConstrainedDataSatelliteOptIn) return;
         if (addSatelliteDataOptInUid(packageName, uid)) {
             reportSatelliteNetworkFallbackUids();
@@ -340,6 +349,7 @@ public class SatelliteAccessController {
      * @param pkgList An array of package names that have become available.
      */
     public void onExternalApplicationsAvailable(String[] pkgList) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!mSupportConstrainedDataSatelliteOptIn) return;
         if (CollectionUtils.isEmpty(pkgList)) {
             mLog.e("No available external application.");
@@ -367,6 +377,7 @@ public class SatelliteAccessController {
      * @param uid containing the integer uid previously assigned to the package.
      */
     public void onPackageRemoved(@NonNull final String packageName, final int uid) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         if (!mSupportConstrainedDataSatelliteOptIn) return;
 
         // Scan for all apps sharing the same uid.
@@ -414,6 +425,7 @@ public class SatelliteAccessController {
 
     /** Dump info to dumpsys */
     public void dump(@NonNull IndentingPrintWriter pw) {
+        HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
         pw.println("SatelliteAccessController:");
         pw.increaseIndent();
         pw.println("SupportConstrainedDataSatelliteOptIn: "
