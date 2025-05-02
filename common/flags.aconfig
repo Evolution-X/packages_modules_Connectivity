@@ -175,3 +175,11 @@ flag {
   bug: "388774939"
   is_fixed_read_only: true
 }
+
+flag {
+  name: "mdns_advertising_improvement"
+  is_exported: true
+  namespace: "android_core_networking"
+  description: "Flag for MDNS advertising quality, reliability and performance improvement"
+  bug: "373270045"
+}
