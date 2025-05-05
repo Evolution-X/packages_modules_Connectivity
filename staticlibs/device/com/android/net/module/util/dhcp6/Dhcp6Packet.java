@@ -142,7 +142,7 @@ public class Dhcp6Packet {
     /**
      * The unique identifier for IA_NA, IA_TA, IA_PD used in this particular DHCPv6 negotiation
      */
-    protected int mIaId;
+    protected int mIaid;
     // Per rfc8415#section-12, the IAID MUST be consistent across restarts.
     // Since currently only one IAID is supported, a well-known value can be used (0).
     public static final int IAID = 0;
@@ -171,10 +171,10 @@ public class Dhcp6Packet {
     }
 
     /**
-     * Returns IA_ID associated to IA_PD.
+     * Returns IAID associated to IA_PD.
      */
-    public int getIaId() {
-        return mIaId;
+    public int getIaid() {
+        return mIaid;
     }
 
     /**
@@ -566,7 +566,7 @@ public class Dhcp6Packet {
 
         if (pd != null) {
             newPacket.mPrefixDelegation = pd;
-            newPacket.mIaId = pd.iaid;
+            newPacket.mIaid = pd.iaid;
         }
         newPacket.mStatusCode = statusCode;
         newPacket.mRapidCommit = rapidCommit;
