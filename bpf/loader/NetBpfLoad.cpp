@@ -1399,10 +1399,7 @@ int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
 
     ret = readCodeSections(elfFile, cs);
-    // BPF .o's with no programs are only supported by mainline netbpfload,
-    // make sure .o's targeting non-mainline (ie. S) bpfloader don't show up.
-    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_S_VERSION)
-        return 0;
+    if (ret == -ENOENT) return 0;
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
