@@ -1399,10 +1399,7 @@ int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
 
     ret = readCodeSections(elfFile, cs);
-    // BPF .o's with no programs are only supported by mainline netbpfload,
-    // make sure .o's targeting non-mainline (ie. S) bpfloader don't show up.
-    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_S_VERSION)
-        return 0;
+    if (ret == -ENOENT) return 0;
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
@@ -1674,6 +1671,10 @@ static int doLoad(char** argv, char * const envp[]) {
     if (runningAsRoot) ++bpfloader_ver;  // [45] BPFLOADER_MAINLINE_U_QPR3_VERSION
     if (isAtLeastV) ++bpfloader_ver;     // [46] BPFLOADER_MAINLINE_V_VERSION
     if (isAtLeast25Q2) ++bpfloader_ver;  // [47] BPFLOADER_MAINLINE_25Q2_VERSION
+    if (isAtLeast25Q3) ++bpfloader_ver;  // [48] BPFLOADER_MAINLINE_25Q3_VERSION
+    if (isAtLeast25Q4) ++bpfloader_ver;  // [49] BPFLOADER_MAINLINE_25Q4_VERSION
+    if (isAtLeast26Q1) ++bpfloader_ver;  // [50] BPFLOADER_MAINLINE_26Q1_VERSION
+    if (isAtLeast26Q2) ++bpfloader_ver;  // [51] BPFLOADER_MAINLINE_26Q2_VERSION
 
     ALOGI("NetBpfLoad v0.%u (%s) api:%d/%d kver:%07x (%s) libbpf: v%u.%u "
           "uid:%d rc:%d%d",
@@ -1717,6 +1718,13 @@ static int doLoad(char** argv, char * const envp[]) {
     // see also: //system/netd/tests/kernel_test.cpp TestKernel54
     if (isAtLeast25Q2 && !isAtLeastKernelVersion(5, 4, 0)) {
         ALOGE("Android 25Q2 requires kernel 5.4.");
+        return 1;
+    }
+
+    // 25Q4 bumps the kernel requirement up to 5.10
+    // see also: //system/netd/tests/kernel_test.cpp TestKernel510
+    if (isAtLeast25Q4 && !isAtLeastKernelVersion(5, 10, 0)) {
+        ALOGE("Android 25Q4 requires kernel 5.10.");
         return 1;
     }
 
