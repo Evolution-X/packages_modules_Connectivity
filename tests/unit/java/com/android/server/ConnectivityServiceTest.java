@@ -2412,6 +2412,11 @@ public class ConnectivityServiceTest {
         public boolean shouldEnforceLocalNetRestrictions(int uid) {
             return false;
         }
+
+        @Override
+        public boolean isFeatureNotChickenedOut(Context context, String name) {
+            return true;
+        }
     }
 
     private class AutomaticOnOffKeepaliveTrackerDependencies

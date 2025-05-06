@@ -79,6 +79,19 @@ public final class ConnectivityFlags {
     public static final String EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN =
             "early_link_properties_update_for_vpn";
 
+    /**
+     * Kill switch for the PermissionMonitor refactoring that centralizes intent
+     * receiving and dispatching within the {@link BroadcastReceiveHelper}.
+     * If enabled, the refactored logic in {@link BroadcastReceiveHelper} will be used.
+     * If disabled, the PermissionMonitor will revert to its previous implementation
+     * for receiving and dispatching intents.
+     *
+     * This flag is introduced as a risk mitigation strategy in case issues are
+     * discovered with the new refactored implementation.
+     */
+    public static final String USE_BROADCAST_RECEIVE_HELPER_FOR_PERMISSION_MONITOR =
+            "use_broadcast_receive_helper_for_permission_monitor";
+
     private boolean mNoRematchAllRequestsOnRegister;
 
     /**

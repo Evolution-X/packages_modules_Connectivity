@@ -30,6 +30,7 @@ import static android.net.connectivity.ConnectivityCompatChanges.RESTRICT_LOCAL_
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 
+import static com.android.server.connectivity.ConnectivityFlags.USE_BROADCAST_RECEIVE_HELPER_FOR_PERMISSION_MONITOR;
 import static com.android.server.connectivity.NetworkPermissions.PERMISSION_NETWORK;
 import static com.android.server.connectivity.NetworkPermissions.PERMISSION_NONE;
 import static com.android.server.connectivity.NetworkPermissions.PERMISSION_SYSTEM;
@@ -40,9 +41,13 @@ import static com.android.net.module.util.CollectionUtils.toIntArray;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.app.compat.CompatChanges;
 import android.content.AttributionSource;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -60,6 +65,7 @@ import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemConfigManager;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.permission.PermissionManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
@@ -72,6 +78,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.SharedLog;
 import com.android.networkstack.apishim.ProcessShimImpl;
 import com.android.networkstack.apishim.common.ProcessShim;
@@ -93,6 +100,7 @@ public class PermissionMonitor {
     private static final int VERSION_Q = Build.VERSION_CODES.Q;
 
     private final PackageManager mPackageManager;
+    private final UserManager mUserManager;
     private final SystemConfigManager mSystemConfigManager;
     private final PermissionManager mPermissionManager;
     private final PermissionChangeListener mPermissionChangeListener;
@@ -156,6 +164,54 @@ public class PermissionMonitor {
 
     private static final int MAX_PERMISSION_UPDATE_LOGS = 40;
     private final SharedLog mPermissionUpdateLogs = new SharedLog(MAX_PERMISSION_UPDATE_LOGS, TAG);
+    private final boolean mUseBroadcastReceiveHelper;
+
+    private final BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (mUseBroadcastReceiveHelper) {
+                throw new IllegalStateException(
+                        "This should only be called if UseBroadcastReceiveHelper is false");
+            }
+            final String action = intent.getAction();
+
+            if (Intent.ACTION_PACKAGE_ADDED.equals(action)) {
+                final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
+                final Uri packageData = intent.getData();
+                final String packageName =
+                        packageData != null ? packageData.getSchemeSpecificPart() : null;
+                onPackageAdded(packageName, uid);
+            } else if (Intent.ACTION_PACKAGE_REMOVED.equals(action)) {
+                final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
+                final Uri packageData = intent.getData();
+                final String packageName =
+                        packageData != null ? packageData.getSchemeSpecificPart() : null;
+                onPackageRemoved(packageName, uid);
+            } else if (Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE.equals(action)) {
+                final String[] pkgList =
+                        intent.getStringArrayExtra(Intent.EXTRA_CHANGED_PACKAGE_LIST);
+                onExternalApplicationsAvailable(pkgList);
+            } else if (Intent.ACTION_USER_ADDED.equals(action)) {
+                final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
+                // User should be filled for below intents, check the existence.
+                if (user == null) {
+                    Log.wtf(TAG, action + " broadcast without EXTRA_USER");
+                    return;
+                }
+                onUserAdded(user);
+            } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
+                final UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
+                // User should be filled for below intents, check the existence.
+                if (user == null) {
+                    Log.wtf(TAG, action + " broadcast without EXTRA_USER");
+                    return;
+                }
+                onUserRemoved(user);
+            } else {
+                Log.wtf(TAG, "received unexpected intent: " + action);
+            }
+        }
+    };
 
     /**
      * Dependencies of PermissionMonitor, for injection in tests.
@@ -189,6 +245,13 @@ public class PermissionMonitor {
             // TODO(b/394567896): Update compat change checks for enforcement
             return BpfNetMaps.isAtLeast25Q2() &&
                     CompatChanges.isChangeEnabled(RESTRICT_LOCAL_NETWORK, uid);
+        }
+
+        /**
+         * @see DeviceConfigUtils#isTetheringFeatureNotChickenedOut
+         */
+        public boolean isFeatureNotChickenedOut(Context context, String name) {
+            return DeviceConfigUtils.isTetheringFeatureNotChickenedOut(context, name);
         }
     }
 
@@ -249,6 +312,13 @@ public class PermissionMonitor {
             // boot setup such that any changes to runtime permissions for local network
             // restrictions can only occur after this registration has completed.
             mPackageManager.addOnPermissionsChangeListener(mPermissionChangeListener);
+        }
+        mUseBroadcastReceiveHelper = mDeps.isFeatureNotChickenedOut(
+                mContext, USE_BROADCAST_RECEIVE_HELPER_FOR_PERMISSION_MONITOR);
+        if (!mUseBroadcastReceiveHelper) {
+            mUserManager = context.getSystemService(UserManager.class);
+        } else {
+            mUserManager = null;
         }
     }
 
@@ -406,11 +476,38 @@ public class PermissionMonitor {
      * Intended to be called only once at startup, in the systemReady phase.
      * This shouldn't/needn't be called again.
      */
+    @SuppressLint("MissingPermission")
     public synchronized void initialize() {
         log("Initialize");
 
         final Handler handler = new Handler(mThread.getLooper());
         final Context userAllContext = mContext.createContextAsUser(UserHandle.ALL, 0 /* flags */);
+
+        if (!mUseBroadcastReceiveHelper) {
+            final IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+            intentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+            intentFilter.addDataScheme("package");
+            userAllContext.registerReceiver(
+                    mIntentReceiver, intentFilter, null /* broadcastPermission */, handler);
+
+            // Listen to EXTERNAL_APPLICATIONS_AVAILABLE is that an app becoming
+            // available means it may need to gain a permission. But an app that
+            // becomes unavailable can neither gain nor lose permissions on that
+            // account, it just can no longer run. Thus, doesn't need to listen to
+            // EXTERNAL_APPLICATIONS_UNAVAILABLE.
+            final IntentFilter externalIntentFilter =
+                    new IntentFilter(Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE);
+            userAllContext.registerReceiver(
+                    mIntentReceiver, externalIntentFilter, null /* broadcastPermission */, handler);
+
+            // Listen for user add/remove.
+            final IntentFilter userIntentFilter = new IntentFilter();
+            userIntentFilter.addAction(Intent.ACTION_USER_ADDED);
+            userIntentFilter.addAction(Intent.ACTION_USER_REMOVED);
+            userAllContext.registerReceiver(
+                    mIntentReceiver, userIntentFilter, null /* broadcastPermission */, handler);
+        }
 
         // Register UIDS_ALLOWED_ON_RESTRICTED_NETWORKS setting observer
         mDeps.registerContentObserver(
@@ -432,7 +529,24 @@ public class PermissionMonitor {
         // are not specific to any particular user.
         mUsersTrafficPermissions.put(UserHandle.ALL, getSystemTrafficPerm());
 
+        if (!mUseBroadcastReceiveHelper) {
+            final List<UserHandle> usrs = mUserManager.getUserHandles(true /* excludeDying */);
+            // Update netd permissions for all users.
+            for (UserHandle user : usrs) {
+                onUserAdded(user);
+            }
+        }
+
         log("UidToNetworkPerm: " + mUidToNetworkPerm.size());
+    }
+
+    /**
+     * Indicates whether the BroadcastReceiveHelper should be used by PermissionMonitor.
+     *
+     * This flag value is initialized in the constructor, ensuring consistency across sub-modules.
+     */
+    public boolean useBroadcastReceiveHelper() {
+        return mUseBroadcastReceiveHelper;
     }
 
     @VisibleForTesting
@@ -538,6 +652,17 @@ public class PermissionMonitor {
         } catch (RemoteException e) {
             loge("Exception when updating permissions: " + e);
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private synchronized void onUserAdded(@NonNull UserHandle user) {
+        if (mUseBroadcastReceiveHelper) {
+            throw new IllegalStateException(
+                    "This should only be called if UseBroadcastReceiveHelper is false");
+        }
+        final List<PackageInfo> apps =  mPackageManager.getInstalledPackagesAsUser(
+                GET_PERMISSIONS, user.getIdentifier());
+        onUserAddedWithInstalledPackageList(user, apps);
     }
 
     /**

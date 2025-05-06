@@ -7759,7 +7759,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         updateProfileAllowedNetworks();
         final List<PackageInfo> apps = mContext.getPackageManager()
                 .getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
-        mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onUserAddedWithInstalledPackageList(user, apps);
         }
@@ -7775,7 +7777,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         if (mOemNetworkPreferences.getNetworkPreferences().size() > 0) {
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
-        mPermissionMonitor.onUserRemoved(user);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onUserRemoved(user);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onUserRemoved(user);
         }
@@ -7784,7 +7788,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
-        mPermissionMonitor.onPackageAdded(packageName, uid);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onPackageAdded(packageName, uid);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onPackageAdded(packageName, uid);
         }
@@ -7793,7 +7799,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onPackageRemoved(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
-        mPermissionMonitor.onPackageRemoved(packageName, uid);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onPackageRemoved(packageName, uid);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onPackageRemoved(packageName, uid);
         }
@@ -7806,7 +7814,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     @Override
     public void onExternalApplicationsAvailable(@Nullable String[] pkgList) {
-        mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onExternalApplicationsAvailable((pkgList));
         }
