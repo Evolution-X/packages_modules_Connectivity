@@ -74,7 +74,6 @@ public class SatelliteAccessController {
     private final DefaultMessageRoleListener mDefaultMessageRoleListener;
     private final BiConsumer<Set<Integer>, Set<Integer>> mCallback;
     private final Handler mConnectivityServiceHandler;
-    private final PackageManager mPackageManager;
     private final boolean mSupportConstrainedDataSatelliteOptIn;
     private final SharedLog mLog = new SharedLog(MAX_LOG_ENTRIES, TAG);
 
@@ -157,7 +156,6 @@ public class SatelliteAccessController {
         mDefaultMessageRoleListener = new DefaultMessageRoleListener();
         mCallback = callback;
         mConnectivityServiceHandler = connectivityServiceInternalHandler;
-        mPackageManager = mContext.getPackageManager();
         mSupportConstrainedDataSatelliteOptIn = mDeps.supportConstrainedDataSatelliteOptIn(c);
     }
 
@@ -165,7 +163,7 @@ public class SatelliteAccessController {
     private Set<Integer> getRoleSmsUidsWithSatellitePermission(List<String> packageNames,
             @NonNull UserHandle userHandle) {
         final Set<Integer> roleSmsUids = new ArraySet<>();
-        final PackageManager pm = mContext.createContextAsUser(userHandle, 0).getPackageManager();
+        final PackageManager pm = getPackageManagerForUser(userHandle);
         if (pm != null) {
             for (String packageName : packageNames) {
                 // Check if SATELLITE_COMMUNICATION permission is enabled for default sms
@@ -276,18 +274,16 @@ public class SatelliteAccessController {
     public void onUserAddedWithInstalledPackageList(@NonNull UserHandle userHandle,
             @NonNull List<PackageInfo> apps) {
         HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
+        // Store PackageManager for user for later use.
+        final PackageManager pmForUser = getPackageManagerForUser(userHandle);
+
         // Obtain uids with role sms and satellite communication permission for the added user.
         final boolean roleSmsUidsChanged = updateSatelliteRoleSmsUids(userHandle);
-
-        // Store PackageManager for user for later use.
-        final PackageManager pmForUser =
-                mContext.createContextAsUser(userHandle, 0 /* flag */).getPackageManager();
-        mUserPackageManagers.put(userHandle, pmForUser);
 
         boolean optInUidsChanged = false;
         if (mSupportConstrainedDataSatelliteOptIn) {
             final Set<Integer> satelliteDataOptInUidsForUser =
-                    getSatelliteDataOptInUidsForUser(apps);
+                    getSatelliteDataOptInUidsForUser(pmForUser, apps);
             if (satelliteDataOptInUidsForUser.size() > 0) {
                 mLog.i("Add SatelliteDataOptInUids for user " + userHandle + ": "
                         + satelliteDataOptInUidsForUser);
@@ -338,7 +334,8 @@ public class SatelliteAccessController {
 
     @CheckReturnValue
     private boolean addSatelliteDataOptInUid(@NonNull final String packageName, final int uid) {
-        if (mSupportConstrainedDataSatelliteOptIn && isSatelliteDataOptimizedApp(packageName)) {
+        if (mSupportConstrainedDataSatelliteOptIn
+                && isSatelliteDataOptimizedApp(getPackageManagerForUid(uid), packageName)) {
             mSatelliteDataOptInUids.add(uid);
             return true;
         }
@@ -372,6 +369,11 @@ public class SatelliteAccessController {
         }
     }
 
+    @NonNull
+    private PackageManager getPackageManagerForUid(int uid) {
+        return getPackageManagerForUser(UserHandle.getUserHandleForUid(uid));
+    }
+
     /**
      * Called when a package is removed.
      *
@@ -383,10 +385,11 @@ public class SatelliteAccessController {
         if (!mSupportConstrainedDataSatelliteOptIn) return;
 
         // Scan for all apps sharing the same uid.
-        final String [] pkgs = mPackageManager.getPackagesForUid(uid);
+        final PackageManager pmForUser = getPackageManagerForUid(uid);
+        final String [] pkgs = pmForUser.getPackagesForUid(uid);
         if (pkgs != null) {
             for (String pkg : pkgs) {
-                if (!pkg.equals(packageName) && isSatelliteDataOptimizedApp(pkg)) {
+                if (!pkg.equals(packageName) && isSatelliteDataOptimizedApp(pmForUser, pkg)) {
                     return; // Early return if another satellite-optimized app shares the UID
                 }
             }
@@ -400,20 +403,22 @@ public class SatelliteAccessController {
     }
 
     @NonNull
-    private Set<Integer> getSatelliteDataOptInUidsForUser(@NonNull List<PackageInfo> apps) {
+    private Set<Integer> getSatelliteDataOptInUidsForUser(@NonNull PackageManager pmForUser,
+            @NonNull List<PackageInfo> apps) {
         final ArraySet<Integer> uids = new ArraySet<>();
         for (PackageInfo app : apps) {
             if (null == app.applicationInfo || app.applicationInfo.uid < 0) continue;
-            if (isSatelliteDataOptimizedApp(app.packageName)) {
+            if (isSatelliteDataOptimizedApp(pmForUser, app.packageName)) {
                 uids.add(app.applicationInfo.uid);
             }
         }
         return uids;
     }
 
-    private boolean isSatelliteDataOptimizedApp(@NonNull String packageName) {
+    private boolean isSatelliteDataOptimizedApp(@NonNull PackageManager pmForUser,
+            @NonNull String packageName) {
         try {
-            final ApplicationInfo applicationInfo = mPackageManager.getApplicationInfo(
+            final ApplicationInfo applicationInfo = pmForUser.getApplicationInfo(
                     packageName, PackageManager.GET_META_DATA);
             final Bundle metaData = applicationInfo.metaData;
             if (metaData != null) {
@@ -430,6 +435,16 @@ public class SatelliteAccessController {
     @CheckReturnValue
     private boolean removeSatelliteDataOptInUidsForUser(int userIdToRemove) {
         return mSatelliteDataOptInUids.removeIf(uid -> uid / PER_USER_RANGE == userIdToRemove);
+    }
+
+    @NonNull
+    private PackageManager getPackageManagerForUser(UserHandle user) {
+        PackageManager pm = mUserPackageManagers.get(user);
+        if (pm == null) {
+            pm = mContext.createContextAsUser(user, 0 /* flag */).getPackageManager();
+            mUserPackageManagers.put(user, pm);
+        }
+        return pm;
     }
 
     /** Dump info to dumpsys */
