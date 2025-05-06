@@ -460,6 +460,144 @@ class DataPkt(data: ByteArray) : Packet {
     }
 }
 
+class Dhcp6IaPdOpt(
+    private val iaid: Int,
+    private val t1: Int = 0,
+    private val t2: Int = 0,
+) : Packet {
+
+    private val outputStream = ByteArrayOutputStream()
+    init {
+        val bb = ByteBuffer.allocate(16)
+                .putShort(25) // OPTION_IA_PD
+                .putShort(0) // Length filled in later
+                .putInt(iaid)
+                .putInt(t1)
+                .putInt(t2)
+        bb.flip()
+        outputStream.write(bb.array())
+    }
+
+    fun addIaPrefixOption(prefix: IpPrefix, preferred: Int, valid: Int): Dhcp6IaPdOpt {
+        val bb = ByteBuffer.allocate(29)
+                .putShort(26) // OPTION_IAPREFIX
+                .putShort(25) // Length without IAprefix-options
+                .putInt(preferred)
+                .putInt(valid)
+                .put(prefix.prefixLength.toByte())
+                .put(prefix.rawAddress)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addIaPrefixOption(prefix: String, preferred: Int = 900, valid: Int = 1800): Dhcp6IaPdOpt {
+        return addIaPrefixOption(IpPrefix(prefix), preferred, valid)
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        // Fix up the length *before* appending payload.
+        val bytes = outputStream.toByteArray()
+        val bb = ByteBuffer.wrap(bytes)
+        bb.position(2)
+        // Note that option-len does not include the type (2 bytes) and len (2 bytes) fields
+        bb.putShort((bytes.size - 4).toShort())
+
+        val tempStream = ByteArrayOutputStream()
+        tempStream.write(bytes)
+        if (payload != null) tempStream.write(payload.bytes)
+
+        return object : FinalizedPacket {
+            override val bytes = tempStream.toByteArray()
+        }
+    }
+}
+
+/** Class that facilitates the creation of DHCPv6 packets. */
+class Dhcp6Pkt(
+        private val type: Type,
+        private val transId: Int,
+) : Packet {
+    enum class Type(val value: Byte) {
+        SOLICIT(1),
+        ADVERTISE(2),
+        REQUEST(3),
+        CONFIRM(4),
+        RENEW(5),
+        REBIND(6),
+        REPLY(7),
+        RELEASE(8),
+        DECLINE(9),
+        RECONFIGURE(10),
+        INFORMATION_REQUEST(11), // INFORMATION-REQUEST
+        RELAY_FORW(12),          // RELAY-FORW
+        RELAY_REPL(13);          // RELAY-REPL
+
+        companion object {
+            fun fromString(str: String) = valueOf(str.replace('-', '_'))
+        }
+    }
+
+    constructor(type: String, transId: Int) : this(Type.fromString(type), transId)
+
+    private val outputStream = ByteArrayOutputStream()
+    init {
+        require(transId <= 0xffffff)
+        val dhcp6Header = ByteBuffer.allocate(4)
+            .putInt((type.value.toInt() shl 24) or transId)
+        dhcp6Header.flip()
+        outputStream.write(dhcp6Header.array())
+    }
+
+    fun addClientIdentifierOption(duid: ByteArray): Dhcp6Pkt {
+        require(duid.size <= 0xffff)
+        val bb = ByteBuffer.allocate(4 + duid.size)
+                .putShort(1) // OPTION_CLIENTID
+                .putShort(duid.size.toShort())
+                .put(duid)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addServerIdentifierOption(duid: ByteArray): Dhcp6Pkt {
+        require(duid.size <= 0xffff)
+        val bb = ByteBuffer.allocate(4 + duid.size)
+                .putShort(2) // OPTION_SERVERID
+                .putShort(duid.size.toShort())
+                .put(duid)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addSolMaxRtOption(solMaxRt: Int): Dhcp6Pkt {
+        val bb = ByteBuffer.allocate(8)
+                .putShort(82) // OPTION_SOL_MAX_RT
+                .putShort(4)
+                .putInt(solMaxRt)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    fun addRapidCommitOption(): Dhcp6Pkt {
+        val bb = ByteBuffer.allocate(4)
+                .putShort(14) // OPTION_RAPID_COMMIT
+                .putShort(0)
+        bb.flip()
+        outputStream.write(bb.array())
+        return this
+    }
+
+    override fun build(payload: FinalizedPacket?, pseudo: PseudoHeaderPacket?): FinalizedPacket {
+        if (payload != null) outputStream.write(payload.bytes)
+        return object : FinalizedPacket {
+            override val bytes = outputStream.toByteArray()
+        }
+    }
+}
+
 /**
  * Class that facilitates the creation of UDP packets.
  *

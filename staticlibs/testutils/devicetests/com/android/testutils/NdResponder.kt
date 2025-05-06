@@ -19,7 +19,6 @@ package com.android.testutils
 import android.net.IpPrefix
 import android.net.MacAddress
 import android.system.OsConstants.IPPROTO_ICMPV6
-import android.util.ArrayMap
 import android.util.Log
 import com.android.net.module.util.NetworkStackConstants.ETHER_TYPE_IPV6
 import com.android.net.module.util.NetworkStackConstants.ICMPV6_NEIGHBOR_SOLICITATION
@@ -33,6 +32,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.Inet6Address
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 private const val TAG = "NdResponder"
@@ -67,7 +67,7 @@ class NdResponder(
         val ipAddr: Inet6Address,
         val ra: RaPkt?, // null if neighbor is not a router.
     )
-    private val neighborMap: MutableMap<Inet6Address, NeighborEntry> = ArrayMap()
+    private val neighborMap: ConcurrentHashMap<Inet6Address, NeighborEntry> = ConcurrentHashMap()
 
     constructor(packetReader: PollPacketReader) : this(packetReader, makeRandomPrefix())
 
@@ -84,7 +84,7 @@ class NdResponder(
     }
 
     fun addRouterEntry(mac: MacAddress, ip: Inet6Address, ra: RaPkt) {
-        neighborMap[ip] = NeighborEntry(mac, ip, ra)
+        neighborMap.put(ip, NeighborEntry(mac, ip, ra))
     }
 
     /**
@@ -93,7 +93,7 @@ class NdResponder(
      * @param ip the link-local address of the neighbor.
      */
     fun addNeighborEntry(mac: MacAddress, ip: Inet6Address) {
-        neighborMap[ip] = NeighborEntry(mac, ip, null)
+        neighborMap.put(ip, NeighborEntry(mac, ip, null))
     }
 
     private fun sendPacket(reader: PollPacketReader, packet: ByteArray) {
@@ -107,9 +107,9 @@ class NdResponder(
     }
 
     private fun replyToRouterSolicitation(reader: PollPacketReader, dstMac: MacAddress) {
-        for ((ip, neigh) in neighborMap) {
+        neighborMap.forEach { (ip, neigh) ->
             val ra = neigh.ra
-            if (ra == null) continue
+            if (ra == null) return@forEach // continue
             // TODO: add prefix to neighborMap
             val ether = EtherPkt(src = neigh.macAddr, dst = dstMac)
             val ip6 = Ip6Pkt(src = neigh.ipAddr.hostAddress, dst = "ff02::1")
@@ -124,7 +124,7 @@ class NdResponder(
         dstIp: Inet6Address,
         targetIp: Inet6Address
     ) {
-        val neighbor = neighborMap[targetIp]
+        val neighbor = neighborMap.get(targetIp)
         if (neighbor == null) return
 
         val ether = EtherPkt(dst = dstMac, src = neighbor.macAddr)
