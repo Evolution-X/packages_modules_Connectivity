@@ -315,7 +315,7 @@ class ArrayTrackRecord<E> : TrackRecord<E> {
                     val index = pollForIndexReadLocked(timeoutMs, pos, predicate)
                     when {
                         index < 0 -> readHead = size
-                        index > readHead -> readHead = index + 1
+                        index >= readHead -> readHead = index + 1
                         // else do nothing, the element was found prior to the read head so
                         // don't move the read head
                     }
