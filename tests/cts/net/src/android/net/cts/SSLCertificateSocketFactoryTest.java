@@ -22,6 +22,15 @@ import static org.junit.Assert.fail;
 
 import android.net.SSLCertificateSocketFactory;
 import android.platform.test.annotations.AppModeFull;
+
+import libcore.javax.net.ssl.SSLConfigurationAsserts;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -31,16 +40,13 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
-import libcore.javax.net.ssl.SSLConfigurationAsserts;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import javax.net.ssl.SSLSocket;
 
 @RunWith(JUnit4.class)
 public class SSLCertificateSocketFactoryTest {
@@ -151,8 +157,7 @@ public class SSLCertificateSocketFactoryTest {
      * {@link HttpsURLConnection#getDefaultHostnameVerifier}, so this test connects twice,
      * once with the system default {@link HostnameVerifier} which is expected to succeed,
      * and once after installing a {@link NegativeHostnameVerifier} which will cause
-     * {@link SSLCertificateSocketFactory#verifyHostname} to throw a
-     * {@link SSLPeerUnverifiedException}.
+     * {@link #verifyHostname} to throw a {@link SSLPeerUnverifiedException}.
      *
      * <p>These tests only test the hostname verification logic in SSLCertificateSocketFactory,
      * other TLS failure modes and the default HostnameVerifier are tested elsewhere, see
@@ -251,16 +256,16 @@ public class SSLCertificateSocketFactoryTest {
      *
      * <p>Behaviour is tested by installing a {@link NegativeHostnameVerifier} and by calling
      * {@link #assertConnectedSocket} to ensure TLS handshaking but no hostname verification takes
-     * place.  Next, {@link SSLCertificateSocketFactory#verifyHostname} is called to ensure
-     * that hostname verification is using the {@link HostnameVerifier} returned by
+     * place.  Next, {@link #verifyHostname} is called to ensure that hostname verification is using
+     * the {@link HostnameVerifier} returned by
      * {@link HttpsURLConnection#getDefaultHostnameVerifier} as documented.
      *
      * <p>Tests the following behaviour:-
      * <ul>
      * <li>TEST_SERVER is available and has a valid TLS certificate
      * <li>{@code createSocket()} does not verify the remote hostname
-     * <li>Calling {@link SSLCertificateSocketFactory#verifyHostname} on the returned socket
-     *     throws {@link SSLPeerUnverifiedException} if the remote hostname is invalid
+     * <li>Calling {@link #verifyHostname} on the returned socket throws
+     * {@link SSLPeerUnverifiedException} if the remote hostname is invalid
      * </ul>
      */
     @Test
@@ -272,13 +277,13 @@ public class SSLCertificateSocketFactoryTest {
         mSocketFactory.setHostname(socket, TEST_HOST);
         assertConnectedSocket(socket);
         try {
-          SSLCertificateSocketFactory.verifyHostname(socket, TEST_HOST);
-          fail();
+            verifyHostname(socket, TEST_HOST);
+            fail();
         } catch (SSLPeerUnverifiedException expected) {
             // expected
         }
         HttpsURLConnection.setDefaultHostnameVerifier(mDefaultVerifier);
-        SSLCertificateSocketFactory.verifyHostname(socket, TEST_HOST);
+        verifyHostname(socket, TEST_HOST);
         socket.close();
     }
 
@@ -306,14 +311,35 @@ public class SSLCertificateSocketFactoryTest {
         mSocketFactory.setHostname(socket, TEST_HOST);
         assertConnectedSocket(socket);
         try {
-          SSLCertificateSocketFactory.verifyHostname(socket, TEST_HOST);
-          fail();
+            verifyHostname(socket, TEST_HOST);
+            fail();
         } catch (SSLPeerUnverifiedException expected) {
             // expected
         }
         HttpsURLConnection.setDefaultHostnameVerifier(mDefaultVerifier);
-        SSLCertificateSocketFactory.verifyHostname(socket, TEST_HOST);
+        verifyHostname(socket, TEST_HOST);
         socket.close();
+    }
+
+    // This is copied from SSLCertificateSocketFactory#verifyHostname given that
+    // the method is @hide.
+    private static void verifyHostname(Socket socket, String hostname) throws Exception {
+        if (!(socket instanceof SSLSocket)) {
+            throw new IllegalArgumentException("Attempt to verify non-SSL socket");
+        }
+
+        // The code at the start of OpenSSLSocketImpl.startHandshake()
+        // ensures that the call is idempotent, so we can safely call it.
+        SSLSocket ssl = (SSLSocket) socket;
+        ssl.startHandshake();
+
+        SSLSession session = ssl.getSession();
+        if (session == null) {
+            throw new SSLException("Cannot verify SSL socket without session");
+        }
+        if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(hostname, session)) {
+            throw new SSLPeerUnverifiedException("Cannot verify hostname: " + hostname);
+        }
     }
 
     /**

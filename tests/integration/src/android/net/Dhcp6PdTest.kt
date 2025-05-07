@@ -222,4 +222,45 @@ class Dhcp6PdTest {
         // TODO: Should the stack also derive an address from fd00::/48?
         assertThat(prefixes).containsExactly(IpPrefix("fe80::/64"), IpPrefix("2001:db8:1234::/64"))
     }
+
+    @Test
+    fun testProvisioning_withMultihomingConfiguration() {
+        // Configure two routers.
+        run {
+            val ra = RaPkt()
+                .addPioOption(prefix = "2001:db8:1::/64", flags = "LAP")
+                .addRdnssOption(dns = "2001:4860:4860::8888,2001:4860:4860::8844")
+            ndResponder.addRouterEntry(ROUTER_MAC, ROUTER_V6, ra)
+        }
+        run {
+            val ra = RaPkt()
+                .addPioOption(prefix = "2001:db8:2::/64", flags = "LAP")
+                .addRdnssOption(dns = "2001:4860:4860::8888,2001:4860:4860::8844")
+            val mac = MacAddress.fromString("9:8:7:6:5:4")
+            val ip = InetAddress.getByName("fe80::2") as Inet6Address
+            ndResponder.addRouterEntry(mac, ip, ra)
+        }
+        val (srcAddr, solicit) = expectDhcp6Packet<Dhcp6SolicitPacket>()
+
+        val ether = EtherPkt(src = "42:42:42:42:42:42", dst = localMac.toString())
+        val ipv6 = Ip6Pkt(src = "fe80::42", dst = srcAddr.hostAddress!!)
+        val udp = UdpPkt(sport = 547, dport = 546)
+        val dhcp6 = Dhcp6Pkt(type = "REPLY", transId = solicit.transactionId)
+                .addRapidCommitOption()
+                .addClientIdentifierOption(solicit.clientDuid)
+                .addServerIdentifierOption(byteArrayOf(5, 4, 3, 2, 1))
+        val dhcp6_pd = Dhcp6IaPdOpt(iaid = solicit.iaid)
+                .addIaPrefixOption(prefix = "2001:db8:1:1234::/64")
+                .addIaPrefixOption(prefix = "2001:db8:2:1234::/64")
+        val pkt = ether / ipv6 / udp / dhcp6 / dhcp6_pd
+        iface.sendPacket(pkt)
+
+        val lp = networkCallback.eventuallyExpect<LinkPropertiesChanged>().lp
+        val prefixes = lp.linkAddresses.map { it -> IpPrefix(it.address, it.prefixLength) }
+        assertThat(prefixes).containsExactly(
+                IpPrefix("fe80::/64"),
+                IpPrefix("2001:db8:1:1234::/64"),
+                IpPrefix("2001:db8:2:1234::/64")
+        )
+    }
 }

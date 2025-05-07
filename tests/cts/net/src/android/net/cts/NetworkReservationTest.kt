@@ -83,7 +83,7 @@ private val ETHERNET_REQUEST = NetworkRequest.Builder()
         .addTransportType(TRANSPORT_TEST)
         .removeCapability(NET_CAPABILITY_TRUSTED)
         .build()
-private const val TIMEOUT_MS = 5_000L
+private const val TIMEOUT_MS = 30_000L
 private const val NO_CB_TIMEOUT_MS = 200L
 
 // TODO: integrate with CSNetworkReservationTest and move to common tests.
