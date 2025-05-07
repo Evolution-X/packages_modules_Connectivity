@@ -112,8 +112,12 @@ public class MultinetworkApiTest {
         final Context context = InstrumentationRegistry.getInstrumentation().getContext();
         mCM = context.getSystemService(ConnectivityManager.class);
         mCtsNetUtils = new CtsNetUtils(context);
-        mNetworkCallbackRule.requestCellIfSupported();
-        mNetworkCallbackRule.requestWifiIfSupported();
+        // In instant mode, do not request cell or Wi-Fi connection, as this requires the
+        // CHANGE_NETWORK_STATE permission which cannot be granted.
+        if (!context.getApplicationInfo().isInstantApp()) {
+            mNetworkCallbackRule.requestCellIfSupported();
+            mNetworkCallbackRule.requestWifiIfSupported();
+        }
     }
 
     @Test
