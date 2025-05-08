@@ -24,6 +24,7 @@ import static android.Manifest.permission.INTERNET;
 import static android.Manifest.permission.NEARBY_WIFI_DEVICES;
 import static android.Manifest.permission.NETWORK_STACK;
 import static android.Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS;
+import static android.Manifest.permission.READ_DEVICE_CONFIG;
 import static android.Manifest.permission.UPDATE_DEVICE_STATS;
 import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_OEM;
 import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_PRODUCT;
@@ -45,6 +46,7 @@ import static android.net.connectivity.ConnectivityCompatChanges.RESTRICT_LOCAL_
 import static android.os.Process.SYSTEM_UID;
 import static android.permission.PermissionManager.PERMISSION_GRANTED;
 
+import static com.android.server.connectivity.ConnectivityFlags.USE_BROADCAST_RECEIVE_HELPER_FOR_PERMISSION_MONITOR;
 import static com.android.server.connectivity.PermissionMonitor.isHigherNetworkPermission;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
@@ -75,7 +77,9 @@ import static org.mockito.Mockito.when;
 
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.AttributionSource;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -109,6 +113,8 @@ import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.HandlerUtils;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule;
+import com.android.testutils.com.android.testutils.SetFeatureFlagsRule.FeatureFlag;
 
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
 
@@ -126,6 +132,7 @@ import org.mockito.invocation.InvocationOnMock;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -135,6 +142,17 @@ import java.util.Set;
 public class PermissionMonitorTest {
     @Rule
     public TestRule compatChangeRule = new PlatformCompatChangeRule();
+
+    final HashMap<String, Boolean> mFeatureFlags = new HashMap<>();
+    // This will set feature flags from @FeatureFlag annotations
+    // into the map before setUp() runs.
+    @Rule
+    public final SetFeatureFlagsRule mSetFeatureFlagsRule =
+            new SetFeatureFlagsRule((name, enabled) -> {
+                mFeatureFlags.put(name, enabled);
+                return null;
+            }, (name) -> mFeatureFlags.getOrDefault(name, false));
+
     private static final int MOCK_USER_ID1 = 0;
     private static final int MOCK_USER_ID2 = 1;
     private static final int MOCK_USER_ID3 = 2;
@@ -200,7 +218,7 @@ public class PermissionMonitorTest {
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         when(mContext.getPackageManager()).thenReturn(mPackageManager);
-        when(mContext.getSystemService(eq(Context.USER_SERVICE))).thenReturn(mUserManager);
+        when(mContext.getSystemService(UserManager.class)).thenReturn(mUserManager);
         when(mContext.getSystemService(PermissionManager.class)).thenReturn(mPermissionManager);
         when(mContext.getSystemServiceName(SystemConfigManager.class))
                 .thenReturn(Context.SYSTEM_CONFIG_SERVICE);
@@ -222,6 +240,8 @@ public class PermissionMonitorTest {
         // Set DEVICE_INITIAL_SDK_INT to Q that SYSTEM_UID won't have restricted network permission
         // by default.
         doReturn(VERSION_Q).when(mDeps).getDeviceFirstSdkInt();
+        doAnswer(invocation -> mFeatureFlags.getOrDefault((String) invocation.getArgument(1), true))
+                .when(mDeps).isFeatureNotChickenedOut(any(), anyString());
 
         mHandlerThread = new HandlerThread("PermissionMonitorTest");
         mPermissionMonitor = new PermissionMonitor(
@@ -1408,7 +1428,7 @@ public class PermissionMonitorTest {
         // necessary permission.
         final Context realContext = InstrumentationRegistry.getContext();
         final PermissionMonitor monitor = runAsShell(
-                OBSERVE_GRANT_REVOKE_PERMISSIONS,
+                OBSERVE_GRANT_REVOKE_PERMISSIONS, READ_DEVICE_CONFIG,
                 () -> new PermissionMonitor(realContext, mNetdService, mBpfNetMaps, mHandlerThread)
         );
         final PackageManager manager = realContext.getPackageManager();
@@ -1431,6 +1451,27 @@ public class PermissionMonitorTest {
         mBpfMapMonitor.expectTrafficPerm(PERMISSION_TRAFFIC_ALL, MOCK_APPID2);
     }
 
+    private BroadcastReceiver expectBroadcastReceiver(String... actions) {
+        final ArgumentCaptor<BroadcastReceiver> receiverCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        verify(mContext, times(1)).registerReceiver(receiverCaptor.capture(),
+                argThat(filter -> {
+                    for (String action : actions) {
+                        if (!filter.hasAction(action)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }), any(), any());
+        final BroadcastReceiver originalReceiver = receiverCaptor.getValue();
+        return new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                processOnHandlerThread(() -> originalReceiver.onReceive(context, intent));
+            }
+        };
+    }
+
     private void processOnHandlerThread(Runnable function) {
         final Handler handler = mHandlerThread.getThreadHandler();
         handler.post(() -> function.run());
@@ -1439,7 +1480,35 @@ public class PermissionMonitorTest {
 
     @Test
     @EnableCompatChanges(RESTRICT_LOCAL_NETWORK)
+    @FeatureFlag(name = USE_BROADCAST_RECEIVE_HELPER_FOR_PERMISSION_MONITOR, enabled = false)
+    public void testUidPermissionWhenPackageAddedRemovedWithIntent() throws Exception {
+        doReturn(List.of(MOCK_USER1)).when(mUserManager).getUserHandles(eq(true));
+        initialize();
+        assertFalse(mPermissionMonitor.useBroadcastReceiveHelper());
+
+        final BroadcastReceiver receiver = expectBroadcastReceiver(
+                Intent.ACTION_PACKAGE_ADDED, Intent.ACTION_PACKAGE_REMOVED);
+        // Add/Remove package and verify uid permissions.
+        final Intent addedIntent = new Intent(Intent.ACTION_PACKAGE_ADDED,
+                Uri.fromParts("package", MOCK_PACKAGE1, null /* fragment */));
+        addedIntent.putExtra(Intent.EXTRA_UID, MOCK_UID11);
+        buildAndMockPackageInfoWithPermissions(MOCK_PACKAGE1, MOCK_UID11, INTERNET,
+                UPDATE_DEVICE_STATS);
+        receiver.onReceive(mContext, addedIntent);
+        mBpfMapMonitor.expectTrafficPerm(PERMISSION_TRAFFIC_ALL, MOCK_APPID1);
+
+        when(mPackageManager.getPackagesForUid(MOCK_UID11)).thenReturn(new String[]{});
+        final Intent removedIntent = new Intent(Intent.ACTION_PACKAGE_REMOVED,
+                Uri.fromParts("package", MOCK_PACKAGE1, null /* fragment */));
+        removedIntent.putExtra(Intent.EXTRA_UID, MOCK_UID11);
+        receiver.onReceive(mContext, removedIntent);
+        mBpfMapMonitor.expectTrafficPerm(PERMISSION_UNINSTALLED, MOCK_APPID1);
+    }
+
+    @Test
+    @EnableCompatChanges(RESTRICT_LOCAL_NETWORK)
     public void testUidPermissionWhenPackageAddedRemoved() throws Exception {
+        assertTrue(mPermissionMonitor.useBroadcastReceiveHelper());
         initialize();
         onUserAddedWithInstalledPackageList(MOCK_USER1, List.of());
 

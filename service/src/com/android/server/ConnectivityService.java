@@ -549,6 +549,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     // Flag to delay callbacks for frozen apps, suppressing duplicate and stale callbacks.
     private final boolean mQueueCallbacksForFrozenApps;
+    // Flag for early link properties update
+    private final boolean mSupportEarlyLinkPropertiesUpdateForVPN;
 
     /**
      * Uids ConnectivityService tracks blocked status of to send blocked status callbacks.
@@ -1973,6 +1975,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mQueueNetworkAgentEventsInSystemServer = mDeps.isAtLeastB()
                 && mDeps.isFeatureNotChickenedOut(context,
                         ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER);
+        mSupportEarlyLinkPropertiesUpdateForVPN = mDeps.isFeatureNotChickenedOut(context,
+                ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN);
         // registerUidFrozenStateChangedCallback is only available on U+
         mQueueCallbacksForFrozenApps = mDeps.isAtLeastU()
                 && mDeps.isFeatureNotChickenedOut(context, QUEUE_CALLBACKS_FOR_FROZEN_APPS);
@@ -5532,6 +5536,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 && !caps.hasTransport(TRANSPORT_THREAD));
     }
 
+    private boolean shouldUpdateLinkPropertiesEarlyForVPNNetwork(@NonNull NetworkAgentInfo nai) {
+        return mSupportEarlyLinkPropertiesUpdateForVPN && nai.isVPN();
+    }
+
     private boolean shouldCreateNativeNetwork(@NonNull NetworkAgentInfo nai,
             @NonNull NetworkInfo.State state) {
         if (nai.isCreated()) return false;
@@ -7751,7 +7759,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         updateProfileAllowedNetworks();
         final List<PackageInfo> apps = mContext.getPackageManager()
                 .getInstalledPackagesAsUser(GET_PERMISSIONS, user.getIdentifier());
-        mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onUserAddedWithInstalledPackageList(user, apps);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onUserAddedWithInstalledPackageList(user, apps);
         }
@@ -7767,7 +7777,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         if (mOemNetworkPreferences.getNetworkPreferences().size() > 0) {
             handleSetOemNetworkPreference(mOemNetworkPreferences, null);
         }
-        mPermissionMonitor.onUserRemoved(user);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onUserRemoved(user);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onUserRemoved(user);
         }
@@ -7776,7 +7788,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onPackageAdded(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
-        mPermissionMonitor.onPackageAdded(packageName, uid);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onPackageAdded(packageName, uid);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onPackageAdded(packageName, uid);
         }
@@ -7785,7 +7799,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     @Override
     public void onPackageRemoved(@NonNull final String packageName, final int uid) {
         handlePackageChanged(packageName);
-        mPermissionMonitor.onPackageRemoved(packageName, uid);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onPackageRemoved(packageName, uid);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onPackageRemoved(packageName, uid);
         }
@@ -7798,7 +7814,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     @Override
     public void onExternalApplicationsAvailable(@Nullable String[] pkgList) {
-        mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        if (mPermissionMonitor.useBroadcastReceiveHelper()) {
+            mPermissionMonitor.onExternalApplicationsAvailable(pkgList);
+        }
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.onExternalApplicationsAvailable((pkgList));
         }
@@ -12221,7 +12239,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // interfaces and routing rules have been added, DNS servers programmed, etc.
             // For VPNs, this must be done before the capabilities are updated, because as soon as
             // that happens, UIDs are routed to the network.
-            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
+            if (shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())
+                    || shouldUpdateLinkPropertiesEarlyForVPNNetwork(networkAgent)) {
                 applyInitialLinkProperties(networkAgent);
             }
 
@@ -12246,7 +12265,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
             networkAgent.getAndSetNetworkCapabilities(networkAgent.networkCapabilities);
 
             handlePerNetworkPrivateDnsConfig(networkAgent, mDnsManager.getPrivateDnsConfig());
-            if (!shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())) {
+            if (!(shouldCreateNetworksImmediately(networkAgent.getCapsNoCopy())
+                    || shouldUpdateLinkPropertiesEarlyForVPNNetwork(networkAgent))) {
                 applyInitialLinkProperties(networkAgent);
             } else {
                 // The network was created when the agent registered, and the LinkProperties are

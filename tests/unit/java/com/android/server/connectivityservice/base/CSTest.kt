@@ -28,6 +28,7 @@ import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.pm.UserInfo
 import android.content.res.Resources
 import android.net.ConnectivityManager
+import android.net.IDnsResolver
 import android.net.INetd
 import android.net.INetd.PERMISSION_INTERNET
 import android.net.InetAddresses
@@ -177,6 +178,7 @@ open class CSTest {
         it[ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS] = true
         it[ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER] = true
         it[ConnectivityFlags.CLOSE_QUIC_CONNECTION] = true
+        it[ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN] = true
     }
     fun setFeatureEnabled(flag: String, enabled: Boolean) = enabledFeatures.set(flag, enabled)
 
@@ -227,6 +229,7 @@ open class CSTest {
     val satelliteAccessController = mock<SatelliteAccessController>()
     val quicConnectionCloser = mock<QuicConnectionCloser>()
     val destroySocketsWrapper = mock<DestroySocketsWrapper>()
+    val dnsResolver = mock<IDnsResolver>()
 
     val deps = CSDeps()
     val permDeps = PermDeps()
@@ -266,7 +269,7 @@ open class CSTest {
 
         alarmHandlerThread = HandlerThread("TestAlarmManager").also { it.start() }
         alarmManager = makeMockAlarmManager(alarmHandlerThread)
-        service = makeConnectivityService(context, netd, deps, permDeps).also {
+        service = makeConnectivityService(context, netd, deps, permDeps, dnsResolver).also {
             it.systemReadyInternal()
         }
         cm = ConnectivityManager(context, service)
@@ -428,6 +431,7 @@ open class CSTest {
 
     inner class PermDeps : PermissionMonitor.Dependencies() {
         override fun shouldEnforceLocalNetRestrictions(uid: Int) = false
+        override fun isFeatureNotChickenedOut(context: Context?, name: String?) = true
     }
 
     inner class CSContext(base: Context) : BroadcastInterceptingContext(base) {

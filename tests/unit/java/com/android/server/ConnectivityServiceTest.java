@@ -2209,6 +2209,7 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.QUEUE_CALLBACKS_FOR_FROZEN_APPS:
                 case ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
                 case ConnectivityFlags.CLOSE_QUIC_CONNECTION:
+                case ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN:
                     return true;
                 default:
                     throw new UnsupportedOperationException("Unknown flag " + name
@@ -2410,6 +2411,11 @@ public class ConnectivityServiceTest {
         @Override
         public boolean shouldEnforceLocalNetRestrictions(int uid) {
             return false;
+        }
+
+        @Override
+        public boolean isFeatureNotChickenedOut(Context context, String name) {
+            return true;
         }
     }
 
