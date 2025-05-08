@@ -183,3 +183,11 @@ flag {
   description: "Flag for MDNS advertising quality, reliability and performance improvement"
   bug: "373270045"
 }
+
+flag {
+  name: "ethernet_desktop_config"
+  namespace: "android_core_networking"
+  description: "The flag controls support for ethernet configuration tracking and store by MAC address."
+  bug: "397536853"
+  is_fixed_read_only: true
+}
