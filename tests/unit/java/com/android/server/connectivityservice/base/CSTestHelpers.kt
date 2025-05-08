@@ -223,11 +223,12 @@ internal fun makeConnectivityService(
         context: Context,
         netd: INetd,
         deps: Dependencies,
-        mPermDeps: PermissionMonitor.Dependencies
+        mPermDeps: PermissionMonitor.Dependencies,
+        resolver: IDnsResolver
 ) =
         ConnectivityService(
                 context,
-                mock<IDnsResolver>(),
+                resolver,
                 mock<IpConnectivityLog>(),
                 netd,
                 deps,
