@@ -421,10 +421,19 @@ public class SatelliteAccessController {
             final ApplicationInfo applicationInfo = pmForUser.getApplicationInfo(
                     packageName, PackageManager.GET_META_DATA);
             final Bundle metaData = applicationInfo.metaData;
-            if (metaData != null) {
-                final String value = metaData.getString(PROPERTY_SATELLITE_DATA_OPTIMIZED);
-                return TextUtils.equals(value, packageName);
+            if (metaData == null) return false;
+            // Retrieve the value as a generic Object to avoid Bundle warning log
+            // flooding when the format is mismatched.
+            final Object rawValue = metaData.get(PROPERTY_SATELLITE_DATA_OPTIMIZED);
+            if (rawValue == null) return false; // No expected meta-data.
+
+            // Check if the retrieved object is a matched String.
+            if (rawValue instanceof String
+                    && TextUtils.equals((String) rawValue, packageName)) {
+                return true;
             }
+            // Logging if the value is not expected (e.g., Boolean, wrong package name).
+            mLog.i("Wrong meta-data format: " + packageName);
             return false;
         } catch (PackageManager.NameNotFoundException e) {
             return false;
