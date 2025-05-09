@@ -79,7 +79,6 @@ import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_FALLBAC
 import static com.android.server.net.NetworkStatsService.NETSTATS_IMPORT_SUCCESSES_COUNTER_NAME;
 import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_CLIENT_RATE_LIMIT_CACHE_ENABLED_FLAG;
 import static com.android.server.net.NetworkStatsService.TRAFFICSTATS_SERVICE_RATE_LIMIT_CACHE_ENABLED_FLAG;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -224,7 +223,7 @@ import java.util.function.Consumer;
 @RunWith(DevSdkIgnoreRunner.class)
 @SmallTest
 // NetworkStatsService is not updatable before T, so tests do not need to be backwards compatible
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
     @Rule
     public final DevSdkIgnoreRule ignoreRule = new DevSdkIgnoreRule();

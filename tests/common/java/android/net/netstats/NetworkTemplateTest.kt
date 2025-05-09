@@ -34,7 +34,6 @@ import android.os.Build
 import android.telephony.TelephonyManager
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
-import com.android.testutils.SC_V2
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.junit.Rule
@@ -51,7 +50,7 @@ private const val TEST_WIFI_KEY2 = "wifiKey2"
 class NetworkTemplateTest {
     @Rule
     @JvmField
-    val ignoreRule = DevSdkIgnoreRule(ignoreClassUpTo = SC_V2)
+    val ignoreRule = DevSdkIgnoreRule(ignoreClassUpTo = Build.VERSION_CODES.S_V2)
 
     @Test
     fun testBuilderMatchRules() {

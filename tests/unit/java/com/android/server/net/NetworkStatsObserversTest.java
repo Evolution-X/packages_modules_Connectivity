@@ -30,8 +30,6 @@ import static android.net.NetworkTemplate.MATCH_WIFI;
 import static android.net.TrafficStats.MB_IN_BYTES;
 import static android.text.format.DateUtils.MINUTE_IN_MILLIS;
 
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -45,6 +43,7 @@ import android.net.NetworkIdentitySet;
 import android.net.NetworkStats;
 import android.net.NetworkStatsAccess;
 import android.net.NetworkTemplate;
+import android.os.Build;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
@@ -76,7 +75,7 @@ import java.util.Set;
  */
 @RunWith(DevSdkIgnoreRunner.class)
 @SmallTest
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2) // TODO: Use to Build.VERSION_CODES.SC_V2 when available
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class NetworkStatsObserversTest {
     private static final String TEST_IFACE = "test0";
     private static final String TEST_IFACE2 = "test1";

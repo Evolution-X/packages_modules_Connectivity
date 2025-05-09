@@ -24,7 +24,6 @@ import static android.net.cts.util.CtsNetUtils.TestNetworkCallback;
 import static com.android.compatibility.common.util.SystemUtil.runWithShellPermissionIdentity;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastT;
 import static com.android.modules.utils.build.SdkLevel.isAtLeastU;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -369,7 +368,7 @@ public class Ikev2VpnTest {
         }
     }
 
-    @IgnoreUpTo(SC_V2)
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @Test
     public void testBuildIkev2VpnProfileWithIkeTunnelConnectionParams() throws Exception {
         assumeTrue(mCtsNetUtils.hasIpsecTunnelsFeature());
@@ -664,62 +663,62 @@ public class Ikev2VpnTest {
                         testIpv6Only, requiresValidation, testSessionKey , testIkeTunConnParams)));
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileV4() throws Exception {
         doTestStartStopVpnProfile(false /* testIpv6Only */, false /* requiresValidation */,
                 false /* testSessionKey */, false /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileV4WithValidation() throws Exception {
         doTestStartStopVpnProfile(false /* testIpv6Only */, true /* requiresValidation */,
                 false /* testSessionKey */, false /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileV6() throws Exception {
         doTestStartStopVpnProfile(true /* testIpv6Only */, false /* requiresValidation */,
                 false /* testSessionKey */, false /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileV6WithValidation() throws Exception {
         doTestStartStopVpnProfile(true /* testIpv6Only */, true /* requiresValidation */,
                 false /* testSessionKey */, false /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileIkeTunConnParamsV4() throws Exception {
         doTestStartStopVpnProfile(false /* testIpv6Only */, false /* requiresValidation */,
                 false /* testSessionKey */, true /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileIkeTunConnParamsV4WithValidation() throws Exception {
         doTestStartStopVpnProfile(false /* testIpv6Only */, true /* requiresValidation */,
                 false /* testSessionKey */, true /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileIkeTunConnParamsV6() throws Exception {
         doTestStartStopVpnProfile(true /* testIpv6Only */, false /* requiresValidation */,
                 false /* testSessionKey */, true /* testIkeTunConnParams */);
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testStartStopVpnProfileIkeTunConnParamsV6WithValidation() throws Exception {
         doTestStartStopVpnProfile(true /* testIpv6Only */, true /* requiresValidation */,
                 false /* testSessionKey */, true /* testIkeTunConnParams */);
     }
 
-    @IgnoreUpTo(SC_V2)
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @Test
     public void testStartProvisionedVpnV4ProfileSession() throws Exception {
         doTestStartStopVpnProfile(false /* testIpv6Only */, false /* requiresValidation */,
                 true /* testSessionKey */, false /* testIkeTunConnParams */);
     }
 
-    @IgnoreUpTo(SC_V2)
+    @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @Test
     public void testStartProvisionedVpnV6ProfileSession() throws Exception {
         doTestStartStopVpnProfile(true /* testIpv6Only */, false /* requiresValidation */,
