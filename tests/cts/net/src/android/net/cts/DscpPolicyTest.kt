@@ -46,6 +46,7 @@ import android.net.TestNetworkInterface
 import android.net.TestNetworkManager
 import android.net.TestNetworkManager.TestInterfaceRequest
 import android.net.cts.util.CtsNetUtils.TestNetworkCallback
+import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.platform.test.annotations.AppModeFull
@@ -71,8 +72,8 @@ import com.android.testutils.CompatUtil
 import com.android.testutils.ConnectivityModuleTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.NdResponder
-import com.android.testutils.SC_V2
 import com.android.testutils.PollPacketReader
+import com.android.testutils.SC_V2
 import com.android.testutils.TestableNetworkAgent
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnDscpPolicyStatusUpdated
 import com.android.testutils.TestableNetworkAgent.CallbackEntry.OnNetworkCreated
@@ -175,7 +176,7 @@ class DscpPolicyTest {
 
         handlerThread.start()
         reader = PollPacketReader(
-                handlerThread.threadHandler,
+                Handler(handlerThread.looper),
                 iface.fileDescriptor.fileDescriptor,
                 MAX_PACKET_LENGTH)
         reader.startAsyncForTest()
