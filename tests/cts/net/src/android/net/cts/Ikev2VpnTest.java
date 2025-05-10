@@ -61,7 +61,7 @@ import android.text.TextUtils;
 
 import androidx.test.InstrumentationRegistry;
 
-import com.android.internal.util.HexDump;
+import com.android.net.module.util.HexDump;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.VpnManagerShimImpl;
 import com.android.networkstack.apishim.common.VpnManagerShim;

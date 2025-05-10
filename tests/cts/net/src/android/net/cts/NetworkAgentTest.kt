@@ -96,7 +96,6 @@ import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.telephony.data.EpsBearerQosSessionAttributes
 import android.util.ArraySet
-import android.util.DebugUtils.valueToString
 import androidx.test.InstrumentationRegistry
 import com.android.compatibility.common.util.SystemUtil.runShellCommand
 import com.android.compatibility.common.util.SystemUtil.runWithShellPermissionIdentity
@@ -704,7 +703,9 @@ class NetworkAgentTest {
         val specifier = when {
             transports.size != 1 -> null
             TRANSPORT_ETHERNET in transports -> EthernetNetworkSpecifier("testInterface")
-            TRANSPORT_CELLULAR in transports -> TelephonyNetworkSpecifier(subId)
+            TRANSPORT_CELLULAR in transports -> {
+                TelephonyNetworkSpecifier.Builder().setSubscriptionId(subId).build()
+            }
             else -> null
         }
         val transportInfo = if (TRANSPORT_WIFI in transports && SdkLevel.isAtLeastV()) {
@@ -971,12 +972,11 @@ class NetworkAgentTest {
         // underlying networks, and because not congested, not roaming, and not suspended are the
         // default anyway. It's still useful as an extra check though.
         vpnNc = mCM.getNetworkCapabilities(agent.network!!)!!
-        for (cap in listOf(
-            NET_CAPABILITY_NOT_CONGESTED,
-            NET_CAPABILITY_NOT_ROAMING,
-            NET_CAPABILITY_NOT_SUSPENDED
+        for ((cap, capStr) in listOf(
+            NET_CAPABILITY_NOT_CONGESTED to "NET_CAPABILITY_NOT_CONGESTED",
+            NET_CAPABILITY_NOT_ROAMING to "NET_CAPABILITY_NOT_ROAMING",
+            NET_CAPABILITY_NOT_SUSPENDED to "NET_CAPABILITY_NOT_SUSPENDED"
         )) {
-            val capStr = valueToString(NetworkCapabilities::class.java, "NET_CAPABILITY_", cap)
             if (defaultNetworkCapabilities.hasCapability(cap) && !vpnNc.hasCapability(cap)) {
                 fail("$capStr not propagated from underlying: $defaultNetworkCapabilities")
             }
@@ -1265,7 +1265,7 @@ class NetworkAgentTest {
                 .addCapability(NET_CAPABILITY_NOT_VCN_MANAGED)
                 .build(),
             bestMatchingCb,
-            mHandlerThread.threadHandler
+            Handler(mHandlerThread.looper)
         )
 
         val (agent1, _) = createConnectedNetworkAgent(specifier = "AGENT-1")
@@ -1392,6 +1392,22 @@ class NetworkAgentTest {
                 agent.expectCallback<OnRegisterQosCallback>().let {
                     callbackId = it.callbackId
                     assertTrue(it.filter.matchesProtocol(proto))
+                    // This test is only validating QosFilter address match APIs can be called.
+                    // Detail functionality checks are executed on QosSocketFilterTest.
+                    // Verify the match of test socket's Local address, currently the test socket
+                    // binds to the loopback address.
+                    assertTrue(it.filter.matchesLocalPrefix(
+                        IpPrefix(InetAddress.getLoopbackAddress(), 128),
+                        0,
+                        65535
+                    ))
+                    // Since the test socket doesn't connect to the remote address, we expect
+                    // unmatched result.
+                    assertFalse(it.filter.matchesRemotePrefix(
+                        IpPrefix(InetAddress.getLoopbackAddress(), 128),
+                        0,
+                        65535
+                    ))
                 }
 
                 assertFailsWith<QosCallbackRegistrationException>(
@@ -1587,14 +1603,22 @@ class NetworkAgentTest {
     private fun createEpsAttributes(qci: Int = 1): EpsBearerQosSessionAttributes {
         val remoteAddresses = ArrayList<InetSocketAddress>()
         remoteAddresses.add(InetSocketAddress(REMOTE_ADDRESS, 80))
-        return EpsBearerQosSessionAttributes(
-            qci,
-            2,
-            3,
-            4,
-            5,
-            remoteAddresses
-        )
+        return EpsBearerQosSessionAttributes::class.java
+            .getConstructor(
+                Int::class.java,
+                Long::class.java,
+                Long::class.java,
+                Long::class.java,
+                Long::class.java,
+                List::class.java
+            ).newInstance(
+                qci,
+                2,
+                3,
+                4,
+                5,
+                remoteAddresses
+            )
     }
 
     fun sendAndExpectUdpPacket(

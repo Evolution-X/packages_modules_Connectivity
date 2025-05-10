@@ -387,6 +387,29 @@ class SatelliteAccessControllerTest {
 
     @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
     @Test
+    fun testSatelliteOptInUids_invalidMetaData() {
+        val appInfoWithBoolean = ApplicationInfo()
+        appInfoWithBoolean.metaData = Bundle()
+        appInfoWithBoolean.metaData.putBoolean(PROPERTY_SATELLITE_DATA_OPTIMIZED, true)
+        val pm = mockPackageManagerForUser(TEST_UID1.getUserId())
+        doReturn(appInfoWithBoolean).`when`(pm)
+                .getApplicationInfo(TEST_PACKAGE1, PackageManager.GET_META_DATA)
+        onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        verify(callback, never()).accept(any(), any())
+
+        val appInfoWithWrongPackage = ApplicationInfo()
+        appInfoWithWrongPackage.metaData = Bundle()
+        appInfoWithWrongPackage.metaData
+                .putString(PROPERTY_SATELLITE_DATA_OPTIMIZED, "wrong package")
+        doReturn(appInfoWithWrongPackage).`when`(pm)
+                .getApplicationInfo(TEST_PACKAGE1, PackageManager.GET_META_DATA)
+
+        onPackageAdded(TEST_PACKAGE1, TEST_UID1)
+        verify(callback, never()).accept(any(), any())
+    }
+
+    @FeatureFlag(name = CONSTRAINED_DATA_SATELLITE_OPTIN)
+    @Test
     fun testSatelliteOptInUids_onPackageAdded_ignoresIfNotSatelliteOptimized() {
         mockIsSatelliteDataOptimizedAppForUser(TEST_UID1.getUserId(), TEST_PACKAGE1, false)
         onPackageAdded(TEST_PACKAGE1, TEST_UID1)

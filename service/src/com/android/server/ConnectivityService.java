@@ -6719,7 +6719,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         pw.println("Config restrict:               " + configRestrict);
         pw.println("Actively prefer bad wifi:      " + activelyPreferBadWifi());
 
-        final String settingValue = mMultinetworkPolicyTracker.getAvoidBadWifiSetting();
+        final String settingValue = mMultinetworkPolicyTracker.readAvoidBadWifiFromSettings();
         String description;
         // Can't use a switch statement because strings are legal case labels, but null is not.
         if ("0".equals(settingValue)) {

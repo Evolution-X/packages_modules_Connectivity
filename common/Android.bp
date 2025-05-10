@@ -39,6 +39,11 @@ java_aconfig_library {
     ],
 }
 
+// This library MUST NOT be available to platform. This is because if the
+// platform depends on a flag, it will not be able to delete that flag until
+// that platform version is no longer supported by mainline. Additionally,
+// there is no any safety mechanism that prevents the module from
+// deleting the flag by mistake, regressing on previous platform versions.
 java_aconfig_library {
     name: "com.android.net.flags-aconfig-java-export",
     aconfig_declarations: "com.android.net.flags-aconfig",

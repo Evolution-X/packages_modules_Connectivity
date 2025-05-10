@@ -775,13 +775,15 @@ public class DnsResolverTest {
 
     @Test
     public void testPrivateDnsBypass() throws InterruptedException {
+        final String dataStallRecoveryOnBadNetworkSetting =
+                "data_stall_recovery_on_bad_network";
         final String dataStallSetting = Settings.Global.getString(mCR,
-                Settings.Global.DATA_STALL_RECOVERY_ON_BAD_NETWORK);
-        Settings.Global.putInt(mCR, Settings.Global.DATA_STALL_RECOVERY_ON_BAD_NETWORK, 0);
+                dataStallRecoveryOnBadNetworkSetting);
+        Settings.Global.putInt(mCR, dataStallRecoveryOnBadNetworkSetting, 0);
         try {
             doTestPrivateDnsBypass();
         } finally {
-            Settings.Global.putString(mCR, Settings.Global.DATA_STALL_RECOVERY_ON_BAD_NETWORK,
+            Settings.Global.putString(mCR, dataStallRecoveryOnBadNetworkSetting,
                     dataStallSetting);
         }
     }
