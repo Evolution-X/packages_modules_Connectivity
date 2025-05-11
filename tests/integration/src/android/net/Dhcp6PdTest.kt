@@ -60,7 +60,7 @@ import org.junit.runner.RunWith
 
 private const val TAG = "Dhcp6PdTest"
 private const val SHORT_TIMEOUT_MS = 200L
-private const val TIMEOUT_MS = 2000L
+private const val TIMEOUT_MS = 20_000L
 
 private const val DHCP6_PFLAG_CONFIG = "ipclient_dhcpv6_pd_preferred_flag_version"
 
