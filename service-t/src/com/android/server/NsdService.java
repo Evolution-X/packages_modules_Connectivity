@@ -19,10 +19,12 @@ package com.android.server;
 import static android.Manifest.permission.DEVICE_POWER;
 import static android.Manifest.permission.NETWORK_SETTINGS;
 import static android.Manifest.permission.NETWORK_STACK;
+import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.net.ConnectivityManager.NETID_UNSET;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
+import static android.net.nsd.AdvertisingRequest.FLAG_OFFLOAD_ONLY;
 import static android.net.nsd.AdvertisingRequest.FLAG_SKIP_PROBING;
 import static android.net.nsd.AdvertisingRequest.FLAG_SKIP_SUBTYPE_ANNOUNCEMENTS;
 import static android.net.nsd.NsdManager.MDNS_DISCOVERY_MANAGER_EVENT;
@@ -803,6 +805,19 @@ public class NsdService extends INsdManager.Stub {
                 return true;
             }
 
+            private boolean isOffloadOnlyAllowed() {
+                if (!mContext.getPackageManager().hasSystemFeature(FEATURE_LEANBACK)) {
+                    return false;
+                }
+                // The offload-only code path is a fallback for Google Cast on Android TV devices.
+                // To utilize APF-based mDNS offload, the service must be advertised via
+                // NsdManager. However, limitations or edge cases might prevent Google Cast
+                // service advertisement through NsdManager. Until these issues are resolved,
+                // MediaShell can use the offload-only code path to still leverage APF for offload.
+                // This code path is only valid in Android B TV release.
+                return Build.VERSION_CODES.BAKLAVA == Build.VERSION.SDK_INT;
+            }
+
             @Override
             public boolean processMessage(Message msg) {
                 final ClientInfo clientInfo;
@@ -1045,6 +1060,13 @@ public class NsdService extends INsdManager.Stub {
                                         NsdManager.FAILURE_BAD_PARAMETERS, false /* isLegacy */);
                                 break;
                             }
+                            final boolean isOffloadOnly =
+                                    (advertisingRequest.getFlags() & FLAG_OFFLOAD_ONLY) != 0;
+                            if (isOffloadOnly && !isOffloadOnlyAllowed()) {
+                                clientInfo.onRegisterServiceFailedImmediately(clientRequestId,
+                                        NsdManager.FAILURE_BAD_PARAMETERS, false /* isLegacy */);
+                                break;
+                            }
 
                             serviceInfo.setSubtypes(subtypes);
                             maybeStartMonitoringSockets();
@@ -1058,6 +1080,7 @@ public class NsdService extends INsdManager.Stub {
                                             .setSkipProbing(skipProbing)
                                             .setTtl(advertisingRequest.getTtl())
                                             .setSkipSubtypeAnnouncements(skipSubtypeAnnouncements)
+                                            .setOffloadOnly(isOffloadOnly)
                                             .build();
                             mAdvertiser.addOrUpdateService(transactionId, serviceInfo,
                                     mdnsAdvertisingOptions, clientInfo.mUid);

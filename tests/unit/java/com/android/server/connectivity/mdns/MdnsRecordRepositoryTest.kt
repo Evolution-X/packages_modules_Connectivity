@@ -297,6 +297,43 @@ class MdnsRecordRepositoryTest {
     }
 
     @Test
+    fun testGetReplyReturnsNullForOffloadOnlyService() {
+        val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
+        repository.initWithService(
+            TEST_SERVICE_ID_1,
+            TEST_SERVICE_1,
+            option = MdnsAdvertisingOptions.newBuilder().setOffloadOnly(true).build()
+        )
+
+        val queriedName = arrayOf(TEST_SUBTYPE, "_sub", "_testservice", "_tcp", "local")
+        val questions = listOf(MdnsPointerRecord(queriedName, false /* isUnicast */))
+        val query = MdnsPacket(
+            0 /* flags */,
+            questions,
+            emptyList() /* answers */,
+            emptyList() /* authorityRecords */,
+            emptyList() /* additionalRecords */
+        )
+        val src = InetSocketAddress(parseNumericAddress("192.0.2.123"), 5353)
+        val reply = repository.getReply(query, src)
+
+        assertNull(reply)
+    }
+
+    @Test
+    fun testExitServiceReturnNullForOffloadOnlyService() {
+        val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
+        repository.initWithService(
+            TEST_SERVICE_ID_1,
+            TEST_SERVICE_1,
+            option = MdnsAdvertisingOptions.newBuilder().setOffloadOnly(true).build()
+        )
+        repository.onAdvertisementSent(TEST_SERVICE_ID_1, 2 /* sentPacketCount */)
+        val reply = repository.exitService(TEST_SERVICE_ID_1)
+        assertNull(reply)
+    }
+
+    @Test
     fun testInvalidReuseOfServiceId() {
         val repository = MdnsRecordRepository(thread.looper, deps, TEST_HOSTNAME, makeFlags())
         repository.addService(TEST_SERVICE_ID_1, TEST_SERVICE_1, DEFAULT_OPTION)
