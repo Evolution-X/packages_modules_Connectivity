@@ -22,6 +22,7 @@ package android.net.cts
 import android.Manifest.permission
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_LEANBACK
+import android.content.pm.PackageManager.FEATURE_WATCH
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
 import android.net.Network
@@ -390,6 +391,14 @@ class ApfIntegrationTest {
         }
     }
 
+    private fun shouldEnforceApfV6Support(vsrApiLevel: Int): Boolean {
+        if (pm.hasSystemFeature(FEATURE_WATCH)) {
+            // Enforce APFv6 post VSR-16.
+            return vsrApiLevel > 202504
+        }
+        return vsrApiLevel >= 202504
+    }
+
     @VsrTest(
         requirements = ["VSR-5.3.12-001", "VSR-5.3.12-003", "VSR-5.3.12-004", "VSR-5.3.12-009",
             "VSR-5.3.12-012"]
@@ -431,7 +440,11 @@ class ApfIntegrationTest {
         // - Note, the APF RAM requirement for APF version 6.1 will become 4000 bytes in Android 17
         //   with CHIPSETs that set ro.board.first_api_level or ro.board.api_level to 202604 or
         //   higher.
-        if (vsrApiLevel >= 202504) {
+        // Note: At 25Q2, GMS-VSR requirements related to APFv6 are only applicable to handheld
+        // and tablet devices. GTVS requirements related to APFv6 are only applicable to TV devices.
+        // For Wear OS devices, APFv6 will not be enforced until specific requirements for Wear OS
+        // are officially incorporated.
+        if (shouldEnforceApfV6Support(vsrApiLevel)) {
             assertThat(caps.apfVersionSupported).isAnyOf(6000, 6100)
             if (caps.apfVersionSupported == 6000) {
                 assertThat(caps.maximumApfProgramSize).isAtLeast(4000)
