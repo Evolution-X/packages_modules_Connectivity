@@ -352,6 +352,10 @@ class ApfIntegrationTest {
             isTvDeviceSupportFullNetworkingUnder2w()
         )
 
+        // APF GMS-VSR requirements don't apply to automotive devices. There is no power benefit to
+        // running APF on automotive as the device has almost infinite battery power.
+        assumeFalse("Skip test: automotive device", pm.hasSystemFeature(FEATURE_AUTOMOTIVE))
+
         networkCallback = TestableNetworkCallback()
         cm.requestNetwork(
                 NetworkRequest.Builder()
@@ -405,6 +409,8 @@ class ApfIntegrationTest {
     )
     @Test
     fun testApfCapabilities() {
+        // If APF is supported, the version must be valid.
+        assertThat(caps.apfVersionSupported).isAnyOf(0, 2, 3, 4, 6000, 6100)
         // APF became mandatory in Android 14 VSR.
         val vsrApiLevel = getVsrApiLevel()
         assume().that(vsrApiLevel).isAtLeast(34)
