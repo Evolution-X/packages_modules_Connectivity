@@ -405,6 +405,8 @@ class ApfIntegrationTest {
     )
     @Test
     fun testApfCapabilities() {
+        // If APF is supported, the version must be valid.
+        assertThat(caps.apfVersionSupported).isAnyOf(0, 2, 3, 4, 6000, 6100)
         // APF became mandatory in Android 14 VSR.
         val vsrApiLevel = getVsrApiLevel()
         assume().that(vsrApiLevel).isAtLeast(34)
