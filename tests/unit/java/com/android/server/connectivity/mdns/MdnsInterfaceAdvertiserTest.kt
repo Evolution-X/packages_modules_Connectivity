@@ -556,6 +556,24 @@ class MdnsInterfaceAdvertiserTest {
     }
 
     @Test
+    fun testOffloadOnlyWillSkipProbing() {
+        val testProbingInfo = mock(ProbingInfo::class.java)
+        doReturn(TEST_SERVICE_ID_1).`when`(repository)
+            .addService(eq(TEST_SERVICE_ID_1), any(), any())
+        doReturn(TEST_SERVICE_ID_1).`when`(testProbingInfo).serviceId
+        doReturn(testProbingInfo).`when`(repository).setServiceProbing(TEST_SERVICE_ID_1)
+        advertiser.addService(
+            TEST_SERVICE_ID_1,
+            TEST_SERVICE_1_SUBTYPE,
+            MdnsAdvertisingOptions.newBuilder().setOffloadOnly(true).build()
+        )
+        verify(repository).addService(eq(TEST_SERVICE_ID_1), any(), any())
+        thread.waitForIdle(TIMEOUT_MS)
+        verify(prober, never()).startProbing(any())
+        verify(cb).onServiceProbingSucceeded(advertiser, TEST_SERVICE_ID_1)
+    }
+
+    @Test
     fun testUpdateExistingService() {
         doReturn(TEST_SERVICE_ID_DUPLICATE).`when`(repository)
                 .addService(eq(TEST_SERVICE_ID_DUPLICATE), any(), any())
@@ -575,7 +593,11 @@ class MdnsInterfaceAdvertiserTest {
         doReturn(testProbingInfo).`when`(repository).setServiceProbing(serviceId)
 
         advertiser.addService(serviceId, serviceInfo, MdnsAdvertisingOptions.getDefaultOptions())
-        verify(repository).addService(serviceId, serviceInfo, null /* ttl */)
+        verify(repository).addService(
+            serviceId,
+            serviceInfo,
+            MdnsAdvertisingOptions.newBuilder().build()
+        )
         verify(prober).startProbing(testProbingInfo)
 
         return testProbingInfo

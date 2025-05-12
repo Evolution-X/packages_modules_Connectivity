@@ -22,6 +22,7 @@ package android.net.cts
 import android.Manifest.permission
 import android.content.pm.PackageManager.FEATURE_AUTOMOTIVE
 import android.content.pm.PackageManager.FEATURE_LEANBACK
+import android.content.pm.PackageManager.FEATURE_WATCH
 import android.content.pm.PackageManager.FEATURE_WIFI
 import android.net.ConnectivityManager
 import android.net.Network
@@ -72,8 +73,8 @@ import com.android.compatibility.common.util.PropertyUtil.getVsrApiLevel
 import com.android.compatibility.common.util.SystemUtil.runShellCommand
 import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
 import com.android.compatibility.common.util.VsrTest
-import com.android.internal.util.HexDump
 import com.android.modules.utils.build.SdkLevel
+import com.android.net.module.util.HexDump
 import com.android.net.module.util.NetworkStackConstants.ETHER_ADDR_LEN
 import com.android.net.module.util.NetworkStackConstants.ETHER_DST_ADDR_OFFSET
 import com.android.net.module.util.NetworkStackConstants.ETHER_HEADER_LEN
@@ -170,7 +171,10 @@ class ApfIntegrationTest {
             val packageManager = context.getPackageManager()
             val userManager = context.getSystemService(UserManager::class.java)!!
             return (packageManager.hasSystemFeature(FEATURE_AUTOMOTIVE) &&
-                    userManager.isVisibleBackgroundUsersSupported)
+                    // isVisibleBackgroundUsersSupported is @TestApi, but this test should build
+                    // against module API stubs, which do not include it (b/409931932).
+                    userManager.javaClass.getMethod("isVisibleBackgroundUsersSupported")
+                        .invoke(userManager) as Boolean)
         }
 
         private fun disableLowPowerStandby() {
@@ -348,6 +352,10 @@ class ApfIntegrationTest {
             isTvDeviceSupportFullNetworkingUnder2w()
         )
 
+        // APF GMS-VSR requirements don't apply to automotive devices. There is no power benefit to
+        // running APF on automotive as the device has almost infinite battery power.
+        assumeFalse("Skip test: automotive device", pm.hasSystemFeature(FEATURE_AUTOMOTIVE))
+
         networkCallback = TestableNetworkCallback()
         cm.requestNetwork(
                 NetworkRequest.Builder()
@@ -387,12 +395,22 @@ class ApfIntegrationTest {
         }
     }
 
+    private fun shouldEnforceApfV6Support(vsrApiLevel: Int): Boolean {
+        if (pm.hasSystemFeature(FEATURE_WATCH)) {
+            // Enforce APFv6 post VSR-16.
+            return vsrApiLevel > 202504
+        }
+        return vsrApiLevel >= 202504
+    }
+
     @VsrTest(
         requirements = ["VSR-5.3.12-001", "VSR-5.3.12-003", "VSR-5.3.12-004", "VSR-5.3.12-009",
             "VSR-5.3.12-012"]
     )
     @Test
     fun testApfCapabilities() {
+        // If APF is supported, the version must be valid.
+        assertThat(caps.apfVersionSupported).isAnyOf(0, 2, 3, 4, 6000, 6100)
         // APF became mandatory in Android 14 VSR.
         val vsrApiLevel = getVsrApiLevel()
         assume().that(vsrApiLevel).isAtLeast(34)
@@ -428,7 +446,11 @@ class ApfIntegrationTest {
         // - Note, the APF RAM requirement for APF version 6.1 will become 4000 bytes in Android 17
         //   with CHIPSETs that set ro.board.first_api_level or ro.board.api_level to 202604 or
         //   higher.
-        if (vsrApiLevel >= 202504) {
+        // Note: At 25Q2, GMS-VSR requirements related to APFv6 are only applicable to handheld
+        // and tablet devices. GTVS requirements related to APFv6 are only applicable to TV devices.
+        // For Wear OS devices, APFv6 will not be enforced until specific requirements for Wear OS
+        // are officially incorporated.
+        if (shouldEnforceApfV6Support(vsrApiLevel)) {
             assertThat(caps.apfVersionSupported).isAnyOf(6000, 6100)
             if (caps.apfVersionSupported == 6000) {
                 assertThat(caps.maximumApfProgramSize).isAtLeast(4000)

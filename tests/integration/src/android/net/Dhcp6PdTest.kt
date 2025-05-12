@@ -29,6 +29,7 @@ import android.platform.test.annotations.AppModeFull
 import android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.net.module.util.dhcp6.Dhcp6Packet
+import com.android.net.module.util.dhcp6.Dhcp6RebindPacket
 import com.android.net.module.util.dhcp6.Dhcp6SolicitPacket
 import com.android.testutils.AutoCloseTestInterfaceRule
 import com.android.testutils.DevSdkIgnoreRule
@@ -60,7 +61,7 @@ import org.junit.runner.RunWith
 
 private const val TAG = "Dhcp6PdTest"
 private const val SHORT_TIMEOUT_MS = 200L
-private const val TIMEOUT_MS = 2000L
+private const val TIMEOUT_MS = 20_000L
 
 private const val DHCP6_PFLAG_CONFIG = "ipclient_dhcpv6_pd_preferred_flag_version"
 
@@ -193,6 +194,38 @@ class Dhcp6PdTest {
         iface.sendPacket(pkt)
 
         networkCallback.expect<Available>()
+    }
+
+    @Test
+    fun testProvisioning_triggeredByMultiplePrefixesWithPflag() {
+        ndResponder.addRouterEntry(ROUTER_MAC, ROUTER_V6, RA_WITH_PFLAG)
+        val (srcAddr, solicit) = expectDhcp6Packet<Dhcp6SolicitPacket>()
+
+        run {
+            val ether = EtherPkt(src = ROUTER_MAC, dst = localMac)
+            val ipv6 = Ip6Pkt(src = ROUTER_V6, dst = srcAddr)
+            val udp = UdpPkt(sport = 547, dport = 546)
+            val dhcp6 = Dhcp6Pkt(type = "REPLY", transId = solicit.transactionId)
+                .addRapidCommitOption()
+                .addClientIdentifierOption(solicit.clientDuid)
+                .addServerIdentifierOption(byteArrayOf(1, 2, 3, 4, 5, 6))
+            val dhcp6_pd = Dhcp6IaPdOpt(iaid = solicit.iaid)
+                .addIaPrefixOption(prefix = "2001:db8:1234::/64")
+            val pkt = ether / ipv6 / udp / dhcp6 / dhcp6_pd
+            iface.sendPacket(pkt)
+        }
+
+        networkCallback.expect<Available>()
+
+        run {
+            val ether = EtherPkt(src = "f4:34:f0:64:52:fe", dst = "33:33:00:00:00:01")
+            val ipv6 = Ip6Pkt(src = "fe80::12", dst = "ff02::1")
+            val ra = RaPkt(lft = 360, retransTimer = 360)
+                .addPioOption(prefix = "2002:db8:1::/64", flags = "LAP")
+            iface.sendPacket(ether / ipv6 / ra)
+        }
+
+        expectDhcp6Packet<Dhcp6RebindPacket>()
     }
 
     @Test

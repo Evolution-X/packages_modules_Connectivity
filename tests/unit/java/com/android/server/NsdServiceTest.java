@@ -23,6 +23,7 @@ import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHE
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE;
+import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.net.InetAddresses.parseNumericAddress;
@@ -55,6 +56,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -1653,6 +1655,54 @@ public class NsdServiceTest {
 
         verify(regListener, timeout(TIMEOUT_MS))
                 .onRegistrationFailed(any(), eq(FAILURE_BAD_PARAMETERS));
+    }
+
+    @Test
+    public void testAdvertiseOffloadOnly_FailsForNonTv() {
+        setMdnsAdvertiserEnabled();
+        doReturn(false).when(mPackageManager).hasSystemFeature(FEATURE_LEANBACK);
+        final NsdManager client = connectClient(mService);
+        final RegistrationListener regListener = mock(RegistrationListener.class);
+        final ArgumentCaptor<MdnsAdvertiser.AdvertiserCallback> cbCaptor =
+                ArgumentCaptor.forClass(MdnsAdvertiser.AdvertiserCallback.class);
+        verify(mDeps).makeMdnsAdvertiser(any(), any(), cbCaptor.capture(), any(), any(), any());
+
+        final NsdServiceInfo regInfo = new NsdServiceInfo("Service custom TTL", SERVICE_TYPE);
+        regInfo.setPort(1234);
+        final AdvertisingRequest request =
+                new AdvertisingRequest.Builder(regInfo, NsdManager.PROTOCOL_DNS_SD)
+                        .setFlags(AdvertisingRequest.FLAG_OFFLOAD_ONLY).build();
+        client.registerService(request, Runnable::run, regListener);
+        waitForIdle();
+
+        verify(regListener, timeout(TIMEOUT_MS))
+                .onRegistrationFailed(any(), eq(FAILURE_BAD_PARAMETERS));
+    }
+
+    @Test
+    public void testAdvertiseOffloadOnly_SupportForTvRunningAndroidB() {
+        assumeTrue(Build.VERSION_CODES.BAKLAVA == Build.VERSION.SDK_INT);
+        setMdnsAdvertiserEnabled();
+        doReturn(true).when(mPackageManager).hasSystemFeature(FEATURE_LEANBACK);
+        final NsdManager client = connectClient(mService);
+        final RegistrationListener regListener = mock(RegistrationListener.class);
+        final ArgumentCaptor<MdnsAdvertiser.AdvertiserCallback> cbCaptor =
+                ArgumentCaptor.forClass(MdnsAdvertiser.AdvertiserCallback.class);
+        verify(mDeps).makeMdnsAdvertiser(any(), any(), cbCaptor.capture(), any(), any(), any());
+
+        final NsdServiceInfo regInfo = new NsdServiceInfo("Service custom TTL", SERVICE_TYPE);
+        regInfo.setPort(1234);
+        final AdvertisingRequest request =
+                new AdvertisingRequest.Builder(regInfo, NsdManager.PROTOCOL_DNS_SD)
+                        .setFlags(AdvertisingRequest.FLAG_OFFLOAD_ONLY).build();
+        client.registerService(request, Runnable::run, regListener);
+        waitForIdle();
+
+        final ArgumentCaptor<MdnsAdvertisingOptions> optionsCaptor =
+                ArgumentCaptor.forClass(MdnsAdvertisingOptions.class);
+        verify(mAdvertiser).addOrUpdateService(anyInt(), any(),
+                optionsCaptor.capture(), anyInt());
+        assertTrue(optionsCaptor.getValue().isOffloadOnly());
     }
 
     @Test
