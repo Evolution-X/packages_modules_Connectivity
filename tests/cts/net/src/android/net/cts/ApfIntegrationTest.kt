@@ -72,8 +72,8 @@ import com.android.compatibility.common.util.PropertyUtil.getVsrApiLevel
 import com.android.compatibility.common.util.SystemUtil.runShellCommand
 import com.android.compatibility.common.util.SystemUtil.runShellCommandOrThrow
 import com.android.compatibility.common.util.VsrTest
-import com.android.internal.util.HexDump
 import com.android.modules.utils.build.SdkLevel
+import com.android.net.module.util.HexDump
 import com.android.net.module.util.NetworkStackConstants.ETHER_ADDR_LEN
 import com.android.net.module.util.NetworkStackConstants.ETHER_DST_ADDR_OFFSET
 import com.android.net.module.util.NetworkStackConstants.ETHER_HEADER_LEN
@@ -170,7 +170,10 @@ class ApfIntegrationTest {
             val packageManager = context.getPackageManager()
             val userManager = context.getSystemService(UserManager::class.java)!!
             return (packageManager.hasSystemFeature(FEATURE_AUTOMOTIVE) &&
-                    userManager.isVisibleBackgroundUsersSupported)
+                    // isVisibleBackgroundUsersSupported is @TestApi, but this test should build
+                    // against module API stubs, which do not include it (b/409931932).
+                    userManager.javaClass.getMethod("isVisibleBackgroundUsersSupported")
+                        .invoke(userManager) as Boolean)
         }
 
         private fun disableLowPowerStandby() {
