@@ -352,6 +352,10 @@ class ApfIntegrationTest {
             isTvDeviceSupportFullNetworkingUnder2w()
         )
 
+        // APF GMS-VSR requirements don't apply to automotive devices. There is no power benefit to
+        // running APF on automotive as the device has almost infinite battery power.
+        assumeFalse("Skip test: automotive device", pm.hasSystemFeature(FEATURE_AUTOMOTIVE))
+
         networkCallback = TestableNetworkCallback()
         cm.requestNetwork(
                 NetworkRequest.Builder()
