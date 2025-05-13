@@ -845,6 +845,38 @@ public class NetworkStatsTest {
     }
 
     @Test
+    public void testFilteredClone() {
+        final int testUid = 10101;
+        NetworkStats.Entry entry1 = new NetworkStats.Entry(
+                "test1", 10100, SET_DEFAULT, TAG_NONE, METERED_NO, ROAMING_NO,
+                DEFAULT_NETWORK_NO, 50000L, 25L, 100000L, 50L, 0L);
+
+        NetworkStats.Entry entry2 = new NetworkStats.Entry(
+                "test2", testUid, SET_DEFAULT, TAG_NONE, METERED_NO, ROAMING_NO,
+                DEFAULT_NETWORK_NO, 50000L, 25L, 100000L, 50L, 0L);
+
+        NetworkStats.Entry entry3 = new NetworkStats.Entry(
+                "test3", testUid, SET_DEFAULT, 123, METERED_NO, ROAMING_NO,
+                DEFAULT_NETWORK_NO, 50000L, 25L, 100000L, 50L, 0L);
+
+        NetworkStats stats = new NetworkStats(TEST_START, 3)
+                .insertEntry(entry1)
+                .insertEntry(entry2)
+                .insertEntry(entry3);
+
+        NetworkStats filtered = stats.filteredClone(testUid, INTERFACES_ALL, TAG_ALL);
+
+        assertEquals(3, stats.size());
+        assertEquals(entry1, stats.getValues(0, null));
+        assertEquals(entry2, stats.getValues(1, null));
+        assertEquals(entry3, stats.getValues(2, null));
+
+        assertEquals(2, filtered.size());
+        assertEquals(entry2, filtered.getValues(0, null));
+        assertEquals(entry3, filtered.getValues(1, null));
+    }
+
+    @Test
     public void testFilter_InterfaceFilter() {
         final String testIf1 = "testif1";
         final String testIf2 = "testif2";
