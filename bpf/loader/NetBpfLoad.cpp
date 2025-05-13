@@ -1481,23 +1481,19 @@ static int loadAllElfObjects(const unsigned int bpfloader_ver, const Location& l
     return retVal;
 }
 
-static int createSysFsBpfSubDir(const char* const prefix) {
-    if (*prefix) {
-        mode_t prevUmask = umask(0);
+static int createDir(const char* const dir) {
+    mode_t prevUmask = umask(0);
 
-        string s = "/sys/fs/bpf/";
-        s += prefix;
-
-        errno = 0;
-        int ret = mkdir(s.c_str(), S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (ret && errno != EEXIST) {
-            const int err = errno;
-            ALOGE("Failed to create directory: %s, ret: %s", s.c_str(), std::strerror(err));
-            return -err;
-        }
-
+    errno = 0;
+    int ret = mkdir(dir, S_ISVTX | S_IRWXU | S_IRWXG | S_IRWXO);
+    if (ret && errno != EEXIST) {
+        const int err = errno;
         umask(prevUmask);
+        ALOGE("Failed to create directory: %s, ret: %s", dir, std::strerror(err));
+        return -err;
     }
+
+    umask(prevUmask);
     return 0;
 }
 
@@ -1884,18 +1880,17 @@ static int doLoad(char** argv, char * const envp[]) {
     // (this must be done first to allow selinux_context and pin_subdir functionality,
     //  which could otherwise fail with ENOENT during object pinning or renaming,
     //  due to ordering issues)
-    for (const auto& location : locations) {
-        if (location.t_plus && !isAtLeastT) continue;
-        if (createSysFsBpfSubDir(location.prefix)) return 1;
-    }
+    if (createDir("/sys/fs/bpf/tethering")) return 1;
+    // This is technically T+ but S also needs it for the 'mainline_done' file.
+    if (createDir("/sys/fs/bpf/netd_shared")) return 1;
 
     if (isAtLeastT) {
-        // Note: there's no actual src dir for fs_bpf_loader .o's,
-        // so it is not listed in 'locations[].prefix'.
-        // This is because this is primarily meant for triggering genfscon rules,
-        // and as such this will likely always be the case.
-        // Thus we need to manually create the /sys/fs/bpf/loader subdirectory.
-        if (createSysFsBpfSubDir("loader")) return 1;
+        if (createDir("/sys/fs/bpf/netd_readonly")) return 1;
+        if (createDir("/sys/fs/bpf/net_shared")) return 1;
+        if (createDir("/sys/fs/bpf/net_private")) return 1;
+
+        // This one is primarily meant for triggering genfscon rules.
+        if (createDir("/sys/fs/bpf/loader")) return 1;
     }
 
     // Load all ELF objects, create programs and maps, and pin them
@@ -1921,11 +1916,8 @@ static int doLoad(char** argv, char * const envp[]) {
         if (isAtLeastT) return 1;
     }
 
-    // on S we haven't created this subdir yet, but we need it for 'mainline_done' flag below
-    if (!isAtLeastT && createSysFsBpfSubDir("netd_shared")) return 1;
-
     // leave a flag that we're done
-    if (createSysFsBpfSubDir("netd_shared/mainline_done")) return 1;
+    if (createDir("/sys/fs/bpf/netd_shared/mainline_done")) return 1;
 
     // platform bpfloader will only succeed when run as root
     if (!runningAsRoot) {
