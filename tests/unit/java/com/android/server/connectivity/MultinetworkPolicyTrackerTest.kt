@@ -49,16 +49,19 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeNotNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.any
 import org.mockito.Mockito.doCallRealMethod
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
@@ -74,6 +77,17 @@ const val HANDLER_TIMEOUT_MS = 400
 @SmallTest
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
 class MultinetworkPolicyTrackerTest {
+    companion object {
+        @Parameterized.Parameters
+        @JvmStatic
+        fun data(): Iterable<Any?> {
+            return mutableListOf(
+                null,
+                mock(CarrierConfigManager::class.java)
+            )
+        }
+    }
+
     // This wrapper class prevents JUnit from attempting to load unsupported system classes
     // that are present in the System Test (S/T) image, which would otherwise cause test failures.
     private class CarrierConfigChangeRunner(
@@ -97,6 +111,11 @@ class MultinetworkPolicyTrackerTest {
 
     private val featureFlags = HashSet<String>()
 
+    // Indicates where carrierConfigManager is supported.
+    @Parameterized.Parameter(0)
+    @JvmField
+    var carrierConfigManager: CarrierConfigManager? = null
+
     // This will set feature flags from @FeatureFlag annotations
     // into the map before setUp() runs.
     @get:Rule
@@ -115,7 +134,6 @@ class MultinetworkPolicyTrackerTest {
     }
 
     private val telephonyManager = mock(TelephonyManager::class.java)
-    private val carrierConfigManager = mock(CarrierConfigManager::class.java)
     private val subscriptionManager = mock(SubscriptionManager::class.java).also {
         doReturn(null).`when`(it).getActiveSubscriptionInfo(anyInt())
     }
@@ -135,8 +153,6 @@ class MultinetworkPolicyTrackerTest {
         }
         doReturn(subscriptionManager).`when`(it)
             .getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE)
-        doReturn(carrierConfigManager).`when`(it)
-            .getSystemService(CarrierConfigManager::class.java)
         doReturn(resolver).`when`(it).contentResolver
         doReturn(resources).`when`(it).resources
         doReturn(it).`when`(it).createConfigurationContext(any())
@@ -206,6 +222,8 @@ class MultinetworkPolicyTrackerTest {
             featureFlags.contains(FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG)
         )
 
+        doReturn(carrierConfigManager).`when`(context)
+            .getSystemService(CarrierConfigManager::class.java)
         trackerDependencies.setBackgroundThreadHandler(bgHandler)
         tracker = MultinetworkPolicyTracker(
             context,
@@ -219,6 +237,9 @@ class MultinetworkPolicyTrackerTest {
     @After
     fun tearDown() {
         ConnectivityResources.setResourcesContextForTest(null)
+        carrierConfigManager?.let { ccm ->
+            reset(ccm)
+        }
         trackerDependencies.resetAvoidBadWifiCarrierConfigForSubIdMap()
     }
 
@@ -326,6 +347,8 @@ class MultinetworkPolicyTrackerTest {
     @FeatureFlag(name = FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG, true)
     @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.BAKLAVA)
     fun testUpdateAvoidBadWifiOnCarrierConfigChange() {
+        assumeNotNull("skip test if carrierConfigManager is not supported", carrierConfigManager)
+
         // Mock the initial global setting to null
         Settings.Global.putString(resolver, NETWORK_AVOID_BAD_WIFI, null)
 
@@ -346,7 +369,7 @@ class MultinetworkPolicyTrackerTest {
         // Mock the initial carrier configuration to return false
         trackerDependencies.setAvoidBadWifiCarrierConfigForSubId(activeSubId, false)
         verify(carrierConfigManager, times(1))
-            .registerCarrierConfigChangeListener(any(), carrierConfiglistenCaptor.capture())
+            ?.registerCarrierConfigChangeListener(any(), carrierConfiglistenCaptor.capture())
 
         val carrierConfiglistener = carrierConfiglistenCaptor.value
         // dispatch for the first carrier config initialization on the handler thread
