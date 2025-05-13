@@ -1269,13 +1269,6 @@ public class Tethering {
         return mEntitlementMgr.isTetherProvisioningRequired(cfg);
     }
 
-    private int getServedUsbType(boolean forNcmFunction) {
-        // TETHERING_NCM is only used if the device does not use NCM for regular USB tethering.
-        if (forNcmFunction && !mConfig.isUsingNcm()) return TETHERING_NCM;
-
-        return TETHERING_USB;
-    }
-
     // TODO: Figure out how to update for local hotspot mode interfaces.
     private void notifyTetherStatesChanged() {
         if (!isTetheringSupported()) return;
@@ -1816,14 +1809,7 @@ public class Tethering {
     //     - allows requesting either tethering or local hotspot serving states
     //     - only tethers the first matching interface in listInterfaces()
     //       order of a given type
-    private void enableUsbIpServing(boolean forNcmFunction) {
-        // Note: TetheringConfiguration#isUsingNcm can change between the call to
-        // startTethering(TETHERING_USB) and the ACTION_USB_STATE broadcast. If the USB tethering
-        // function changes from NCM to RNDIS, this can lead to Tethering starting NCM tethering
-        // as local-only. But if this happens, the SettingsObserver will call stopTetheringInternal
-        // for both TETHERING_USB and TETHERING_NCM, so the local-only NCM interface will be
-        // stopped immediately.
-        final int tetheringType = getServedUsbType(forNcmFunction);
+    private void enableUsbIpServing(boolean isNcm) {
         String[] ifaces = null;
         try {
             ifaces = mNetd.interfaceGetList();
@@ -1832,17 +1818,24 @@ public class Tethering {
             return;
         }
 
+        // Note: TetheringConfiguration#isUsingNcm can change between the call to
+        // startTethering(TETHERING_USB) and the ACTION_USB_STATE broadcast. If the USB tethering
+        // function changes from NCM to RNDIS, this can lead to Tethering starting NCM tethering
+        // as local-only. But if this happens, the SettingsObserver will call stopTetheringInternal
+        // for both TETHERING_USB and TETHERING_NCM, so the local-only NCM interface will be
+        // stopped immediately.
+        final int tetheringType = (isNcm && !mConfig.isUsingNcm()) ? TETHERING_NCM : TETHERING_USB;
         final TetheringRequest request = mRequestTracker.getOrCreatePendingRequest(tetheringType);
         if (ifaces != null) {
             for (String iface : ifaces) {
                 if (ifaceNameToType(iface) == tetheringType) {
-                    enableIpServing(request, iface, forNcmFunction);
+                    enableIpServing(request, iface, isNcm);
                     return;
                 }
             }
         }
 
-        mLog.e("could not enable IpServer for function " + (forNcmFunction ? "NCM" : "RNDIS"));
+        mLog.e("could not enable IpServer for function " + (isNcm ? "NCM" : "RNDIS"));
     }
 
     private void disableUsbIpServing(boolean forNcmFunction) {
