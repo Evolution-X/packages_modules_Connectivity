@@ -158,7 +158,7 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
     @Nullable
     public SocketKey guessNetworkOfRemoteHost(@NonNull List<NetworkInterfaceWrapper> knownIfaces,
             @NonNull InetAddress address) {
-        if (address.isLinkLocalAddress()) {
+        if (address instanceof Inet6Address && address.isLinkLocalAddress()) {
             final int scopeId = ((Inet6Address) address).getScopeId();
             for (NetworkInterfaceWrapper iface : knownIfaces) {
                 if (iface.getIndex() == scopeId) {
@@ -174,7 +174,11 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
                 // Note LinkProperties does not always contain routes for local subnets before P
                 // (change ID I35b614eebccfd22c4a5270f40256f9be1e25abfb), but on M+ Wi-Fi does add
                 // them from netlink/DHCP.
-                CollectionUtils.any(lp.getRoutes(), r -> r.matches(address)));
+                // Look for the address in directly-connected routes (no gateway).
+                // Note RouteInfo#hasGateway would be equivalent and simpler but is API 29+
+                CollectionUtils.any(lp.getRoutes(), r ->
+                      (r.getGateway() == null || r.getGateway().isAnyLocalAddress())
+                      && r.matches(address)));
         if (match == null) {
             return null;
         }
