@@ -1134,6 +1134,7 @@ public class Tethering {
         if (type == TETHERING_INVALID) {
             Log.e(TAG, "Ignoring call to legacy tether for unknown iface " + iface);
             sendTetherResult(listener, TETHER_ERROR_UNKNOWN_IFACE);
+            return;
         }
 
         TetheringRequest request = mRequestTracker.getNextPendingRequest(type);
