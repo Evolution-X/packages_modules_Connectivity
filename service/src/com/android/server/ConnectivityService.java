@@ -4175,27 +4175,27 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // Since mApps in PermissionMonitor needs to be populated first to ensure that
         // listening network request which is sent by MultipathPolicyTracker won't be added
         // NET_CAPABILITY_FOREGROUND capability. Thus, MultipathPolicyTracker.start() must
-        // be called after PermissionMonitor#startMonitoring().
-        // Calling PermissionMonitor#startMonitoring() in systemReadyInternal() and the
+        // be called after PermissionMonitor#initialize().
+        // Calling PermissionMonitor#initialize() in systemReadyInternal() and the
         // MultipathPolicyTracker.start() is called in NetworkPolicyManagerService#systemReady()
         // to ensure the tracking will be initialized correctly.
-        final ConditionVariable startMonitoringDone = new ConditionVariable();
+        final ConditionVariable permissionMonitorInitializeDone = new ConditionVariable();
         mHandler.post(() -> {
             mPermissionMonitor.initialize();
             // Calling mBroadcastReceiveHelper.callCallbackForInitialUsers() after
-            // PermissionMonitor.startMonitoring() ensures that the internal lists
+            // PermissionMonitor#initialize() ensures that the internal lists
             // (mUidsAllowedOnRestrictedNetworks and mUsersTrafficPermissions) in
             // PermissionMonitor are prepared before processing initial users.
             // While technically the onUserAdded callback (triggered by
             // callCallbackForInitialUsers) handles sending network and traffic
             // permissions to netd and bpf, which depend on these lists, moving
-            // this call before startMonitoring would necessitate performing these
-            // actions again within startMonitoring, leading to redundant work.
+            // this call before initialize would necessitate performing these
+            // actions again within initialize, leading to redundant work.
             // Therefore, keeping callCallbackForInitialUsers() in this order is the
             // safest approach to avoid duplicated operations and ensure the
             // permission lists are ready when the initial user callbacks are invoked.
             mBroadcastReceiveHelper.callOnUserAddedForExistingUsers();
-            startMonitoringDone.open();
+            permissionMonitorInitializeDone.open();
         });
         mProxyTracker.loadGlobalProxy();
         registerDnsResolverUnsolicitedEventListener();
@@ -4239,9 +4239,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 CONNECTIVITY_STATE_SAMPLE, this::sampleConnectivityStateToStatsEvent);
         // Wait PermissionMonitor to finish the permission update. Then MultipathPolicyTracker won't
         // have permission problem. While CV#block() is unbounded in time and can in principle block
-        // forever, this replaces a synchronous call to PermissionMonitor#startMonitoring, which
+        // forever, this replaces a synchronous call to PermissionMonitor#initialize, which
         // could have blocked forever too.
-        startMonitoringDone.block();
+        permissionMonitorInitializeDone.block();
     }
 
     /**
