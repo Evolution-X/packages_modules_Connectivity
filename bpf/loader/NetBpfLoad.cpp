@@ -122,12 +122,6 @@ static constexpr bool specified(domain d) {
     return d != domain::unspecified;
 }
 
-struct Location {
-    const char* const dir = "";
-    const char* const prefix = "";
-    const bool t_plus = true;
-};
-
 // Returns the build type string (from ro.build.type).
 const std::string& getBuildType() {
     static std::string t = GetProperty("ro.build.type", "unknown");
@@ -1422,63 +1416,44 @@ static bool exists(const char* const path) {
 }
 
 #define APEXROOT "/apex/com.android.tethering"
-#define BPFROOT APEXROOT "/etc/bpf"
+#define BPFROOT APEXROOT "/etc/bpf/mainline/"
 
-const Location locations[] = {
-        // S+ Tethering mainline module (network_stack): tether offload
-        {
-                .dir = BPFROOT "/tethering/",
-                .prefix = "tethering/",
-                .t_plus = false,
-        },
-        // T+ Tethering mainline module (shared with netd & system server)
-        // netutils_wrapper (for iptables xt_bpf) has access to programs
-        {
-                .dir = BPFROOT "/netd_shared/",
-                .prefix = "netd_shared/",
-        },
-        // T+ Tethering mainline module (shared with netd & system server)
-        // netutils_wrapper has no access, netd has read only access
-        {
-                .dir = BPFROOT "/netd_readonly/",
-                .prefix = "netd_readonly/",
-        },
-        // T+ Tethering mainline module (shared with system server)
-        {
-                .dir = BPFROOT "/net_shared/",
-                .prefix = "net_shared/",
-        },
-        // T+ Tethering mainline module (not shared, just network_stack)
-        {
-                .dir = BPFROOT "/net_private/",
-                .prefix = "net_private/",
-        },
-};
-
-static int loadAllElfObjects(const unsigned int bpfloader_ver, const Location& location) {
-    int retVal = 0;
-    DIR* dir;
-    struct dirent* ent;
-
-    if ((dir = opendir(location.dir)) != NULL) {
-        while ((ent = readdir(dir)) != NULL) {
-            string s = ent->d_name;
-            if (!EndsWith(s, ".o")) continue;
-
-            string progPath(location.dir);
-            progPath += s;
-
-            int ret = loadProg(progPath.c_str(), bpfloader_ver, location.prefix);
-            if (ret) {
-                retVal = ret;
-                ALOGE("Failed to load object: %s, ret: %s", progPath.c_str(), std::strerror(-ret));
-            } else {
-                ALOGD("Loaded object: %s", progPath.c_str());
-            }
-        }
-        closedir(dir);
+static int loadObject(const unsigned int bpfloader_ver, const char* const prefix,
+                      const char* const fname) {
+    string progPath = string(BPFROOT) + fname;
+    int ret = loadProg(progPath.c_str(), bpfloader_ver, prefix);
+    if (ret) {
+        ALOGE("Failed to load object: %s, ret: %s", progPath.c_str(), std::strerror(-ret));
+        return 1;
     }
-    return retVal;
+    ALOGD("Loaded object: %s", progPath.c_str());
+    return 0;
+}
+
+static int loadAllObjects(const unsigned int bpfloader_ver) {
+    // S+ Tethering mainline module (network_stack): tether offload
+    // loads under /sys/fs/bpf/tethering:
+    if (loadObject(bpfloader_ver, "tethering/", "offload.o")) return 1;
+    if (loadObject(bpfloader_ver, "tethering/", "test.o")) return 1;
+    if (isAtLeastT) {
+        // T+ Tethering mainline module loads under:
+        // /sys/fs/bpf/net_shared: shared with netd & system server
+        if (loadObject(bpfloader_ver, "net_shared/", "clatd.o")) return 1;
+        if (loadObject(bpfloader_ver, "net_shared/", "dscpPolicy.o")) return 1;
+
+        // /sys/fs/bpf/netd_shared: shared with netd & system server
+        // - netutils_wrapper (for iptables xt_bpf) has access to programs
+
+        // WARNING: Android T+ non-updatable netd depends on both of the
+        // 'netd_shared' & 'netd' strings for xt_bpf programs it loads
+        if (loadObject(bpfloader_ver, "netd_shared/", "netd.o")) return 1;
+
+        // /sys/fs/bpf/netd_readonly: shared with netd & system server
+        // - netutils_wrapper has no access, netd has read only access
+
+        // /sys/fs/bpf/net_private: not shared, just network_stack
+    }
+    return 0;
 }
 
 static int createDir(const char* const dir) {
@@ -1894,17 +1869,14 @@ static int doLoad(char** argv, char * const envp[]) {
     }
 
     // Load all ELF objects, create programs and maps, and pin them
-    for (const auto& location : locations) {
-        if (location.t_plus && !isAtLeastT) continue;
-        if (loadAllElfObjects(bpfloader_ver, location) != 0) {
-            ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS FROM %s ===", location.dir);
-            ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
-            ALOGE("If this triggers randomly, you might be hitting some memory allocation "
-                  "problems or startup script race.");
-            ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-            sleep(20);
-            return 2;
-        }
+    if (loadAllObjects(bpfloader_ver)) {
+        ALOGE("=== CRITICAL FAILURE LOADING BPF PROGRAMS ===");
+        ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
+        ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+              "problems or startup script race.");
+        ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
+        sleep(20);
+        return 2;
     }
 
     int key = 1;
