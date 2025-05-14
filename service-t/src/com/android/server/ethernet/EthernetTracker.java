@@ -45,6 +45,7 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
+import android.system.Os;
 import android.system.OsConstants;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -872,7 +873,8 @@ public class EthernetTracker {
     }
 
     private void setInterfaceUpState(@NonNull String interfaceName, boolean up) {
-        if (!NetlinkUtils.setInterfaceFlags(interfaceName, up ? IFF_UP : ~IFF_UP)) {
+        if (!NetlinkUtils.setInterfaceFlags(Os.if_nametoindex(interfaceName),
+                up ? IFF_UP : ~IFF_UP)) {
             Log.e(TAG, "Failed to set interface " + interfaceName + (up ? " up" : " down"));
         }
     }

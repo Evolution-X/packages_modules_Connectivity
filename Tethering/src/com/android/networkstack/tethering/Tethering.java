@@ -52,6 +52,7 @@ import static android.net.TetheringManager.TETHER_ERROR_UNAVAIL_IFACE;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_IFACE;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_TYPE;
+import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_FAILED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STARTED;
 import static android.net.TetheringManager.TETHER_HARDWARE_OFFLOAD_STOPPED;
@@ -75,10 +76,6 @@ import static com.android.networkstack.tethering.TetheringConfiguration.TETHER_F
 import static com.android.networkstack.tethering.TetheringNotificationUpdater.DOWNSTREAM_NONE;
 import static com.android.networkstack.tethering.UpstreamNetworkMonitor.isCellular;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED;
-import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI;
-import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P;
-import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS;
-import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS;
 import static com.android.networkstack.tethering.metrics.TetheringStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WITH_PLACEHOLDER_REQUEST;
 import static com.android.networkstack.tethering.util.TetheringMessageBase.BASE_MAIN_SM;
 import static com.android.networkstack.tethering.util.TetheringUtils.createImplicitLocalOnlyTetheringRequest;
@@ -1137,41 +1134,17 @@ public class Tethering {
             return;
         }
 
+        if (type == TETHERING_WIFI || type == TETHERING_WIFI_P2P) {
+            // Metrics show no usage of this legacy codepath. Stop supporing it.
+            sendTetherResult(listener, TETHER_ERROR_UNSUPPORTED);
+            return;
+        }
+
         TetheringRequest request = mRequestTracker.getNextPendingRequest(type);
         if (request == null) {
             request = createLegacyGlobalScopeTetheringRequest(type);
         }
-        int result = tetherInternal(request, iface);
-        switch (type) {
-            case TETHERING_WIFI:
-                Log.i(TAG, "Legacy tether API called on Wifi iface " + iface);
-                TetheringStatsLog.write(
-                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI);
-                if (result == TETHER_ERROR_NO_ERROR) {
-                    Log.i(TAG, "Legacy tether API succeeded on Wifi iface " + iface);
-                    TetheringStatsLog.write(
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_SUCCESS);
-                }
-                break;
-            case TETHERING_WIFI_P2P:
-                Log.i(TAG, "Legacy tether API called on Wifi P2P iface " + iface);
-                TetheringStatsLog.write(
-                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                        CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P);
-                if (result == TETHER_ERROR_NO_ERROR) {
-                    Log.i(TAG, "Legacy tether API succeeded on Wifi P2P iface " + iface);
-                    TetheringStatsLog.write(
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
-                            CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_LEGACY_TETHER_WITH_TYPE_WIFI_P2P_SUCCESS);
-                }
-                break;
-            default:
-                // Do nothing
-                break;
-        }
-        sendTetherResult(listener, result);
+        sendTetherResult(listener, tetherInternal(request, iface));
     }
 
     /**
@@ -1181,11 +1154,12 @@ public class Tethering {
      * processInterfaceStateChanged beforehand, which is only possible for
      *     - WIGIG Pre-S
      *     - BLUETOOTH Pre-T
+     * It was previously supported but no longer allowed for:
      *     - WIFI
      *     - WIFI_P2P.
-     * Note that WIFI and WIFI_P2P already start tethering on their respective ifaces via
-     * WIFI_(AP/P2P_STATE_CHANGED broadcasts, which makes this API redundant for those types unless
-     * those broadcasts are disabled by OEM.
+     * because metrics show that there is no usage of this method for these types in production.
+     * These types start tethering on their respective ifaces via WIFI_(AP/P2P_STATE_CHANGED
+     * broadcasts instead.
      */
     void legacyTether(String iface, final IIntResultListener listener) {
         mHandler.post(() -> handleLegacyTether(iface, listener));

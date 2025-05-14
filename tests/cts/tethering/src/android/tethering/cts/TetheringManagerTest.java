@@ -41,6 +41,7 @@ import static android.net.TetheringManager.TETHER_ERROR_ENTITLEMENT_UNKNOWN;
 import static android.net.TetheringManager.TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION;
 import static android.net.TetheringManager.TETHER_ERROR_NO_ERROR;
 import static android.net.TetheringManager.TETHER_ERROR_UNKNOWN_REQUEST;
+import static android.net.TetheringManager.TETHER_ERROR_UNSUPPORTED;
 import static android.net.cts.util.CtsTetheringUtils.isAnyIfaceMatch;
 import static android.os.Process.INVALID_UID;
 
@@ -432,28 +433,20 @@ public class TetheringManagerTest {
                     mCtsTetheringUtils.startWifiTethering(tetherEventCallback, softApConfig);
 
             assertNotNull(tetheredIface);
+            final String wifiTetheringIface = tetheredIface.getInterface();
             if  (SdkLevel.isAtLeastB()) {
                 assertEquals(softApConfig, tetheredIface.getSoftApConfiguration());
             }
 
             mCtsTetheringUtils.stopWifiTethering(tetherEventCallback);
 
-            if (!SdkLevel.isAtLeastB()) {
-                final String wifiTetheringIface = tetheredIface.getInterface();
-                try {
-                    final int ret = runAsShell(TETHER_PRIVILEGED,
-                            () -> mTM.tether(wifiTetheringIface));
-                    // There is no guarantee that the wifi interface will be available after
-                    // disabling the hotspot, so don't fail the test if the call to tether() fails.
-                    if (ret == TETHER_ERROR_NO_ERROR) {
-                        // If calling #tether successful, there is a callback to tell the result of
-                        // tethering setup.
-                        tetherEventCallback.expectErrorOrTethered(
-                                new TetheringInterface(TETHERING_WIFI, wifiTetheringIface));
-                    }
-                } finally {
-                    runAsShell(TETHER_PRIVILEGED, () -> mTM.untether(wifiTetheringIface));
-                }
+            if (SdkLevel.isAtLeastB()) {
+                assertThrows(UnsupportedOperationException.class,
+                        () -> runAsShell(TETHER_PRIVILEGED,
+                                () -> mTM.tether(wifiTetheringIface)));
+            } else {
+                final int ret = runAsShell(TETHER_PRIVILEGED, () -> mTM.tether(wifiTetheringIface));
+                assertEquals(TETHER_ERROR_UNSUPPORTED, ret);
             }
         } finally {
             mCtsTetheringUtils.unregisterTetheringEventCallback(tetherEventCallback);
