@@ -135,6 +135,14 @@ public class Dhcp6Packet {
     private OptionalInt mSolMaxRt;
 
     /**
+     * DHCPv6 zero-length Optional Type: The Address Registration option. Per RFC9686, the client
+     * can discover if the DHCPv6 infrastructure supports address registration by including this
+     * option in the Option Request options that it sends.
+     */
+    public static final short DHCP6_OPTION_ADDR_REG_ENABLE = 148;
+    public boolean mAddrRegEnable;
+
+    /**
      * The transaction identifier used in this particular DHCPv6 negotiation
      */
     protected final int mTransId;
