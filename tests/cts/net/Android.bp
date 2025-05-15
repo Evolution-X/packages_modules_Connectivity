@@ -82,6 +82,7 @@ java_defaults {
     min_sdk_version: "30",
     per_testcase_directory: true,
     host_required: ["net-tests-utils-host-common"],
+    host_common_data: [":net-tests-utils-host-common"],
     test_config_template: "AndroidTestTemplate.xml",
     data: [
         ":ConnectivityTestPreparer",
