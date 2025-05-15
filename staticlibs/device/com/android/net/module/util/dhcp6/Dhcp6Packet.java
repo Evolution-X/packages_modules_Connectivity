@@ -457,6 +457,7 @@ public class Dhcp6Packet {
         byte[] clientDuid = null;
         short statusCode = STATUS_SUCCESS;
         boolean rapidCommit = false;
+        boolean addrRegEnable = false;
         int solMaxRt = 0;
         PrefixDelegation pd = null;
 
@@ -527,6 +528,10 @@ public class Dhcp6Packet {
                         expectedLen = 4;
                         solMaxRt = packet.getInt();
                         break;
+                    case DHCP6_OPTION_ADDR_REG_ENABLE:
+                        expectedLen = 0;
+                        addrRegEnable = true;
+                        break;
                     default:
                         expectedLen = optionLen;
                         // BufferUnderflowException will be thrown if option is truncated.
@@ -582,6 +587,7 @@ public class Dhcp6Packet {
                 (solMaxRt >= 60 && solMaxRt <= 86400)
                         ? OptionalInt.of(solMaxRt * 1000)
                         : OptionalInt.empty();
+        newPacket.mAddrRegEnable = addrRegEnable;
 
         return newPacket;
     }
