@@ -118,7 +118,6 @@ import static com.android.networkstack.apishim.ConstantsShim.BLOCKED_REASON_NONE
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_EXPORTED;
 import static com.android.networkstack.apishim.ConstantsShim.RECEIVER_NOT_EXPORTED;
 import static com.android.testutils.Cleanup.testAndCleanup;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 import static com.android.testutils.MiscAsserts.assertEventuallyTrue;
 import static com.android.testutils.MiscAsserts.assertThrows;
 import static com.android.testutils.TestNetworkTrackerKt.initTestNetwork;
@@ -692,7 +691,7 @@ public class ConnectivityManagerTest {
         return null;
     }
 
-    @DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+    @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @AppModeFull(reason = "Cannot get installed packages in instant app mode")
     @Test
     public void testGetRedactedLinkPropertiesForPackage() throws Exception {
@@ -781,7 +780,7 @@ public class ConnectivityManagerTest {
     }
 
     @ConnectivityModuleTest
-    @DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+    @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @AppModeFull(reason = "Cannot get installed packages in instant app mode")
     @Test
     public void testGetRedactedNetworkCapabilitiesForPackage() throws Exception {
@@ -3619,7 +3618,7 @@ public class ConnectivityManagerTest {
         assertTrue(dumpOutput, dumpOutput.contains("Active default network"));
     }
 
-    @Test @IgnoreUpTo(SC_V2)
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testDumpBpfNetMaps() throws Exception {
         final String[] args = new String[] {"--short", "trafficcontroller"};
         String dumpOutput = DumpTestUtils.dumpServiceWithShellPermission(
@@ -3734,7 +3733,7 @@ public class ConnectivityManagerTest {
         }, NETWORK_SETTINGS);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingDozable() {
         doTestFirewallBlocking(FIREWALL_CHAIN_DOZABLE, ALLOWLIST);
@@ -3748,43 +3747,43 @@ public class ConnectivityManagerTest {
         doTestFirewallBlocking(FIREWALL_CHAIN_BACKGROUND, ALLOWLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingPowersave() {
         doTestFirewallBlocking(FIREWALL_CHAIN_POWERSAVE, ALLOWLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingRestricted() {
         doTestFirewallBlocking(FIREWALL_CHAIN_RESTRICTED, ALLOWLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingLowPowerStandby() {
         doTestFirewallBlocking(FIREWALL_CHAIN_LOW_POWER_STANDBY, ALLOWLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingStandby() {
         doTestFirewallBlocking(FIREWALL_CHAIN_STANDBY, DENYLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingOemDeny1() {
         doTestFirewallBlocking(FIREWALL_CHAIN_OEM_DENY_1, DENYLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingOemDeny2() {
         doTestFirewallBlocking(FIREWALL_CHAIN_OEM_DENY_2, DENYLIST);
     }
 
-    @Test @IgnoreUpTo(SC_V2) @ConnectivityModuleTest
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2) @ConnectivityModuleTest
     @AppModeFull(reason = "Socket cannot bind in instant app mode")
     public void testFirewallBlockingOemDeny3() {
         doTestFirewallBlocking(FIREWALL_CHAIN_OEM_DENY_3, DENYLIST);

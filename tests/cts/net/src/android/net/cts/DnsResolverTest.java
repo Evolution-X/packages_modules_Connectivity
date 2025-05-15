@@ -26,7 +26,6 @@ import static android.provider.DeviceConfig.NAMESPACE_CONNECTIVITY;
 import static android.system.OsConstants.ETIMEDOUT;
 
 import static com.android.testutils.Cleanup.testAndCleanup;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -44,6 +43,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.ParseException;
 import android.net.cts.util.CtsNetUtils;
+import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
@@ -878,7 +878,7 @@ public class DnsResolverTest {
     }
 
     /** Verifies that DnsResolver.DnsException can be subclassed and its constructor re-used. */
-    @Test @IgnoreUpTo(SC_V2) // TODO: Use to Build.VERSION_CODES.SC_V2 when available
+    @Test @IgnoreUpTo(Build.VERSION_CODES.S_V2)
     public void testDnsExceptionConstructor() throws InterruptedException {
         class TestDnsException extends DnsResolver.DnsException {
             TestDnsException(int code, @Nullable Throwable cause) {
