@@ -56,10 +56,6 @@ public class CertificateTransparencyService extends ICertificateTransparencyMana
         Collection<CompatibilityVersion> compatVersions =
                 Arrays.asList(
                         new CompatibilityVersion(
-                                Config.COMPATIBILITY_VERSION_V1,
-                                Config.URL_SIGNATURE_V1,
-                                Config.URL_LOG_LIST_V1),
-                        new CompatibilityVersion(
                                 Config.COMPATIBILITY_VERSION_V2,
                                 Config.URL_SIGNATURE_V2,
                                 Config.URL_LOG_LIST_V2));
