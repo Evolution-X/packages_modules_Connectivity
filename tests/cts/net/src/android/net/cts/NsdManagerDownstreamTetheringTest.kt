@@ -104,7 +104,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStarted>()
             assertNotNull(downstreamReader.pollForQuery("$serviceType.local", 12 /* type PTR */))
-        } cleanupStep {
+        } cleanup {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
         }
@@ -137,7 +137,7 @@ class NsdManagerDownstreamTetheringTest : EthernetTetheringTestBase() {
             val downstreamReader = downstreamIface.packetReader
             assertNotNull(downstreamReader.pollForQuery("$serviceType.local", 12 /* type PTR */))
             // TODO: Add another test to check packet reply can trigger serviceFound.
-        } cleanupStep {
+        } cleanup {
             nsdManager.stopServiceDiscovery(discoveryRecord)
             discoveryRecord.expectCallback<NsdDiscoveryRecord.DiscoveryEvent.DiscoveryStopped>()
         }
