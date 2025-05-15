@@ -17,7 +17,6 @@
 package com.android.server.connectivity.mdns;
 
 import static com.android.testutils.Cleanup.testAndCleanup;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -44,6 +43,7 @@ import android.net.ConnectivityManager;
 import android.net.InetAddresses;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.MulticastLock;
+import android.os.Build;
 import android.text.format.DateUtils;
 import android.util.Log;
 
@@ -75,7 +75,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Tests for {@link MdnsSocketClient} */
 @RunWith(DevSdkIgnoreRunner.class)
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class MdnsSocketClientTests {
     private static final long TIMEOUT = 500;
     private final byte[] buf = new byte[10];

@@ -33,8 +33,6 @@ import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_UID_TAG;
 import static android.net.netstats.NetworkStatsDataMigrationUtils.PREFIX_XT;
 
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -915,7 +913,7 @@ public class NetworkStatsManagerTest {
         }
     }
 
-    @DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+    @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
     @Test
     public void testDataMigrationUtils() throws Exception {
         final List<String> prefixes = List.of(PREFIX_UID, PREFIX_XT, PREFIX_UID_TAG);

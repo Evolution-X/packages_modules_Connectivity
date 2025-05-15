@@ -17,7 +17,6 @@
 package com.android.server.connectivity.mdns;
 
 import static com.android.server.connectivity.mdns.MdnsSocket.INTERFACE_INDEX_UNSPECIFIED;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -26,6 +25,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import android.net.Network;
+import android.os.Build;
 import android.os.Parcel;
 
 import com.android.server.connectivity.mdns.MdnsServiceInfo.TextEntry;
@@ -39,7 +39,7 @@ import java.time.Instant;
 import java.util.List;
 
 @RunWith(DevSdkIgnoreRunner.class)
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class MdnsServiceInfoTest {
     @Test
     public void constructor_createWithTextEntries_correctAttributes() {

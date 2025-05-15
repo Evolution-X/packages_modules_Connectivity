@@ -19,7 +19,6 @@ package com.android.server.connectivity.mdns;
 import static android.net.InetAddresses.parseNumericAddress;
 
 import static com.android.server.connectivity.mdns.util.MdnsUtils.Clock;
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -32,6 +31,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
 import android.net.Network;
+import android.os.Build;
 import android.util.ArraySet;
 
 import com.android.net.module.util.HexDump;
@@ -57,7 +57,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RunWith(DevSdkIgnoreRunner.class)
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class MdnsResponseDecoderTests {
     private static final byte[] data = HexDump.hexStringToByteArray(
             "0000840000000004"

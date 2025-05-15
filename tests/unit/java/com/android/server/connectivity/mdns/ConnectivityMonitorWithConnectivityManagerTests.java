@@ -19,8 +19,6 @@ package com.android.server.connectivity.mdns;
 import static android.net.InetAddresses.parseNumericAddress;
 import static android.net.RouteInfo.RTN_UNICAST;
 
-import static com.android.testutils.DevSdkIgnoreRuleKt.SC_V2;
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -37,6 +35,7 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkRequest;
 import android.net.RouteInfo;
+import android.os.Build;
 
 import com.android.net.module.util.SharedLog;
 import com.android.testutils.DevSdkIgnoreRule;
@@ -55,7 +54,7 @@ import java.util.List;
 
 /** Tests for {@link ConnectivityMonitor}. */
 @RunWith(DevSdkIgnoreRunner.class)
-@DevSdkIgnoreRule.IgnoreUpTo(SC_V2)
+@DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class ConnectivityMonitorWithConnectivityManagerTests {
     @Mock private Context mContext;
     @Mock private ConnectivityMonitor.Listener mockListener;

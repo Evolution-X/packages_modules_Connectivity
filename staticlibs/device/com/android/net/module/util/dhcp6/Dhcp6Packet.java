@@ -135,6 +135,14 @@ public class Dhcp6Packet {
     private OptionalInt mSolMaxRt;
 
     /**
+     * DHCPv6 zero-length Optional Type: The Address Registration option. Per RFC9686, the client
+     * can discover if the DHCPv6 infrastructure supports address registration by including this
+     * option in the Option Request options that it sends.
+     */
+    public static final short DHCP6_OPTION_ADDR_REG_ENABLE = 148;
+    public boolean mAddrRegEnable;
+
+    /**
      * The transaction identifier used in this particular DHCPv6 negotiation
      */
     protected final int mTransId;
@@ -449,6 +457,7 @@ public class Dhcp6Packet {
         byte[] clientDuid = null;
         short statusCode = STATUS_SUCCESS;
         boolean rapidCommit = false;
+        boolean addrRegEnable = false;
         int solMaxRt = 0;
         PrefixDelegation pd = null;
 
@@ -519,6 +528,10 @@ public class Dhcp6Packet {
                         expectedLen = 4;
                         solMaxRt = packet.getInt();
                         break;
+                    case DHCP6_OPTION_ADDR_REG_ENABLE:
+                        expectedLen = 0;
+                        addrRegEnable = true;
+                        break;
                     default:
                         expectedLen = optionLen;
                         // BufferUnderflowException will be thrown if option is truncated.
@@ -574,6 +587,7 @@ public class Dhcp6Packet {
                 (solMaxRt >= 60 && solMaxRt <= 86400)
                         ? OptionalInt.of(solMaxRt * 1000)
                         : OptionalInt.empty();
+        newPacket.mAddrRegEnable = addrRegEnable;
 
         return newPacket;
     }
