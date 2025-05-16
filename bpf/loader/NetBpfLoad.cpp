@@ -1795,6 +1795,19 @@ static int doLoad(char** argv, char * const envp[]) {
         }
     }
 
+    // Linux 6.12 was an LTS released at the end of 2024 (Nov 17),
+    // and was first supported by Android 16 / 25Q2 (released in June 2025).
+    // The next Linux LTS should be released near the end of 2025,
+    // and will likely be 6.18.
+    // Since officially Android only supports LTS, 6.13+ really means 6.18+,
+    // and won't be supported before 2026, most likely Android 17 / 26Q2.
+    // 6.13+ (implying 26Q2+) requires 64-bit userspace.
+    if (isUserspace32bit() && isAtLeastKernelVersion(6, 13, 0)) {
+        // due to previous check only reachable on Arm && (<=T kernel uprev || TV || Wear)
+        ALOGE("64-bit userspace required on 6.13+ kernels.");
+        return 1;
+    }
+
     if (isAtLeast25Q2) {
         FILE * f = fopen("/system/etc/init/netbpfload.rc", "re");
         if (!f) {
