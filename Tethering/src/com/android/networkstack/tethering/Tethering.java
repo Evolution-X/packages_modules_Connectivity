@@ -614,7 +614,10 @@ public class Tethering {
         if (type == TETHERING_BLUETOOTH && SdkLevel.isAtLeastT()) return;
 
         // Cannot happen: on S+, tetherableWigigRegexps is always empty.
-        if (type == TETHERING_WIGIG && SdkLevel.isAtLeastS()) return;
+        if (type == TETHERING_WIGIG
+                && (SdkLevel.isAtLeastS() || !hasSystemFeature(PackageManager.FEATURE_WIFI))) {
+            return;
+        }
 
         // After V, don't allow this legacy codepath to create IpServers for any tethering type:
         // everything must call ensureIpServerStarted directly. Also, on any release, don't create
@@ -644,7 +647,7 @@ public class Tethering {
         if (enabled && type == TETHERING_INVALID) return;
 
         if (enabled) {
-            ensureIpServerStartedLegacy(iface, type);
+            ensureIpServerStarted(iface, type, false /* isNcm */);
         } else {
             ensureIpServerStopped(iface);
         }
@@ -3055,22 +3058,6 @@ public class Tethering {
         }
 
         return type != TETHERING_INVALID;
-    }
-
-    /**
-     * Creates an IpServer, but does not enable it. Only used by legacy codepaths:
-     * - Pre-T BLUETOOTH
-     * - (Pre-S) WIGIG
-     */
-    private void ensureIpServerStartedLegacy(final String iface, int interfaceType) {
-        // If we don't care about this type of interface, ignore.
-        if (!checkTetherableType(interfaceType)) {
-            mLog.log(iface + " is used for " + interfaceType + " which is not tetherable"
-                     + " (-1 == INVALID is expected on upstream interface)");
-            return;
-        }
-
-        ensureIpServerStarted(iface, interfaceType, false /* isNcm */);
     }
 
     private void ensureIpServerStarted(final String iface, int interfaceType, boolean isNcm) {
