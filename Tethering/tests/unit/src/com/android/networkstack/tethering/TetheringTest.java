@@ -1008,23 +1008,11 @@ public class TetheringTest {
         }
         sendWifiApStateChanged(WIFI_AP_STATE_ENABLED);
 
-        // If, and only if, Tethering received an interface status changed then
-        // it creates a IpServer and sends out a broadcast indicating that the
-        // interface is "available".
-        if (emulateInterfaceStatusChanged) {
-            if (!SdkLevel.isAtLeastB()) {
-                // There is 1 IpServer state change event: STATE_AVAILABLE
-                verify(mNotificationUpdater, times(1)).onDownstreamChanged(DOWNSTREAM_NONE);
-                verifyTetheringBroadcast(TEST_WLAN_IFNAME, EXTRA_AVAILABLE_TETHER);
-                verify(mWifiManager).updateInterfaceIpState(
-                        TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
-            } else {
-                // Starting in B, ignore the interfaceStatusChanged
-                verify(mNotificationUpdater, never()).onDownstreamChanged(DOWNSTREAM_NONE);
-                verify(mWifiManager, never()).updateInterfaceIpState(
-                        TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
-            }
-        }
+        // Wi-Fi tethering ignores interface up events. The behaviour is the same
+        // regardless of whether the interface up event was received or not.
+        verify(mNotificationUpdater, never()).onDownstreamChanged(DOWNSTREAM_NONE);
+        verify(mWifiManager, never()).updateInterfaceIpState(
+                TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
         verifyNoMoreInteractions(mNetd);
         verifyNoMoreInteractions(mWifiManager);
     }
@@ -2046,18 +2034,10 @@ public class TetheringTest {
         sendWifiApStateChanged(WIFI_AP_STATE_ENABLED);
         mLooper.dispatchAll();
 
-        if (!SdkLevel.isAtLeastB()) {
-            // There is 1 IpServer state change event: STATE_AVAILABLE from interfaceStatusChanged
-            verify(mNotificationUpdater, times(1)).onDownstreamChanged(DOWNSTREAM_NONE);
-            verifyTetheringBroadcast(TEST_WLAN_IFNAME, EXTRA_AVAILABLE_TETHER);
-            verify(mWifiManager).updateInterfaceIpState(
-                    TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
-        } else {
-            // Starting in B, ignore the interfaceStatusChanged
-            verify(mNotificationUpdater, never()).onDownstreamChanged(DOWNSTREAM_NONE);
-            verify(mWifiManager, never()).updateInterfaceIpState(
-                    TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
-        }
+        // Wi-Fi tethering ignores interface up events.
+        verify(mNotificationUpdater, never()).onDownstreamChanged(DOWNSTREAM_NONE);
+        verify(mWifiManager, never()).updateInterfaceIpState(
+                TEST_WLAN_IFNAME, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
         verifyNoMoreInteractions(mNetd);
         verifyNoMoreInteractions(mWifiManager);
     }
@@ -3428,6 +3408,10 @@ public class TetheringTest {
         mTethering.legacyTether(TEST_WIFI_IFNAME, result);
         mLooper.dispatchAll();
         result.assertHasResult();
+
+        // No IpServer should have been started, so no STATE_AVAILABLE should have been sent, and no
+        // tethering broadcasts should have been sent.
+        assertEquals(0, mIntents.size());
     }
 
     @Test
