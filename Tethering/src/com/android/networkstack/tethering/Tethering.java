@@ -616,28 +616,32 @@ public class Tethering {
         // Cannot happen: on S+, tetherableWigigRegexps is always empty.
         if (type == TETHERING_WIGIG && SdkLevel.isAtLeastS()) return;
 
-        // After V, disallow this legacy codepath from starting tethering of any type:
-        // everything must call ensureIpServerStarted directly.
+        // After V, don't allow this legacy codepath to create IpServers for any tethering type:
+        // everything must call ensureIpServerStarted directly. Also, on any release, don't create
+        // IpServers for WIFI or WIFI_P2P. These types always use the enableIpServing path.
         //
         // Don't touch the teardown path for now. It's more complicated because:
         // - ensureIpServerStarted and ensureIpServerStopped act on different
-        //   tethering types.
+        //   tethering types, and ensureIpServerStopped doesn't look at the type at all.
         // - Depending on the type, ensureIpServerStopped is either called twice (once
         //   on interface down and once on interface removed) or just once (on
-        //   interface removed).
+        //   interface removed). It's not clear whether it's possible to remove one of
+        //   these two calls without causing breakage in the field - for example, it's
+        //   possible that if the code did not call ensureIpServerStopped on wifi, then
+        //   when wifi tethering is disabled and wifi goes into client mode, tethering
+        //   has not brought down the IpServer because the WIFI_AP_STATE_CHANGED_ACTION
+        //   was delayed.
         //
-        // Note that this only affects WIFI and WIFI_P2P. The other types are either
-        // ignored above, or ignored by ensureIpServerStarted. Note that even for WIFI
-        // and WIFI_P2P, this code should not ever run in normal use, because the
-        // hotspot and p2p code do not call tether(). It's possible that this could
-        // happen in the field due to unforeseen OEM modifications. If it does happen,
-        // a terrible error is logged in tether().
         // TODO: fix the teardown path to stop depending on interface state notifications.
         // These are not necessary since most/all link layers have their own teardown
         // notifications, and can race with those notifications.
-        if (enabled && SdkLevel.isAtLeastB()) {
-            return;
-        }
+        if (enabled && SdkLevel.isAtLeastB()) return;
+
+        if (enabled && (type == TETHERING_WIFI || type == TETHERING_WIFI_P2P))  return;
+
+        // In this method, INVALID includes ETHERNET and VIRTUAL, because ifaceNameToType never
+        // returns these. The legacy codepath does not support these.
+        if (enabled && type == TETHERING_INVALID) return;
 
         if (enabled) {
             ensureIpServerStartedLegacy(iface, type);
