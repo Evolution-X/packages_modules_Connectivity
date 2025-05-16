@@ -640,7 +640,7 @@ public class Tethering {
         }
 
         if (enabled) {
-            ensureIpServerStartedForInterface(iface);
+            ensureIpServerStartedLegacy(iface, type);
         } else {
             ensureIpServerStopped(iface);
         }
@@ -1662,7 +1662,7 @@ public class Tethering {
     }
 
     private void enableIpServing(@NonNull TetheringRequest request, String ifname, boolean isNcm) {
-        ensureIpServerStartedForType(ifname, request.getTetheringType(), isNcm);
+        ensureIpServerStarted(ifname, request.getTetheringType(), isNcm);
         if (tetherInternal(request, ifname) != TETHER_ERROR_NO_ERROR) {
             Log.e(TAG, "unable start tethering on iface " + ifname);
         }
@@ -3053,20 +3053,23 @@ public class Tethering {
         return type != TETHERING_INVALID;
     }
 
-    private void ensureIpServerStartedForInterface(final String iface) {
+    /**
+     * Creates an IpServer, but does not enable it. Only used by legacy codepaths:
+     * - Pre-T BLUETOOTH
+     * - (Pre-S) WIGIG
+     */
+    private void ensureIpServerStartedLegacy(final String iface, int interfaceType) {
         // If we don't care about this type of interface, ignore.
-        final int interfaceType = ifaceNameToType(iface);
         if (!checkTetherableType(interfaceType)) {
             mLog.log(iface + " is used for " + interfaceType + " which is not tetherable"
                      + " (-1 == INVALID is expected on upstream interface)");
             return;
         }
 
-        ensureIpServerStartedForType(iface, interfaceType, false /* isNcm */);
+        ensureIpServerStarted(iface, interfaceType, false /* isNcm */);
     }
 
-    private void ensureIpServerStartedForType(final String iface, int interfaceType,
-            boolean isNcm) {
+    private void ensureIpServerStarted(final String iface, int interfaceType, boolean isNcm) {
         // If we have already started a TISM for this interface, skip.
         if (mTetherStates.containsKey(iface)) {
             mLog.log("active iface (" + iface + ") reported as added, ignoring");
