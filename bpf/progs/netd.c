@@ -902,4 +902,3 @@ DEFINE_NETD_V_BPF_PROG_KVER("setsockopt/prog", setsockopt_prog, KVER_5_4)
 }
 
 LICENSE("Apache 2.0");
-CRITICAL("Connectivity and netd");

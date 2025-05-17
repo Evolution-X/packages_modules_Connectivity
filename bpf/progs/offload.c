@@ -750,74 +750,7 @@ DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream4_ether$stub", AID_ROOT, AID
 
 // ----- XDP Support -----
 
+// java populates this map, and bpf_existence_test requires it on S+
 DEFINE_BPF_MAP_GRW(tether_dev_map, DEVMAP_HASH, uint32_t, uint32_t, 64, AID_NETWORK_STACK)
 
-static inline __always_inline int do_xdp_forward6(__unused struct xdp_md *ctx,
-        __unused const struct rawip_bool rawip, __unused const struct stream_bool stream) {
-    return XDP_PASS;
-}
-
-static inline __always_inline int do_xdp_forward4(__unused struct xdp_md *ctx,
-        __unused const struct rawip_bool rawip, __unused const struct stream_bool stream) {
-    return XDP_PASS;
-}
-
-static inline __always_inline int do_xdp_forward_ether(struct xdp_md *ctx,
-                                                       const struct stream_bool stream) {
-    const void* data = (void*)(long)ctx->data;
-    const void* data_end = (void*)(long)ctx->data_end;
-    const struct ethhdr* eth = data;
-
-    // Make sure we actually have an ethernet header
-    if ((void*)(eth + 1) > data_end) return XDP_PASS;
-
-    if (eth->h_proto == htons(ETH_P_IPV6))
-        return do_xdp_forward6(ctx, ETHER, stream);
-    if (eth->h_proto == htons(ETH_P_IP))
-        return do_xdp_forward4(ctx, ETHER, stream);
-
-    // Anything else we don't know how to handle...
-    return XDP_PASS;
-}
-
-static inline __always_inline int do_xdp_forward_rawip(struct xdp_md *ctx,
-                                                       const struct stream_bool stream) {
-    const void* data = (void*)(long)ctx->data;
-    const void* data_end = (void*)(long)ctx->data_end;
-
-    // The top nibble of both IPv4 and IPv6 headers is the IP version.
-    if (data_end - data < 1) return XDP_PASS;
-    const uint8_t v = (*(uint8_t*)data) >> 4;
-
-    if (v == 6) return do_xdp_forward6(ctx, RAWIP, stream);
-    if (v == 4) return do_xdp_forward4(ctx, RAWIP, stream);
-
-    // Anything else we don't know how to handle...
-    return XDP_PASS;
-}
-
-#define DEFINE_XDP_PROG(str, func) \
-    DEFINE_BPF_PROG_KVER(str, AID_ROOT, AID_NETWORK_STACK, func, KVER_5_10)(struct xdp_md *ctx)
-
-DEFINE_XDP_PROG("xdp/tether_downstream_ether",
-                 xdp_tether_downstream_ether) {
-    return do_xdp_forward_ether(ctx, DOWNSTREAM);
-}
-
-DEFINE_XDP_PROG("xdp/tether_downstream_rawip",
-                 xdp_tether_downstream_rawip) {
-    return do_xdp_forward_rawip(ctx, DOWNSTREAM);
-}
-
-DEFINE_XDP_PROG("xdp/tether_upstream_ether",
-                 xdp_tether_upstream_ether) {
-    return do_xdp_forward_ether(ctx, UPSTREAM);
-}
-
-DEFINE_XDP_PROG("xdp/tether_upstream_rawip",
-                 xdp_tether_upstream_rawip) {
-    return do_xdp_forward_rawip(ctx, UPSTREAM);
-}
-
 LICENSE("Apache 2.0");
-CRITICAL("Connectivity (Tethering)");
