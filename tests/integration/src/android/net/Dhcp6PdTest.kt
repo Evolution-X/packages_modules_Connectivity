@@ -54,6 +54,7 @@ import java.net.InetAddress
 import java.nio.ByteBuffer
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -130,6 +131,17 @@ class Dhcp6PdTest {
         }
         assertNotNull(p)
         return p
+    }
+
+    private fun assertNoPacket(predicate: (ByteArray) -> Boolean) {
+        val p = iface.packetReader.poll(SHORT_TIMEOUT_MS) {
+            it != null && predicate(it)
+        }
+        assertNull(p)
+    }
+
+    private fun assertNoDhcp6Packet() {
+        assertNoPacket(::isDhcp6Packet)
     }
 
     private fun isDhcp6Packet(p: ByteArray): Boolean {
@@ -295,5 +307,19 @@ class Dhcp6PdTest {
                 IpPrefix("2001:db8:1:1234::/64"),
                 IpPrefix("2001:db8:2:1234::/64")
         )
+    }
+
+    @Test
+    fun testSolicit_notTriggeredByLinkLocalPrefix() {
+        // RA includes a SLAAC prefix to ensure the heuristic does not trigger.
+        val ra = RaPkt()
+            .addPioOption(prefix = "2001:db8:1::/64", flags = "LA")
+            .addPioOption(prefix = "fe80:42::/64", flags = "LP")
+            .addRdnssOption(dns = "2001:4860::8888")
+        ndResponder.addRouterEntry(ROUTER_MAC, ROUTER_V6, ra)
+        // Expect network Available to wait for RA arrival
+        networkCallback.expect<Available>()
+        // Ensure that no Solicit was sent.
+        assertNoDhcp6Packet()
     }
 }
