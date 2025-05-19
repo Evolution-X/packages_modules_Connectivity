@@ -87,7 +87,7 @@ public class NetlinkUtils {
 
     public static final int DEFAULT_RECV_BUFSIZE = 8 * 1024;
     public static final int SOCKET_RECV_BUFSIZE = 64 * 1024;
-    public static final int SOCKET_DUMP_RECV_BUFSIZE = 128 * 1024;
+    public static final int SOCKET_DUMP_RECV_BUFSIZE = 1024 * 1024;
 
     /**
      * Return whether the input ByteBuffer contains enough remaining bytes for
