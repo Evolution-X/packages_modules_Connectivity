@@ -149,6 +149,7 @@ import com.android.internal.util.StateMachine;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
 import com.android.net.module.util.CollectionUtils;
+import com.android.net.module.util.FrameworkConnectivityStatsLog;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.NetdUtils;
 import com.android.net.module.util.RoutingCoordinatorManager;
@@ -1718,6 +1719,12 @@ public class Tethering {
         // After T, tethering always trust the iface pass by state change intent. This allow
         // tethering to deprecate tetherable p2p regexs after T.
         final int type = SdkLevel.isAtLeastT() ? TETHERING_WIFI_P2P : ifaceNameToType(ifname);
+        if (type != TETHERING_WIFI_P2P) {
+            FrameworkConnectivityStatsLog.write(
+                    FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                    FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WIFIP2P_TYPE_MISMATCH);
+        }
+
         if (!checkTetherableType(type)) {
             mLog.e(ifname + " is not a tetherable iface, ignoring");
             return;
@@ -1767,6 +1774,11 @@ public class Tethering {
             default:
                 mLog.e("Cannot enable IP serving in unknown WiFi mode: " + wifiIpMode);
                 return;
+        }
+        if (type != TETHERING_WIFI) {
+            FrameworkConnectivityStatsLog.write(
+                    FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED,
+                    FrameworkConnectivityStatsLog.CORE_NETWORKING_TERRIBLE_ERROR_OCCURRED__ERROR_TYPE__TYPE_TETHER_WIFI_TYPE_MISMATCH);
         }
 
         // After T, tethering always trust the iface pass by state change intent. This allow
