@@ -117,7 +117,7 @@ _Static_assert(_Alignof(unsigned long long) == 8, "_Alignof unsigned long long !
 // for maps:
 struct shared_bool { bool shared; };
 #define PRIVATE ((struct shared_bool){ .shared = false })
-#define SHARED ((struct shared_bool){ .shared = true })
+//#define SHARED ((struct shared_bool){ .shared = true })
 
 // for programs:
 struct optional_bool { bool optional; };
@@ -127,15 +127,15 @@ struct optional_bool { bool optional; };
 // for both maps and programs:
 struct ignore_on_eng_bool { bool ignore_on_eng; };
 #define LOAD_ON_ENG ((struct ignore_on_eng_bool){ .ignore_on_eng = false })
-#define IGNORE_ON_ENG ((struct ignore_on_eng_bool){ .ignore_on_eng = true })
+//#define IGNORE_ON_ENG ((struct ignore_on_eng_bool){ .ignore_on_eng = true })
 
 struct ignore_on_user_bool { bool ignore_on_user; };
 #define LOAD_ON_USER ((struct ignore_on_user_bool){ .ignore_on_user = false })
-#define IGNORE_ON_USER ((struct ignore_on_user_bool){ .ignore_on_user = true })
+//#define IGNORE_ON_USER ((struct ignore_on_user_bool){ .ignore_on_user = true })
 
 struct ignore_on_userdebug_bool { bool ignore_on_userdebug; };
 #define LOAD_ON_USERDEBUG ((struct ignore_on_userdebug_bool){ .ignore_on_userdebug = false })
-#define IGNORE_ON_USERDEBUG ((struct ignore_on_userdebug_bool){ .ignore_on_userdebug = true })
+//#define IGNORE_ON_USERDEBUG ((struct ignore_on_userdebug_bool){ .ignore_on_userdebug = true })
 
 
 // Length of strings (incl. selinux_context and pin_subdir)
