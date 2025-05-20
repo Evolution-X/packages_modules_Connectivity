@@ -970,6 +970,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
         if (specified(pin_subdir)) {
             ALOGV("map %s pin_subdir [%-32s] -> %d -> '%s'", mapNames[i].c_str(), md[i].pin_subdir,
                   static_cast<int>(pin_subdir), lookupPinSubdir(pin_subdir));
+            abort();
         }
 
         // Format of pin location is /sys/fs/bpf/<pin_subdir|prefix>map_<objName>_<mapName>
@@ -1203,6 +1204,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             ALOGV("prog %s pin_subdir [%-32s] -> %d -> '%s'", name.c_str(),
                   cs[i].prog_def->pin_subdir, static_cast<int>(pin_subdir),
                   lookupPinSubdir(pin_subdir));
+            abort();
         }
 
         // strip any potential $foo suffix
