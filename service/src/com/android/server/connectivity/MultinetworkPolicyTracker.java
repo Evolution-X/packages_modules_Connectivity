@@ -20,6 +20,7 @@ import static android.content.pm.PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION;
 import static android.net.ConnectivitySettingsManager.NETWORK_AVOID_BAD_WIFI;
 import static android.net.ConnectivitySettingsManager.NETWORK_METERED_MULTIPATH_PREFERENCE;
 
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TargetApi;
@@ -52,6 +53,8 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.HandlerUtils;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -87,10 +90,23 @@ public class MultinetworkPolicyTracker {
         }
     }
 
-    private enum AvoidBadWifiSource {
-        FROM_RESOURCE,
-        FROM_CARRIER_CONFIG,
-    }
+    /**
+     * Indicates that the "Avoid Bad Wi-Fi" setting originates from a resource.
+     */
+    private static final int FROM_RESOURCE = 0;
+
+    /**
+     * Indicates that the "Avoid Bad Wi-Fi" setting originates from carrier configuration.
+     */
+    private static final int FROM_CARRIER_CONFIG = 1;
+
+    /**
+     * Defines the set of possible integer constants for AvoidBadWifiSource.
+     * This annotation provides compile-time type safety.
+     */
+    @IntDef({FROM_RESOURCE, FROM_CARRIER_CONFIG})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface AvoidBadWifiSource {}
 
     private static String TAG = MultinetworkPolicyTracker.class.getSimpleName();
 
@@ -105,8 +121,7 @@ public class MultinetworkPolicyTracker {
     private final ContentResolver mResolver;
     private final SettingObserver mSettingObserver;
     private final BroadcastReceiver mBroadcastReceiver;
-    private final boolean mAvoidBadWifiFromCarrierConfigFeature;
-    private final boolean mHasTelephonySubscription;
+    private final @AvoidBadWifiSource int mAvoidBadWifiSource;
     // This will be null if the FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG is off
     private final @Nullable CarrierConfigManager mCarrierConfigManager;
     private final @Nullable CarrierConfigChangeListener mCarrierConfigChangeListener;
@@ -162,15 +177,19 @@ public class MultinetworkPolicyTracker {
 
         @VisibleForTesting
         protected boolean readAvoidBadWifiFromCarrierConfig(
-                @NonNull final Context context, final int subId) {
+                @Nullable final CarrierConfigManager ccm, final int subId) {
             // Defaults to true to avoid potentially poor Wi-Fi and improve user experience.
             final boolean defaultConfig = true;
             if (subId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
                 return defaultConfig;
             }
 
+            // It implies the FEATURE_TELEPHONY_SUBSCRIPTION is not supported, return default config
+            if (ccm == null) {
+                return defaultConfig;
+            }
+
             PersistableBundle config = null;
-            final CarrierConfigManager ccm = context.getSystemService(CarrierConfigManager.class);
 
             try {
                 config = ccm.getConfigForSubId(subId,
@@ -271,18 +290,17 @@ public class MultinetworkPolicyTracker {
             }
         };
 
-        mHasTelephonySubscription =
-            mContext.getPackageManager().hasSystemFeature(FEATURE_TELEPHONY_SUBSCRIPTION);
-        mAvoidBadWifiFromCarrierConfigFeature = mDeps.getAvoidBadWifiFromCarrierConfigFeature();
-        mCarrierConfigManager = mAvoidBadWifiFromCarrierConfigFeature
-            ? mContext.getSystemService(CarrierConfigManager.class)
-            : null;
-
-        mCarrierConfigChangeListener = mAvoidBadWifiFromCarrierConfigFeature
-            ? new CarrierConfigChangeListener()
-            : null;
-
-        if (!mAvoidBadWifiFromCarrierConfigFeature) {
+        if (mDeps.getAvoidBadWifiFromCarrierConfigFeature()) {
+            mAvoidBadWifiSource = FROM_CARRIER_CONFIG;
+            mCarrierConfigManager =
+                mContext.getPackageManager().hasSystemFeature(FEATURE_TELEPHONY_SUBSCRIPTION)
+                ? mContext.getSystemService(CarrierConfigManager.class)
+                : null;
+            mCarrierConfigChangeListener = new CarrierConfigChangeListener();
+        } else {
+            mAvoidBadWifiSource = FROM_RESOURCE;
+            mCarrierConfigManager = null;
+            mCarrierConfigChangeListener = null;
             updateAvoidBadWifi();
             updateMeteredMultipathPreference();
         }
@@ -304,7 +322,7 @@ public class MultinetworkPolicyTracker {
         mContext.getSystemService(TelephonyManager.class).registerTelephonyCallback(
                 handlerExecutor, new ActiveDataSubscriptionIdListener());
 
-        if (mAvoidBadWifiFromCarrierConfigFeature) {
+        if (mCarrierConfigManager != null) {
             mCarrierConfigManager.registerCarrierConfigChangeListener(
                     BackgroundThread.getExecutor(), mCarrierConfigChangeListener
             );
@@ -325,7 +343,7 @@ public class MultinetworkPolicyTracker {
         mResolver.unregisterContentObserver(mSettingObserver);
 
         mContext.unregisterReceiver(mBroadcastReceiver);
-        if (mAvoidBadWifiFromCarrierConfigFeature) {
+        if (mCarrierConfigManager != null) {
             mCarrierConfigManager.unregisterCarrierConfigChangeListener(
                     mCarrierConfigChangeListener
             );
@@ -463,18 +481,6 @@ public class MultinetworkPolicyTracker {
     }
 
     /**
-     * Determines the source of the avoid bad Wi-Fi setting.
-     * It returns FROM_CARRIER_CONFIG if the carrier config feature is enabled,
-     * otherwise it returns FROM_RESOURCE.
-     *
-     */
-    private AvoidBadWifiSource getAvoidBadWifiSource() {
-        return mAvoidBadWifiFromCarrierConfigFeature
-            ? AvoidBadWifiSource.FROM_CARRIER_CONFIG
-            : AvoidBadWifiSource.FROM_RESOURCE;
-    }
-
-    /**
      * Updates the local cache of the "avoid bad Wi-Fi" setting from the carrier config
      * for a specific subscription ID.
      * Must be called on the handler thread.
@@ -502,8 +508,8 @@ public class MultinetworkPolicyTracker {
 
         // CarrierConfigManager#getConfigForSubId() is supported
         // only when system has FEATURE_TELEPHONY_SUBSCRIPTION
-        final boolean config = !mHasTelephonySubscription
-                || mDeps.readAvoidBadWifiFromCarrierConfig(mContext, subId);
+        final boolean config =
+                mDeps.readAvoidBadWifiFromCarrierConfig(mCarrierConfigManager, subId);
         mHandler.post(() -> updateAvoidBadWifiFromCarrierConfig(subId, config));
     }
 
@@ -528,33 +534,35 @@ public class MultinetworkPolicyTracker {
      */
     public boolean updateAvoidBadWifi() {
         final boolean prevAvoid = mAvoidBadWifi;
-        if (getAvoidBadWifiSource() == AvoidBadWifiSource.FROM_CARRIER_CONFIG) {
-            // Force update activelyPreferBadWifi since it will always be true in Android U+,
-            // and mAvoidBadWifiFromCarrierConfigFeature is a trunk stable flag
-            // that only exists in 25Q4+
-            mActivelyPreferBadWifi = true;
-
-            final String settingAvoidBadWifiStr = readAvoidBadWifiFromSettings();
-            if (settingAvoidBadWifiStr != null) {
-                mAvoidBadWifi = "1".equals(settingAvoidBadWifiStr);
-            } else {
-                // Retrieve the avoid bad Wi-Fi setting from the local cache to avoid potential
-                // issues or blocking from the IPC call getAvoidBadWifiCarrierConfigForSubId().
-                mAvoidBadWifi = readAvoidBadWifiFromCache(mActiveSubId);
-            }
-            return mAvoidBadWifi != prevAvoid;
-        } else {
-            final boolean settingAvoidBadWifi = "1".equals(readAvoidBadWifiFromSettings());
-            mAvoidBadWifi = settingAvoidBadWifi || !configRestrictsAvoidBadWifi();
-            final boolean prevActive = mActivelyPreferBadWifi;
-            final Boolean deviceConfigPreferBadWifi = deviceConfigActivelyPreferBadWifi();
-            if (null == deviceConfigPreferBadWifi) {
-                mActivelyPreferBadWifi = configActivelyPrefersBadWifi();
-            } else {
-                mActivelyPreferBadWifi = deviceConfigPreferBadWifi;
-            }
-
-            return mAvoidBadWifi != prevAvoid || mActivelyPreferBadWifi != prevActive;
+        switch (mAvoidBadWifiSource) {
+            case FROM_CARRIER_CONFIG:
+                // Force update activelyPreferBadWifi since it will always be true in Android U+,
+                // and mAvoidBadWifiFromCarrierConfigFeature is a trunk stable flag
+                // that only exists in 25Q4+
+                mActivelyPreferBadWifi = true;
+                final String settingAvoidBadWifiStr = readAvoidBadWifiFromSettings();
+                if (settingAvoidBadWifiStr != null) {
+                    mAvoidBadWifi = "1".equals(settingAvoidBadWifiStr);
+                } else {
+                    // Retrieve the avoid bad Wi-Fi setting from the local cache to avoid potential
+                    // issues or blocking from the IPC call getAvoidBadWifiCarrierConfigForSubId().
+                    mAvoidBadWifi = readAvoidBadWifiFromCache(mActiveSubId);
+                }
+                return mAvoidBadWifi != prevAvoid;
+            case FROM_RESOURCE:
+                final boolean settingAvoidBadWifi = "1".equals(readAvoidBadWifiFromSettings());
+                mAvoidBadWifi = settingAvoidBadWifi || !configRestrictsAvoidBadWifi();
+                final boolean prevActive = mActivelyPreferBadWifi;
+                final Boolean deviceConfigPreferBadWifi = deviceConfigActivelyPreferBadWifi();
+                if (null == deviceConfigPreferBadWifi) {
+                    mActivelyPreferBadWifi = configActivelyPrefersBadWifi();
+                } else {
+                    mActivelyPreferBadWifi = deviceConfigPreferBadWifi;
+                }
+                return mAvoidBadWifi != prevAvoid || mActivelyPreferBadWifi != prevActive;
+            default:
+                Log.wtf(TAG, "Unexpected avoid bad Wi-Fi source: " + mAvoidBadWifiSource);
+                return false;
         }
     }
 
