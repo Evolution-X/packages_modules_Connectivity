@@ -67,8 +67,8 @@ import com.android.networkstack.apishim.common.VpnProfileStateShim;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DevSdkIgnoreRunner;
-import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.TestableNetworkCallback;
+import com.android.testutils.TestableNetworkCallback.Event;
 
 import org.bouncycastle.x509.X509V1CertificateGenerator;
 import org.junit.After;
@@ -565,7 +565,7 @@ public class Ikev2VpnTest {
                 HexDump.hexStringToByteArray(authResp));
 
         // Verify the VPN network came up
-        final Network vpnNetwork = cb.expect(CallbackEntry.AVAILABLE).getNetwork();
+        final Network vpnNetwork = cb.expect(Event.AVAILABLE).getNetwork();
 
         if (testSessionKey) {
             final VpnProfileStateShim profileState = mVmShim.getProvisionedVpnProfileState();
@@ -579,8 +579,8 @@ public class Ikev2VpnTest {
                 && c.hasCapability(NET_CAPABILITY_INTERNET)
                 && !c.hasCapability(NET_CAPABILITY_VALIDATED)
                 && Process.myUid() == c.getOwnerUid());
-        cb.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, vpnNetwork);
-        cb.expect(CallbackEntry.BLOCKED_STATUS, vpnNetwork);
+        cb.expect(Event.LINK_PROPERTIES_CHANGED, vpnNetwork);
+        cb.expect(Event.BLOCKED_STATUS, vpnNetwork);
 
         // A VPN that requires validation is initially not validated, while one that doesn't
         // immediately validate automatically. Because this VPN can't actually access Internet,
@@ -592,15 +592,15 @@ public class Ikev2VpnTest {
         // misuse VPN network itself as the underlying network. The fix is not available without
         // SDK > T platform. Thus, verify this only on T+ platform.
         if (!requiresValidation && isAtLeastT()) {
-            cb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED, TIMEOUT_MS,
-                    entry -> ((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+            cb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED, TIMEOUT_MS,
+                    entry -> ((Event.CapabilitiesChanged) entry).getCaps()
                             .hasCapability(NET_CAPABILITY_VALIDATED));
         }
 
         sVpnMgr.stopProvisionedVpnProfile();
         // Using expectCallback may cause the test to be flaky since test may receive other
         // callbacks such as linkproperties change.
-        cb.eventuallyExpect(CallbackEntry.LOST, TIMEOUT_MS,
+        cb.eventuallyExpect(Event.LOST, TIMEOUT_MS,
                 lost -> vpnNetwork.equals(lost.getNetwork()));
     }
 

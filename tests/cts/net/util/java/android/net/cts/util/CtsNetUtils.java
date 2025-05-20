@@ -74,8 +74,8 @@ import com.android.compatibility.common.util.SystemUtil;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.ConnectivitySettingsUtils;
 import com.android.testutils.ConnectUtil;
-import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.TestableNetworkCallback;
+import com.android.testutils.TestableNetworkCallback.Event;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -582,7 +582,7 @@ public final class CtsNetUtils {
                     .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build(), cb);
-            final Network cellNetwork = cb.expect(CallbackEntry.AVAILABLE, errorMsg).getNetwork();
+            final Network cellNetwork = cb.expect(Event.AVAILABLE, errorMsg).getNetwork();
             mCm.unregisterNetworkCallback(cb);
             testableNetworks.add(cellNetwork);
         }

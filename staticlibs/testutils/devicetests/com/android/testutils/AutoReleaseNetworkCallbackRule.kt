@@ -27,7 +27,7 @@ import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkRequest
 import android.os.Handler
 import androidx.test.platform.app.InstrumentationRegistry
-import com.android.testutils.RecorderCallback.CallbackEntry
+import com.android.testutils.TestableNetworkCallback.Event.Available
 import java.util.Collections
 import kotlin.test.fail
 import org.junit.rules.TestRule
@@ -84,7 +84,7 @@ open class NetworkCallbackHelper {
         }
         val cb = requestNetwork(getInternetRequest(TRANSPORT_CELLULAR))
         cellRequestCb = cb
-        return cb.expect<CallbackEntry.Available>(
+        return cb.expect<Available>(
             errorMsg = "Cell network not available. " +
                     "Please ensure the device has working mobile data."
         ).network

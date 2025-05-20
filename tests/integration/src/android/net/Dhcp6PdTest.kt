@@ -43,9 +43,9 @@ import com.android.testutils.Ip6Pkt
 import com.android.testutils.NdResponder
 import com.android.testutils.PacketBuilder
 import com.android.testutils.RaPkt
-import com.android.testutils.RecorderCallback.CallbackEntry.Available
-import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Available
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
 import com.android.testutils.UdpPkt
 import com.android.testutils.runAsShell
 import com.google.common.truth.Truth.assertThat

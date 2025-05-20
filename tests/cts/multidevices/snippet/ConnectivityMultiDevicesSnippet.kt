@@ -41,8 +41,8 @@ import com.android.modules.utils.build.SdkLevel
 import com.android.testutils.AutoReleaseNetworkCallbackRule
 import com.android.testutils.ConnectUtil
 import com.android.testutils.NetworkCallbackHelper
-import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
 import com.android.testutils.runAsShell
 import com.google.android.mobly.snippet.Snippet
 import com.google.android.mobly.snippet.rpc.Rpc

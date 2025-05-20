@@ -232,7 +232,7 @@ import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.DeviceConfigRule;
 import com.android.testutils.DeviceInfoUtils;
 import com.android.testutils.DumpTestUtils;
-import com.android.testutils.RecorderCallback.CallbackEntry;
+import com.android.testutils.TestableNetworkCallback.Event;
 import com.android.testutils.SkipPresubmit;
 import com.android.testutils.TestHttpServer;
 import com.android.testutils.TestNetworkTracker;
@@ -482,9 +482,9 @@ public class ConnectivityManagerTest {
             final TestableNetworkCallback callback =
                     networkCallbackRule.registerDefaultNetworkCallback();
             assertNotNull("Couldn't restore Internet connectivity",
-                    callback.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+                    callback.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                             NETWORK_CALLBACK_TIMEOUT_MS,
-                            entry -> ((CallbackEntry.CapabilitiesChanged) entry)
+                            entry -> ((Event.CapabilitiesChanged) entry)
                                     .getCaps().hasCapability(NET_CAPABILITY_VALIDATED)));
         });
     }
@@ -656,7 +656,7 @@ public class ConnectivityManagerTest {
             // callbacks. This is guaranteed to succeed because the callback is registered
             // before getAllNetworkStateSnapshots is called.
             final LinkProperties lpFromSnapshot = snapshot.getLinkProperties();
-            allNetworkLinkPropertiesListener.eventuallyExpect(CallbackEntry.LINK_PROPERTIES_CHANGED,
+            allNetworkLinkPropertiesListener.eventuallyExpect(Event.LINK_PROPERTIES_CHANGED,
                     NETWORK_CALLBACK_TIMEOUT_MS, 0 /* mark */, entry ->
                             entry.getNetwork().equals(network)
                                     && entry.getLp().equals(lpFromSnapshot));
@@ -1134,9 +1134,9 @@ public class ConnectivityManagerTest {
                 .build();
     }
 
-    private boolean hasPrivateDnsValidated(CallbackEntry entry, Network networkForPrivateDns) {
+    private boolean hasPrivateDnsValidated(Event entry, Network networkForPrivateDns) {
         if (!networkForPrivateDns.equals(entry.getNetwork())) return false;
-        final NetworkCapabilities nc = ((CallbackEntry.CapabilitiesChanged) entry).getCaps();
+        final NetworkCapabilities nc = ((Event.CapabilitiesChanged) entry).getCaps();
         return !nc.isPrivateDnsBroken() && nc.hasCapability(NET_CAPABILITY_VALIDATED);
     }
 
@@ -1154,13 +1154,13 @@ public class ConnectivityManagerTest {
         try {
             // Verifying the good private DNS sever
             mCtsNetUtils.setPrivateDnsStrictMode(goodPrivateDnsServer);
-            cb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS,
+            cb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> hasPrivateDnsValidated(entry, networkForPrivateDns));
 
             // Verifying the broken private DNS sever
             mCtsNetUtils.setPrivateDnsStrictMode(invalidPrivateDnsServer);
-            cb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS,
-                    entry -> (((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+            cb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS,
+                    entry -> (((Event.CapabilitiesChanged) entry).getCaps()
                     .isPrivateDnsBroken()) && networkForPrivateDns.equals(entry.getNetwork()));
         } finally {
             mCtsNetUtils.restorePrivateDnsSetting();
@@ -1215,22 +1215,22 @@ public class ConnectivityManagerTest {
         // Now we should expect to get a network callback about availability of the wifi
         // network even if it was already connected as a state-based action when the callback
         // is registered.
-        wifiNetwork = callback.eventuallyExpect(CallbackEntry.AVAILABLE).getNetwork();
+        wifiNetwork = callback.eventuallyExpect(Event.AVAILABLE).getNetwork();
         assertNotNull("Did not receive onAvailable for TRANSPORT_WIFI request",
                 wifiNetwork);
 
         final Network defaultNetwork = defaultTrackingCallback.eventuallyExpect(
-                CallbackEntry.AVAILABLE).getNetwork();
+                Event.AVAILABLE).getNetwork();
         assertNotNull("Did not receive onAvailable on default network callback",
                 defaultNetwork);
 
         if (TestUtils.shouldTestSApis()) {
-            systemDefaultCallback.eventuallyExpect(CallbackEntry.AVAILABLE);
-            final Network perUidNetwork = perUidCallback.eventuallyExpect(CallbackEntry.AVAILABLE)
+            systemDefaultCallback.eventuallyExpect(Event.AVAILABLE);
+            final Network perUidNetwork = perUidCallback.eventuallyExpect(Event.AVAILABLE)
                     .getNetwork();
             assertEquals(defaultNetwork, perUidNetwork);
             final Network bestMatchingNetwork = bestMatchingCallback.eventuallyExpect(
-                    CallbackEntry.AVAILABLE).getNetwork();
+                    Event.AVAILABLE).getNetwork();
             assertEquals(defaultNetwork, bestMatchingNetwork);
         }
     }
@@ -1460,7 +1460,7 @@ public class ConnectivityManagerTest {
                         .build());
 
         // Wait to get callback for availability of internet
-        callback.eventuallyExpect(CallbackEntry.AVAILABLE).getNetwork();
+        callback.eventuallyExpect(Event.AVAILABLE).getNetwork();
     }
 
     /**
@@ -1484,7 +1484,7 @@ public class ConnectivityManagerTest {
                 100 /* timeoutMs */);
         try {
             // Wait to get callback for unavailability of requested network
-            callback.eventuallyExpect(CallbackEntry.UNAVAILABLE, 2_000 /* timeoutMs */);
+            callback.eventuallyExpect(Event.UNAVAILABLE, 2_000 /* timeoutMs */);
         } finally {
             if (previousWifiEnabledState) {
                 mCtsNetUtils.connectToWifi();
@@ -1602,7 +1602,7 @@ public class ConnectivityManagerTest {
         }
 
         return networkCallback.eventuallyExpect(
-                CallbackEntry.NETWORK_CAPS_UPDATED,
+                Event.NETWORK_CAPS_UPDATED,
                 // Changing meteredness on wifi involves reconnecting, which can take several
                 // seconds (involves re-associating, DHCP...).
                 NETWORK_CALLBACK_TIMEOUT_MS,
@@ -2276,10 +2276,10 @@ public class ConnectivityManagerTest {
 
         try (Socket socket = new Socket()) {
             // Verify that the network is restricted.
-            testNetworkCb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+            testNetworkCb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                     NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> network.equals(entry.getNetwork())
-                            && (!((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                            && (!((Event.CapabilitiesChanged) entry).getCaps()
                             .hasCapability(NET_CAPABILITY_NOT_RESTRICTED)));
             // CtsNetTestCases package doesn't hold CONNECTIVITY_USE_RESTRICTED_NETWORKS, so it
             // does not allow to bind socket to restricted network.
@@ -2397,7 +2397,7 @@ public class ConnectivityManagerTest {
             }
             if (supportTelephony) {
                 telephonyCb.eventuallyExpect(
-                        CallbackEntry.AVAILABLE, CELL_DATA_AVAILABLE_TIMEOUT_MS);
+                        Event.AVAILABLE, CELL_DATA_AVAILABLE_TIMEOUT_MS);
             }
         } finally {
             // Restore the previous state of airplane mode and permissions:
@@ -2413,16 +2413,16 @@ public class ConnectivityManagerTest {
         waitForAvailable(cb);
     }
 
-    private CallbackEntry.Available waitForAvailable(@NonNull final TestableNetworkCallback cb) {
-        return cb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
-                c -> c instanceof CallbackEntry.Available);
+    private Event.Available waitForAvailable(@NonNull final TestableNetworkCallback cb) {
+        return cb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+                c -> c instanceof Event.Available);
     }
 
     private void waitForTransport(
             @NonNull final TestableNetworkCallback cb, final int expectedTransport) {
-        cb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+        cb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                 NETWORK_CALLBACK_TIMEOUT_MS,
-                entry -> ((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                entry -> ((Event.CapabilitiesChanged) entry).getCaps()
                         .hasTransport(expectedTransport));
     }
 
@@ -2434,8 +2434,8 @@ public class ConnectivityManagerTest {
     }
 
     private void waitForLost(@NonNull final TestableNetworkCallback cb) {
-        cb.eventuallyExpect(CallbackEntry.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
-                c -> c instanceof CallbackEntry.Lost);
+        cb.eventuallyExpect(Event.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
+                c -> c instanceof Event.Lost);
     }
 
     private void setAndVerifyAirplaneMode(Boolean expectedResult)
@@ -2522,7 +2522,7 @@ public class ConnectivityManagerTest {
         // Registering a callback here guarantees onCapabilitiesChanged is called immediately
         // because WiFi network should be connected.
         final NetworkCapabilities nc = callback.eventuallyExpect(
-                CallbackEntry.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS).getCaps();
+                Event.NETWORK_CAPS_UPDATED, NETWORK_CALLBACK_TIMEOUT_MS).getCaps();
         // Verify if ssid is contained in the NetworkCapabilities received from callback.
         assertEquals(hasSsid, Pattern.compile(ssid).matcher(nc.toString()).find());
     }
@@ -2588,10 +2588,10 @@ public class ConnectivityManagerTest {
             // non-listen requests will get available callback before it can be put into
             // background if no foreground request can be satisfied. Thus, wait for a short
             // period is needed to let foreground capability go away.
-            callback.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+            callback.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                     NETWORK_CALLBACK_TIMEOUT_MS,
-                    c -> c instanceof CallbackEntry.CapabilitiesChanged
-                            && !((CallbackEntry.CapabilitiesChanged) c).getCaps()
+                    c -> c instanceof Event.CapabilitiesChanged
+                            && !((Event.CapabilitiesChanged) c).getCaps()
                             .hasCapability(NET_CAPABILITY_FOREGROUND));
             final NetworkCapabilities nc = mCm.getNetworkCapabilities(testNetwork);
             assertFalse("expected background network, but got " + nc,
@@ -2601,7 +2601,7 @@ public class ConnectivityManagerTest {
             runWithShellPermissionIdentity(() -> {
                 if (null != n) {
                     tnm.teardownTestNetwork(n);
-                    callback.eventuallyExpect(CallbackEntry.LOST,
+                    callback.eventuallyExpect(Event.LOST,
                             NETWORK_CALLBACK_TIMEOUT_MS,
                             lost -> n.equals(lost.getNetwork()));
                 }
@@ -2616,16 +2616,16 @@ public class ConnectivityManagerTest {
                     BLOCKED_REASON_NONE, NETWORK_CALLBACK_TIMEOUT_MS);
         }
         public void eventuallyExpectBlockedStatusCallback(Network network, int blockedStatus) {
-            super.eventuallyExpect(CallbackEntry.BLOCKED_STATUS_INT, NETWORK_CALLBACK_TIMEOUT_MS,
+            super.eventuallyExpect(Event.BLOCKED_STATUS_INT, NETWORK_CALLBACK_TIMEOUT_MS,
                     (it) -> it.getNetwork().equals(network) && it.getReason() == blockedStatus);
         }
         public void onBlockedStatusChanged(Network network, int blockedReasons) {
             Log.v(TAG, "onBlockedStatusChanged " + network + " " + blockedReasons);
-            getHistory().add(new CallbackEntry.BlockedStatusInt(network, blockedReasons));
+            getHistory().add(new Event.BlockedStatusInt(network, blockedReasons));
         }
         private void assertNoBlockedStatusCallback() {
             super.assertNoCallback(NO_CALLBACK_TIMEOUT_MS,
-                    c -> c instanceof CallbackEntry.BlockedStatus);
+                    c -> c instanceof Event.BlockedStatus);
         }
     }
 
@@ -2671,7 +2671,7 @@ public class ConnectivityManagerTest {
                 () -> networkCallbackRule.registerDefaultNetworkCallbackForUid(
                         otherUid, otherUidCallback, handler), NETWORK_SETTINGS);
 
-        final Network defaultNetwork = myUidCallback.expect(CallbackEntry.AVAILABLE).getNetwork();
+        final Network defaultNetwork = myUidCallback.expect(Event.AVAILABLE).getNetwork();
         final List<DetailedBlockedStatusCallback> allCallbacks =
                 List.of(myUidCallback, otherUidCallback);
         for (DetailedBlockedStatusCallback callback : allCallbacks) {
@@ -2918,14 +2918,14 @@ public class ConnectivityManagerTest {
 
             // Validate that an unmetered network is used over other networks.
             waitForAvailable(defaultCallback, wifiNetwork);
-            systemDefaultCallback.eventuallyExpect(CallbackEntry.AVAILABLE,
+            systemDefaultCallback.eventuallyExpect(Event.AVAILABLE,
                     NETWORK_CALLBACK_TIMEOUT_MS, cb -> wifiNetwork.equals(cb.getNetwork()));
 
             // Validate that when setting unmetered to metered, unmetered is lost and replaced by
             // the network with the TEST transport. Also wait for validation here, in case there
             // is a bug that's only visible when the network is validated.
             setWifiMeteredStatusAndWait(ssid, true /* isMetered */, true /* waitForValidation */);
-            defaultCallback.eventuallyExpect(CallbackEntry.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
+            defaultCallback.eventuallyExpect(Event.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
                     l -> l.getNetwork().equals(wifiNetwork));
             waitForAvailable(defaultCallback, tnt.getNetwork());
             // Depending on if this device has cellular connectivity or not, multiple available
@@ -2938,7 +2938,7 @@ public class ConnectivityManagerTest {
                 runWithShellPermissionIdentity(tnt::teardown);
                 // The other callbacks (LP or NC changes) would receive before LOST callback. Use
                 // eventuallyExpect to check callback for avoiding test flake.
-                defaultCallback.eventuallyExpect(CallbackEntry.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
+                defaultCallback.eventuallyExpect(Event.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
                         lost -> tnt.getNetwork().equals(lost.getNetwork()));
                 waitForAvailable(defaultCallback);
             }, /* cleanup */ () -> {
@@ -2974,11 +2974,11 @@ public class ConnectivityManagerTest {
                     OemNetworkPreferences.OEM_NETWORK_PREFERENCE_TEST_ONLY);
             registerTestOemNetworkPreferenceCallbacks(defaultCallback, systemDefaultCallback);
             waitForAvailable(defaultCallback, testNetwork);
-            systemDefaultCallback.eventuallyExpect(CallbackEntry.AVAILABLE,
+            systemDefaultCallback.eventuallyExpect(Event.AVAILABLE,
                     NETWORK_CALLBACK_TIMEOUT_MS, cb -> wifiNetwork.equals(cb.getNetwork()));
         }, /* cleanup */ () -> {
                 runWithShellPermissionIdentity(tnt::teardown);
-                defaultCallback.eventuallyExpect(CallbackEntry.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
+                defaultCallback.eventuallyExpect(Event.LOST, NETWORK_CALLBACK_TIMEOUT_MS,
                         cb -> testNetwork.equals(cb.getNetwork()));
 
                 // This network preference should only ever use the test network therefore available
@@ -3128,7 +3128,7 @@ public class ConnectivityManagerTest {
                 mCm.setAcceptPartialConnectivity(network, false /* accept */, false /* always */);
             });
             // Reject partial connectivity network should cause the network being torn down
-            assertEquals(network, cb.eventuallyExpect(CallbackEntry.LOST).getNetwork());
+            assertEquals(network, cb.eventuallyExpect(Event.LOST).getNetwork());
         } finally {
             mHttpServer.stop();
             // Wifi will not automatically reconnect to the network. ensureWifiDisconnected cannot
@@ -3213,9 +3213,9 @@ public class ConnectivityManagerTest {
                     makeWifiNetworkRequest());
 
             // Verify wifi is the default network.
-            defaultCb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+            defaultCb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> wifiNetwork.equals(entry.getNetwork()));
-            wifiCb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+            wifiCb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> wifiNetwork.equals(entry.getNetwork()));
             assertTrue(mCm.getNetworkCapabilities(wifiNetwork).hasCapability(
                     NET_CAPABILITY_VALIDATED));
@@ -3225,20 +3225,20 @@ public class ConnectivityManagerTest {
             configTestServer(Status.INTERNAL_ERROR, Status.INTERNAL_ERROR);
             mCm.reportNetworkConnectivity(wifiNetwork, false);
             // Default network should stay on unvalidated wifi because avoid bad wifi is disabled.
-            defaultCb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+            defaultCb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                     NETWORK_CALLBACK_TIMEOUT_MS,
-                    entry -> !((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                    entry -> !((Event.CapabilitiesChanged) entry).getCaps()
                             .hasCapability(NET_CAPABILITY_VALIDATED));
-            wifiCb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+            wifiCb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                     NETWORK_CALLBACK_TIMEOUT_MS,
-                    entry -> !((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                    entry -> !((Event.CapabilitiesChanged) entry).getCaps()
                             .hasCapability(NET_CAPABILITY_VALIDATED));
 
             runAsShell(NETWORK_SETTINGS, () -> {
                 mCm.setAvoidUnvalidated(wifiNetwork);
             });
             // Default network should be updated to validated cellular network.
-            defaultCb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+            defaultCb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> cellNetwork.equals(entry.getNetwork()));
             // The network should not validate again.
             wifiCb.assertNoCallback(NO_CALLBACK_TIMEOUT_MS, c -> isValidatedCaps(c));
@@ -3249,9 +3249,9 @@ public class ConnectivityManagerTest {
         }
     }
 
-    private boolean isValidatedCaps(CallbackEntry c) {
-        if (!(c instanceof CallbackEntry.CapabilitiesChanged)) return false;
-        final CallbackEntry.CapabilitiesChanged capsChanged = (CallbackEntry.CapabilitiesChanged) c;
+    private boolean isValidatedCaps(Event c) {
+        if (!(c instanceof Event.CapabilitiesChanged)) return false;
+        final Event.CapabilitiesChanged capsChanged = (Event.CapabilitiesChanged) c;
         return capsChanged.getCaps().hasCapability(NET_CAPABILITY_VALIDATED);
     }
 
@@ -3275,7 +3275,7 @@ public class ConnectivityManagerTest {
 
     private Network expectNetworkHasCapability(Network network, int expectedNetCap, long timeout) {
         return networkCallbackRule.registerNetworkCallback(new NetworkRequest.Builder().build())
-                .eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED, timeout,
+                .eventuallyExpect(Event.NETWORK_CAPS_UPDATED, timeout,
                         cb -> cb.getNetwork().equals(network)
                                 && cb.getCaps().hasCapability(expectedNetCap)).getNetwork();
     }
@@ -3406,8 +3406,8 @@ public class ConnectivityManagerTest {
     private void assertNoCallbackExceptCapOrLpChange(
             @NonNull final TestableNetworkCallback cb) {
         cb.assertNoCallback(NO_CALLBACK_TIMEOUT_MS,
-                c -> !(c instanceof CallbackEntry.CapabilitiesChanged
-                        || c instanceof CallbackEntry.LinkPropertiesChanged));
+                c -> !(c instanceof Event.CapabilitiesChanged
+                        || c instanceof Event.LinkPropertiesChanged));
     }
 
     @AppModeFull(reason = "Cannot get WifiManager in instant app mode")
@@ -3456,7 +3456,7 @@ public class ConnectivityManagerTest {
             newMobileDataPreferredUids.add(uid);
             ConnectivitySettingsManager.setMobileDataPreferredUids(
                     mContext, newMobileDataPreferredUids);
-            defaultTrackingCb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+            defaultTrackingCb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> cellNetwork.equals(entry.getNetwork()));
             // No change for system default network. Expect no callback except CapabilitiesChanged
             // or LinkPropertiesChanged which may be triggered randomly from wifi network.
@@ -3469,7 +3469,7 @@ public class ConnectivityManagerTest {
             newMobileDataPreferredUids.remove(uid);
             ConnectivitySettingsManager.setMobileDataPreferredUids(
                     mContext, newMobileDataPreferredUids);
-            defaultTrackingCb.eventuallyExpect(CallbackEntry.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
+            defaultTrackingCb.eventuallyExpect(Event.AVAILABLE, NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> wifiNetwork.equals(entry.getNetwork()));
             // No change for system default network. Expect no callback except CapabilitiesChanged
             // or LinkPropertiesChanged which may be triggered randomly from wifi network.
@@ -3572,10 +3572,10 @@ public class ConnectivityManagerTest {
 
         try (Socket socket = new Socket()) {
             // Verify that the network is restricted.
-            testNetworkCb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+            testNetworkCb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                     NETWORK_CALLBACK_TIMEOUT_MS,
                     entry -> network.equals(entry.getNetwork())
-                            && (!((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                            && (!((Event.CapabilitiesChanged) entry).getCaps()
                             .hasCapability(NET_CAPABILITY_NOT_RESTRICTED)));
             // CtsNetTestCases package doesn't hold CONNECTIVITY_USE_RESTRICTED_NETWORKS, so it
             // does not allow to bind socket to restricted network.
@@ -3596,10 +3596,10 @@ public class ConnectivityManagerTest {
                 // Uid is in allowed list. Try file network request again.
                 networkCallbackRule.requestNetwork(restrictedRequest, restrictedNetworkCb);
                 // Verify that the network is restricted.
-                restrictedNetworkCb.eventuallyExpect(CallbackEntry.NETWORK_CAPS_UPDATED,
+                restrictedNetworkCb.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
                         NETWORK_CALLBACK_TIMEOUT_MS,
                         entry -> network.equals(entry.getNetwork())
-                                && (!((CallbackEntry.CapabilitiesChanged) entry).getCaps()
+                                && (!((Event.CapabilitiesChanged) entry).getCaps()
                                 .hasCapability(NET_CAPABILITY_NOT_RESTRICTED)));
             }
         } finally {
@@ -4036,7 +4036,7 @@ public class ConnectivityManagerTest {
 
         final DetailedBlockedStatusCallback cb = new DetailedBlockedStatusCallback();
         networkCallbackRule.registerDefaultNetworkCallback(cb);
-        final Network network = cb.expect(CallbackEntry.AVAILABLE).getNetwork();
+        final Network network = cb.expect(Event.AVAILABLE).getNetwork();
         testAndCleanup(() -> {
             // Disable chain and set RULE_DENY on target chain
             runWithShellPermissionIdentity(() -> {
@@ -4086,7 +4086,7 @@ public class ConnectivityManagerTest {
 
         final DetailedBlockedStatusCallback cb = new DetailedBlockedStatusCallback();
         networkCallbackRule.registerDefaultNetworkCallback(cb);
-        final Network network = cb.expect(CallbackEntry.AVAILABLE).getNetwork();
+        final Network network = cb.expect(Event.AVAILABLE).getNetwork();
         testAndCleanup(() -> {
             cb.eventuallyExpectBlockedStatusCallback(network, BLOCKED_REASON_NONE);
 

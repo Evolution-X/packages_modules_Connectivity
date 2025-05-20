@@ -24,7 +24,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import com.android.internal.annotations.VisibleForTesting
 import com.android.net.module.util.BitUtils
-import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import org.junit.runner.Description

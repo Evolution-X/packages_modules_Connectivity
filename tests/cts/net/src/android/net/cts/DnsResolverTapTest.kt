@@ -39,7 +39,7 @@ import com.android.testutils.DeviceConfigRule
 import com.android.testutils.DnsResolverModuleTest
 import com.android.testutils.IPv6UdpFilter
 import com.android.testutils.NdResponder
-import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
 import com.android.testutils.TapPacketReaderRule
 import com.android.testutils.TestableNetworkAgent
 import com.android.testutils.TestDnsPacket

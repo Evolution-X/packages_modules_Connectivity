@@ -27,7 +27,7 @@ import android.net.TestNetworkInterface
 import android.os.Handler
 import android.util.Log
 import com.android.net.module.util.ArrayTrackRecord
-import com.android.testutils.EthernetTestInterface.EthernetStateListener.CallbackEntry.InterfaceStateChanged
+import com.android.testutils.EthernetTestInterface.EthernetStateListener.Event.InterfaceStateChanged
 import java.net.NetworkInterface
 import kotlin.concurrent.Volatile
 import kotlin.test.assertNotNull
@@ -47,15 +47,15 @@ class EthernetTestInterface(
     val testIface: TestNetworkInterface
 ) {
     private class EthernetStateListener(private val trackedIface: String) : InterfaceStateListener {
-        val events = ArrayTrackRecord<CallbackEntry>().newReadHead()
+        val events = ArrayTrackRecord<Event>().newReadHead()
 
-        sealed class CallbackEntry {
+        sealed class Event {
             data class InterfaceStateChanged(
                 val iface: String,
                 val state: Int,
                 val role: Int,
                 val cfg: IpConfiguration?
-            ) : CallbackEntry()
+            ) : Event()
         }
 
         override fun onInterfaceStateChanged(

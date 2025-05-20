@@ -52,8 +52,8 @@ import android.net.StaticIpConfiguration
 import android.net.TestNetworkInterface
 import android.net.TestNetworkManager
 import android.net.TestNetworkManager.TestInterfaceRequest
-import android.net.cts.EthernetManagerTest.EthernetStateListener.CallbackEntry.EthernetStateChanged
-import android.net.cts.EthernetManagerTest.EthernetStateListener.CallbackEntry.InterfaceStateChanged
+import android.net.cts.EthernetManagerTest.EthernetStateListener.Event.EthernetStateChanged
+import android.net.cts.EthernetManagerTest.EthernetStateListener.Event.InterfaceStateChanged
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -69,10 +69,10 @@ import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.DeviceInfoUtils.isKernelVersionAtLeast
 import com.android.testutils.NdResponder
-import com.android.testutils.RecorderCallback.CallbackEntry.Available
-import com.android.testutils.RecorderCallback.CallbackEntry.CapabilitiesChanged
-import com.android.testutils.RecorderCallback.CallbackEntry.LinkPropertiesChanged
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
+import com.android.testutils.TestableNetworkCallback.Event.Available
+import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import com.android.testutils.PollPacketReader
 import com.android.testutils.TestableNetworkCallback
 import com.android.testutils.assertThrows
@@ -208,20 +208,20 @@ class EthernetManagerTest {
     }
 
     private open class EthernetStateListener private constructor(
-        private val history: ArrayTrackRecord<CallbackEntry>
+        private val history: ArrayTrackRecord<Event>
     ) : InterfaceStateListener, IntConsumer,
-                TrackRecord<EthernetStateListener.CallbackEntry> by history {
+                TrackRecord<EthernetStateListener.Event> by history {
         constructor() : this(ArrayTrackRecord())
 
         val events = history.newReadHead()
 
-        sealed class CallbackEntry {
+        sealed class Event {
             data class InterfaceStateChanged(
                 val iface: String,
                 val state: Int,
                 val role: Int,
                 val configuration: IpConfiguration?
-            ) : CallbackEntry() {
+            ) : Event() {
                 override fun toString(): String {
                     val stateString = when (state) {
                         STATE_ABSENT -> "STATE_ABSENT"
@@ -240,7 +240,7 @@ class EthernetManagerTest {
                 }
             }
 
-            data class EthernetStateChanged(val state: Int) : CallbackEntry() {
+            data class EthernetStateChanged(val state: Int) : Event() {
                 override fun toString(): String {
                     val stateString = when (state) {
                         ETHERNET_STATE_ENABLED -> "ETHERNET_STATE_ENABLED"
@@ -265,7 +265,7 @@ class EthernetManagerTest {
             add(EthernetStateChanged(state))
         }
 
-        fun <T : CallbackEntry> expectCallback(expected: T): T {
+        fun <T : Event> expectCallback(expected: T): T {
             val event = events.poll(TIMEOUT_MS)
             assertEquals(expected, event)
             return event as T
@@ -283,7 +283,7 @@ class EthernetManagerTest {
                 InterfaceStateChanged(iface, state, role,
                         if (state != STATE_ABSENT) DEFAULT_IP_CONFIGURATION else null)
 
-        fun eventuallyExpect(expected: CallbackEntry) {
+        fun eventuallyExpect(expected: Event) {
             val cb = events.poll(TIMEOUT_MS) { it == expected }
             assertNotNull(cb, "Never received expected $expected. Received: ${events.backtrace()}")
         }
