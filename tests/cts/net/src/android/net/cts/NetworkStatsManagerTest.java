@@ -77,8 +77,8 @@ import com.android.testutils.ConnectivityDiagnosticsCollector;
 import com.android.testutils.ConnectivityModuleTest;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
-import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.TestableNetworkCallback;
+import com.android.testutils.TestableNetworkCallback.Event;
 
 import org.junit.After;
 import org.junit.Before;
@@ -192,7 +192,7 @@ public class NetworkStatsManagerTest {
                             networkCallbackRule.requestNetwork(buildRequestForTransport(
                                     NetworkCapabilities.TRANSPORT_WIFI),
                                     mRequestNetworkCb, TIMEOUT_MILLIS);
-                            return mRequestNetworkCb.expect(CallbackEntry.AVAILABLE,
+                            return mRequestNetworkCb.expect(Event.AVAILABLE,
                                     "Wifi network not available. "
                                             + "Please ensure the device has working wifi."
                             ).getNetwork();
@@ -214,7 +214,7 @@ public class NetworkStatsManagerTest {
                             networkCallbackRule.requestNetwork(buildRequestForTransport(
                                             NetworkCapabilities.TRANSPORT_CELLULAR),
                                     mRequestNetworkCb, TIMEOUT_MILLIS);
-                            return mRequestNetworkCb.expect(CallbackEntry.AVAILABLE,
+                            return mRequestNetworkCb.expect(Event.AVAILABLE,
                                     "Cell network not available. "
                                             + "Please ensure the device has working mobile data."
                             ).getNetwork();
@@ -366,7 +366,7 @@ public class NetworkStatsManagerTest {
         // interested attributes are not mutable, and not expected to be
         // changed during the test.
         final NetworkCapabilities caps = networkInterface.mRequestNetworkCb.expect(
-                CallbackEntry.NETWORK_CAPS_UPDATED, network).getCaps();
+                Event.NETWORK_CAPS_UPDATED, network).getCaps();
         networkInterface.setMetered(!caps.hasCapability(
                 NetworkCapabilities.NET_CAPABILITY_NOT_METERED));
         networkInterface.setRoaming(!caps.hasCapability(

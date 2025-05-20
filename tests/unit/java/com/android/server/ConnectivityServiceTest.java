@@ -189,16 +189,16 @@ import static com.android.testutils.MiscAsserts.assertLength;
 import static com.android.testutils.MiscAsserts.assertRunsInAtMost;
 import static com.android.testutils.MiscAsserts.assertSameElements;
 import static com.android.testutils.MiscAsserts.assertThrows;
-import static com.android.testutils.RecorderCallback.CallbackEntry.AVAILABLE;
-import static com.android.testutils.RecorderCallback.CallbackEntry.BLOCKED_STATUS;
-import static com.android.testutils.RecorderCallback.CallbackEntry.BLOCKED_STATUS_INT;
-import static com.android.testutils.RecorderCallback.CallbackEntry.LINK_PROPERTIES_CHANGED;
-import static com.android.testutils.RecorderCallback.CallbackEntry.LOSING;
-import static com.android.testutils.RecorderCallback.CallbackEntry.LOST;
-import static com.android.testutils.RecorderCallback.CallbackEntry.NETWORK_CAPS_UPDATED;
-import static com.android.testutils.RecorderCallback.CallbackEntry.RESUMED;
-import static com.android.testutils.RecorderCallback.CallbackEntry.SUSPENDED;
-import static com.android.testutils.RecorderCallback.CallbackEntry.UNAVAILABLE;
+import static com.android.testutils.TestableNetworkCallback.Event.AVAILABLE;
+import static com.android.testutils.TestableNetworkCallback.Event.BLOCKED_STATUS;
+import static com.android.testutils.TestableNetworkCallback.Event.BLOCKED_STATUS_INT;
+import static com.android.testutils.TestableNetworkCallback.Event.LINK_PROPERTIES_CHANGED;
+import static com.android.testutils.TestableNetworkCallback.Event.LOSING;
+import static com.android.testutils.TestableNetworkCallback.Event.LOST;
+import static com.android.testutils.TestableNetworkCallback.Event.NETWORK_CAPS_UPDATED;
+import static com.android.testutils.TestableNetworkCallback.Event.RESUMED;
+import static com.android.testutils.TestableNetworkCallback.Event.SUSPENDED;
+import static com.android.testutils.TestableNetworkCallback.Event.UNAVAILABLE;
 import static com.android.testutils.TestPermissionUtil.runAsShell;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -433,8 +433,8 @@ import com.android.testutils.FunctionalUtils.Function3;
 import com.android.testutils.FunctionalUtils.ThrowingConsumer;
 import com.android.testutils.FunctionalUtils.ThrowingRunnable;
 import com.android.testutils.HandlerUtils;
-import com.android.testutils.RecorderCallback.CallbackEntry;
 import com.android.testutils.TestableNetworkCallback;
+import com.android.testutils.TestableNetworkCallback.Event;
 import com.android.testutils.TestableNetworkOfferCallback;
 
 import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
@@ -3387,8 +3387,8 @@ public class ConnectivityServiceTest {
                     ConnectivityServiceTest.this::waitForIdle);
         }
 
-        public CallbackEntry.Losing expectLosing(final HasNetwork n, final long timeoutMs) {
-            final CallbackEntry.Losing losing = expect(LOSING, n, timeoutMs);
+        public Event.Losing expectLosing(final HasNetwork n, final long timeoutMs) {
+            final Event.Losing losing = expect(LOSING, n, timeoutMs);
             final int maxMsToLive = losing.getMaxMsToLive();
             if (maxMsToLive < 0 || maxMsToLive > mService.mLingerDelayMs) {
                 // maxMsToLive is the value that was received in the onLosing callback. That must
@@ -3403,7 +3403,7 @@ public class ConnectivityServiceTest {
             return losing;
         }
 
-        public CallbackEntry.Losing expectLosing(final HasNetwork n) {
+        public Event.Losing expectLosing(final HasNetwork n) {
             return expectLosing(n, getDefaultTimeoutMs());
         }
     }
@@ -3468,9 +3468,9 @@ public class ConnectivityServiceTest {
         cb.assertNoCallback();
         mWiFiAgent.connect(false);
         cb.expectAvailableCallbacksUnvalidated(mWiFiAgent);
-        final CallbackEntry found = CollectionUtils.findLast(cb.getHistory(),
-                it -> it instanceof CallbackEntry.CapabilitiesChanged);
-        assertTrue(((CallbackEntry.CapabilitiesChanged) found).getCaps()
+        final Event found = CollectionUtils.findLast(cb.getHistory(),
+                it -> it instanceof Event.CapabilitiesChanged);
+        assertTrue(((Event.CapabilitiesChanged) found).getCaps()
                 .hasCapability(NET_CAPABILITY_TEMPORARILY_NOT_METERED));
         cb.assertNoCallback();
         mCm.unregisterNetworkCallback(cb);
@@ -3518,16 +3518,16 @@ public class ConnectivityServiceTest {
 
         b = expectConnectivityAction(2);
         mWiFiAgent.disconnect();
-        genericNetworkCallback.expect(CallbackEntry.LOST, mWiFiAgent);
-        wifiNetworkCallback.expect(CallbackEntry.LOST, mWiFiAgent);
+        genericNetworkCallback.expect(Event.LOST, mWiFiAgent);
+        wifiNetworkCallback.expect(Event.LOST, mWiFiAgent);
         cellNetworkCallback.assertNoCallback();
         b.expectBroadcast();
         assertNoCallbacks(genericNetworkCallback, wifiNetworkCallback, cellNetworkCallback);
 
         b = expectConnectivityAction(1);
         mCellAgent.disconnect();
-        genericNetworkCallback.expect(CallbackEntry.LOST, mCellAgent);
-        cellNetworkCallback.expect(CallbackEntry.LOST, mCellAgent);
+        genericNetworkCallback.expect(Event.LOST, mCellAgent);
+        cellNetworkCallback.expect(Event.LOST, mCellAgent);
         b.expectBroadcast();
         assertNoCallbacks(genericNetworkCallback, wifiNetworkCallback, cellNetworkCallback);
 
@@ -7882,7 +7882,7 @@ public class ConnectivityServiceTest {
         networkAgent.connect(true);
         networkCallback.expect(AVAILABLE, networkAgent);
         networkCallback.expect(NETWORK_CAPS_UPDATED, networkAgent);
-        CallbackEntry.LinkPropertiesChanged cbi =
+        Event.LinkPropertiesChanged cbi =
                 networkCallback.expect(LINK_PROPERTIES_CHANGED, networkAgent);
         networkCallback.expect(BLOCKED_STATUS, networkAgent);
         networkCallback.expectCaps(networkAgent, c -> c.hasCapability(NET_CAPABILITY_VALIDATED));
@@ -8480,7 +8480,7 @@ public class ConnectivityServiceTest {
         reset(mMockDnsResolver);
         cellNetworkCallback.expect(AVAILABLE, mCellAgent);
         cellNetworkCallback.expect(NETWORK_CAPS_UPDATED, mCellAgent);
-        CallbackEntry.LinkPropertiesChanged cbi = cellNetworkCallback.expect(
+        Event.LinkPropertiesChanged cbi = cellNetworkCallback.expect(
                 LINK_PROPERTIES_CHANGED, mCellAgent);
         cellNetworkCallback.expect(BLOCKED_STATUS, mCellAgent);
         cellNetworkCallback.assertNoCallback();
@@ -8547,7 +8547,7 @@ public class ConnectivityServiceTest {
         waitForIdle();
         cellNetworkCallback.expect(AVAILABLE, mCellAgent);
         cellNetworkCallback.expect(NETWORK_CAPS_UPDATED, mCellAgent);
-        CallbackEntry.LinkPropertiesChanged cbi = cellNetworkCallback.expect(
+        Event.LinkPropertiesChanged cbi = cellNetworkCallback.expect(
                 LINK_PROPERTIES_CHANGED, mCellAgent);
         cellNetworkCallback.expect(BLOCKED_STATUS, mCellAgent);
         cellNetworkCallback.assertNoCallback();
@@ -9826,7 +9826,7 @@ public class ConnectivityServiceTest {
             super.expectAvailableThenValidatedCallbacks(n.getNetwork(), blockedStatus, TIMEOUT_MS);
         }
         public void onBlockedStatusChanged(Network network, int blockedReasons) {
-            getHistory().add(new CallbackEntry.BlockedStatusInt(network, blockedReasons));
+            getHistory().add(new Event.BlockedStatusInt(network, blockedReasons));
         }
     }
 
@@ -10080,7 +10080,7 @@ public class ConnectivityServiceTest {
 
         // Expect exactly one blocked callback for each agent.
         for (int i = 0; i < agents.length; i++) {
-            final CallbackEntry e = callback.expect(BLOCKED_STATUS, TIMEOUT_MS,
+            final Event e = callback.expect(BLOCKED_STATUS, TIMEOUT_MS,
                     c -> c.getBlocked() == blocked);
             final Network network = e.getNetwork();
             assertTrue("Received unexpected blocked callback for network " + network,
@@ -11932,7 +11932,7 @@ public class ConnectivityServiceTest {
         final LinkProperties testLinkProperties = new LinkProperties();
         testLinkProperties.setHttpProxy(initialProxyInfo);
         mWiFiAgent.sendLinkProperties(testLinkProperties);
-        wifiCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mWiFiAgent);
+        wifiCallback.expect(Event.LINK_PROPERTIES_CHANGED, mWiFiAgent);
         cellCallback.assertNoCallback();
 
         // At first the local PAC proxy server is unstarted (see the description of what the local
@@ -11965,7 +11965,7 @@ public class ConnectivityServiceTest {
         final ProxyInfo servingProxyInfo = new ProxyInfo(pacUrl, 2097);
         final ExpectedBroadcast servingProxyBroadcast = expectProxyChangeAction(servingProxyInfo);
         mService.simulateUpdateProxyInfo(mWiFiAgent.getNetwork(), servingProxyInfo);
-        wifiCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mWiFiAgent);
+        wifiCallback.expect(Event.LINK_PROPERTIES_CHANGED, mWiFiAgent);
         cellCallback.assertNoCallback();
         servingProxyBroadcast.expectBroadcast();
 
@@ -11997,14 +11997,14 @@ public class ConnectivityServiceTest {
                 lp -> lp.getLp().getHttpProxy().getPort() == -1
                         && lp.getLp().getHttpProxy().isPacProxy());
         // Wifi is lingered as it was the default but is no longer serving any request.
-        wifiCallback.expect(CallbackEntry.LOSING, mWiFiAgent);
+        wifiCallback.expect(Event.LOSING, mWiFiAgent);
 
         // Now arrange for Ethernet to have a PAC proxy.
         final ProxyInfo ethProxy = ProxyInfo.buildPacProxy(ethPacUrl);
         final LinkProperties ethLinkProperties = new LinkProperties();
         ethLinkProperties.setHttpProxy(ethProxy);
         mEthernetAgent.sendLinkProperties(ethLinkProperties);
-        ethernetCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mEthernetAgent);
+        ethernetCallback.expect(Event.LINK_PROPERTIES_CHANGED, mEthernetAgent);
         // Default network is Ethernet
         assertEquals(ethProxy, mService.getProxyForNetwork(null));
         assertEquals(ethProxy, mService.getProxyForNetwork(mEthernetAgent.getNetwork()));
@@ -12024,7 +12024,7 @@ public class ConnectivityServiceTest {
         final ExpectedBroadcast servingEthProxyBroadcast = expectProxyChangeAction(servingEthProxy);
         final ExpectedBroadcast servingProxyBroadcast2 = expectProxyChangeAction(servingProxyInfo);
         mService.simulateUpdateProxyInfo(mEthernetAgent.getNetwork(), servingEthProxy);
-        ethernetCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mEthernetAgent);
+        ethernetCallback.expect(Event.LINK_PROPERTIES_CHANGED, mEthernetAgent);
         assertEquals(servingEthProxy, mService.getProxyForNetwork(null));
         assertEquals(servingEthProxy, mService.getProxyForNetwork(mEthernetAgent.getNetwork()));
         assertEquals(initialProxyInfo, mService.getProxyForNetwork(mWiFiAgent.getNetwork()));
@@ -12033,7 +12033,7 @@ public class ConnectivityServiceTest {
 
         // Ethernet disconnects, back to WiFi
         mEthernetAgent.disconnect();
-        ethernetCallback.expect(CallbackEntry.LOST, mEthernetAgent);
+        ethernetCallback.expect(Event.LOST, mEthernetAgent);
 
         // WiFi is now the default network again. However, the local proxy server does not serve
         // WiFi at this time, so at this time a proxy with port -1 is still the correct value.
@@ -12056,7 +12056,7 @@ public class ConnectivityServiceTest {
         // starts up. This should cause a LP event to inform clients of the port to access the
         // proxy server for wifi.
         mService.simulateUpdateProxyInfo(mWiFiAgent.getNetwork(), servingProxyInfo);
-        wifiCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mWiFiAgent);
+        wifiCallback.expect(Event.LINK_PROPERTIES_CHANGED, mWiFiAgent);
         assertEquals(servingProxyInfo, mService.getProxyForNetwork(null));
         assertEquals(servingProxyInfo, mService.getProxyForNetwork(mWiFiAgent.getNetwork()));
         assertNull(mService.getProxyForNetwork(mCellAgent.getNetwork()));
@@ -12070,7 +12070,7 @@ public class ConnectivityServiceTest {
                 proxy -> proxy == null || TextUtils.isEmpty(proxy.getHost()));
         mWiFiAgent.disconnect();
         emptyProxyBroadcast.expectBroadcast();
-        wifiCallback.expect(CallbackEntry.LOST, mWiFiAgent);
+        wifiCallback.expect(Event.LOST, mWiFiAgent);
         assertNull(mService.getProxyForNetwork(null));
         assertNull(mService.getLinkProperties(mCellAgent.getNetwork()).getHttpProxy());
         assertNull(mService.getGlobalProxy());
@@ -12100,7 +12100,7 @@ public class ConnectivityServiceTest {
         final ProxyInfo servingProxyInfo = new ProxyInfo(pacUrl, 2097);
         final ExpectedBroadcast servingProxyBroadcast = expectProxyChangeAction(servingProxyInfo);
         mService.simulateUpdateProxyInfo(mWiFiAgent.getNetwork(), servingProxyInfo);
-        wifiCallback.expect(CallbackEntry.LINK_PROPERTIES_CHANGED, mWiFiAgent);
+        wifiCallback.expect(Event.LINK_PROPERTIES_CHANGED, mWiFiAgent);
         servingProxyBroadcast.expectBroadcast();
 
         // Now disconnect Wi-Fi and make sure there is a broadcast for some empty proxy. Whether
@@ -12109,7 +12109,7 @@ public class ConnectivityServiceTest {
         final ExpectedBroadcast emptyProxyBroadcast = expectProxyChangeAction(
                 proxy -> proxy == null || TextUtils.isEmpty(proxy.getHost()));
         mWiFiAgent.disconnect();
-        wifiCallback.expect(CallbackEntry.LOST, mWiFiAgent);
+        wifiCallback.expect(Event.LOST, mWiFiAgent);
         emptyProxyBroadcast.expectBroadcast();
     }
 

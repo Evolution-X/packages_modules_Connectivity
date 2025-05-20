@@ -63,7 +63,7 @@ import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo;
 import com.android.testutils.DeviceConfigRule;
 import com.android.testutils.DnsResolverModuleTest;
-import com.android.testutils.RecorderCallback.CallbackEntry;
+import com.android.testutils.TestableNetworkCallback.Event;
 import com.android.testutils.SkipPresubmit;
 import com.android.testutils.TestableNetworkCallback;
 
@@ -194,7 +194,7 @@ public class DnsResolverTest {
     private Network getDefaultNetwork() {
         final TestableNetworkCallback cb = callbackRule.registerDefaultNetworkCallback();
         return testAndCleanup(
-                () -> cb.eventuallyExpect(CallbackEntry.AVAILABLE, TIMEOUT_MS).getNetwork(),
+                () -> cb.eventuallyExpect(Event.AVAILABLE, TIMEOUT_MS).getNetwork(),
                 () -> callbackRule.unregisterNetworkCallback(cb));
     }
 

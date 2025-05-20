@@ -41,9 +41,9 @@ import com.android.server.ConnectivityService.PREFERENCE_ORDER_DEBUG_FALLBACK
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
-import com.android.testutils.RecorderCallback.CallbackEntry.Losing
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Losing
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import java.io.File
 import org.junit.Assume.assumeTrue
 import org.junit.Rule

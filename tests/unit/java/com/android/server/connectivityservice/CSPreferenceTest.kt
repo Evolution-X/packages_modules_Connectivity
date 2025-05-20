@@ -41,11 +41,11 @@ import androidx.test.filters.SmallTest
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
-import com.android.testutils.RecorderCallback.CallbackEntry.Lost
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Lost
 import com.android.testutils.TestableNetworkOfferCallback
-import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Needed
-import com.android.testutils.TestableNetworkOfferCallback.CallbackEntry.Unneeded
+import com.android.testutils.TestableNetworkOfferCallback.Event.Needed
+import com.android.testutils.TestableNetworkOfferCallback.Event.Unneeded
 import com.android.testutils.postAndWait
 import com.android.testutils.runAsShell
 import kotlin.test.assertEquals

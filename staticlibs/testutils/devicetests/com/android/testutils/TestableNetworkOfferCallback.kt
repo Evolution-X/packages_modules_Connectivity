@@ -31,12 +31,12 @@ class TestableNetworkOfferCallback(
     private val noCallbackTimeoutMs: Long = DEFAULT_NO_CALLBACK_TIMEOUT,
 ) : NetworkProvider.NetworkOfferCallback {
     private val TAG = this::class.simpleName
-    val history = ArrayTrackRecord<CallbackEntry>().newReadHead()
+    val history = ArrayTrackRecord<Event>().newReadHead()
     val mark get() = history.mark
 
-    sealed class CallbackEntry {
-        data class Needed(val request: NetworkRequest) : CallbackEntry()
-        data class Unneeded(val request: NetworkRequest) : CallbackEntry()
+    sealed class Event {
+        data class Needed(val request: NetworkRequest) : Event()
+        data class Unneeded(val request: NetworkRequest) : Event()
     }
 
     /**
@@ -45,7 +45,7 @@ class TestableNetworkOfferCallback(
      */
     override fun onNetworkNeeded(request: NetworkRequest) {
         Log.d(TAG, "onNetworkNeeded $request")
-        history.add(CallbackEntry.Needed(request))
+        history.add(Event.Needed(request))
     }
 
     /**
@@ -53,10 +53,10 @@ class TestableNetworkOfferCallback(
      */
     override fun onNetworkUnneeded(request: NetworkRequest) {
         Log.d(TAG, "onNetworkUnneeded $request")
-        history.add(CallbackEntry.Unneeded(request))
+        history.add(Event.Unneeded(request))
     }
 
-    inline fun <reified T : CallbackEntry> expect(
+    inline fun <reified T : Event> expect(
         errorMsg: String? = null,
         predicate: (T) -> Boolean = { true }
     ): T {
@@ -76,11 +76,11 @@ class TestableNetworkOfferCallback(
 
     // TODO : remove when there are no callers
     @Deprecated("Use expect instead of expectCallbackThat")
-    inline fun <reified T : CallbackEntry> expectCallbackThat(
+    inline fun <reified T : Event> expectCallbackThat(
         crossinline predicate: (T) -> Boolean
     ): T = expect<T>(null, predicate)
 
-    inline fun <reified T : CallbackEntry> eventuallyExpect(
+    inline fun <reified T : Event> eventuallyExpect(
         errorMsg: String? = null,
         from: Int = mark,
         crossinline predicate: (T) -> Boolean = { true }
@@ -94,12 +94,12 @@ class TestableNetworkOfferCallback(
     } as T
 
     fun expectOnNetworkNeeded(capabilities: NetworkCapabilities) =
-            expectCallbackThat<CallbackEntry.Needed> {
+            expectCallbackThat<Event.Needed> {
                 it.request.canBeSatisfiedBy(capabilities)
             }
 
     fun expectOnNetworkUnneeded(capabilities: NetworkCapabilities) =
-            expectCallbackThat<CallbackEntry.Unneeded> {
+            expectCallbackThat<Event.Unneeded> {
                 it.request.canBeSatisfiedBy(capabilities)
             }
 
