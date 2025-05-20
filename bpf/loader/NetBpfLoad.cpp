@@ -909,7 +909,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             ALOGD("skipping map %s which is ignored on %s builds", mapNames[i].c_str(),
                   getBuildType().c_str());
             mapFds.push_back(unique_fd());
-            continue;
+            abort();
         }
 
         if ((isArm() && isKernel32Bit() && md[i].ignore_on_arm32) ||
@@ -920,7 +920,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             ALOGD("skipping map %s which is ignored on %s", mapNames[i].c_str(),
                   describeArch());
             mapFds.push_back(unique_fd());
-            continue;
+            abort();
         }
 
         enum bpf_map_type type = md[i].type;
@@ -1182,7 +1182,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             (cs[i].prog_def->ignore_on_userdebug && isUserdebug())) {
             ALOGD("cs[%d].name:%s is ignored on %s builds", i, name.c_str(),
                   getBuildType().c_str());
-            continue;
+            abort();
         }
 
         if ((isArm() && isKernel32Bit() && cs[i].prog_def->ignore_on_arm32) ||
@@ -1191,7 +1191,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             (isX86() && isKernel64Bit() && cs[i].prog_def->ignore_on_x86_64) ||
             (isRiscV() && cs[i].prog_def->ignore_on_riscv64)) {
             ALOGD("cs[%d].name:%s is ignored on %s", i, name.c_str(), describeArch());
-            continue;
+            abort();
         }
 
         if (specified(selinux_context)) {
