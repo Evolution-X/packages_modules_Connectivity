@@ -58,11 +58,12 @@ private val NOOP = Runnable {}
 open class TestableNetworkCallback private constructor(
     src: TestableNetworkCallback?,
     val defaultTimeoutMs: Long,
-    val defaultNoCallbackTimeoutMs: Long,
-    val waiterFunc: Runnable,
+    private val defaultNoCallbackTimeoutMs: Long,
+    private val waiterFunc: Runnable,
     private val logTag: String
 ) : NetworkCallback() {
-    val backingRecord: ArrayTrackRecord<Event> = src?.backingRecord ?: ArrayTrackRecord()
+    private val backingRecord: ArrayTrackRecord<Event> =
+        src?.backingRecord ?: ArrayTrackRecord()
     val history: ArrayTrackRecord<Event>.ReadHead = backingRecord.newReadHead()
     val mark get() = history.mark
 
@@ -75,7 +76,7 @@ open class TestableNetworkCallback private constructor(
         // constructor by specifying override.
         abstract val network: Network
 
-        data class Reserved private constructor(
+        data class Reserved(
             override val network: Network,
             val caps: NetworkCapabilities
         ) : Event() {
@@ -98,7 +99,7 @@ open class TestableNetworkCallback private constructor(
         data class Resumed(override val network: Network) : Event()
         data class Losing(override val network: Network, val maxMsToLive: Int) : Event()
         data class Lost(override val network: Network) : Event()
-        data class Unavailable private constructor(
+        data class Unavailable(
             override val network: Network
         ) : Event() {
             constructor() : this(NULL_NETWORK)
@@ -312,7 +313,6 @@ open class TestableNetworkCallback private constructor(
     ) = expect(type, network.network, defaultTimeoutMs, errorMsg, test)
 
     // Without |errorMsg|, in Network and HasNetwork versions
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         network: Network,
@@ -320,7 +320,6 @@ open class TestableNetworkCallback private constructor(
         test: (T) -> Boolean
     ) = expect(type, network, timeoutMs, null, test)
 
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         network: HasNetwork,
@@ -345,14 +344,12 @@ open class TestableNetworkCallback private constructor(
     ) = expect(type, ANY_NETWORK, timeoutMs, null, test)
 
     // Without |timeout| or |errorMsg|, in Network and HasNetwork versions
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         network: Network,
         test: (T) -> Boolean
     ) = expect(type, network, defaultTimeoutMs, null, test)
 
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         network: HasNetwork,
@@ -360,7 +357,6 @@ open class TestableNetworkCallback private constructor(
     ) = expect(type, network.network, defaultTimeoutMs, null, test)
 
     // Without |network| or |timeout| or |errorMsg|
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         test: (T) -> Boolean
