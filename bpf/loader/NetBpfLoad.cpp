@@ -904,25 +904,6 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             continue;
         }
 
-        if ((md[i].ignore_on_eng && isEng()) || (md[i].ignore_on_user && isUser()) ||
-            (md[i].ignore_on_userdebug && isUserdebug())) {
-            ALOGD("skipping map %s which is ignored on %s builds", mapNames[i].c_str(),
-                  getBuildType().c_str());
-            mapFds.push_back(unique_fd());
-            abort();
-        }
-
-        if ((isArm() && isKernel32Bit() && md[i].ignore_on_arm32) ||
-            (isArm() && isKernel64Bit() && md[i].ignore_on_aarch64) ||
-            (isX86() && isKernel32Bit() && md[i].ignore_on_x86_32) ||
-            (isX86() && isKernel64Bit() && md[i].ignore_on_x86_64) ||
-            (isRiscV() && md[i].ignore_on_riscv64)) {
-            ALOGD("skipping map %s which is ignored on %s", mapNames[i].c_str(),
-                  describeArch());
-            mapFds.push_back(unique_fd());
-            abort();
-        }
-
         enum bpf_map_type type = md[i].type;
         if (type == BPF_MAP_TYPE_LPM_TRIE && !isAtLeastKernelVersion(4, 14, 0)) {
             // On Linux Kernels older than 4.14 this map type doesn't exist - autoskip.
@@ -1176,23 +1157,6 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
               bpfMinVer, bpfMaxVer);
         if (bpfloader_ver < bpfMinVer) continue;
         if (bpfloader_ver >= bpfMaxVer) continue;
-
-        if ((cs[i].prog_def->ignore_on_eng && isEng()) ||
-            (cs[i].prog_def->ignore_on_user && isUser()) ||
-            (cs[i].prog_def->ignore_on_userdebug && isUserdebug())) {
-            ALOGD("cs[%d].name:%s is ignored on %s builds", i, name.c_str(),
-                  getBuildType().c_str());
-            abort();
-        }
-
-        if ((isArm() && isKernel32Bit() && cs[i].prog_def->ignore_on_arm32) ||
-            (isArm() && isKernel64Bit() && cs[i].prog_def->ignore_on_aarch64) ||
-            (isX86() && isKernel32Bit() && cs[i].prog_def->ignore_on_x86_32) ||
-            (isX86() && isKernel64Bit() && cs[i].prog_def->ignore_on_x86_64) ||
-            (isRiscV() && cs[i].prog_def->ignore_on_riscv64)) {
-            ALOGD("cs[%d].name:%s is ignored on %s", i, name.c_str(), describeArch());
-            abort();
-        }
 
         if (specified(selinux_context)) {
             ALOGV("prog %s selinux_context [%-32s] -> %d -> '%s' (%s)", name.c_str(),

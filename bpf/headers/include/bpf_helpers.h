@@ -286,14 +286,6 @@ static int (*bpf_sk_storage_delete_unsafe) (const struct bpf_map_def* sk_storage
         __attribute__ ((section(".maps." #name), used)) \
                 ____btf_map_##name = { }
 
-#define BPF_ASSERT_LOADER_VERSION(min_loader, ignore_eng, ignore_user, ignore_userdebug) \
-    _Static_assert(                                                                      \
-        (min_loader) >= BPFLOADER_IGNORED_ON_VERSION ||                                  \
-            !((ignore_eng).ignore_on_eng ||                                              \
-              (ignore_user).ignore_on_user ||                                            \
-              (ignore_userdebug).ignore_on_userdebug),                                   \
-        "bpfloader min version must be >= 0.33 in order to use ignored_on");
-
 #define ABSOLUTE(x) ((x) < 0 ? -(x) : (x))
 
 #define DEFAULT_BPF_MAP_FLAGS(type, num_entries, mapflags)         \
@@ -323,11 +315,7 @@ static int (*bpf_sk_storage_delete_unsafe) (const struct bpf_map_def* sk_storage
         .selinux_context = (selinux),                                       \
         .pin_subdir = (pindir),                                             \
         .shared = (share).shared,                                           \
-        .ignore_on_eng = (ignore_eng).ignore_on_eng,                        \
-        .ignore_on_user = (ignore_user).ignore_on_user,                     \
-        .ignore_on_userdebug = (ignore_userdebug).ignore_on_userdebug,      \
-    };                                                                      \
-    BPF_ASSERT_LOADER_VERSION(minloader, ignore_eng, ignore_user, ignore_userdebug);
+    };
 
 // Type safe macro to declare a ring buffer and related output functions.
 // Compatibility:
@@ -542,9 +530,6 @@ static int (*bpf_trace_printk)(const char* fmt, int fmt_size, ...) = (void*) BPF
         .bpfloader_max_ver = (max_loader),                                               \
         .selinux_context = (selinux),                                                    \
         .pin_subdir = (pindir),                                                          \
-        .ignore_on_eng = (ignore_eng).ignore_on_eng,                                     \
-        .ignore_on_user = (ignore_user).ignore_on_user,                                  \
-        .ignore_on_userdebug = (ignore_userdebug).ignore_on_userdebug,                   \
     };                                                                                   \
     SECTION(SECTION_NAME)                                                                \
     int the_prog
