@@ -986,6 +986,7 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             saved_errno = errno;
             ALOGD("bpf_create_map reusing map %s, ret: %d", mapNames[i].c_str(), fd.get());
             reuse = true;
+            abort();
         } else {
             union bpf_attr req = {
               .map_type = type,
