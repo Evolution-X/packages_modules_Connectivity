@@ -2741,7 +2741,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 sample.getNetworkCountPerTransports().toByteArray(),
                 sample.getConnectionDurationPerTransports().toByteArray(),
                 sample.getNetworkRequestCount().toByteArray(),
-                sample.getNetworks().toByteArray());
+                sample.getNetworks().toByteArray(),
+                sample.getSatelliteAccessInfo().toByteArray());
     }
 
     /**
