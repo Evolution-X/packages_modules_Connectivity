@@ -37,6 +37,8 @@ import static android.net.NetworkStats.ROAMING_ALL;
 import static android.net.NetworkStats.ROAMING_NO;
 import static android.net.NetworkStats.ROAMING_YES;
 
+import static com.android.net.module.util.NetworkCapabilitiesUtils.TYPE_TEST;
+
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -870,7 +872,7 @@ public final class NetworkTemplate implements Parcelable {
      * all test networks would be matched.
      */
     private boolean matchesTest(NetworkIdentity ident) {
-        return ident.mType == NetworkIdentity.TYPE_TEST
+        return ident.mType == TYPE_TEST
                 && ((CollectionUtils.isEmpty(mMatchWifiNetworkKeys)
                 || CollectionUtils.contains(mMatchWifiNetworkKeys, ident.mWifiNetworkKey)));
     }
