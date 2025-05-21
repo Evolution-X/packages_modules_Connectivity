@@ -16,6 +16,9 @@
 
 package com.android.server.connectivity.mdns;
 
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TargetApi;
@@ -25,6 +28,7 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.util.ArrayMap;
 import android.util.Pair;
@@ -37,7 +41,9 @@ import com.android.net.module.util.SharedLog;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /** Class for monitoring connectivity changes using {@link ConnectivityManager}. */
@@ -47,6 +53,16 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
     private final Listener listener;
     private final ConnectivityManager.NetworkCallback networkCallback;
     private final ConnectivityManager connectivityManager;
+    private final Context context;
+    private final boolean supportsIncludeOtherUidNetworks =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+    private final BroadcastReceiver networkChangedReceiver =
+        new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                notifyConnectivityChange();
+            }
+        };
     @GuardedBy("knownNetworks")
     private final ArrayMap<Network, LinkProperties> knownNetworks = new ArrayMap<>();
     // TODO(b/71901993): Ideally we shouldn't need this flag. However we still don't have clues why
@@ -60,6 +76,7 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
             SharedLog sharedLog) {
         this.listener = listener;
         this.sharedLog = sharedLog;
+        this.context = context;
 
         connectivityManager =
                 (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -114,10 +131,21 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
             return;
         }
 
-        connectivityManager.registerNetworkCallback(
-                new NetworkRequest.Builder().addTransportType(
-                        NetworkCapabilities.TRANSPORT_WIFI).build(),
-                networkCallback);
+        final NetworkRequest.Builder builder =
+            new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+        if (supportsIncludeOtherUidNetworks) {
+            builder.setIncludeOtherUidNetworks(true);
+        }
+        connectivityManager.registerNetworkCallback(builder.build(), networkCallback);
+
+        if (!supportsIncludeOtherUidNetworks) {
+            // Since networks created via ConnectivityManager#requestNetwork with a
+            // WifiNetworkSpecifier cannot be obtained via callbacks before S due to the lack of
+            // setIncludeOtherUidNetworks, register a Wi-Fi BroadcastReceiver to ensure network
+            // state is updated.
+            context.registerReceiver(
+                networkChangedReceiver, new IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION));
+        }
         isCallbackRegistered = true;
     }
 
@@ -131,6 +159,9 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
         }
 
         connectivityManager.unregisterNetworkCallback(networkCallback);
+        if (!supportsIncludeOtherUidNetworks) {
+            context.unregisterReceiver(networkChangedReceiver);
+        }
         synchronized (knownNetworks) {
             knownNetworks.clear();
         }
@@ -203,6 +234,7 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
 
     private Pair<Network, LinkProperties> findMatchingNetwork(
             @NonNull Predicate<LinkProperties> predicate) {
+        final Set<Network> testedNetworks;
         synchronized (knownNetworks) {
             for (int i = 0; i < knownNetworks.size(); i++) {
                 final LinkProperties lp = knownNetworks.valueAt(i);
@@ -210,6 +242,23 @@ public class ConnectivityMonitorWithConnectivityManager implements ConnectivityM
                 // not compatible with MDNS, and this is consistent with MdnsSocketProvider.
                 if (predicate.test(lp)) {
                     return new Pair<>(knownNetworks.keyAt(i), knownNetworks.valueAt(i));
+                }
+            }
+            testedNetworks = new HashSet<>(knownNetworks.keySet());
+        }
+        if (!supportsIncludeOtherUidNetworks) {
+            // Before S setIncludeOtherUidNetworks cannot be set on the NetworkRequest, so it
+            // will not match networks brought up by apps via networkRequest with a
+            // WifiNetworkSpecifier (which have uids set in their NetworkCapabilities on S+, or
+            // requestor UID set on R-).
+            // Fall back to synchronous methods if no matching network could be found.
+            for (Network network : connectivityManager.getAllNetworks()) {
+                if (testedNetworks.contains(network)) {
+                    continue;
+                }
+                final LinkProperties lp = connectivityManager.getLinkProperties(network);
+                if (lp != null && predicate.test(lp)) {
+                    return new Pair<>(network, lp);
                 }
             }
         }
