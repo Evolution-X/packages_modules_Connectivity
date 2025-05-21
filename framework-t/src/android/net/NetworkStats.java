@@ -44,6 +44,7 @@ import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1431,21 +1432,26 @@ public final class NetworkStats implements Parcelable, Iterable<NetworkStats.Ent
      * @hide
      */
     public NetworkStats filteredClone(int limitUid, String[] limitIfaces, int limitTag) {
+        // Compute the size needed for the final NetworkStats object to avoid
+        // overallocation and intermediate copies. Performance experiments
+        // suggest we save a little by avoiding getValues calls on unmatched
+        // entries, even at the allocation cost of a temporary BitSet.
+        BitSet matches = new BitSet(size);
         NetworkStats.Entry e = null;
         int filteredSize = 0;
         for (int i = 0; i < size; i++) {
             e = getValues(i, e);
             if (e.matches(limitUid, limitIfaces, limitTag)) {
+                matches.set(i);
                 filteredSize++;
             }
         }
 
         final NetworkStats clone = new NetworkStats(elapsedRealtime, filteredSize);
-        for (int i = 0; i < size; i++) {
-            e = getValues(i, e);
-            if (e.matches(limitUid, limitIfaces, limitTag)) {
-                clone.insertEntry(e);
-            }
+        int i = matches.nextSetBit(0);
+        while (i != -1) {
+            clone.insertEntry(getValues(i, e));
+            i = matches.nextSetBit(i + 1);
         }
         return clone;
     }
