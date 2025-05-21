@@ -72,7 +72,7 @@ class MultinetworkPolicyTrackerTestDependencies(
         resources
 
     override fun readAvoidBadWifiFromCarrierConfig(
-        ccm: CarrierConfigManager?,
+        ccm: CarrierConfigManager,
         subId: Int
     ): Boolean =
         avoidBadWifiCarrierConfigForSubIdMap.getOrDefault(subId, true)

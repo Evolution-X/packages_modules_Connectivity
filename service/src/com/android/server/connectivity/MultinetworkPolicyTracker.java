@@ -177,15 +177,10 @@ public class MultinetworkPolicyTracker {
 
         @VisibleForTesting
         protected boolean readAvoidBadWifiFromCarrierConfig(
-                @Nullable final CarrierConfigManager ccm, final int subId) {
+                @NonNull final CarrierConfigManager ccm, final int subId) {
             // Defaults to true to avoid potentially poor Wi-Fi and improve user experience.
             final boolean defaultConfig = true;
             if (subId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                return defaultConfig;
-            }
-
-            // It implies the FEATURE_TELEPHONY_SUBSCRIPTION is not supported, return default config
-            if (ccm == null) {
                 return defaultConfig;
             }
 

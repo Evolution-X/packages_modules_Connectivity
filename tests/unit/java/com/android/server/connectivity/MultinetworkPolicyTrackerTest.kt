@@ -49,7 +49,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeNotNull
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -61,7 +61,6 @@ import org.mockito.Mockito.any
 import org.mockito.Mockito.doCallRealMethod
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
@@ -82,8 +81,8 @@ class MultinetworkPolicyTrackerTest {
         @JvmStatic
         fun data(): Iterable<Any?> {
             return mutableListOf(
-                null,
-                mock(CarrierConfigManager::class.java)
+                false,
+                true
             )
         }
     }
@@ -111,9 +110,12 @@ class MultinetworkPolicyTrackerTest {
 
     private val featureFlags = HashSet<String>()
 
-    // Indicates where carrierConfigManager is supported.
+    // Indicates where CarrierConfigManager is supported.
+    // It will be false if FEATURE_TELEPHONY_SUBSCRIPTION is not supported.
     @Parameterized.Parameter(0)
     @JvmField
+    var supportCarrierConfigManager: Boolean = false
+
     var carrierConfigManager: CarrierConfigManager? = null
 
     // This will set feature flags from @FeatureFlag annotations
@@ -222,8 +224,15 @@ class MultinetworkPolicyTrackerTest {
             featureFlags.contains(FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG)
         )
 
+        if (supportCarrierConfigManager) {
+            carrierConfigManager = mock(CarrierConfigManager::class.java)
+        } else {
+            carrierConfigManager = null
+        }
+
         doReturn(carrierConfigManager).`when`(context)
             .getSystemService(CarrierConfigManager::class.java)
+
         trackerDependencies.setBackgroundThreadHandler(bgHandler)
         tracker = MultinetworkPolicyTracker(
             context,
@@ -237,9 +246,6 @@ class MultinetworkPolicyTrackerTest {
     @After
     fun tearDown() {
         ConnectivityResources.setResourcesContextForTest(null)
-        carrierConfigManager?.let { ccm ->
-            reset(ccm)
-        }
         trackerDependencies.resetAvoidBadWifiCarrierConfigForSubIdMap()
     }
 
@@ -347,7 +353,10 @@ class MultinetworkPolicyTrackerTest {
     @FeatureFlag(name = FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG, true)
     @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.BAKLAVA)
     fun testUpdateAvoidBadWifiOnCarrierConfigChange() {
-        assumeNotNull("skip test if carrierConfigManager is not supported", carrierConfigManager)
+        assumeTrue(
+            "skip test if carrierConfigManager is not supported",
+            supportCarrierConfigManager
+        )
 
         // Mock the initial global setting to null
         Settings.Global.putString(resolver, NETWORK_AVOID_BAD_WIFI, null)
