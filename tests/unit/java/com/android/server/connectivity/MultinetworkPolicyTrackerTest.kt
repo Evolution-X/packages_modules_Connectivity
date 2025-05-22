@@ -79,12 +79,7 @@ class MultinetworkPolicyTrackerTest {
     companion object {
         @Parameterized.Parameters
         @JvmStatic
-        fun data(): Iterable<Any?> {
-            return mutableListOf(
-                false,
-                true
-            )
-        }
+        fun data() = listOf(false, true)
     }
 
     // This wrapper class prevents JUnit from attempting to load unsupported system classes
