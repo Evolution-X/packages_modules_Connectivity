@@ -618,7 +618,12 @@ class EthernetManagerTest {
         // see aosp/2123900.
         try {
             // assumeException does not exist.
-            requestTetheredInterface().expectOnAvailable(NO_CALLBACK_TIMEOUT_MS)
+            val listener = requestTetheredInterface()
+            // Force requestTetheredInterface() to be processed before proceeding by calling
+            // setEthernetEnabled() which always waits on a callback and is guaranteed to be
+            // processed after requestTetheredInterface().
+            setEthernetEnabled(ethernetEnabled)
+            listener.expectOnAvailable(0)
             // interface used for tethering is available, throw an assumption error.
             assumeTrue(false)
         } catch (e: TimeoutException) {
@@ -626,8 +631,8 @@ class EthernetManagerTest {
             // tethering.
             releaseTetheredInterface()
             // Force releaseTetheredInterface() to be processed before proceeding by calling
-            // setEthernetEnabled(true) which always waits on a callback.
-            setEthernetEnabled(true)
+            // setEthernetEnabled() which always waits on a callback.
+            setEthernetEnabled(ethernetEnabled)
         }
     }
 
