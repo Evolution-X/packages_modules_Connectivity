@@ -86,10 +86,10 @@ import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRule.IgnoreUpTo
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.NetworkStackModuleTest
-import com.android.testutils.TestableNetworkCallback.Event.Available
-import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
 import com.android.testutils.SkipPresubmit
 import com.android.testutils.TestableNetworkCallback
+import com.android.testutils.TestableNetworkCallback.Event.Available
+import com.android.testutils.TestableNetworkCallback.Event.LinkPropertiesChanged
 import com.android.testutils.pollingCheck
 import com.android.testutils.runAsShell
 import com.android.testutils.waitForIdle
@@ -110,6 +110,7 @@ import kotlin.test.assertNotNull
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -395,12 +396,15 @@ class ApfIntegrationTest {
         }
     }
 
-    private fun shouldEnforceApfV6Support(vsrApiLevel: Int): Boolean {
+    private fun shouldEnforceApfSupport(vsrApiLevel: Int): Boolean {
+        // Note: GMS-VSR requirements related to APFv4/APFv6 are only applicable to handheld
+        // and tablet devices. GTVS requirements related to APFv6 are only applicable to TV devices.
+        // For Wear OS devices, APFv4/APFv6 will not be enforced until Wear OS 7.
         if (pm.hasSystemFeature(FEATURE_WATCH)) {
-            // Enforce APFv6 post VSR-16.
+            // Enforce APF on watch post VSR-16.
             return vsrApiLevel > 202504
         }
-        return vsrApiLevel >= 202504
+        return vsrApiLevel >= 34
     }
 
     @VsrTest(
@@ -413,7 +417,7 @@ class ApfIntegrationTest {
         assertThat(caps.apfVersionSupported).isAnyOf(0, 2, 3, 4, 6000, 6100)
         // APF became mandatory in Android 14 VSR.
         val vsrApiLevel = getVsrApiLevel()
-        assume().that(vsrApiLevel).isAtLeast(34)
+        assumeTrue(shouldEnforceApfSupport(vsrApiLevel))
 
         // DEVICEs launching with Android 14 with CHIPSETs that set ro.board.first_api_level to 34:
         // - [GMS-VSR-5.3.12-003] MUST return 4 or higher as the APF version number from calls to
@@ -446,11 +450,7 @@ class ApfIntegrationTest {
         // - Note, the APF RAM requirement for APF version 6.1 will become 4000 bytes in Android 17
         //   with CHIPSETs that set ro.board.first_api_level or ro.board.api_level to 202604 or
         //   higher.
-        // Note: At 25Q2, GMS-VSR requirements related to APFv6 are only applicable to handheld
-        // and tablet devices. GTVS requirements related to APFv6 are only applicable to TV devices.
-        // For Wear OS devices, APFv6 will not be enforced until specific requirements for Wear OS
-        // are officially incorporated.
-        if (shouldEnforceApfV6Support(vsrApiLevel)) {
+        if (vsrApiLevel >= 202504) {
             assertThat(caps.apfVersionSupported).isAnyOf(6000, 6100)
             if (caps.apfVersionSupported == 6000) {
                 assertThat(caps.maximumApfProgramSize).isAtLeast(4000)
