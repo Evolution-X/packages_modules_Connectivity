@@ -631,8 +631,8 @@ class EthernetManagerTest {
             // tethering.
             releaseTetheredInterface()
             // Force releaseTetheredInterface() to be processed before proceeding by calling
-            // setEthernetEnabled(true) which always waits on a callback.
-            setEthernetEnabled(true)
+            // setEthernetEnabled() which always waits on a callback.
+            setEthernetEnabled(ethernetEnabled)
         }
     }
 
