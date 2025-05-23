@@ -2038,4 +2038,42 @@ class NetworkAgentTest {
         val agent = createNetworkAgent()
         agent.unregister()
     }
+
+    fun getBinderProxyCount(): Int {
+        // Call gc before checking binder proxy count.
+        System.gc()
+        System.runFinalization()
+        System.gc()
+
+        // Extracts the number of binder proxy objects from the `dumpsys meminfo` output.
+        // Expects a line in the format: "Local Binders: 13 Proxy Binders: 30".
+        val dumpOutput = ("dumpsys meminfo " + Process.myPid()).execute()
+        val line = dumpOutput.split("\n").firstOrNull { it.contains("Proxy Binders:") }
+        assertNotNull(line, "Dumpsys does not contain \"Proxy Binders:\", output: $dumpOutput")
+
+        val matched = Regex("Proxy Binders:\\s*(\\d+)").find(line)
+        assertNotNull(matched, "Failed to parse, line: $line")
+
+        return matched.groupValues[1].toInt()
+    }
+
+    @Test
+    fun testRegisterUnregisterDoesNotLeakBinderProxy() {
+        val startCount = getBinderProxyCount()
+
+        for (i in 1..30) {
+            val agent = createNetworkAgent(realContext)
+            agent.register()
+            agent.unregister()
+        }
+
+        val deadline = SystemClock.elapsedRealtime() + DEFAULT_TIMEOUT_MS
+        var endCount: Int
+        do {
+            endCount = getBinderProxyCount()
+            if (endCount - startCount < 10) return
+            SystemClock.sleep(50 /* ms */)
+        } while (SystemClock.elapsedRealtime() < deadline)
+        fail("Binder Proxy is leaked: $startCount -> $endCount")
+    }
 }
