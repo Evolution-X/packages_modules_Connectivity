@@ -18,7 +18,6 @@ package com.android.metrics;
 
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_SATELLITE;
-import static android.net.NetworkTemplate.MATCH_MOBILE;
 
 import static com.android.net.module.util.FrameworkConnectivityStatsLog.CORE_NETWORKING_CRITICAL_BYTES_EVENT_OCCURRED;
 import static com.android.net.module.util.FrameworkConnectivityStatsLog.CORE_NETWORKING_CRITICAL_BYTES_EVENT_OCCURRED__EVENT_TYPE__CRITICAL_BYTES_EVENT_TYPE_SATELLITE_COARSE_RX_USAGE;
@@ -63,8 +62,8 @@ public class SatelliteCoarseUsageMetricsCollector {
         // To prevent NetworkTemplate#Builder not found error when
         // initializing CSTest on S-based image.
         if (SdkLevel.isAtLeastU()) {
-            SATELLITE_TEMPLATE = new NetworkTemplate.Builder(MATCH_MOBILE)
-                    .setTransportTypes(new int[]{TRANSPORT_SATELLITE}).build();
+            SATELLITE_TEMPLATE = new NetworkTemplate.Builder()
+                    .setTransportType(TRANSPORT_SATELLITE).build();
         } else {
             SATELLITE_TEMPLATE = null;
         }

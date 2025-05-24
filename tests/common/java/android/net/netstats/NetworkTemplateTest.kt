@@ -16,12 +16,7 @@
 
 package android.net.netstats
 
-import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
-import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
-import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
-import android.net.NetworkCapabilities.TRANSPORT_TEST
-import android.net.NetworkCapabilities.TRANSPORT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkStats.DEFAULT_NETWORK_ALL
 import android.net.NetworkStats.METERED_ALL
@@ -34,7 +29,6 @@ import android.net.NetworkTemplate.MATCH_CARRIER
 import android.net.NetworkTemplate.MATCH_ETHERNET
 import android.net.NetworkTemplate.MATCH_MOBILE
 import android.net.NetworkTemplate.MATCH_PROXY
-import android.net.NetworkTemplate.MATCH_TEST
 import android.net.NetworkTemplate.MATCH_WIFI
 import android.net.NetworkTemplate.NETWORK_TYPE_ALL
 import android.net.NetworkTemplate.OEM_MANAGED_ALL
@@ -299,93 +293,53 @@ class NetworkTemplateTest {
         }
     }
 
-    // Verify the builder does not throw, and transports read from the getter is expected.
+    /**
+     * Tests the successful setting and retrieval of a transport type.
+     */
     @Test
-    fun testBuilderTransportTypes() {
-        assertGetSetTransportTypes(MATCH_MOBILE, TRANSPORT_CELLULAR)
-        assertGetSetTransportTypes(MATCH_MOBILE, TRANSPORT_SATELLITE)
-        assertGetSetTransportTypes(MATCH_WIFI, TRANSPORT_WIFI)
-        assertGetSetTransportTypes(MATCH_ETHERNET, TRANSPORT_ETHERNET)
-        assertGetSetTransportTypes(MATCH_BLUETOOTH, TRANSPORT_BLUETOOTH)
-        assertGetSetTransportTypes(MATCH_PROXY, TRANSPORT_BLUETOOTH)
-        assertGetSetTransportTypes(MATCH_CARRIER, TRANSPORT_CELLULAR)
-        assertGetSetTransportTypes(MATCH_CARRIER, TRANSPORT_WIFI)
-        assertGetSetTransportTypes(MATCH_TEST, TRANSPORT_TEST)
-    }
-
-    private fun assertGetSetTransportTypes(matchRule: Int, transport: Int) {
-        val builder = NetworkTemplate.Builder(matchRule)
-                .setTransportTypes(intArrayOf(transport))
-        if (matchRule == MATCH_CARRIER) {
-            builder.setSubscriberIds(setOf(TEST_IMSI1))
-        }
-        val template = builder.build()
-        assertEquals(1, template.transportTypes.size)
-        assertEquals(transport, template.transportTypes[0])
-    }
-
-    @Test
-    fun testValidateTransportTypesNoTransportsSetSuccess() {
-        // Should succeed for any match rule if no transports are explicitly set.
-        listOf(
-                MATCH_WIFI,
-                MATCH_MOBILE,
-                MATCH_ETHERNET,
-                MATCH_BLUETOOTH,
-                MATCH_PROXY,
-                MATCH_TEST
-        ).forEach { matchRule ->
-            NetworkTemplate.Builder(matchRule)
-                    .setTransportTypes(intArrayOf()) // Explicitly empty, or just don't call it
-                    .build() // Should not throw
-        }
-        NetworkTemplate.Builder(MATCH_CARRIER)
-                .setSubscriberIds(setOf(TEST_IMSI1))
-                .setTransportTypes(intArrayOf())
-                .build() // Should not throw
-    }
-
-    @Test
-    fun testValidateTransportTypesDeducedTransportPlusCompatibleSuccess() {
-        NetworkTemplate.Builder(MATCH_WIFI)
-                .setTransportTypes(intArrayOf(TRANSPORT_WIFI, TRANSPORT_VPN))
+    fun testSetAndGetTransportType() {
+        val template = NetworkTemplate.Builder()
+                .setTransportType(TRANSPORT_CELLULAR)
                 .build()
-        NetworkTemplate.Builder(MATCH_MOBILE)
-                .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR, TRANSPORT_TEST))
-                .build()
+
+        assertFailsWith<IllegalStateException> { template.matchRule }
+        assertEquals(TRANSPORT_CELLULAR, template.transportType)
     }
 
+    /**
+     * Verifies that if `setTransportType` is called multiple times, the last value supplied is used.
+     */
     @Test
-    fun testValidateTransportTypesDeducedTransportMissingThrows() {
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_WIFI)
-                    .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR))
-                    .build()
-        }
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_MOBILE)
-                    .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
-                    .build()
-        }
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_ETHERNET)
-                    .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
-                    .build()
-        }
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_CARRIER)
-                    .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
-                    .build()
-        }
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_TEST)
-                    .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
-                    .build()
-        }
-        assertFailsWith<IllegalArgumentException> {
-            NetworkTemplate.Builder(MATCH_TEST)
-                    .setTransportTypes(intArrayOf(INVALID_TRANSPORT))
-                    .build()
-        }
+    fun testMultipleSetTransportTypeOverrides() {
+        val template = NetworkTemplate.Builder()
+                .setTransportType(TRANSPORT_CELLULAR).setTransportType(TRANSPORT_WIFI).build()
+        assertEquals(TRANSPORT_WIFI, template.transportType)
+    }
+
+    /**
+     * Verifies that building a template with a transport type set for a
+     * non-transport match rule throws an IllegalArgumentException.
+     */
+    @Test(expected = IllegalArgumentException::class)
+    fun testSetTransportType_withNonTransportRuleThrows() {
+        NetworkTemplate.Builder(MATCH_WIFI).setTransportType(TRANSPORT_CELLULAR)
+    }
+
+    /**
+     * Verifies that building a template with a non-transport match rule throws an
+     * IllegalStateException when getTransportType() calls.
+     */
+    @Test(expected = IllegalStateException::class)
+    fun testNonTransportRule_getTransportThrows() {
+        val template = NetworkTemplate.Builder(MATCH_WIFI).build()
+        template.transportType
+    }
+
+    /**
+     * Verifies template built with default constructor but doesn't specify transport throws.
+     */
+    @Test(expected = IllegalArgumentException::class)
+    fun testGetTransportType_whenNotSetThrows() {
+        NetworkTemplate.Builder().build()
     }
 }

@@ -51,7 +51,6 @@ import android.net.NetworkTemplate.normalize
 import android.net.wifi.WifiInfo
 import android.os.Build
 import android.telephony.TelephonyManager
-import com.android.net.module.util.BitUtils
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.NonNullTestUtils
@@ -684,7 +683,6 @@ class NetworkTemplateTest {
     fun testEquals() {
         val templateImsi1 = NetworkTemplate.Builder(MATCH_MOBILE).setMeteredness(METERED_YES)
                 .setSubscriberIds(setOf(TEST_IMSI1)).setRatType(TelephonyManager.NETWORK_TYPE_UMTS)
-                .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE, TRANSPORT_VPN))
                 .build()
         val dupTemplateImsi1 = NetworkTemplate(
                 MATCH_MOBILE,
@@ -695,7 +693,7 @@ class NetworkTemplateTest {
                 DEFAULT_NETWORK_ALL,
                 TelephonyManager.NETWORK_TYPE_UMTS,
                 OEM_MANAGED_ALL,
-                BitUtils.packBits(intArrayOf(TRANSPORT_SATELLITE, TRANSPORT_VPN))
+                TRANSPORT_TYPES_ALL
         )
         val templateImsi2 = NetworkTemplate.Builder(MATCH_MOBILE).setMeteredness(METERED_YES)
                 .setSubscriberIds(setOf(TEST_IMSI2)).setRatType(TelephonyManager.NETWORK_TYPE_UMTS)
@@ -707,7 +705,6 @@ class NetworkTemplateTest {
 
         val templateWifiKey1 = NetworkTemplate.Builder(MATCH_WIFI)
                 .setWifiNetworkKeys(setOf(TEST_WIFI_KEY1))
-                .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
                 .build()
         val dupTemplateWifiKey1 = NetworkTemplate(
                 MATCH_WIFI,
@@ -718,7 +715,7 @@ class NetworkTemplateTest {
                 DEFAULT_NETWORK_ALL,
                 NETWORK_TYPE_ALL,
                 OEM_MANAGED_ALL,
-                BitUtils.packBits(intArrayOf(TRANSPORT_WIFI))
+                TRANSPORT_TYPES_ALL
         )
         val templateWifiKey2 = NetworkTemplate.Builder(MATCH_WIFI)
                 .setWifiNetworkKeys(setOf(TEST_WIFI_KEY2)).build()
@@ -911,46 +908,31 @@ class NetworkTemplateTest {
                 .setType(TYPE_MOBILE)
                 .setTransportTypes(setOf(TRANSPORT_SATELLITE))
                 .build()
-        val identMobileVpn = NetworkIdentity.Builder()
+        val identCellularVpn = NetworkIdentity.Builder()
                 .setType(TYPE_MOBILE)
                 .setTransportTypes(setOf(TRANSPORT_CELLULAR, TRANSPORT_VPN))
                 .build()
-        val identOnlyCellular = NetworkIdentity.Builder()
+        val identCellular = NetworkIdentity.Builder()
                 .setType(TYPE_MOBILE)
                 .setTransportTypes(setOf(TRANSPORT_CELLULAR))
                 .build()
 
-        val templateMobileNoTransport = NetworkTemplate.Builder(MATCH_MOBILE)
-                .build() // Wildcard for transports
-        val templateMobileWithCellularTransport = NetworkTemplate.Builder(MATCH_MOBILE)
-                .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR))
+        val templateCellular = NetworkTemplate.Builder()
+                .setTransportType(TRANSPORT_CELLULAR)
                 .build()
-        val templateSatellite = NetworkTemplate.Builder(MATCH_MOBILE)
-                .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
-                .build()
-        val templateVpnAndCellular = NetworkTemplate.Builder(MATCH_MOBILE)
-                .setTransportTypes(intArrayOf(TRANSPORT_VPN, TRANSPORT_CELLULAR))
+        val templateSatellite = NetworkTemplate.Builder()
+                .setTransportType(TRANSPORT_SATELLITE)
                 .build()
 
-        // 1. Mobile wildcard template
-        templateMobileNoTransport.assertMatches(identSatellite)
-        templateMobileNoTransport.assertMatches(identMobileVpn)
-        templateMobileNoTransport.assertMatches(identOnlyCellular)
+        // 1. Template requiring TRANSPORT_CELLULAR
+        templateCellular.assertDoesNotMatch(identSatellite)
+        templateCellular.assertMatches(identCellularVpn)
+        templateCellular.assertMatches(identCellular)
 
-        // 2. Template requiring TRANSPORT_CELLULAR
-        templateMobileWithCellularTransport.assertDoesNotMatch(identSatellite)
-        templateMobileWithCellularTransport.assertMatches(identMobileVpn)
-        templateMobileWithCellularTransport.assertMatches(identOnlyCellular)
-
-        // 3. Template requiring TRANSPORT_SATELLITE
+        // 2. Template requiring TRANSPORT_SATELLITE
         templateSatellite.assertMatches(identSatellite)
-        templateSatellite.assertDoesNotMatch(identMobileVpn)
-        templateSatellite.assertDoesNotMatch(identOnlyCellular)
-
-        // 4. Template requiring TRANSPORT_VPN AND TRANSPORT_CELLULAR
-        templateVpnAndCellular.assertDoesNotMatch(identSatellite)
-        templateVpnAndCellular.assertMatches(identMobileVpn)
-        templateVpnAndCellular.assertDoesNotMatch(identOnlyCellular)
+        templateSatellite.assertDoesNotMatch(identCellularVpn)
+        templateSatellite.assertDoesNotMatch(identCellular)
     }
 
     @Test
