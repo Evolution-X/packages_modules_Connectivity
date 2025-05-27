@@ -158,6 +158,7 @@ import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
 import static com.android.server.connectivity.ConnectivityFlags.CLOSE_QUIC_CONNECTION;
+import static com.android.server.connectivity.ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_METRICS;
 import static com.android.server.connectivity.ConnectivityFlags.DELAY_DESTROY_SOCKETS;
 import static com.android.server.connectivity.ConnectivityFlags.INGRESS_TO_VPN_ADDRESS_FILTERING;
 import static com.android.server.connectivity.ConnectivityFlags.NAMESPACE_TETHERING_BOOT;
@@ -338,6 +339,7 @@ import com.android.metrics.NetworkDescription;
 import com.android.metrics.NetworkList;
 import com.android.metrics.NetworkRequestCount;
 import com.android.metrics.RequestCountForType;
+import com.android.metrics.SatelliteAccessInfo;
 import com.android.modules.utils.BasicShellCommandHandler;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
@@ -551,6 +553,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final boolean mQueueCallbacksForFrozenApps;
     // Flag for early link properties update
     private final boolean mSupportEarlyLinkPropertiesUpdateForVPN;
+    private final boolean mConstrainedDataSatelliteMetrics;
 
     /**
      * Uids ConnectivityService tracks blocked status of to send blocked status callbacks.
@@ -1992,6 +1995,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         } else {
             mSatelliteAccessController = null;
         }
+        mConstrainedDataSatelliteMetrics = (mSatelliteAccessController != null)
+                && mDeps.isFeatureNotChickenedOut(mContext, CONSTRAINED_DATA_SATELLITE_METRICS);
 
         // To ensure uid state is synchronized with Network Policy, register for
         // NetworkPolicyManagerService events must happen prior to NetworkPolicyManagerService
@@ -2760,6 +2765,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         builder.setConnectionDurationPerTransports(sampleConnectionDuration(mNetworkAgentInfos));
         builder.setNetworkRequestCount(sampleNetworkRequestCount(mNetworkRequests.values()));
         builder.setNetworks(sampleNetworks(mNetworkAgentInfos));
+        if (mConstrainedDataSatelliteMetrics) {
+            builder.setSatelliteAccessInfo(sampleSatelliteAccessInfo(mSatelliteAccessController));
+        }
         return builder.build();
     }
 
@@ -2857,6 +2865,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
             builder.addNetworkDescription(d);
         }
         return builder.build();
+    }
+
+    @NonNull
+    private static SatelliteAccessInfo sampleSatelliteAccessInfo(
+            @NonNull final SatelliteAccessController controller) {
+        final int optInUidCount = controller.getCachedOptInUidsCount();
+        return SatelliteAccessInfo.newBuilder().setOptinUidCount(optInUidCount).build();
     }
 
     @Override

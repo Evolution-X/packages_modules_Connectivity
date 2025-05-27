@@ -2208,6 +2208,7 @@ public class ConnectivityServiceTest {
                 case ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER:
                 case ConnectivityFlags.CLOSE_QUIC_CONNECTION:
                 case ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN:
+                case ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_METRICS:
                     return true;
                 default:
                     throw new UnsupportedOperationException("Unknown flag " + name

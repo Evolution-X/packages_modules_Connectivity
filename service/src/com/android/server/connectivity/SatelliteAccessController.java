@@ -456,6 +456,12 @@ public class SatelliteAccessController {
         return pm;
     }
 
+    // Return cached opt-in uid list for metrics sampling.
+    // Should only be called on handler thread.
+    public int getCachedOptInUidsCount() {
+        return mSatelliteDataOptInUids.size();
+    }
+
     /** Dump info to dumpsys */
     public void dump(@NonNull IndentingPrintWriter pw) {
         HandlerUtils.ensureRunningOnHandlerThread(mConnectivityServiceHandler);
