@@ -17,6 +17,7 @@
 package com.android.server.net;
 
 import static android.net.ConnectivityManager.TYPE_MOBILE;
+import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkIdentity.OEM_NONE;
 import static android.net.NetworkStats.DEFAULT_NETWORK_NO;
 import static android.net.NetworkStats.DEFAULT_NETWORK_YES;
@@ -54,6 +55,7 @@ import android.util.ArrayMap;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.net.module.util.BitUtils;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 import com.android.testutils.HandlerUtils;
@@ -300,7 +302,8 @@ public class NetworkStatsObserversTest {
         identSet.add(new NetworkIdentity(
                 TYPE_MOBILE, TelephonyManager.NETWORK_TYPE_UNKNOWN,
                 IMSI_1, null /* networkId */, false /* roaming */, true /* metered */,
-                true /* defaultNetwork */, OEM_NONE, SUBID_1));
+                true /* defaultNetwork */, OEM_NONE, SUBID_1,
+                BitUtils.packBits(new int[] { TRANSPORT_CELLULAR })));
         return identSet;
     }
 

@@ -70,6 +70,9 @@ public final class ConnectivityFlags {
     public static final String CONSTRAINED_DATA_SATELLITE_OPTIN =
             "constrained_data_satellite_optin";
 
+    public static final String CONSTRAINED_DATA_SATELLITE_METRICS =
+            "constrained_data_satellite_metrics";
+
     /**
      * A feature flag to control whether the early link properties update for vpn should be enabled.
      *

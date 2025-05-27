@@ -179,6 +179,7 @@ open class CSTest {
         it[ConnectivityFlags.QUEUE_NETWORK_AGENT_EVENTS_IN_SYSTEM_SERVER] = true
         it[ConnectivityFlags.CLOSE_QUIC_CONNECTION] = true
         it[ConnectivityFlags.EARLY_LINK_PROPERTIES_UPDATE_FOR_VPN] = true
+        it[ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_METRICS] = true
     }
     fun setFeatureEnabled(flag: String, enabled: Boolean) = enabledFeatures.set(flag, enabled)
 

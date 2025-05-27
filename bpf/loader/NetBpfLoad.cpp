@@ -16,6 +16,7 @@
 
 #define LOG_TAG "NetBpfLoad"
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <bpf/btf.h>
 #include <bpf/libbpf.h>

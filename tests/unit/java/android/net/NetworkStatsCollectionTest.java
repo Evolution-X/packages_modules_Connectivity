@@ -17,6 +17,7 @@
 package android.net;
 
 import static android.net.ConnectivityManager.TYPE_MOBILE;
+import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkIdentity.OEM_NONE;
 import static android.net.NetworkStats.DEFAULT_NETWORK_NO;
 import static android.net.NetworkStats.IFACE_ALL;
@@ -56,6 +57,7 @@ import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.SmallTest;
 
 import com.android.frameworks.tests.net.R;
+import com.android.net.module.util.BitUtils;
 import com.android.testutils.DevSdkIgnoreRule;
 import com.android.testutils.DevSdkIgnoreRunner;
 
@@ -249,7 +251,8 @@ public class NetworkStatsCollectionTest {
         final NetworkStats.Entry entry = new NetworkStats.Entry();
         final NetworkIdentitySet identSet = new NetworkIdentitySet();
         identSet.add(new NetworkIdentity(TYPE_MOBILE, TelephonyManager.NETWORK_TYPE_UNKNOWN,
-                TEST_IMSI, null, false, true, true, OEM_NONE, TEST_SUBID));
+                TEST_IMSI, null, false, true, true, OEM_NONE, TEST_SUBID,
+                BitUtils.packBits(new int[]{TRANSPORT_CELLULAR})));
 
         int myUid = Process.myUid();
         int otherUidInSameUser = Process.myUid() + 1;
@@ -511,7 +514,8 @@ public class NetworkStatsCollectionTest {
         final NetworkStatsCollection large = new NetworkStatsCollection(HOUR_IN_MILLIS);
         final NetworkIdentitySet ident = new NetworkIdentitySet();
         ident.add(new NetworkIdentity(ConnectivityManager.TYPE_MOBILE, -1, TEST_IMSI, null,
-                false, true, true, OEM_NONE, TEST_SUBID));
+                false, true, true, OEM_NONE, TEST_SUBID,
+                BitUtils.packBits(new int[] {TRANSPORT_CELLULAR})));
         large.recordData(ident, UID_ALL, SET_ALL, TAG_NONE, TIME_A, TIME_B,
                 new NetworkStats.Entry(IFACE_ALL, UID_ALL, SET_DEFAULT, TAG_NONE, METERED_NO,
                 ROAMING_NO, DEFAULT_NETWORK_NO, 12_730_893_164L, 1, 0, 0, 0));
