@@ -535,10 +535,8 @@ class EthernetManagerTest {
         NetworkRequest.Builder(NetworkRequest(ETH_REQUEST))
             .setNetworkSpecifier(EthernetNetworkSpecifier(ifaceName)).build()
 
-    // b/233534110: eventuallyExpect<Lost>() does not advance ReadHead, use
-    // eventuallyExpect(Lost::class) instead.
     private fun TestableNetworkCallback.eventuallyExpectLost(n: Network? = null) =
-        eventuallyExpect(Lost::class) { n?.equals(it.network) ?: true }
+        eventuallyExpect<Lost> { n?.equals(it.network) ?: true }
 
     private fun TestableNetworkCallback.assertNeverLost(n: Network? = null) =
         assertNoCallback { it is Lost && (n?.equals(it.network) ?: true) }
@@ -550,8 +548,7 @@ class EthernetManagerTest {
         expect<CapabilitiesChanged> { it.caps.networkSpecifier == EthernetNetworkSpecifier(name) }
 
     private fun TestableNetworkCallback.eventuallyExpectCapabilities(nc: NetworkCapabilities) {
-        // b/233534110: eventuallyExpect<CapabilitiesChanged>() does not advance ReadHead.
-        eventuallyExpect(CapabilitiesChanged::class) {
+        eventuallyExpect<CapabilitiesChanged> {
             // CS may mix in additional capabilities, so NetworkCapabilities#equals cannot be used.
             // Check if all expected capabilities are present instead.
             it is CapabilitiesChanged && nc.capabilities.all { c -> it.caps.hasCapability(c) }
@@ -561,8 +558,7 @@ class EthernetManagerTest {
     private fun TestableNetworkCallback.eventuallyExpectLpForStaticConfig(
         config: StaticIpConfiguration
     ) {
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead.
-        eventuallyExpect(LinkPropertiesChanged::class) {
+        eventuallyExpect<LinkPropertiesChanged> {
             it is LinkPropertiesChanged && it.lp.linkAddresses.any { la ->
                 la.isSameAddressAs(config.ipAddress)
             }
@@ -826,8 +822,7 @@ class EthernetManagerTest {
     fun testNetworkRequest_linkPropertiesUpdate() {
         val iface = createInterface()
         val cb = requestNetwork(ETH_REQUEST)
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead
-        cb.eventuallyExpect(LinkPropertiesChanged::class) {
+        cb.eventuallyExpect<LinkPropertiesChanged> {
             it is LinkPropertiesChanged && it.lp.addresses.any {
                 address -> iface.onLinkPrefix.contains(address)
             }
