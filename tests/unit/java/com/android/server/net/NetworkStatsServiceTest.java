@@ -1535,6 +1535,78 @@ public class NetworkStatsServiceTest extends NetworkStatsBaseTest {
 
     }
 
+    // This test demonstrates that a network identity with legacy type TYPE_MOBILE
+    // can represent different underlying physical transports (e.g., satellite or cellular).
+    // NetworkTemplate, using MATCH_MOBILE, can then differentiate these further
+    // by applying a transportTypes filter.
+    @Test
+    public void testGetSatelliteStats() throws Exception {
+        mockDefaultSettings();
+        final NetworkTemplate templateSatellite =
+                new NetworkTemplate.Builder(MATCH_MOBILE)
+                        .setMeteredness(METERED_YES)
+                        .setSubscriberIds(Set.of(IMSI_1))
+                        .setTransportTypes(new int[]{NetworkCapabilities.TRANSPORT_SATELLITE})
+                        .build();
+
+        final NetworkTemplate templateCellularOnly =
+                new NetworkTemplate.Builder(MATCH_MOBILE)
+                        .setMeteredness(METERED_YES)
+                        .setSubscriberIds(Set.of(IMSI_1))
+                        .setTransportTypes(new int[]{NetworkCapabilities.TRANSPORT_CELLULAR})
+                        .build();
+
+        // Initial state: Assert all relevant templates are empty
+        assertUidTotal(sTemplateImsi1, UID_RED, 0L, 0L, 0L, 0L, 0);
+        assertUidTotal(templateSatellite, UID_RED, 0L, 0L, 0L, 0L, 0);
+        assertUidTotal(templateCellularOnly, UID_RED, 0L, 0L, 0L, 0L, 0);
+
+        // 1. Bring up SATELLITE mobile network for IMSI_1
+        NetworkStateSnapshot satelliteState = buildSatelliteMobileState(IMSI_1);
+
+        mService.notifyNetworkStatus(NETWORKS_MOBILE, new NetworkStateSnapshot[]{satelliteState},
+                getActiveIface(satelliteState), new UnderlyingNetworkInfo[0]);
+        setMobileRatTypeAndWaitForIdle(TelephonyManager.NETWORK_TYPE_LTE);
+
+        // Record 100 bytes of data on the satellite network for UID_RED
+        incrementCurrentTime(HOUR_IN_MILLIS);
+        mockNetworkStatsUidDetail(new NetworkStats(getElapsedRealtime(), 1)
+                .insertEntry(TEST_IFACE, UID_RED, SET_DEFAULT, TAG_NONE, METERED_YES, ROAMING_NO,
+                        DEFAULT_NETWORK_YES, 100L, 10L, 100L, 10L, 0L));
+        forcePollAndWaitForIdle();
+
+        // Verify data attribution for SATELLITE
+        // sTemplateImsi1 (general mobile) should count satellite data.
+        assertUidTotal(sTemplateImsi1, UID_RED, 100L, 10L, 100L, 10L, 0);
+        // sTemplateMobileSatelliteImsi1 (satellite specific) should count satellite data.
+        assertUidTotal(templateSatellite, UID_RED, 100L, 10L, 100L, 10L, 0);
+        // templateCellularOnly (cellular specific) should NOT count satellite data.
+        assertUidTotal(templateCellularOnly, UID_RED, 0L, 0L, 0L, 0L, 0);
+
+        // 2. Switch to CELLULAR mobile network for IMSI_1 on the same interface
+        NetworkStateSnapshot cellularState = buildMobileState(IMSI_1);
+
+        mService.notifyNetworkStatus(NETWORKS_MOBILE, new NetworkStateSnapshot[]{cellularState},
+                getActiveIface(cellularState), new UnderlyingNetworkInfo[0]);
+        // Mocking UID details to reflect total traffic on the interface since boot/last poll.
+        // Previous satellite data (100B) + new cellular data (200B) = 300B total on iface.
+        incrementCurrentTime(HOUR_IN_MILLIS);
+        mockNetworkStatsUidDetail(new NetworkStats(getElapsedRealtime(), 1)
+                .insertEntry(TEST_IFACE, UID_RED, SET_DEFAULT, TAG_NONE, METERED_YES, ROAMING_NO,
+                        DEFAULT_NETWORK_YES, 300L, 30L, 300L, 30L, 0L)); // 100sat + 200cell
+        forcePollAndWaitForIdle();
+
+        // Verify data attribution after CELLULAR usage
+        // sTemplateImsi1 (general mobile) should count cumulative data (satellite + cellular).
+        // (100 previous + 200 new = 300 total)
+        assertUidTotal(sTemplateImsi1, UID_RED, 300L, 30L, 300L, 30L, 0);
+        // sTemplateMobileSatelliteImsi1 should still only have the satellite data.
+        assertUidTotal(templateSatellite, UID_RED, 100L, 10L, 100L, 10L, 0);
+        // templateCellularOnly should now have the new cellular data (200B).
+        // (Current total on iface 300B - previous total on iface before this poll 100B = 200B)
+        assertUidTotal(templateCellularOnly, UID_RED, 200L, 20L, 200L, 20L, 0);
+    }
+
     @Test
     public void testForegroundBackground() throws Exception {
         // pretend that network comes online

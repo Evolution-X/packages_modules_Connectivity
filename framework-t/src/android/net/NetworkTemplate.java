@@ -55,6 +55,7 @@ import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.net.module.util.BitUtils;
 import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.NetworkIdentityUtils;
 
@@ -137,6 +138,10 @@ public final class NetworkTemplate implements Parcelable {
      * {@code TelephonyManager.NETWORK_TYPE_*} constants, and thus needs to stay in sync.
      */
     public static final int NETWORK_TYPE_ALL = -1;
+
+    /** @hide */
+    @VisibleForTesting
+    public static final long TRANSPORT_TYPES_ALL = 0L;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -410,6 +415,8 @@ public final class NetworkTemplate implements Parcelable {
     // Bitfield containing OEM network properties{@code NetworkIdentity#OEM_*}.
     private final int mOemManaged;
 
+    private final long mTransportTypesBits;
+
     private static void checkValidMatchSubscriberIds(int matchRule, String[] matchSubscriberIds) {
         switch (matchRule) {
             // CARRIER templates must always specify a valid subscriber ID.
@@ -459,7 +466,7 @@ public final class NetworkTemplate implements Parcelable {
                 subscriberId != null ? new String[] { subscriberId } : new String[0],
                 wifiNetworkKey != null ? new String[] { wifiNetworkKey } : new String[0],
                 getMeterednessForBackwardsCompatibility(matchRule), ROAMING_ALL,
-                DEFAULT_NETWORK_ALL, NETWORK_TYPE_ALL, OEM_MANAGED_ALL);
+                DEFAULT_NETWORK_ALL, NETWORK_TYPE_ALL, OEM_MANAGED_ALL, TRANSPORT_TYPES_ALL);
         if (matchRule == 6 || matchRule == 7) {
             Log.e(TAG, "Use MATCH_MOBILE with empty subscriberIds or MATCH_WIFI with empty "
                     + "wifiNetworkKeys instead of template with matchRule=" + matchRule);
@@ -495,7 +502,7 @@ public final class NetworkTemplate implements Parcelable {
                 wifiNetworkKey != null ? new String[] { wifiNetworkKey } : new String[0],
                 getMeterednessForBackwardsCompatibility(matchRule),
                 ROAMING_ALL, DEFAULT_NETWORK_ALL, NETWORK_TYPE_ALL,
-                OEM_MANAGED_ALL);
+                OEM_MANAGED_ALL, TRANSPORT_TYPES_ALL);
         // TODO : this is part of hidden-o txt, does that mean it should be annotated with
         // @UnsupportedAppUsage(maxTargetSdk = O) ? If yes, can't throwAtLeastU() lest apps
         // targeting O- crash on those devices.
@@ -512,14 +519,15 @@ public final class NetworkTemplate implements Parcelable {
         // subscriberIds.
         this(getBackwardsCompatibleMatchRule(matchRule),
                 matchSubscriberIds == null ? new String[]{} : matchSubscriberIds,
-                matchWifiNetworkKeys, metered, roaming, defaultNetwork, ratType, oemManaged);
+                matchWifiNetworkKeys, metered, roaming, defaultNetwork, ratType, oemManaged,
+                TRANSPORT_TYPES_ALL);
         throwAtLeastU();
     }
 
     /** @hide */
     public NetworkTemplate(int matchRule, String[] matchSubscriberIds,
             String[] matchWifiNetworkKeys, int metered, int roaming, int defaultNetwork,
-            int ratType, int oemManaged) {
+            int ratType, int oemManaged, long transportTypesBits) {
         Objects.requireNonNull(matchWifiNetworkKeys);
         Objects.requireNonNull(matchSubscriberIds);
         mMatchRule = matchRule;
@@ -530,6 +538,7 @@ public final class NetworkTemplate implements Parcelable {
         mDefaultNetwork = defaultNetwork;
         mRatType = ratType;
         mOemManaged = oemManaged;
+        mTransportTypesBits = transportTypesBits;
         checkValidMatchSubscriberIds(matchRule, matchSubscriberIds);
         if (!isKnownMatchRule(matchRule)) {
             throw new IllegalArgumentException("Unknown network template rule " + matchRule
@@ -546,6 +555,7 @@ public final class NetworkTemplate implements Parcelable {
         mDefaultNetwork = in.readInt();
         mRatType = in.readInt();
         mOemManaged = in.readInt();
+        mTransportTypesBits = in.readLong();
     }
 
     @Override
@@ -558,6 +568,7 @@ public final class NetworkTemplate implements Parcelable {
         dest.writeInt(mDefaultNetwork);
         dest.writeInt(mRatType);
         dest.writeInt(mOemManaged);
+        dest.writeLong(mTransportTypesBits);
     }
 
     @Override
@@ -590,6 +601,9 @@ public final class NetworkTemplate implements Parcelable {
         if (mOemManaged != OEM_MANAGED_ALL) {
             builder.append(", oemManaged=").append(getOemManagedNames(mOemManaged));
         }
+        if (mTransportTypesBits != TRANSPORT_TYPES_ALL) {
+            builder.append(", transportTypes=").append(Arrays.toString(getTransportTypes()));
+        }
         return builder.toString();
     }
 
@@ -597,7 +611,7 @@ public final class NetworkTemplate implements Parcelable {
     public int hashCode() {
         return Objects.hash(mMatchRule, Arrays.hashCode(mMatchSubscriberIds),
                 Arrays.hashCode(mMatchWifiNetworkKeys), mMetered, mRoaming, mDefaultNetwork,
-                mRatType, mOemManaged);
+                mRatType, mOemManaged, mTransportTypesBits);
     }
 
     @Override
@@ -611,7 +625,8 @@ public final class NetworkTemplate implements Parcelable {
                     && mRatType == other.mRatType
                     && mOemManaged == other.mOemManaged
                     && Arrays.equals(mMatchSubscriberIds, other.mMatchSubscriberIds)
-                    && Arrays.equals(mMatchWifiNetworkKeys, other.mMatchWifiNetworkKeys);
+                    && Arrays.equals(mMatchWifiNetworkKeys, other.mMatchWifiNetworkKeys)
+                    && mTransportTypesBits == other.mTransportTypesBits;
         }
         return false;
     }
@@ -710,6 +725,16 @@ public final class NetworkTemplate implements Parcelable {
     }
 
     /**
+     * Get the transport types filter of the template.
+     *
+     * @hide
+     */
+    @NonNull
+    public int[] getTransportTypes() {
+        return BitUtils.unpackBits(mTransportTypesBits);
+    }
+
+    /**
      * Get the OEM managed filter of the template. See {@code OEM_MANAGED_*} or
      * {@code android.net.NetworkIdentity#OEM_*}.
      */
@@ -730,7 +755,10 @@ public final class NetworkTemplate implements Parcelable {
         if (!matchesRoaming(ident)) return false;
         if (!matchesDefaultNetwork(ident)) return false;
         if (!matchesOemNetwork(ident)) return false;
+        if (!matchesTransportTypes(ident)) return false;
 
+        // TODO: Convert match rule handling into transport type matches and
+        //  eliminate the need of legacy network types.
         switch (mMatchRule) {
             case MATCH_MOBILE:
                 return matchesMobile(ident);
@@ -776,6 +804,13 @@ public final class NetworkTemplate implements Parcelable {
             || (mOemManaged == OEM_MANAGED_YES
                     && ident.mOemManaged != OEM_NONE)
             || (mOemManaged == ident.mOemManaged);
+    }
+
+    private boolean matchesTransportTypes(NetworkIdentity ident) {
+        if (this.mTransportTypesBits == TRANSPORT_TYPES_ALL) return true;
+        // Otherwise, for a match, the identity must possess ALL transport types
+        // specified in the template.
+        return (this.mTransportTypesBits & ident.mTransportTypesBits) == this.mTransportTypesBits;
     }
 
     private boolean matchesCollapsedRatType(NetworkIdentity ident) {
@@ -1004,7 +1039,8 @@ public final class NetworkTemplate implements Parcelable {
                         (template.mMatchRule == MATCH_MOBILE
                                 || template.mMatchRule == MATCH_CARRIER)
                                 ? METERED_YES : METERED_ALL,
-                        ROAMING_ALL, DEFAULT_NETWORK_ALL, NETWORK_TYPE_ALL, OEM_MANAGED_ALL);
+                        ROAMING_ALL, DEFAULT_NETWORK_ALL, NETWORK_TYPE_ALL, OEM_MANAGED_ALL,
+                        TRANSPORT_TYPES_ALL);
             }
         }
 
@@ -1041,6 +1077,7 @@ public final class NetworkTemplate implements Parcelable {
         private int mRoaming;
         private int mDefaultNetwork;
         private int mRatType;
+        private long mTransportTypesBits;
 
         // Bitfield containing OEM network properties {@code NetworkIdentity#OEM_*}.
         private int mOemManaged;
@@ -1059,6 +1096,7 @@ public final class NetworkTemplate implements Parcelable {
             mDefaultNetwork = DEFAULT_NETWORK_ALL;
             mRatType = NETWORK_TYPE_ALL;
             mOemManaged = OEM_MANAGED_ALL;
+            mTransportTypesBits = TRANSPORT_TYPES_ALL;
         }
 
         /**
@@ -1154,6 +1192,25 @@ public final class NetworkTemplate implements Parcelable {
         }
 
         /**
+         * Sets the transport types filter for this template.
+         *
+         * - If the array is empty, matches any transport type (wildcard).
+         * - If not empty, matches networks possessing ALL specified transport types.
+         * For example, a set with {@code TRANSPORT_WIFI} and {@code TRANSPORT_VPN}
+         * requires a network to have both.
+         *
+         * @param transportTypes The array of {@code NetworkCapabilities#TRANSPORT_*} constants.
+         *                       An empty array acts as a wildcard for all transports.
+         * @return This {@code Builder} for chaining.
+         * @hide
+         */
+        @NonNull
+        public Builder setTransportTypes(int[] transportTypes) {
+            mTransportTypesBits = BitUtils.packBits(transportTypes);
+            return this;
+        }
+
+        /**
          * Set the OEM managed filter.
          *
          * @param oemManaged the match rule to match different type of OEM managed network or
@@ -1203,7 +1260,7 @@ public final class NetworkTemplate implements Parcelable {
             return new NetworkTemplate(mMatchRule,
                     mMatchSubscriberIds.toArray(new String[0]),
                     mMatchWifiNetworkKeys.toArray(new String[0]), mMetered, mRoaming,
-                    mDefaultNetwork, mRatType, mOemManaged);
+                    mDefaultNetwork, mRatType, mOemManaged, mTransportTypesBits);
         }
     }
 }

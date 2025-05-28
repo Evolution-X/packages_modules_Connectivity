@@ -21,7 +21,10 @@ import android.content.Context
 import android.net.ConnectivityManager.TYPE_MOBILE
 import android.net.ConnectivityManager.TYPE_TEST
 import android.net.ConnectivityManager.TYPE_WIFI
+import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
+import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
 import android.net.NetworkCapabilities.TRANSPORT_TEST
+import android.net.NetworkCapabilities.TRANSPORT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkIdentity.OEM_NONE
 import android.net.NetworkIdentity.OEM_PAID
@@ -40,6 +43,7 @@ import android.net.NetworkTemplate.NETWORK_TYPE_ALL
 import android.net.NetworkTemplate.OEM_MANAGED_ALL
 import android.net.NetworkTemplate.OEM_MANAGED_NO
 import android.net.NetworkTemplate.OEM_MANAGED_YES
+import android.net.NetworkTemplate.TRANSPORT_TYPES_ALL
 import android.net.NetworkTemplate.buildTemplateMobileAll
 import android.net.NetworkTemplate.buildTemplateMobileWildcard
 import android.net.NetworkTemplate.buildTemplateWifiWildcard
@@ -47,6 +51,7 @@ import android.net.NetworkTemplate.normalize
 import android.net.wifi.WifiInfo
 import android.os.Build
 import android.telephony.TelephonyManager
+import com.android.net.module.util.BitUtils
 import com.android.testutils.DevSdkIgnoreRule
 import com.android.testutils.DevSdkIgnoreRunner
 import com.android.testutils.NonNullTestUtils
@@ -93,7 +98,8 @@ class NetworkTemplateTest {
             subscriberId: String? = null,
             wifiKey: String? = null,
             oemManaged: Int = OEM_NONE,
-            metered: Boolean = true
+            metered: Boolean = true,
+            transportTypes: IntArray = intArrayOf(),
     ): NetworkStateSnapshot {
         `when`(mockWifiInfo.getNetworkKey()).thenReturn(wifiKey)
         val lp = LinkProperties()
@@ -108,6 +114,7 @@ class NetworkTemplateTest {
                     NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE,
                     (oemManaged and OEM_PRIVATE) == OEM_PRIVATE
             )
+            setTransportTypes(transportTypes)
             if (type == TYPE_TEST) {
                 wifiKey?.let { TestNetworkSpecifier(it) }?.let {
                     // Must have a single non-test transport specified to use setNetworkSpecifier.
@@ -193,7 +200,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 NETWORK_TYPE_ALL,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                TRANSPORT_TYPES_ALL
         )
 
         val identMobile1 = buildNetworkIdentity(
@@ -676,6 +684,7 @@ class NetworkTemplateTest {
     fun testEquals() {
         val templateImsi1 = NetworkTemplate.Builder(MATCH_MOBILE).setMeteredness(METERED_YES)
                 .setSubscriberIds(setOf(TEST_IMSI1)).setRatType(TelephonyManager.NETWORK_TYPE_UMTS)
+                .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE, TRANSPORT_VPN))
                 .build()
         val dupTemplateImsi1 = NetworkTemplate(
                 MATCH_MOBILE,
@@ -685,7 +694,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 TelephonyManager.NETWORK_TYPE_UMTS,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                BitUtils.packBits(intArrayOf(TRANSPORT_SATELLITE, TRANSPORT_VPN))
         )
         val templateImsi2 = NetworkTemplate.Builder(MATCH_MOBILE).setMeteredness(METERED_YES)
                 .setSubscriberIds(setOf(TEST_IMSI2)).setRatType(TelephonyManager.NETWORK_TYPE_UMTS)
@@ -696,7 +706,9 @@ class NetworkTemplateTest {
         assertNotEquals(templateImsi1, templateImsi2)
 
         val templateWifiKey1 = NetworkTemplate.Builder(MATCH_WIFI)
-                .setWifiNetworkKeys(setOf(TEST_WIFI_KEY1)).build()
+                .setWifiNetworkKeys(setOf(TEST_WIFI_KEY1))
+                .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
+                .build()
         val dupTemplateWifiKey1 = NetworkTemplate(
                 MATCH_WIFI,
                 emptyArray<String>(),
@@ -705,7 +717,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 NETWORK_TYPE_ALL,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                BitUtils.packBits(intArrayOf(TRANSPORT_WIFI))
         )
         val templateWifiKey2 = NetworkTemplate.Builder(MATCH_WIFI)
                 .setWifiNetworkKeys(setOf(TEST_WIFI_KEY2)).build()
@@ -725,7 +738,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 TelephonyManager.NETWORK_TYPE_LTE,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                0x12345678L
         )
         val templateWifi = NetworkTemplate(
                 MATCH_WIFI,
@@ -735,7 +749,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 0,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                0xDEADBEEFL
         )
         val templateOem = NetworkTemplate(
                 MATCH_MOBILE,
@@ -745,11 +760,12 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 0,
-                OEM_MANAGED_YES
+                OEM_MANAGED_YES,
+                0xFFFFFFFFL
         )
-        assertParcelSane(templateMobile, 8)
-        assertParcelSane(templateWifi, 8)
-        assertParcelSane(templateOem, 8)
+        assertParcelSane(templateMobile, 9)
+        assertParcelSane(templateWifi, 9)
+        assertParcelSane(templateOem, 9)
     }
 
     // Verify NETWORK_TYPE_* constants in NetworkTemplate do not conflict with
@@ -818,7 +834,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 NETWORK_TYPE_ALL,
-                OEM_MANAGED_YES
+                OEM_MANAGED_YES,
+                TRANSPORT_TYPES_ALL
         )
         val templateOemAll = NetworkTemplate(
                 matchType,
@@ -828,7 +845,8 @@ class NetworkTemplateTest {
                 ROAMING_ALL,
                 DEFAULT_NETWORK_ALL,
                 NETWORK_TYPE_ALL,
-                OEM_MANAGED_ALL
+                OEM_MANAGED_ALL,
+                TRANSPORT_TYPES_ALL
         )
 
         for (identityOemManagedState in oemManagedStates) {
@@ -854,7 +872,8 @@ class NetworkTemplateTest {
                         ROAMING_ALL,
                         DEFAULT_NETWORK_ALL,
                         NETWORK_TYPE_ALL,
-                        templateOemManagedState
+                        templateOemManagedState,
+                        TRANSPORT_TYPES_ALL
                 )
                 if (identityOemManagedState == templateOemManagedState) {
                     template.assertMatches(ident)
@@ -884,6 +903,54 @@ class NetworkTemplateTest {
                 identWifiKey = TEST_WIFI_KEY1
         )
         matchOemManagedIdent(TYPE_WIFI, MATCH_WIFI, identWifiKey = TEST_WIFI_KEY1)
+    }
+
+    @Test
+    fun testTransportTypesMatches() {
+        val identSatellite = NetworkIdentity.Builder()
+                .setType(TYPE_MOBILE)
+                .setTransportTypes(setOf(TRANSPORT_SATELLITE))
+                .build()
+        val identMobileVpn = NetworkIdentity.Builder()
+                .setType(TYPE_MOBILE)
+                .setTransportTypes(setOf(TRANSPORT_CELLULAR, TRANSPORT_VPN))
+                .build()
+        val identOnlyCellular = NetworkIdentity.Builder()
+                .setType(TYPE_MOBILE)
+                .setTransportTypes(setOf(TRANSPORT_CELLULAR))
+                .build()
+
+        val templateMobileNoTransport = NetworkTemplate.Builder(MATCH_MOBILE)
+                .build() // Wildcard for transports
+        val templateMobileWithCellularTransport = NetworkTemplate.Builder(MATCH_MOBILE)
+                .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR))
+                .build()
+        val templateSatellite = NetworkTemplate.Builder(MATCH_MOBILE)
+                .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
+                .build()
+        val templateVpnAndCellular = NetworkTemplate.Builder(MATCH_MOBILE)
+                .setTransportTypes(intArrayOf(TRANSPORT_VPN, TRANSPORT_CELLULAR))
+                .build()
+
+        // 1. Mobile wildcard template
+        templateMobileNoTransport.assertMatches(identSatellite)
+        templateMobileNoTransport.assertMatches(identMobileVpn)
+        templateMobileNoTransport.assertMatches(identOnlyCellular)
+
+        // 2. Template requiring TRANSPORT_CELLULAR
+        templateMobileWithCellularTransport.assertDoesNotMatch(identSatellite)
+        templateMobileWithCellularTransport.assertMatches(identMobileVpn)
+        templateMobileWithCellularTransport.assertMatches(identOnlyCellular)
+
+        // 3. Template requiring TRANSPORT_SATELLITE
+        templateSatellite.assertMatches(identSatellite)
+        templateSatellite.assertDoesNotMatch(identMobileVpn)
+        templateSatellite.assertDoesNotMatch(identOnlyCellular)
+
+        // 4. Template requiring TRANSPORT_VPN AND TRANSPORT_CELLULAR
+        templateVpnAndCellular.assertDoesNotMatch(identSatellite)
+        templateVpnAndCellular.assertMatches(identMobileVpn)
+        templateVpnAndCellular.assertDoesNotMatch(identOnlyCellular)
     }
 
     @Test
