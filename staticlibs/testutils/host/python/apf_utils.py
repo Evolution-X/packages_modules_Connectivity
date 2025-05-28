@@ -32,57 +32,28 @@ class UnsupportedOperationException(Exception):
 def get_apf_counter(
     ad: android_device.AndroidDevice, iface: str, counter_name: str
 ) -> int:
-  counters = get_apf_counters_from_dumpsys(ad, iface)
-  return counters.get(counter_name, 0)
+  counters = get_apf_counters_from_cmd(ad, iface)
+  try:
+    return int(counters.get(counter_name, 0))
+  except ValueError:
+    return -1
 
-
-def get_apf_counters_from_dumpsys(
+def get_apf_counters_from_cmd(
     ad: android_device.AndroidDevice, iface_name: str
 ) -> dict:
-  dumpsys = adb_utils.get_dumpsys_for_service(ad, "network_stack")
+  cmd = f'cmd network_stack apf {iface_name} dump-counters'
+  output = AdbOutputHandler(ad, cmd).get_output()
+  data_dict = {}
+  for line in output.strip().split('\n'):
+    if line: # Ensure the line is not empty
+      # split only at the first colon
+      parts = line.split(':', 1)
+      if len(parts) == 2:
+        data_dict[parts[0]] = parts[1]
+      else:
+        raise assert_utils.UnexpectedBehaviorError(f"Got unexpected output: {output}.")
 
-  # Extract IpClient section of the specified interface.
-  # This takes inputs like:
-  # IpClient.wlan0
-  #   ...
-  # IpClient.wlan1
-  #   ...
-  iface_pattern = re.compile(
-      r"^IpClient\." + iface_name + r"\n" + r"((^\s.*\n)+)", re.MULTILINE
-  )
-  iface_result = iface_pattern.search(dumpsys)
-  if iface_result is None:
-    raise PatternNotFoundException("Cannot find IpClient for " + iface_name)
-
-  # Extract APF counters section from IpClient section, which looks like:
-  #     APF packet counters:
-  #       COUNTER_NAME: VALUE
-  #       ....
-  apf_pattern = re.compile(
-      r"APF packet counters:.*\n.(\s+[A-Z_0-9]+: \d+\n)+", re.MULTILINE
-  )
-  apf_result = apf_pattern.search(iface_result.group(0))
-  if apf_result is None:
-    raise PatternNotFoundException(
-        "Cannot find APF counters in text: " + iface_result.group(0)
-    )
-
-  # Extract key-value pairs from APF counters section into a list of tuples,
-  # e.g. [('COUNTER1', '1'), ('COUNTER2', '2')].
-  counter_pattern = re.compile(r"(?P<name>[A-Z_0-9]+): (?P<value>\d+)")
-  counter_result = counter_pattern.findall(apf_result.group(0))
-  if counter_result is None:
-    raise PatternNotFoundException(
-        "Cannot extract APF counters in text: " + apf_result.group(0)
-    )
-
-  # Convert into a dict.
-  result = {}
-  for key, value_str in counter_result:
-    result[key] = int(value_str)
-
-  ad.log.debug("Getting apf counters: " + str(result))
-  return result
+  return data_dict
 
 def get_ipv4_addresses(
     ad: android_device.AndroidDevice, iface_name: str
@@ -232,6 +203,22 @@ def is_packet_capture_supported(
     )
     assert_utils.expect_throws(
       lambda: get_matched_packet_counts(ad, "", ""),
+      assert_utils.UnexpectedBehaviorError
+    )
+  except assert_utils.UnexpectedExceptionError:
+    return False
+
+  # If no UnsupportOperationException is thrown, regard it as supported
+  return True
+
+def is_apf_dump_counters_supported(
+    ad: android_device.AndroidDevice
+) -> bool:
+  try:
+    # Invoke the shell command with empty argument and see how NetworkStack respond.
+    # If supported, an IllegalArgumentException with help page will be printed.
+    assert_utils.expect_throws(
+      lambda: get_apf_counters_from_cmd(ad, ""),
       assert_utils.UnexpectedBehaviorError
     )
   except assert_utils.UnexpectedExceptionError:
