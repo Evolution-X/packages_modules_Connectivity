@@ -344,6 +344,7 @@ import com.android.metrics.NetworkList;
 import com.android.metrics.NetworkRequestCount;
 import com.android.metrics.RequestCountForType;
 import com.android.metrics.SatelliteAccessInfo;
+import com.android.metrics.SatelliteCoarseUsageMetricsCollector;
 import com.android.modules.utils.BasicShellCommandHandler;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
@@ -1066,6 +1067,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final NetworkNotificationManager mNotifier;
     private final LingerMonitor mLingerMonitor;
     private final SatelliteAccessController mSatelliteAccessController;
+    private final SatelliteCoarseUsageMetricsCollector mSatelliteCoarseUsageMetricsCollector;
 
     private final L2capNetworkProvider mL2capNetworkProvider;
 
@@ -1707,6 +1709,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     connectivityServiceInternalHandler);
         }
 
+        /**
+         * @see SatelliteCoarseUsageMetricsCollector
+         */
+        @Nullable
+        public SatelliteCoarseUsageMetricsCollector makeSatelliteCoarseUsageMetricsCollector(
+                @NonNull final Context context) {
+            return new SatelliteCoarseUsageMetricsCollector(context);
+        }
+
         /** Creates an L2capNetworkProvider */
         public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
             return new L2capNetworkProvider(context);
@@ -2090,6 +2101,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         mConstrainedDataSatelliteMetrics = (mSatelliteAccessController != null)
                 && mDeps.isFeatureNotChickenedOut(mContext, CONSTRAINED_DATA_SATELLITE_METRICS);
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector =
+                    mDeps.makeSatelliteCoarseUsageMetricsCollector(mContext);
+        } else {
+            mSatelliteCoarseUsageMetricsCollector = null;
+        }
 
         if (mDeps.flagConnectivityServiceDestroySocket()) {
             mIpToNetworksMap = new HashMap<>();
@@ -4363,6 +4380,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // forever, this replaces a synchronous call to PermissionMonitor#initialize, which
         // could have blocked forever too.
         permissionMonitorInitializeDone.block();
+
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector.startMonitoring();
+        }
     }
 
     /**
@@ -4688,6 +4709,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         pw.println();
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.dump(pw);
+        }
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector.dump(pw);
         }
 
         pw.println();
