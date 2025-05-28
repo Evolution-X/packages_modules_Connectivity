@@ -24,13 +24,14 @@ from net_tests_utils.host.python.apf_utils import (
     UnsupportedOperationException,
     get_apf_capabilities,
     get_apf_counter,
-    get_apf_counters_from_dumpsys,
+    get_apf_counters_from_cmd,
     get_ipv4_addresses,
     get_non_tentative_ipv6_addresses,
     get_exclude_all_host_ipv6_multicast_addresses,
     get_hardware_address,
     is_send_raw_packet_downstream_supported,
     is_packet_capture_supported,
+    is_apf_dump_counters_supported,
     start_capture_packets,
     stop_capture_packets,
     get_matched_packet_counts,
@@ -50,53 +51,24 @@ class TestApfUtils(base_test.BaseTestClass, parameterized.TestCase):
   def setup_test(self):
     self.mock_ad = MagicMock()  # Mock Android device object
 
-  @patch("net_tests_utils.host.python.adb_utils.get_dumpsys_for_service")
-  def test_get_apf_counters_from_dumpsys_success(
-      self, mock_get_dumpsys: MagicMock
-  ) -> None:
-    mock_get_dumpsys.return_value = """
-IpClient.wlan0
-  APF packet counters:
-    COUNTER_NAME1: 123
-    COUNTER_NAME2: 456
-"""
-    counters = get_apf_counters_from_dumpsys(self.mock_ad, "wlan0")
-    asserts.assert_equal(counters, {"COUNTER_NAME1": 123, "COUNTER_NAME2": 456})
-
-  @patch("net_tests_utils.host.python.adb_utils.get_dumpsys_for_service")
-  def test_get_apf_counters_from_dumpsys_exceptions(
-      self, mock_get_dumpsys: MagicMock
-  ) -> None:
-    test_cases = [
-        "",
-        "IpClient.wlan0\n",
-        "IpClient.wlan0\n APF packet counters:\n",
-        """
-IpClient.wlan1
-  APF packet counters:
-    COUNTER_NAME1: 123
-    COUNTER_NAME2: 456
-""",
-    ]
-
-    for dumpsys_output in test_cases:
-      mock_get_dumpsys.return_value = dumpsys_output
-      with asserts.assert_raises(PatternNotFoundException):
-        get_apf_counters_from_dumpsys(self.mock_ad, "wlan0")
-
-  @patch("net_tests_utils.host.python.apf_utils.get_apf_counters_from_dumpsys")
+  @patch("net_tests_utils.host.python.apf_utils.get_apf_counters_from_cmd")
   def test_get_apf_counter(self, mock_get_counters: MagicMock) -> None:
     iface = "wlan0"
     mock_get_counters.return_value = {
-        "COUNTER_NAME1": 123,
-        "COUNTER_NAME2": 456,
+        "COUNTER_NAME1": "123",
+        "COUNTER_NAME2": "456",
+        "COUNTER_NAME3": "[ERROR: impossible]",
     }
     asserts.assert_equal(
         get_apf_counter(self.mock_ad, iface, "COUNTER_NAME1"), 123
     )
+    # Invalid counter value
+    asserts.assert_equal(
+        get_apf_counter(self.mock_ad, iface, "COUNTER_NAME3"), -1
+    )
     # Not found
     asserts.assert_equal(
-        get_apf_counter(self.mock_ad, iface, "COUNTER_NAME3"), 0
+        get_apf_counter(self.mock_ad, iface, "COUNTER_NAME4"), 0
     )
 
   @patch("net_tests_utils.host.python.adb_utils.adb_shell")
@@ -378,6 +350,74 @@ IpClient.wlan1
       asserts.assert_false(
           is_packet_capture_supported(self.mock_ad),
           "Get matched packet counts should not be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_apf_counters_from_cmd_success(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = """
+        NDIANNESS: 305419896
+        TOTAL_PACKETS: 157553
+        FILTER_AGE_SECONDS: 356
+        FILTER_AGE_16384THS: 5836719
+        APF_VERSION: 6000
+        APF_PROGRAM_ID: 25
+        PASSED_ARP_UNICAST_REPLY: 7
+        PASSED_IPV4: 14
+        PASSED_IPV4_UNICAST: 153472
+        PASSED_IPV6_ICMP: 1
+        PASSED_IPV6_NON_ICMP: 2764
+        PASSED_IPV6_UNICAST_NON_ICMP: 970
+        PASSED_RA: 6
+        DROPPED_RA: 2
+        DROPPED_IPV4_BROADCAST_ADDR: 48
+        DROPPED_IPV4_BROADCAST_NET: 63
+        DROPPED_IPV4_MULTICAST: 30
+        DROPPED_IPV6_NS_OTHER_HOST: 6
+        DROPPED_IPV6_NS_REPLIED_NON_DAD: 9
+        DROPPED_ETHERTYPE_NOT_ALLOWED: 58
+        DROPPED_ARP_OTHER_HOST: 89
+        DROPPED_ARP_REQUEST_REPLIED: 13
+      """
+      get_apf_counters_from_cmd(
+          self.mock_ad, TEST_IFACE_NAME
+      )
+      mock_adb_shell.assert_called_once_with(
+          self.mock_ad,
+          f"cmd network_stack apf {TEST_IFACE_NAME} dump-counters"
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_apf_counters_from_cmd_failure(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.return_value = (  # Unexpected command output
+          "Any Unexpected Output"
+      )
+      with asserts.assert_raises(UnexpectedBehaviorError):
+          get_apf_counters_from_cmd(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_true(
+          is_packet_capture_supported(self.mock_ad),
+          "Dump APF packet counters should be supported.",
+      )
+
+  @patch("net_tests_utils.host.python.adb_utils.adb_shell")
+  def test_get_apf_counters_from_cmd_unsupported(
+          self, mock_adb_shell: MagicMock
+  ) -> None:
+      mock_adb_shell.side_effect = AdbError(
+          cmd="", stdout="Unknown command", stderr="", ret_code=3
+      )
+      with asserts.assert_raises(UnsupportedOperationException):
+          get_apf_counters_from_cmd(
+              self.mock_ad, TEST_IFACE_NAME
+          )
+      asserts.assert_false(
+          is_apf_dump_counters_supported(self.mock_ad),
+          "Dump APF packet counters should not be supported.",
       )
 
   @parameterized.parameters(
