@@ -990,7 +990,11 @@ class EthernetManagerTest {
 
         // UpdateConfiguration() currently does a restart on the ethernet interface therefore lost
         // will be expected first before available, as part of the restart.
-        cb.expect<Lost>(network)
+        // Note: this uses eventuallyExpect, because depending on how the DAD timers align, there
+        // may be 1 or 2 onLinkPropertiesChanged() callbacks. It is possible for that second
+        // onLinkPropertiesChanged() to arrive after assertNeverLost() returns.
+        // TODO: consider disabling DAD for these tests.
+        cb.eventuallyExpectLost(network)
         val updatedNetwork = cb.expect<Available>().network
         // With the test process UID allowed, binding to a restricted network should be successful.
         Socket().use { socket -> updatedNetwork.bindSocket(socket) }
