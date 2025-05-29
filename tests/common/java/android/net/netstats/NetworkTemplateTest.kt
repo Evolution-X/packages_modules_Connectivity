@@ -20,6 +20,8 @@ import android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_SATELLITE
+import android.net.NetworkCapabilities.TRANSPORT_TEST
+import android.net.NetworkCapabilities.TRANSPORT_VPN
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 import android.net.NetworkStats.DEFAULT_NETWORK_ALL
 import android.net.NetworkStats.METERED_ALL
@@ -32,6 +34,7 @@ import android.net.NetworkTemplate.MATCH_CARRIER
 import android.net.NetworkTemplate.MATCH_ETHERNET
 import android.net.NetworkTemplate.MATCH_MOBILE
 import android.net.NetworkTemplate.MATCH_PROXY
+import android.net.NetworkTemplate.MATCH_TEST
 import android.net.NetworkTemplate.MATCH_WIFI
 import android.net.NetworkTemplate.NETWORK_TYPE_ALL
 import android.net.NetworkTemplate.OEM_MANAGED_ALL
@@ -50,6 +53,7 @@ import org.junit.runners.JUnit4
 private const val TEST_IMSI1 = "imsi"
 private const val TEST_WIFI_KEY1 = "wifiKey1"
 private const val TEST_WIFI_KEY2 = "wifiKey2"
+private const val INVALID_TRANSPORT = 100
 
 @RunWith(JUnit4::class)
 @ConnectivityModuleTest
@@ -306,6 +310,7 @@ class NetworkTemplateTest {
         assertGetSetTransportTypes(MATCH_PROXY, TRANSPORT_BLUETOOTH)
         assertGetSetTransportTypes(MATCH_CARRIER, TRANSPORT_CELLULAR)
         assertGetSetTransportTypes(MATCH_CARRIER, TRANSPORT_WIFI)
+        assertGetSetTransportTypes(MATCH_TEST, TRANSPORT_TEST)
     }
 
     private fun assertGetSetTransportTypes(matchRule: Int, transport: Int) {
@@ -317,5 +322,70 @@ class NetworkTemplateTest {
         val template = builder.build()
         assertEquals(1, template.transportTypes.size)
         assertEquals(transport, template.transportTypes[0])
+    }
+
+    @Test
+    fun testValidateTransportTypesNoTransportsSetSuccess() {
+        // Should succeed for any match rule if no transports are explicitly set.
+        listOf(
+                MATCH_WIFI,
+                MATCH_MOBILE,
+                MATCH_ETHERNET,
+                MATCH_BLUETOOTH,
+                MATCH_PROXY,
+                MATCH_TEST
+        ).forEach { matchRule ->
+            NetworkTemplate.Builder(matchRule)
+                    .setTransportTypes(intArrayOf()) // Explicitly empty, or just don't call it
+                    .build() // Should not throw
+        }
+        NetworkTemplate.Builder(MATCH_CARRIER)
+                .setSubscriberIds(setOf(TEST_IMSI1))
+                .setTransportTypes(intArrayOf())
+                .build() // Should not throw
+    }
+
+    @Test
+    fun testValidateTransportTypesDeducedTransportPlusCompatibleSuccess() {
+        NetworkTemplate.Builder(MATCH_WIFI)
+                .setTransportTypes(intArrayOf(TRANSPORT_WIFI, TRANSPORT_VPN))
+                .build()
+        NetworkTemplate.Builder(MATCH_MOBILE)
+                .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR, TRANSPORT_TEST))
+                .build()
+    }
+
+    @Test
+    fun testValidateTransportTypesDeducedTransportMissingThrows() {
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_WIFI)
+                    .setTransportTypes(intArrayOf(TRANSPORT_CELLULAR))
+                    .build()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_MOBILE)
+                    .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
+                    .build()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_ETHERNET)
+                    .setTransportTypes(intArrayOf(TRANSPORT_WIFI))
+                    .build()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_CARRIER)
+                    .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
+                    .build()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_TEST)
+                    .setTransportTypes(intArrayOf(TRANSPORT_SATELLITE))
+                    .build()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkTemplate.Builder(MATCH_TEST)
+                    .setTransportTypes(intArrayOf(INVALID_TRANSPORT))
+                    .build()
+        }
     }
 }

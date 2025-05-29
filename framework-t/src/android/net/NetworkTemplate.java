@@ -24,6 +24,12 @@ import static android.net.ConnectivityManager.TYPE_PROXY;
 import static android.net.ConnectivityManager.TYPE_WIFI;
 import static android.net.ConnectivityManager.TYPE_WIFI_P2P;
 import static android.net.ConnectivityManager.TYPE_WIMAX;
+import static android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH;
+import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
+import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
+import static android.net.NetworkCapabilities.TRANSPORT_SATELLITE;
+import static android.net.NetworkCapabilities.TRANSPORT_TEST;
+import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkIdentity.OEM_NONE;
 import static android.net.NetworkIdentity.OEM_PAID;
 import static android.net.NetworkIdentity.OEM_PRIVATE;
@@ -37,6 +43,7 @@ import static android.net.NetworkStats.ROAMING_ALL;
 import static android.net.NetworkStats.ROAMING_NO;
 import static android.net.NetworkStats.ROAMING_YES;
 
+import static com.android.net.module.util.CollectionUtils.toIntArray;
 import static com.android.net.module.util.NetworkCapabilitiesUtils.TYPE_TEST;
 
 import android.annotation.IntDef;
@@ -1237,6 +1244,7 @@ public final class NetworkTemplate implements Parcelable {
 
         private void assertRequestableParameters() {
             validateWifiNetworkKeys();
+            validateTransportTypes();
             // TODO: Check all the input are legitimate.
         }
 
@@ -1246,6 +1254,59 @@ public final class NetworkTemplate implements Parcelable {
                     && !mMatchWifiNetworkKeys.isEmpty()) {
                 throw new IllegalArgumentException("Trying to build non wifi match rule: "
                         + mMatchRule + " with wifi network keys");
+            }
+        }
+
+        // Validates if transport types are specified (i.e., mTransportTypesBits is not 0),
+        // they must be consistent with the template's mMatchRule. This means
+        // the specified transports must include at least one type that is
+        // deducible or expected for that matchRule.
+        // For example, if mMatchRule is MATCH_WIFI and transports are specified,
+        // TRANSPORT_WIFI must be among them.
+        private void validateTransportTypes() {
+            assertDeducedTransportTypes(mMatchRule, mTransportTypesBits);
+        }
+
+        /**
+         * Determines possible transport types for a match rule.
+         * @return Set of TRANSPORT_* constants.
+         * @throws IllegalArgumentException for unknown matchRule.
+         */
+        private static Set<Integer> getPossibleTransportsForMatchRule(int matchRule) {
+            return switch (matchRule) {
+                case MATCH_MOBILE -> Set.of(TRANSPORT_CELLULAR, TRANSPORT_SATELLITE);
+                case MATCH_WIFI -> Set.of(TRANSPORT_WIFI);
+                case MATCH_ETHERNET -> Set.of(TRANSPORT_ETHERNET);
+                // See NetworkCapabilitiesUtils#deduceTransportTypeForLegacyIdentity.
+                case MATCH_PROXY, MATCH_BLUETOOTH -> Set.of(TRANSPORT_BLUETOOTH);
+                // Carrier networks are identified by subscriberId and can be either cellular
+                // or carrier-provided Wi-Fi.
+                case MATCH_CARRIER -> Set.of(TRANSPORT_CELLULAR, TRANSPORT_WIFI);
+                case MATCH_TEST -> Set.of(TRANSPORT_TEST);
+                default -> throw new IllegalArgumentException(
+                        "Unexpected match rule: " + matchRule);
+            };
+        }
+
+        /**
+         * Asserts template's transport types are consistent with its match rule.
+         * Called during NetworkTemplate construction.
+         *
+         * @param matchRule The NetworkTemplate match rule.
+         * @param transportTypesBits Bitmask of transport types. No-op if 0.
+         * @throws IllegalArgumentException if transports are inconsistent with the rule.
+         */
+        private static void assertDeducedTransportTypes(int matchRule, long transportTypesBits) {
+            // No transports specified, nothing to check.
+            if (transportTypesBits == 0L) return;
+
+            Set<Integer> possibleTransportsSet = getPossibleTransportsForMatchRule(matchRule);
+            final long possibleTransportBitsForMatchRule =
+                    BitUtils.packBits(toIntArray(possibleTransportsSet));
+
+            // Template transports must overlap with possible transports for the rule.
+            if ((transportTypesBits & possibleTransportBitsForMatchRule) == 0L) {
+                throw new IllegalArgumentException("No deduced transport type: " + matchRule);
             }
         }
 
