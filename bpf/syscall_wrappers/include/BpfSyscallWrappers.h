@@ -260,7 +260,7 @@ inline int bpfGetFd ## NAME(const borrowed_fd& fd) { \
         .info_len = sizeof(info), \
         .info = ptr_to_u64(&info), \
     }}; \
-    int rv = bpf(BPF_OBJ_GET_INFO_BY_FD, attr); \
+    int rv = bpf(BPF_OBJ_GET_INFO_BY_FD, &attr); \
     if (rv) return rv; \
     if (attr.info.info_len < offsetof(bpf_ ## TYPE ## _info, FIELD) + sizeof(info.FIELD)) { \
         errno = EOPNOTSUPP; \
