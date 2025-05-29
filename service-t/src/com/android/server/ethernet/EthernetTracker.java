@@ -39,6 +39,7 @@ import android.net.IpConfiguration;
 import android.net.IpConfiguration.IpAssignment;
 import android.net.IpConfiguration.ProxySettings;
 import android.net.LinkAddress;
+import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.StaticIpConfiguration;
 import android.os.ConditionVariable;
@@ -220,18 +221,24 @@ public class EthernetTracker {
             // ignore messages for the loopback interface
             if ((ifinfomsg.flags & OsConstants.IFF_LOOPBACK) != 0) return;
 
-            // check if the received message applies to an ethernet interface.
+            // rtnl_fill_ifinfo sets IFLA_ADDRESS when there is one. This should always be true for
+            // all ethernet interfaces.
+            final MacAddress mac = msg.getHardwareAddress();
+            if (mac == null) return;
+
             final String ifname = msg.getInterfaceName();
-            if (!shouldTrackInterface(ifname)) return;
+            final EthernetPort port = new EthernetPort(ifname, mac, ifinfomsg.index);
+            // check if the received message applies to an ethernet interface.
+            if (!shouldTrackInterface(port.getInterfaceName())) return;
 
             switch (msg.getHeader().nlmsg_type) {
                 case NetlinkConstants.RTM_NEWLINK:
                     final boolean linkUp = (ifinfomsg.flags & NetlinkConstants.IFF_LOWER_UP) != 0;
-                    onNewLink(ifname, linkUp);
+                    onNewLink(port.getInterfaceName(), linkUp);
                     break;
 
                 case NetlinkConstants.RTM_DELLINK:
-                    onDelLink(ifname);
+                    onDelLink(port.getInterfaceName());
                     break;
 
                 default:
