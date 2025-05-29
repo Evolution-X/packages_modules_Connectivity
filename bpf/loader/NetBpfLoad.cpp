@@ -639,10 +639,11 @@ static bool mapMatchesExpectations(const unique_fd& fd, const string& mapName,
         return true;
     }
 
-    ALOGE("bpf map name %s mismatch: desired/found: "
+    ALOGE("bpf map name %s mismatch: desired/found (errno: %d): "
           "type:%d/%d key:%u/%d value:%u/%d entries:%u/%d flags:%u/%d",
-          mapName.c_str(), type, fd_type, mapDef.key_size, fd_key_size, mapDef.value_size,
-          fd_value_size, mapDef.max_entries, fd_max_entries, desired_map_flags, fd_map_flags);
+          mapName.c_str(), errno, type, fd_type, mapDef.key_size, fd_key_size,
+          mapDef.value_size, fd_value_size, mapDef.max_entries, fd_max_entries,
+          desired_map_flags, fd_map_flags);
     return false;
 }
 
