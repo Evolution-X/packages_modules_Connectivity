@@ -397,6 +397,9 @@ static inline __always_inline int do_forward4_bottom(struct __sk_buff* skb,
     uint64_t packets = 1;
     uint64_t L3_bytes = skb->len - l2_header_size;
     if (L3_bytes > v->pmtu) {
+        if (KVER_IS_AT_LEAST(kver, 5, 4, 0)) {
+            if (skb->gso_segs <= 1) TC_PUNT(ABOVE_IPV4_PMTU);
+        }
         const int tcp4_overhead = sizeof(struct iphdr) + sizeof(struct tcphdr) + 12;
         const int mss = v->pmtu - tcp4_overhead;
         const uint64_t payload = L3_bytes - tcp4_overhead;
