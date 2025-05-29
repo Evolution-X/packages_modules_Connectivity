@@ -598,28 +598,28 @@ static inline __always_inline int do_forward4(struct __sk_buff* skb,
     }
 }
 
-// Full featured (required) implementations for 5.8+ kernels (these are S+ by definition)
+// Full featured (required) implementations for 5.10+ kernels (these are S+ by definition)
 
-DEFINE_BPF_PROG_KVER("schedcls/tether_downstream4_rawip$5_8", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_downstream4_rawip_5_8, KVER_5_10)
+DEFINE_BPF_PROG_KVER("schedcls/tether_downstream4_rawip$5_10", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_downstream4_rawip_5_10, KVER_5_10)
 (struct __sk_buff* skb) {
     return do_forward4(skb, RAWIP, DOWNSTREAM, UPDATETIME, KVER_5_10);
 }
 
-DEFINE_BPF_PROG_KVER("schedcls/tether_upstream4_rawip$5_8", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_upstream4_rawip_5_8, KVER_5_10)
+DEFINE_BPF_PROG_KVER("schedcls/tether_upstream4_rawip$5_10", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_upstream4_rawip_5_10, KVER_5_10)
 (struct __sk_buff* skb) {
     return do_forward4(skb, RAWIP, UPSTREAM, UPDATETIME, KVER_5_10);
 }
 
-DEFINE_BPF_PROG_KVER("schedcls/tether_downstream4_ether$5_8", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_downstream4_ether_5_8, KVER_5_10)
+DEFINE_BPF_PROG_KVER("schedcls/tether_downstream4_ether$5_10", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_downstream4_ether_5_10, KVER_5_10)
 (struct __sk_buff* skb) {
     return do_forward4(skb, ETHER, DOWNSTREAM, UPDATETIME, KVER_5_10);
 }
 
-DEFINE_BPF_PROG_KVER("schedcls/tether_upstream4_ether$5_8", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_upstream4_ether_5_8, KVER_5_10)
+DEFINE_BPF_PROG_KVER("schedcls/tether_upstream4_ether$5_10", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_upstream4_ether_5_10, KVER_5_10)
 (struct __sk_buff* skb) {
     return do_forward4(skb, ETHER, UPSTREAM, UPDATETIME, KVER_5_10);
 }
