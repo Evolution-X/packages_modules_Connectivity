@@ -230,7 +230,7 @@ public class EthernetTracker {
             final String ifname = port.getInterfaceName();
             if (!mFactory.hasInterface(ifname) && !ifname.equals(mTetheringInterface)) {
                 Log.i(TAG, "onInterfaceAdded: " + port);
-                maybeTrackInterface(ifname);
+                maybeTrackInterface(port);
             }
             Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
             updateInterfaceState(ifname, linkUp);
@@ -770,14 +770,15 @@ public class EthernetTracker {
         mTetheredInterfaceWasAvailable = available;
     }
 
-    private void maybeTrackInterface(String iface) {
+    private void maybeTrackInterface(EthernetPort port) {
+        final String iface = port.getInterfaceName();
         // If we don't already track this interface, and if this interface matches
         // our regex, start tracking it.
         if (mFactory.hasInterface(iface) || iface.equals(mTetheringInterface)) {
-            if (DBG) Log.w(TAG, "Ignoring already-tracked interface " + iface);
+            if (DBG) Log.w(TAG, "Ignoring already-tracked " + port);
             return;
         }
-        if (DBG) Log.i(TAG, "maybeTrackInterface: " + iface);
+        if (DBG) Log.i(TAG, "maybeTrackInterface: " + port);
 
         // Do not use an interface for tethering if it has configured NetworkCapabilities.
         if (mTetheringInterface == null && !mNetworkCapabilities.containsKey(iface)) {
