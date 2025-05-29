@@ -37,7 +37,6 @@ import android.net.NetworkRequest;
 import android.net.NetworkTemplate;
 import android.os.Handler;
 import android.os.Process;
-import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -90,7 +89,8 @@ public class SatelliteCoarseUsageMetricsCollector {
     private final Dependencies mDeps;
 
     // The start timestamp used to query the snapshots of data usage.
-    final long mStartTime;
+    // This must only be accessed on the handler thread.
+    long mStartTime;
 
     /**
      * Constructs a helper to monitor satellite network usage.
@@ -111,7 +111,6 @@ public class SatelliteCoarseUsageMetricsCollector {
         mContext = context;
         mDeps = deps;
         mHandler = mDeps.getBackgroundThreadHandler();
-        mStartTime = getStartTimestamp();
     }
 
     /**
@@ -162,6 +161,16 @@ public class SatelliteCoarseUsageMetricsCollector {
         @NonNull
         public Handler getBackgroundThreadHandler() {
             return BackgroundThread.getHandler();
+        }
+
+        /** Get current time */
+        public long getCurrentTimeMillis() {
+            return System.currentTimeMillis();
+        }
+
+        /** Get max netstats bucket duration */
+        public long getMaxBucketDuration() {
+            return MAX_NETSTATS_BUCKET_DURATION_MS;
         }
     }
 
@@ -246,12 +255,18 @@ public class SatelliteCoarseUsageMetricsCollector {
          */
         @Override
         public void onLost(Network network) {
+            // The start time must be matched with the baseline, in order to calculate
+            // the difference.
             final MyStatsEntry snapshot = mDeps.getSummary(mNsm, mStartTime);
             // Report diff with metrics.
             final MyStatsEntry diff = snapshot.minus(mSatelliteBaseline);
             mDeps.reportUsage(diff);
             mReportedUsage.add(diff);
-            mSatelliteBaseline = snapshot;
+
+            // Fetch another snapshot as a baseline, with a more recent start timestamp.
+            // This is to prevent from fetching too much data.
+            updateStartTimestamp();
+            mSatelliteBaseline = mDeps.getSummary(mNsm, mStartTime);
             Log.d(TAG, "onLost: Last satellite network " + network + ", Reported usage: " + diff);
         }
     }
@@ -259,19 +274,17 @@ public class SatelliteCoarseUsageMetricsCollector {
     // Calculate the start timestamp used for querying data usage snapshots.
     // This timestamp needs to be early enough to ensure the query window
     // starts at or before the beginning of the usage bucket in which the
-    // device boot event occurred. This is achieved by setting the start time
+    // first event occurred. This is achieved by setting the start time
     // to one bucket duration prior to the calculated bootTimeMillis.
     //
     // It is acceptable if this timestamp is not perfectly aligned with exact
     // bucket boundaries or results in covering some redundant data from before
-    // the boot event. Any such duplicated or irrelevant data will be effectively
+    // the event. Any such duplicated or irrelevant data will be effectively
     // subtracted out when calculating usage from the differences of two snapshots,
     // provided both snapshots are queried using this same consistent start timestamp.
-    private long getStartTimestamp() {
-        final long elapsedMillisSinceBoot = SystemClock.elapsedRealtime();
-        final long currentTimeMillis = System.currentTimeMillis();
-        final long bootTimeMillis = currentTimeMillis - elapsedMillisSinceBoot;
-        return bootTimeMillis - MAX_NETSTATS_BUCKET_DURATION_MS;
+    // This must only be called on the handler thread.
+    private void updateStartTimestamp() {
+        mStartTime = mDeps.getCurrentTimeMillis() - mDeps.getMaxBucketDuration();
     }
 
     /**
@@ -294,6 +307,7 @@ public class SatelliteCoarseUsageMetricsCollector {
         // This behavior is not rate-limited because the calling uid is the system UID.
         mNsm.setPollOnOpen(true);
         // Get the first baseline.
+        updateStartTimestamp();
         mSatelliteBaseline = mDeps.getSummary(mNsm, mStartTime);
 
         final NetworkRequest satelliteRequest = new NetworkRequest.Builder()

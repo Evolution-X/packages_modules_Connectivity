@@ -34,8 +34,10 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.Mockito.clearInvocations
+import org.mockito.ArgumentMatchers.eq
+import org.mockito.InOrder
 import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -51,6 +53,7 @@ import org.mockito.Mockito.verify
 class SatelliteCoarseUsageMetricsCollectorTest {
     companion object {
         const val THREAD_BLOCK_TIMEOUT_MS = 1000L
+        const val TEST_BUCKET_DURATION_MS = 10L
     }
 
     private val mockCm = mock(ConnectivityManager::class.java)
@@ -63,6 +66,7 @@ class SatelliteCoarseUsageMetricsCollectorTest {
     private val mockDeps = mock(SatelliteCoarseUsageMetricsCollector.Dependencies::class.java)
             .also {
                 doReturn(handler).`when`(it).backgroundThreadHandler
+                doReturn(TEST_BUCKET_DURATION_MS).`when`(it).maxBucketDuration
             }
     private val collector = SatelliteCoarseUsageMetricsCollector(mockCtx, mockDeps)
 
@@ -82,23 +86,37 @@ class SatelliteCoarseUsageMetricsCollectorTest {
         doReturn(statsEntry).`when`(mockDeps).getSummary(any(), anyLong())
     }
 
-    private fun assertReportedUsage(rxBytes: Long, txBytes: Long) {
+    private fun assertReportedUsage(inOrder: InOrder, rxBytes: Long, txBytes: Long) {
         val reportedUsageCaptor = ArgumentCaptor.forClass(MyStatsEntry::class.java)
-        verify(mockDeps).reportUsage(reportedUsageCaptor.capture())
+        inOrder.verify(mockDeps).reportUsage(reportedUsageCaptor.capture())
 
         val reportedUsage = reportedUsageCaptor.value
         assertEquals(rxBytes, reportedUsage.rxBytes)
         assertEquals(txBytes, reportedUsage.txBytes)
     }
 
+    private fun mockTime(time: Long) {
+        doReturn(time).`when`(mockDeps).currentTimeMillis
+    }
+
     @Test
     fun testSingleNetwork() {
         val mockNet = mock(Network::class.java)
+        val inOrder = inOrder(mockDeps)
+        mockTime(1000)
         mockGetSummary(100, 50)
         val cb = startMonitoring()
+        inOrder.verify(mockDeps).getSummary(any(), eq(1000 - TEST_BUCKET_DURATION_MS))
+
+        // Advance time, Simulate losing the network. This triggers two getSummary calls:
+        // 1. The first call uses the original start time to calculate the usage difference.
+        // 2. The second call creates a new baseline with an updated start time.
+        mockTime(2000)
         mockGetSummary(300, 150)
         cb.onLost(mockNet)
-        assertReportedUsage(200, 100)
+        inOrder.verify(mockDeps).getSummary(any(), eq(1000 - TEST_BUCKET_DURATION_MS))
+        assertReportedUsage(inOrder, 200, 100)
+        inOrder.verify(mockDeps).getSummary(any(), eq(2000 - TEST_BUCKET_DURATION_MS))
     }
 
     // Test multiple satellite networks. This could happen when telephony creates
@@ -108,26 +126,35 @@ class SatelliteCoarseUsageMetricsCollectorTest {
         // Mock multiple networks, ensuring they are identified as distinct.
         val mockNet1 = Network(1)
         val mockNet2 = Network(2)
+        val inOrder = inOrder(mockDeps)
 
         // Simulate baseline.
+        mockTime(1000)
         mockGetSummary(100, 50)
         val cb = startMonitoring()
+        inOrder.verify(mockDeps).getSummary(any(), eq(1000 - TEST_BUCKET_DURATION_MS))
 
         // Simulate onAvailable events, verify nothing happens.
+        mockTime(2000)
         cb.onAvailable(mockNet1)
         cb.onAvailable(mockNet2)
-        verify(mockDeps, never()).reportUsage(any())
+        inOrder.verify(mockDeps, never()).reportUsage(any())
 
         // Simulate first network lost (not the last), simulate no change at all,
         // verify reportUsage is invoked with zero bytes.
+        mockTime(3000)
         cb.onLost(mockNet1)
-        assertReportedUsage(0L, 0L)
+        inOrder.verify(mockDeps).getSummary(any(), eq(1000 - TEST_BUCKET_DURATION_MS))
+        assertReportedUsage(inOrder, 0L, 0L)
+        inOrder.verify(mockDeps).getSummary(any(), eq(3000 - TEST_BUCKET_DURATION_MS))
 
         // Simulate second network lost (the last one).
-        clearInvocations(mockDeps)
+        mockTime(4000)
         mockGetSummary(300, 150)
         cb.onLost(mockNet2)
-        assertReportedUsage(200L, 100L)
+        inOrder.verify(mockDeps).getSummary(any(), eq(3000 - TEST_BUCKET_DURATION_MS))
+        assertReportedUsage(inOrder, 200L, 100L)
+        inOrder.verify(mockDeps).getSummary(any(), eq(4000 - TEST_BUCKET_DURATION_MS))
     }
 
     @Test
