@@ -122,7 +122,7 @@ public class EthernetTracker {
 
     /**
      * Interface names we track. This is a product-dependent regular expression.
-     * Use isValidEthernetInterface to check if a interface name is a valid ethernet interface (this
+     * Use shouldTrackInterface to check if a interface name is a valid ethernet interface (this
      * includes test interfaces if setIncludeTestInterfaces is set to true).
      */
     private final String mIfaceMatch;
@@ -222,7 +222,7 @@ public class EthernetTracker {
 
             // check if the received message applies to an ethernet interface.
             final String ifname = msg.getInterfaceName();
-            if (!isValidEthernetInterface(ifname)) return;
+            if (!shouldTrackInterface(ifname)) return;
 
             switch (msg.getHeader().nlmsg_type) {
                 case NetlinkConstants.RTM_NEWLINK:
@@ -447,7 +447,7 @@ public class EthernetTracker {
         }
 
         // There is a possible race with setIncludeTestInterfaces() which can affect
-        // isValidEthernetInterface (it returns true for test interfaces if setIncludeTestInterfaces
+        // shouldTrackInterface (it returns true for test interfaces if setIncludeTestInterfaces
         // is set to true).
         // setIncludeTestInterfaces() is only used in tests, and since getEthernetInterfaceList()
         // does not run on the handler thread, the behavior around setIncludeTestInterfaces() is
@@ -456,7 +456,7 @@ public class EthernetTracker {
         // In production code, this has no effect.
         while (ifaces.hasMoreElements()) {
             NetworkInterface iface = ifaces.nextElement();
-            if (isValidEthernetInterface(iface.getName())) interfaceList.add(iface.getName());
+            if (shouldTrackInterface(iface.getName())) interfaceList.add(iface.getName());
         }
         return interfaceList;
     }
@@ -500,7 +500,7 @@ public class EthernetTracker {
                 removeTestData();
                 // remove all test interfaces
                 for (String iface : getAllInterfaces()) {
-                    if (isValidEthernetInterface(iface)) continue;
+                    if (shouldTrackInterface(iface)) continue;
                     stopTrackingInterface(iface);
                 }
             }
@@ -806,7 +806,7 @@ public class EthernetTracker {
         return ret;
     }
 
-    private boolean isValidEthernetInterface(String iface) {
+    private boolean shouldTrackInterface(String iface) {
         return iface.matches(mIfaceMatch) || isValidTestInterface(iface);
     }
 
