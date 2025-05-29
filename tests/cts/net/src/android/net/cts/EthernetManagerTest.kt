@@ -535,11 +535,6 @@ class EthernetManagerTest {
         NetworkRequest.Builder(NetworkRequest(ETH_REQUEST))
             .setNetworkSpecifier(EthernetNetworkSpecifier(ifaceName)).build()
 
-    // b/233534110: eventuallyExpect<Lost>() does not advance ReadHead, use
-    // eventuallyExpect(Lost::class) instead.
-    private fun TestableNetworkCallback.eventuallyExpectLost(n: Network? = null) =
-        eventuallyExpect(Lost::class) { n?.equals(it.network) ?: true }
-
     private fun TestableNetworkCallback.assertNeverLost(n: Network? = null) =
         assertNoCallback { it is Lost && (n?.equals(it.network) ?: true) }
 
@@ -550,8 +545,7 @@ class EthernetManagerTest {
         expect<CapabilitiesChanged> { it.caps.networkSpecifier == EthernetNetworkSpecifier(name) }
 
     private fun TestableNetworkCallback.eventuallyExpectCapabilities(nc: NetworkCapabilities) {
-        // b/233534110: eventuallyExpect<CapabilitiesChanged>() does not advance ReadHead.
-        eventuallyExpect(CapabilitiesChanged::class) {
+        eventuallyExpect<CapabilitiesChanged> {
             // CS may mix in additional capabilities, so NetworkCapabilities#equals cannot be used.
             // Check if all expected capabilities are present instead.
             it is CapabilitiesChanged && nc.capabilities.all { c -> it.caps.hasCapability(c) }
@@ -561,8 +555,7 @@ class EthernetManagerTest {
     private fun TestableNetworkCallback.eventuallyExpectLpForStaticConfig(
         config: StaticIpConfiguration
     ) {
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead.
-        eventuallyExpect(LinkPropertiesChanged::class) {
+        eventuallyExpect<LinkPropertiesChanged> {
             it is LinkPropertiesChanged && it.lp.linkAddresses.any { la ->
                 la.isSameAddressAs(config.ipAddress)
             }
@@ -708,7 +701,7 @@ class EthernetManagerTest {
 
         cb.assertNeverLost()
         releaseRequest(cb)
-        listenerCb.eventuallyExpectLost(network)
+        listenerCb.eventuallyExpect<Lost>() { network.equals(it.network) }
     }
 
     @Test
@@ -726,7 +719,7 @@ class EthernetManagerTest {
         // remove interface before network request has been removed
         cb.assertNeverLost()
         removeInterface(iface)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     @Test
@@ -742,7 +735,7 @@ class EthernetManagerTest {
         removeInterface(iface1)
         cb.assertNeverLost()
         removeInterface(iface2)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     @Test
@@ -758,7 +751,7 @@ class EthernetManagerTest {
 
         // remove iface1 and verify the request brings up iface2
         removeInterface(iface1)
-        cb.eventuallyExpectLost(network)
+        cb.eventuallyExpect<Lost>() { network.equals(it.network) }
         cb.expect<Available>()
     }
 
@@ -801,7 +794,7 @@ class EthernetManagerTest {
 
         cb2.assertNeverLost()
         releaseRequest(cb2)
-        listener.eventuallyExpectLost(network)
+        listener.eventuallyExpect<Lost>() { network.equals(it.network) }
     }
 
     @Test
@@ -818,7 +811,7 @@ class EthernetManagerTest {
         cb.expect<Available>()
 
         iface.setCarrierEnabled(false)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     // TODO: move to MTS
@@ -826,8 +819,7 @@ class EthernetManagerTest {
     fun testNetworkRequest_linkPropertiesUpdate() {
         val iface = createInterface()
         val cb = requestNetwork(ETH_REQUEST)
-        // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead
-        cb.eventuallyExpect(LinkPropertiesChanged::class) {
+        cb.eventuallyExpect<LinkPropertiesChanged> {
             it is LinkPropertiesChanged && it.lp.addresses.any {
                 address -> iface.onLinkPrefix.contains(address)
             }
@@ -864,7 +856,7 @@ class EthernetManagerTest {
         cb.assertNeverLost()
 
         disableInterface(iface).expectResult(iface.name)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
 
         enableInterface(iface).expectResult(iface.name)
         cb.expect<Available>()
@@ -975,7 +967,7 @@ class EthernetManagerTest {
         // Request the restricted network as the shell with CONNECTIVITY_USE_RESTRICTED_NETWORKS.
         val cb = runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) { requestNetwork(request) }
         val network = cb.expect<Available>().network
-        cb.assertNeverLost(network)
+        cb.assertNeverLost()
 
         // The network is restricted therefore binding to it when available will fail.
         Socket().use { socket ->
@@ -990,7 +982,11 @@ class EthernetManagerTest {
 
         // UpdateConfiguration() currently does a restart on the ethernet interface therefore lost
         // will be expected first before available, as part of the restart.
-        cb.expect<Lost>(network)
+        // Note: this uses eventuallyExpect, because depending on how the DAD timers align, there
+        // may be 1 or 2 onLinkPropertiesChanged() callbacks. It is possible for that second
+        // onLinkPropertiesChanged() to arrive after assertNeverLost() returns.
+        // TODO: consider disabling DAD for these tests.
+        cb.eventuallyExpect<Lost>()
         val updatedNetwork = cb.expect<Available>().network
         // With the test process UID allowed, binding to a restricted network should be successful.
         Socket().use { socket -> updatedNetwork.bindSocket(socket) }
@@ -1031,7 +1027,7 @@ class EthernetManagerTest {
         cb.expect<Available>()
 
         iface.setCarrierEnabled(false)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
 
         updateConfiguration(iface, STATIC_IP_CONFIGURATION, TEST_CAPS).expectResult(iface.name)
         cb.assertNoCallback()

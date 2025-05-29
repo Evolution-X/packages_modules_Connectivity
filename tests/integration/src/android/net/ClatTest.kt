@@ -129,9 +129,7 @@ class ClatTest {
         // Wait for the clat interface to be created.
         var linkPropertiesChanged: LinkPropertiesChanged
         do {
-            // b/233534110: eventuallyExpect<LinkPropertiesChanged>() does not advance ReadHead, use
-            // eventuallyExpect(LinkProperties::class) instead.
-            linkPropertiesChanged = cb.eventuallyExpect(LinkPropertiesChanged::class)
+            linkPropertiesChanged = cb.eventuallyExpect<LinkPropertiesChanged>()
         } while (linkPropertiesChanged.lp.stackedLinks.isEmpty())
 
         network = linkPropertiesChanged.network
