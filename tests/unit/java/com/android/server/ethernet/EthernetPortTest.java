@@ -115,7 +115,7 @@ public class EthernetPortTest {
     public void testToString() {
         EthernetPort port = new EthernetPort(
                 mTestInterfaceName, mTestMacAddress, mTestInterfaceIndex);
-        String expect = "Interface name: eth0, MAC address: 0a:1b:2c:3d:4e:5f, Interface index: 1";
+        String expect = "EthernetPort(eth0, ifindex=1, MAC=0a:1b:2c:3d:4e:5f)";
         assertEquals(expect, port.toString());
     }
 }
