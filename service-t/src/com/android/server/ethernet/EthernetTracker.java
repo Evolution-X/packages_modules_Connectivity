@@ -611,7 +611,7 @@ public class EthernetTracker {
         mTetheringInterfaceMode = mode;
         if (mTetheringInterface != null) {
             removeInterface(mTetheringInterface.getInterfaceName());
-            addInterface(mTetheringInterface.getInterfaceName());
+            addInterface(mTetheringInterface);
             // when this broadcast is sent, any calls to notifyTetheredInterfaceAvailable or
             // notifyTetheredInterfaceUnavailable have already happened
             broadcastInterfaceStateChange(mTetheringInterface.getInterfaceName());
@@ -663,7 +663,8 @@ public class EthernetTracker {
         broadcastInterfaceStateChange(iface);
     }
 
-    private void addInterface(String iface) {
+    private void addInterface(EthernetPort port) {
+        final String iface = port.getInterfaceName();
         final InterfaceConfigurationParcel config;
         // Bring up the interface so we get link status indications.
         try {
@@ -682,7 +683,7 @@ public class EthernetTracker {
         // Only bring the interface up when ethernet is enabled, otherwise set interface down.
         setInterfaceUpState(iface, mIsEthernetEnabled);
 
-        final String hwAddress = config.hwAddr;
+        final String hwAddress = port.getMacAddress().toString();
 
         if (getInterfaceMode(iface) == INTERFACE_MODE_SERVER) {
             maybeUpdateServerModeInterfaceState(iface, true);
@@ -783,7 +784,7 @@ public class EthernetTracker {
             mTetheringInterface = port;
         }
 
-        addInterface(iface);
+        addInterface(port);
 
         broadcastInterfaceStateChange(iface);
     }
