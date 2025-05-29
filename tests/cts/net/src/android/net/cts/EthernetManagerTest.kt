@@ -535,9 +535,6 @@ class EthernetManagerTest {
         NetworkRequest.Builder(NetworkRequest(ETH_REQUEST))
             .setNetworkSpecifier(EthernetNetworkSpecifier(ifaceName)).build()
 
-    private fun TestableNetworkCallback.eventuallyExpectLost(n: Network? = null) =
-        eventuallyExpect<Lost> { n?.equals(it.network) ?: true }
-
     private fun TestableNetworkCallback.assertNeverLost(n: Network? = null) =
         assertNoCallback { it is Lost && (n?.equals(it.network) ?: true) }
 
@@ -704,7 +701,7 @@ class EthernetManagerTest {
 
         cb.assertNeverLost()
         releaseRequest(cb)
-        listenerCb.eventuallyExpectLost(network)
+        listenerCb.eventuallyExpect<Lost>() { network.equals(it.network) }
     }
 
     @Test
@@ -722,7 +719,7 @@ class EthernetManagerTest {
         // remove interface before network request has been removed
         cb.assertNeverLost()
         removeInterface(iface)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     @Test
@@ -738,7 +735,7 @@ class EthernetManagerTest {
         removeInterface(iface1)
         cb.assertNeverLost()
         removeInterface(iface2)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     @Test
@@ -754,7 +751,7 @@ class EthernetManagerTest {
 
         // remove iface1 and verify the request brings up iface2
         removeInterface(iface1)
-        cb.eventuallyExpectLost(network)
+        cb.eventuallyExpect<Lost>() { network.equals(it.network) }
         cb.expect<Available>()
     }
 
@@ -797,7 +794,7 @@ class EthernetManagerTest {
 
         cb2.assertNeverLost()
         releaseRequest(cb2)
-        listener.eventuallyExpectLost(network)
+        listener.eventuallyExpect<Lost>() { network.equals(it.network) }
     }
 
     @Test
@@ -814,7 +811,7 @@ class EthernetManagerTest {
         cb.expect<Available>()
 
         iface.setCarrierEnabled(false)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
     }
 
     // TODO: move to MTS
@@ -859,7 +856,7 @@ class EthernetManagerTest {
         cb.assertNeverLost()
 
         disableInterface(iface).expectResult(iface.name)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
 
         enableInterface(iface).expectResult(iface.name)
         cb.expect<Available>()
@@ -970,7 +967,7 @@ class EthernetManagerTest {
         // Request the restricted network as the shell with CONNECTIVITY_USE_RESTRICTED_NETWORKS.
         val cb = runAsShell(CONNECTIVITY_USE_RESTRICTED_NETWORKS) { requestNetwork(request) }
         val network = cb.expect<Available>().network
-        cb.assertNeverLost(network)
+        cb.assertNeverLost()
 
         // The network is restricted therefore binding to it when available will fail.
         Socket().use { socket ->
@@ -989,7 +986,7 @@ class EthernetManagerTest {
         // may be 1 or 2 onLinkPropertiesChanged() callbacks. It is possible for that second
         // onLinkPropertiesChanged() to arrive after assertNeverLost() returns.
         // TODO: consider disabling DAD for these tests.
-        cb.eventuallyExpectLost(network)
+        cb.eventuallyExpect<Lost>()
         val updatedNetwork = cb.expect<Available>().network
         // With the test process UID allowed, binding to a restricted network should be successful.
         Socket().use { socket -> updatedNetwork.bindSocket(socket) }
@@ -1030,7 +1027,7 @@ class EthernetManagerTest {
         cb.expect<Available>()
 
         iface.setCarrierEnabled(false)
-        cb.eventuallyExpectLost()
+        cb.eventuallyExpect<Lost>()
 
         updateConfiguration(iface, STATIC_IP_CONFIGURATION, TEST_CAPS).expectResult(iface.name)
         cb.assertNoCallback()
