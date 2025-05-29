@@ -639,24 +639,23 @@ public class EthernetTracker {
     }
 
     private void addInterface(String iface) {
-        InterfaceConfigurationParcel config = null;
+        final InterfaceConfigurationParcel config;
         // Bring up the interface so we get link status indications.
         try {
             // Read the flags before attempting to bring up the interface. If the interface is
             // already running an UP event is created after adding the interface.
             config = NetdUtils.getInterfaceConfigParcel(mNetd, iface);
-            // Only bring the interface up when ethernet is enabled, otherwise set interface down.
-            setInterfaceUpState(iface, mIsEthernetEnabled);
         } catch (IllegalStateException e) {
-            // Either the system is crashing or the interface has disappeared. Just ignore the
-            // error; we haven't modified any state because we only do that if our calls succeed.
-            Log.e(TAG, "Error upping interface " + iface, e);
+            Log.e(TAG, "Failed to addInterface(" + iface + "). getInterfaceConfigParcel failed", e);
+            return;
         }
-
         if (config == null) {
             Log.e(TAG, "Null interface config parcelable for " + iface + ". Bailing out.");
             return;
         }
+
+        // Only bring the interface up when ethernet is enabled, otherwise set interface down.
+        setInterfaceUpState(iface, mIsEthernetEnabled);
 
         final String hwAddress = config.hwAddr;
 
