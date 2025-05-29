@@ -199,18 +199,19 @@ public class EthernetTracker {
                     OsConstants.NETLINK_ROUTE, NetlinkConstants.RTMGRP_LINK);
         }
 
-        private void onNewLink(String ifname, boolean linkUp) {
+        private void onNewLink(EthernetPort port, boolean linkUp) {
+            final String ifname = port.getInterfaceName();
             if (!mFactory.hasInterface(ifname) && !ifname.equals(mTetheringInterface)) {
-                Log.i(TAG, "onInterfaceAdded, iface: " + ifname);
+                Log.i(TAG, "onInterfaceAdded: " + port);
                 maybeTrackInterface(ifname);
             }
-            Log.i(TAG, "interfaceLinkStateChanged, iface: " + ifname + ", up: " + linkUp);
+            Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
             updateInterfaceState(ifname, linkUp);
         }
 
-        private void onDelLink(String ifname) {
-            Log.i(TAG, "onInterfaceRemoved, iface: " + ifname);
-            stopTrackingInterface(ifname);
+        private void onDelLink(EthernetPort port) {
+            Log.i(TAG, "onInterfaceRemoved: " + port);
+            stopTrackingInterface(port.getInterfaceName());
         }
 
         private void processRtNetlinkLinkMessage(RtNetlinkLinkMessage msg) {
@@ -234,11 +235,11 @@ public class EthernetTracker {
             switch (msg.getHeader().nlmsg_type) {
                 case NetlinkConstants.RTM_NEWLINK:
                     final boolean linkUp = (ifinfomsg.flags & NetlinkConstants.IFF_LOWER_UP) != 0;
-                    onNewLink(port.getInterfaceName(), linkUp);
+                    onNewLink(port, linkUp);
                     break;
 
                 case NetlinkConstants.RTM_DELLINK:
-                    onDelLink(port.getInterfaceName());
+                    onDelLink(port);
                     break;
 
                 default:
