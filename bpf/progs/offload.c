@@ -417,24 +417,26 @@ static inline __always_inline int do_forward4_bottom(struct __sk_buff* skb,
     // Required IPv4 minimum mtu is 68, below that not clear what we should do, abort...
     if (v->pmtu < 68) TC_PUNT(BELOW_IPV4_MTU);
 
-    // Approximate handling of TCP/IPv4 overhead for incoming LRO/GRO packets: default
-    // outbound path mtu of 1500 is not necessarily correct, but worst case we simply
-    // undercount, which is still better then not accounting for this overhead at all.
-    // Note: this really shouldn't be device/path mtu at all, but rather should be
-    // derived from this particular connection's mss (ie. from gro segment size).
-    // This would require a much newer kernel with newer ebpf accessors.
-    // (This is also blindly assuming 12 bytes of tcp timestamp option in tcp header)
+    // Handling of IPv4 overhead for incoming LRO/GRO packets
     uint64_t packets = 1;
     uint64_t L3_bytes = skb->len - l2_header_size;
     if (L3_bytes > v->pmtu) {
+        // we know it is IPv4 without IP options, and either TCP or UDP
+        const int hdr_sz = sizeof(struct iphdr) + (is_tcp ? tcph->doff * 4 : sizeof(struct udphdr));
+        const uint64_t payload = L3_bytes - hdr_sz;
         if (KVER_IS_AT_LEAST(kver, 5, 4, 0)) {
             if (skb->gso_segs <= 1) TC_PUNT(ABOVE_IPV4_PMTU);
+            // ?udp gso frags: gso_size is variable (thus 0), could this fail to trigger?
+            if (hdr_sz + skb->gso_size > v->pmtu) TC_PUNT(ABOVE_IPV4_PMTU_GSO);
+            packets = skb->gso_segs;
+        } else {
+            // pmtu may be larger then hdr_sz + gso_size, thus we may undercount nr of packets,
+            // which is still better then not accounting for this overhead at all.
+            // We cannot punt over-pmtu gso packets without simply disabling offload entirely...
+            const int mss = v->pmtu - hdr_sz;
+            packets = (payload + mss - 1) / mss;
         }
-        const int tcp4_overhead = sizeof(struct iphdr) + sizeof(struct tcphdr) + 12;
-        const int mss = v->pmtu - tcp4_overhead;
-        const uint64_t payload = L3_bytes - tcp4_overhead;
-        packets = (payload + mss - 1) / mss;
-        L3_bytes = tcp4_overhead * packets + payload;
+        L3_bytes = hdr_sz * packets + payload;
     }
 
     // Are we past the limit?  If so, then abort...
