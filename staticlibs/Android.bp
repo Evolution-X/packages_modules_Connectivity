@@ -253,6 +253,9 @@ java_library {
         "net-utils-device-common-struct",
         "net-utils-device-common-struct-base",
     ],
+    static_libs: [
+        "netd_aidl_interface-lateststable-java",
+    ],
     apex_available: [
         "com.android.tethering",
         "//apex_available:platform",
