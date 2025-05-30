@@ -65,6 +65,8 @@ public class Dhcp6Packet {
     public static final byte DHCP6_MESSAGE_TYPE_INFORMATION_REQUEST = 11;
     public static final byte DHCP6_MESSAGE_TYPE_RELAY_FORW = 12;
     public static final byte DHCP6_MESSAGE_TYPE_RELAY_REPL = 13;
+    public static final byte DHCP6_MESSAGE_TYPE_ADDR_REG_INFORM = 36;
+    public static final byte DHCP6_MESSAGE_TYPE_ADDR_REG_REPLY = 37;
 
     /**
      * DHCPv6 Optional Type: Client Identifier.
