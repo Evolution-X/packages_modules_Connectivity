@@ -156,6 +156,8 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermissionOr;
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
+import static com.android.server.NetIdManager.MAX_NET_ID;
+import static com.android.server.NetIdManager.MIN_NET_ID;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
 import static com.android.server.connectivity.ConnectivityFlags.CLOSE_QUIC_CONNECTION;
 import static com.android.server.connectivity.ConnectivityFlags.CONSTRAINED_DATA_SATELLITE_METRICS;
@@ -276,6 +278,7 @@ import android.net.netd.aidl.NativeUidRangeConfig;
 import android.net.networkstack.ModuleNetworkStackClient;
 import android.net.networkstack.NetworkStackClientBase;
 import android.net.networkstack.aidl.NetworkMonitorParameters;
+import android.net.platform.flags.Flags;
 import android.net.resolv.aidl.DnsHealthEventParcel;
 import android.net.resolv.aidl.IDnsResolverUnsolicitedEventListener;
 import android.net.resolv.aidl.Nat64PrefixEventParcel;
@@ -311,6 +314,7 @@ import android.stats.connectivity.RequestType;
 import android.stats.connectivity.ValidatedState;
 import android.sysprop.NetworkProperties;
 import android.system.ErrnoException;
+import android.system.OsConstants;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -340,6 +344,7 @@ import com.android.metrics.NetworkList;
 import com.android.metrics.NetworkRequestCount;
 import com.android.metrics.RequestCountForType;
 import com.android.metrics.SatelliteAccessInfo;
+import com.android.metrics.SatelliteCoarseUsageMetricsCollector;
 import com.android.modules.utils.BasicShellCommandHandler;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
@@ -350,14 +355,21 @@ import com.android.net.module.util.CollectionUtils;
 import com.android.net.module.util.DeviceConfigUtils;
 import com.android.net.module.util.HandlerUtils;
 import com.android.net.module.util.InterfaceParams;
+import com.android.net.module.util.LinkPropertiesUtils;
 import com.android.net.module.util.LinkPropertiesUtils.CompareOrUpdateResult;
 import com.android.net.module.util.LinkPropertiesUtils.CompareResult;
 import com.android.net.module.util.LocationPermissionChecker;
 import com.android.net.module.util.PerUidCounter;
 import com.android.net.module.util.PermissionUtils;
 import com.android.net.module.util.RoutingCoordinatorService;
+import com.android.net.module.util.SharedLog;
 import com.android.net.module.util.TcUtils;
+import com.android.net.module.util.ip.NetlinkMonitor;
 import com.android.net.module.util.netlink.InetDiagMessage;
+import com.android.net.module.util.netlink.NetlinkConstants;
+import com.android.net.module.util.netlink.NetlinkMessage;
+import com.android.net.module.util.netlink.RtNetlinkAddressMessage;
+import com.android.net.module.util.netlink.StructIfaddrMsg;
 import com.android.networkstack.apishim.BroadcastOptionsShimImpl;
 import com.android.networkstack.apishim.ConstantsShim;
 import com.android.networkstack.apishim.common.BroadcastOptionsShim;
@@ -375,6 +387,7 @@ import com.android.server.connectivity.DnsManager;
 import com.android.server.connectivity.DnsManager.PrivateDnsValidationUpdate;
 import com.android.server.connectivity.DscpPolicyTracker;
 import com.android.server.connectivity.FullScore;
+import com.android.server.connectivity.IntegerRangeUtils;
 import com.android.server.connectivity.InterfaceTracker;
 import com.android.server.connectivity.InvalidTagException;
 import com.android.server.connectivity.KeepaliveResourceUtil;
@@ -411,6 +424,7 @@ import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -1053,6 +1067,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final NetworkNotificationManager mNotifier;
     private final LingerMonitor mLingerMonitor;
     private final SatelliteAccessController mSatelliteAccessController;
+    private final SatelliteCoarseUsageMetricsCollector mSatelliteCoarseUsageMetricsCollector;
 
     private final L2capNetworkProvider mL2capNetworkProvider;
 
@@ -1132,6 +1147,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
     // This is null if mCloseQuicConnection is false
     @Nullable
     private final QuicConnectionCloser mQuicConnectionCloser;
+
+    // A map from IP address to networks. Only the handler thread is allowed to access this field.
+    @Nullable @VisibleForTesting final Map<InetAddress, Set<NetworkAgentInfo>> mIpToNetworksMap;
+    // NetlinkMonitor for ConnectivityService
+    @Nullable private final AddressUpdateMonitor mAddressUpdateMonitor;
 
     /**
      * Implements support for the legacy "one network per network type" model.
@@ -1479,6 +1499,28 @@ public class ConnectivityService extends IConnectivityManager.Stub
     }
 
     /**
+     * Simple NetlinkMonitor. Listen for address changed events from kernel.
+     * All methods except the constructor must be called on the handler thread.
+     */
+    public static class AddressUpdateMonitor extends NetlinkMonitor {
+        private final Consumer<NetlinkMessage> mNetlinkMessageConsumer;
+
+        AddressUpdateMonitor(Handler h, SharedLog log, String tag,
+                Consumer<NetlinkMessage> netlinkMessageConsumer) {
+            super(h, log, tag, OsConstants.NETLINK_ROUTE,
+                    (NetlinkConstants.RTMGRP_IPV4_IFADDR
+                            | NetlinkConstants.RTMGRP_IPV6_IFADDR));
+            mNetlinkMessageConsumer = netlinkMessageConsumer;
+        }
+
+        @Override
+        protected void processNetlinkMessage(
+                @NonNull NetlinkMessage nlMsg, long whenMs) {
+            mNetlinkMessageConsumer.accept(nlMsg);
+        }
+    }
+
+    /**
      * Dependencies of ConnectivityService, for injection in tests.
      */
     @VisibleForTesting
@@ -1667,6 +1709,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     connectivityServiceInternalHandler);
         }
 
+        /**
+         * @see SatelliteCoarseUsageMetricsCollector
+         */
+        @Nullable
+        public SatelliteCoarseUsageMetricsCollector makeSatelliteCoarseUsageMetricsCollector(
+                @NonNull final Context context) {
+            return new SatelliteCoarseUsageMetricsCollector(context);
+        }
+
         /** Creates an L2capNetworkProvider */
         public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
             return new L2capNetworkProvider(context);
@@ -1839,6 +1890,45 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
 
         /**
+         * Destroy live tcp sockets for IP addresses with conditions.
+         *
+         * @param address a local address to destroy sockets
+         * @param netIdRange range of net IDs to destroy sockets
+         * @param uidRanges ranges of UIDs to destroy sockets
+         */
+        public void destroyLiveTcpSocketsByLocalAddress(
+                @NonNull InetAddress address,
+                @Nullable Set<Range<Integer>> netIdRange,
+                @Nullable Set<Range<Integer>> uidRanges)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsByLocalAddress(address, netIdRange, uidRanges);
+        }
+
+        /**
+         * Destroy live tcp sockets for IP addresses with conditions.
+         *
+         * @param address a local address to destroy sockets
+         * @param interfaceId interface ID
+         */
+        public void destroyLiveTcpSocketsByLocalAddress(
+                @NonNull InetAddress address, int interfaceId)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsByLocalAddress(address, interfaceId);
+        }
+
+        /**
+         * Call {@link InetDiagMessage#destroyLiveTcpSocketsLackingPermission(int, int)}
+         *
+         * @param netId network ID
+         * @param permission network permission
+         */
+        public void destroyLiveTcpSocketsLackingPermission(
+                int netId, int permission)
+                throws SocketException, InterruptedIOException, ErrnoException {
+            InetDiagMessage.destroyLiveTcpSocketsLackingPermission(netId, permission);
+        }
+
+        /**
          * Schedule the evaluation timeout.
          *
          * When a network connects, it's "not evaluated" yet. Detection events cause the network
@@ -1861,6 +1951,20 @@ public class ConnectivityService extends IConnectivityManager.Stub
         public QuicConnectionCloser makeQuicConnectionCloser(
                 final SparseArray<NetworkAgentInfo> networkForNetId, final Handler handler) {
             return new QuicConnectionCloser(networkForNetId, handler);
+        }
+
+        /** Whether the flag for connectivity service socket destroy is enabled or not. */
+        public boolean flagConnectivityServiceDestroySocket() {
+            return Flags.connectivityServiceDestroySocket();
+        }
+
+        /**
+         * Create a AddressUpdateMonitor instance.
+         */
+        public AddressUpdateMonitor makeAddressUpdateMonitor(
+                @NonNull Handler h, @NonNull SharedLog log, @NonNull String tag,
+                @NonNull Consumer<NetlinkMessage> consumer) {
+            return new AddressUpdateMonitor(h, log, tag, consumer);
         }
     }
 
@@ -1997,7 +2101,22 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
         mConstrainedDataSatelliteMetrics = (mSatelliteAccessController != null)
                 && mDeps.isFeatureNotChickenedOut(mContext, CONSTRAINED_DATA_SATELLITE_METRICS);
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector =
+                    mDeps.makeSatelliteCoarseUsageMetricsCollector(mContext);
+        } else {
+            mSatelliteCoarseUsageMetricsCollector = null;
+        }
 
+        if (mDeps.flagConnectivityServiceDestroySocket()) {
+            mIpToNetworksMap = new HashMap<>();
+            mAddressUpdateMonitor = mDeps.makeAddressUpdateMonitor(
+                    mHandler, new SharedLog(20, TAG), TAG,
+                    this::processNetlinkAddressUpdateMessage);
+        } else {
+            mIpToNetworksMap = null;
+            mAddressUpdateMonitor = null;
+        }
         // To ensure uid state is synchronized with Network Policy, register for
         // NetworkPolicyManagerService events must happen prior to NetworkPolicyManagerService
         // reading existing policy from disk.
@@ -4213,6 +4332,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
             mBroadcastReceiveHelper.callOnUserAddedForExistingUsers();
             permissionMonitorInitializeDone.open();
         });
+        if (mAddressUpdateMonitor != null) {
+            mHandler.post(() -> mAddressUpdateMonitor.start());
+        }
         mProxyTracker.loadGlobalProxy();
         registerDnsResolverUnsolicitedEventListener();
 
@@ -4258,6 +4380,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
         // forever, this replaces a synchronous call to PermissionMonitor#initialize, which
         // could have blocked forever too.
         permissionMonitorInitializeDone.block();
+
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector.startMonitoring();
+        }
     }
 
     /**
@@ -4584,6 +4710,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         if (mSatelliteAccessController != null) {
             mSatelliteAccessController.dump(pw);
         }
+        if (mConstrainedDataSatelliteMetrics) {
+            mSatelliteCoarseUsageMetricsCollector.dump(pw);
+        }
 
         pw.println();
         pw.println("Legacy network activity:");
@@ -4602,6 +4731,21 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 (mMulticastRoutingCoordinatorService != null));
         pw.println("Background firewall chain enabled: " + mBackgroundFirewallChainEnabled);
         pw.println("IngressToVpnAddressFiltering: " + mIngressToVpnAddressFiltering);
+
+        if (mIpToNetworksMap != null) {
+            pw.println();
+            pw.println("mIpToNetworksMap:");
+            pw.increaseIndent();
+            for (Map.Entry<InetAddress, Set<NetworkAgentInfo>> info : mIpToNetworksMap.entrySet()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(info.getKey()).append(": ");
+                for (NetworkAgentInfo nai : info.getValue()) {
+                    sb.append("{").append(nai.network).append("}");
+                }
+                pw.println(sb);
+            }
+            pw.decreaseIndent();
+        }
     }
 
     private void dumpNetworks(IndentingPrintWriter pw) {
@@ -5728,8 +5872,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         // Delayed teardown.
         if (nai.isCreated() && !nai.isDestroyed()) {
+            destroyLiveTcpSocketsLackingPermission(
+                    nai, getNetworkPermission(nai.networkCapabilities), INetd.PERMISSION_SYSTEM);
             try {
                 mNetd.networkSetPermissionForNetwork(nai.network.netId, INetd.PERMISSION_SYSTEM);
+                // Call again in case sockets were opened after the first time : see
+                // updateNetworkPermissions
+                destroyLiveTcpSocketsLackingPermission(nai,
+                        getNetworkPermission(nai.networkCapabilities), INetd.PERMISSION_SYSTEM);
             } catch (RemoteException e) {
                 Log.d(TAG, "Error marking network restricted during teardown: ", e);
             }
@@ -5858,6 +6008,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         } catch (RemoteException | ServiceSpecificException e) {
             loge("Exception destroying network(networkDestroy): " + e);
         }
+        updateIpAddressesAndDestroySockets(nai, nai.linkProperties, null);
         try {
             mDnsResolver.destroyNetworkCache(nai.network.getNetId());
         } catch (RemoteException | ServiceSpecificException e) {
@@ -9866,10 +10017,102 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
             networkAgent.networkMonitor().notifyLinkPropertiesChanged(
                     new LinkProperties(newLp, true /* parcelSensitiveFields */));
+            updateIpAddressesAndDestroySockets(networkAgent, oldLp, newLp);
             notifyNetworkCallbacks(networkAgent, CALLBACK_IP_CHANGED);
         }
 
         mKeepaliveTracker.handleCheckKeepalivesStillValid(networkAgent);
+    }
+
+    private void updateIpAddressesAndDestroySockets(
+            NetworkAgentInfo nai, LinkProperties oldLp, LinkProperties newLp) {
+        ensureRunningOnConnectivityServiceThread();
+        if (mIpToNetworksMap == null) {
+            return;
+        }
+
+        final CompareResult<LinkAddress> result =
+                LinkPropertiesUtils.compareAllAddresses(oldLp, newLp);
+
+        if (!result.added.isEmpty()) {
+            for (LinkAddress la : result.added) {
+                if (la.getAddress() instanceof Inet6Address
+                        && la.getAddress().isLinkLocalAddress()) {
+                    // Some NetworkAgents may not report IPv6 link local address to CS, thus socket
+                    // destruction on the address will be done at handling RTM_DELADDR and the
+                    // address doesn't need to be added to mIpToNetworksMap.
+                    continue;
+                }
+                mIpToNetworksMap.computeIfAbsent(la.getAddress(), k -> new ArraySet<>()).add(nai);
+            }
+        }
+
+        if (!result.removed.isEmpty()) {
+            for (LinkAddress la : result.removed) {
+                if (la.getAddress() instanceof Inet6Address
+                        && la.getAddress().isLinkLocalAddress()) {
+                    continue;
+                }
+                final Set<NetworkAgentInfo> networks = mIpToNetworksMap.get(la.getAddress());
+                destroySocketsForRemovedAddress(la.getAddress(), nai, networks);
+                if (networks != null) {
+                    networks.remove(nai);
+                    if (networks.isEmpty()) {
+                        mIpToNetworksMap.remove(la.getAddress());
+                    }
+                }
+            }
+        }
+    }
+
+    private void destroySocketsForRemovedAddress(
+            InetAddress address,
+            @NonNull NetworkAgentInfo targetNai,
+            @NonNull Set<NetworkAgentInfo> networks) {
+        // Logic to destroy sockets(MIN_NET_ID ~ MAX_NET_ID) on networks managed by this service
+        // when IP addresses are removed. Sockets(0 ~ MIN_NET_ID - 1) are for OEM network or legacy
+        // local network. Those are not tracked by this service, thus will be destroyed at the
+        // RTM_DELADDR event handling.
+        final Set<Range<Integer>> netIdRangeSet;
+        final Set<Range<Integer>> uidRangeSet;
+        if (networks.size() == 1) {
+            // Removed IP address was in single network.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = null;
+        } else if (CollectionUtils.all(networks, nai -> !nai.isVPN())) {
+            // If all networks are not VPNs, other networks with the same IP address can be exempted
+            // from this socket destruction. Since there may be remaining socket's which has Fwmark
+            // matched to previously disconnected VPN's netId, It's intended destroying sockets not
+            // matched to exempt networks rather than sockets matched to the target network.
+            final List<Integer> exemptNetIds = new ArrayList<>();
+            for (NetworkAgentInfo nai : networks) {
+                if (nai.network.netId != targetNai.network.netId) {
+                    exemptNetIds.add(nai.network.netId);
+                }
+            }
+            netIdRangeSet = IntegerRangeUtils.rangeWithoutValues(
+                    Range.create(MIN_NET_ID, MAX_NET_ID), exemptNetIds);
+            uidRangeSet = null;
+        } else if (CollectionUtils.all(networks, NetworkAgentInfo::isVPN)) {
+            // Since the UID ranges of VPN networks cannot overlap with each other, if all networks
+            // with the corresponding address were VPNs, sockets included in the UID range of the
+            // target network are selectively removed.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = targetNai.networkCapabilities.getUids();
+        } else {
+            // If there is at least one VPN network among multiple networks with the same address,
+            // there may be sockets with Fwmark value which does not match the netId (e.g. Socket
+            // connections on non-bypassable VPN or socket connections fallen out of split tunnel
+            // for the bypassable VPN), and it is currently too complicated to distinguish them.
+            // Thus sockets in whole netId range will be destroyed based on local IP address.
+            netIdRangeSet = Set.of(Range.create(MIN_NET_ID, MAX_NET_ID));
+            uidRangeSet = null;
+        }
+        try {
+            mDeps.destroyLiveTcpSocketsByLocalAddress(address, netIdRangeSet, uidRangeSet);
+        } catch (SocketException | InterruptedIOException | ErrnoException e) {
+            loge("Exception destroy TCP sockets on local address: ", e);
+        }
     }
 
     private void applyInitialLinkProperties(@NonNull NetworkAgentInfo nai) {
@@ -10430,8 +10673,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
         final int oldPermission = getNetworkPermission(nai.networkCapabilities);
         final int newPermission = getNetworkPermission(newNc);
         if (oldPermission != newPermission && nai.isCreated() && !nai.isVPN()) {
+            destroyLiveTcpSocketsLackingPermission(nai, oldPermission, newPermission);
             try {
                 mNetd.networkSetPermissionForNetwork(nai.network.getNetId(), newPermission);
+                // Destroy sockets again in case any were opened after
+                // destroySocketsLackingPermission is called above and before the permissions is
+                // changed. These sockets won't be able to send any RST packets because they are now
+                // no longer routed, but at least the apps will get errors.
+                destroyLiveTcpSocketsLackingPermission(nai, oldPermission, newPermission);
             } catch (RemoteException | ServiceSpecificException e) {
                 loge("Exception in networkSetPermissionForNetwork: " + e);
             }
@@ -15352,4 +15601,62 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mQuicConnectionCloser.unregisterQuicConnectionClosePayload(pfd);
     }
 
+    // Currently this only handles message type RTM_DELADDR to destroy sockets for the deleted
+    // address, we could make this a dispatcher method if we have more use cases in the future.
+    private void processNetlinkAddressUpdateMessage(NetlinkMessage nlMsg) {
+        if (!(nlMsg instanceof RtNetlinkAddressMessage msg)) {
+            return;
+        }
+        if (msg.getHeader().nlmsg_type != NetlinkConstants.RTM_DELADDR) {
+            return;
+        }
+
+        final StructIfaddrMsg ifaddrMsg = msg.getIfaddrHeader();
+        final InetAddress removedAddress = msg.getIpAddress();
+        if (removedAddress instanceof Inet6Address && removedAddress.isLinkLocalAddress()) {
+            try {
+                mDeps.destroyLiveTcpSocketsByLocalAddress(removedAddress, ifaddrMsg.index);
+            } catch (SocketException | InterruptedIOException | ErrnoException e) {
+                loge("Exception destroying TCP sockets on local address with interfaceId: ", e);
+            }
+        } else {
+            // Range of netId for networks that ConnectivityService isn't aware of. OEM & legacy
+            // local networks are included in this scope.
+            try {
+                mDeps.destroyLiveTcpSocketsByLocalAddress(
+                        removedAddress,
+                        Set.of(Range.create(0, MIN_NET_ID - 1)), null /* uidRanges */
+                );
+            } catch (SocketException | InterruptedIOException | ErrnoException e) {
+                loge("Exception destroy TCP sockets on local address: ", e);
+            }
+        }
+    }
+
+    private void destroyLiveTcpSocketsLackingPermission(
+            NetworkAgentInfo nai, int oldPermission, int newPermission) {
+        if (!mDeps.flagConnectivityServiceDestroySocket()) {
+            return;
+        }
+        // Virtual network doesn't have permission set.
+        if (!isPermissionMoreRestrictive(oldPermission, newPermission) || nai.isVPN()) {
+            return;
+        }
+        try {
+            mDeps.destroyLiveTcpSocketsLackingPermission(
+                    nai.network.netId, newPermission);
+        } catch (SocketException | InterruptedIOException | ErrnoException e) {
+            loge("Exception destroy TCP sockets lacking permission: " + e);
+        }
+    }
+
+    private boolean isPermissionMoreRestrictive(int oldPermission, int newPermission) {
+        return switch (newPermission) {
+            case INetd.PERMISSION_NONE -> false;
+            case INetd.PERMISSION_NETWORK -> oldPermission == INetd.PERMISSION_NONE;
+            case INetd.PERMISSION_SYSTEM -> oldPermission == INetd.PERMISSION_NONE
+                    || oldPermission == INetd.PERMISSION_NETWORK;
+            default -> throw new IllegalArgumentException("Invalid permission");
+        };
+    }
 }

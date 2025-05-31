@@ -39,6 +39,7 @@ import android.net.IpConfiguration;
 import android.net.IpConfiguration.IpAssignment;
 import android.net.IpConfiguration.ProxySettings;
 import android.net.LinkAddress;
+import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.StaticIpConfiguration;
 import android.os.ConditionVariable;
@@ -122,7 +123,7 @@ public class EthernetTracker {
 
     /**
      * Interface names we track. This is a product-dependent regular expression.
-     * Use isValidEthernetInterface to check if a interface name is a valid ethernet interface (this
+     * Use shouldTrackInterface to check if a interface name is a valid ethernet interface (this
      * includes test interfaces if setIncludeTestInterfaces is set to true).
      */
     private final String mIfaceMatch;
@@ -198,18 +199,19 @@ public class EthernetTracker {
                     OsConstants.NETLINK_ROUTE, NetlinkConstants.RTMGRP_LINK);
         }
 
-        private void onNewLink(String ifname, boolean linkUp) {
+        private void onNewLink(EthernetPort port, boolean linkUp) {
+            final String ifname = port.getInterfaceName();
             if (!mFactory.hasInterface(ifname) && !ifname.equals(mTetheringInterface)) {
-                Log.i(TAG, "onInterfaceAdded, iface: " + ifname);
+                Log.i(TAG, "onInterfaceAdded: " + port);
                 maybeTrackInterface(ifname);
             }
-            Log.i(TAG, "interfaceLinkStateChanged, iface: " + ifname + ", up: " + linkUp);
+            Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
             updateInterfaceState(ifname, linkUp);
         }
 
-        private void onDelLink(String ifname) {
-            Log.i(TAG, "onInterfaceRemoved, iface: " + ifname);
-            stopTrackingInterface(ifname);
+        private void onDelLink(EthernetPort port) {
+            Log.i(TAG, "onInterfaceRemoved: " + port);
+            stopTrackingInterface(port.getInterfaceName());
         }
 
         private void processRtNetlinkLinkMessage(RtNetlinkLinkMessage msg) {
@@ -220,18 +222,24 @@ public class EthernetTracker {
             // ignore messages for the loopback interface
             if ((ifinfomsg.flags & OsConstants.IFF_LOOPBACK) != 0) return;
 
-            // check if the received message applies to an ethernet interface.
+            // rtnl_fill_ifinfo sets IFLA_ADDRESS when there is one. This should always be true for
+            // all ethernet interfaces.
+            final MacAddress mac = msg.getHardwareAddress();
+            if (mac == null) return;
+
             final String ifname = msg.getInterfaceName();
-            if (!isValidEthernetInterface(ifname)) return;
+            final EthernetPort port = new EthernetPort(ifname, mac, ifinfomsg.index);
+            // check if the received message applies to an ethernet interface.
+            if (!shouldTrackInterface(port.getInterfaceName())) return;
 
             switch (msg.getHeader().nlmsg_type) {
                 case NetlinkConstants.RTM_NEWLINK:
                     final boolean linkUp = (ifinfomsg.flags & NetlinkConstants.IFF_LOWER_UP) != 0;
-                    onNewLink(ifname, linkUp);
+                    onNewLink(port, linkUp);
                     break;
 
                 case NetlinkConstants.RTM_DELLINK:
-                    onDelLink(ifname);
+                    onDelLink(port);
                     break;
 
                 default:
@@ -447,7 +455,7 @@ public class EthernetTracker {
         }
 
         // There is a possible race with setIncludeTestInterfaces() which can affect
-        // isValidEthernetInterface (it returns true for test interfaces if setIncludeTestInterfaces
+        // shouldTrackInterface (it returns true for test interfaces if setIncludeTestInterfaces
         // is set to true).
         // setIncludeTestInterfaces() is only used in tests, and since getEthernetInterfaceList()
         // does not run on the handler thread, the behavior around setIncludeTestInterfaces() is
@@ -456,7 +464,7 @@ public class EthernetTracker {
         // In production code, this has no effect.
         while (ifaces.hasMoreElements()) {
             NetworkInterface iface = ifaces.nextElement();
-            if (isValidEthernetInterface(iface.getName())) interfaceList.add(iface.getName());
+            if (shouldTrackInterface(iface.getName())) interfaceList.add(iface.getName());
         }
         return interfaceList;
     }
@@ -500,7 +508,7 @@ public class EthernetTracker {
                 removeTestData();
                 // remove all test interfaces
                 for (String iface : getAllInterfaces()) {
-                    if (isValidEthernetInterface(iface)) continue;
+                    if (shouldTrackInterface(iface)) continue;
                     stopTrackingInterface(iface);
                 }
             }
@@ -631,24 +639,23 @@ public class EthernetTracker {
     }
 
     private void addInterface(String iface) {
-        InterfaceConfigurationParcel config = null;
+        final InterfaceConfigurationParcel config;
         // Bring up the interface so we get link status indications.
         try {
             // Read the flags before attempting to bring up the interface. If the interface is
             // already running an UP event is created after adding the interface.
             config = NetdUtils.getInterfaceConfigParcel(mNetd, iface);
-            // Only bring the interface up when ethernet is enabled, otherwise set interface down.
-            setInterfaceUpState(iface, mIsEthernetEnabled);
         } catch (IllegalStateException e) {
-            // Either the system is crashing or the interface has disappeared. Just ignore the
-            // error; we haven't modified any state because we only do that if our calls succeed.
-            Log.e(TAG, "Error upping interface " + iface, e);
+            Log.e(TAG, "Failed to addInterface(" + iface + "). getInterfaceConfigParcel failed", e);
+            return;
         }
-
         if (config == null) {
             Log.e(TAG, "Null interface config parcelable for " + iface + ". Bailing out.");
             return;
         }
+
+        // Only bring the interface up when ethernet is enabled, otherwise set interface down.
+        setInterfaceUpState(iface, mIsEthernetEnabled);
 
         final String hwAddress = config.hwAddr;
 
@@ -806,7 +813,7 @@ public class EthernetTracker {
         return ret;
     }
 
-    private boolean isValidEthernetInterface(String iface) {
+    private boolean shouldTrackInterface(String iface) {
         return iface.matches(mIfaceMatch) || isValidTestInterface(iface);
     }
 

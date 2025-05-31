@@ -214,12 +214,12 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
@@ -391,6 +391,7 @@ import com.android.internal.net.VpnConfig;
 import com.android.internal.util.WakeupMessage;
 import com.android.internal.util.test.BroadcastInterceptingContext;
 import com.android.internal.util.test.FakeSettingsProvider;
+import com.android.metrics.SatelliteCoarseUsageMetricsCollector;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.ArrayTrackRecord;
 import com.android.net.module.util.BaseNetdUnsolicitedEventListener;
@@ -405,7 +406,6 @@ import com.android.server.ConnectivityService.ConnectivityDiagnosticsCallbackInf
 import com.android.server.ConnectivityService.NetworkRequestInfo;
 import com.android.server.ConnectivityServiceTest.ConnectivityServiceDependencies.DestroySocketsWrapper;
 import com.android.server.ConnectivityServiceTest.ConnectivityServiceDependencies.ReportedInterfaces;
-import com.android.server.L2capNetworkProvider;
 import com.android.server.connectivity.ApplicationSelfCertifiedNetworkCapabilities;
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker;
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator;
@@ -651,6 +651,7 @@ public class ConnectivityServiceTest {
     @Mock SubscriptionManager mSubscriptionManager;
     @Mock KeepaliveTracker.Dependencies mMockKeepaliveTrackerDependencies;
     @Mock SatelliteAccessController mSatelliteAccessController;
+    @Mock SatelliteCoarseUsageMetricsCollector mSatelliteCoarseUsageMetricsCollector;
 
     // BatteryStatsManager is final and cannot be mocked with regular mockito, so just mock the
     // underlying binder calls.
@@ -2092,6 +2093,12 @@ public class ConnectivityServiceTest {
                 BiConsumer<Set<Integer>, Set<Integer>> updateSatelliteNetworkFallbackUidCallback,
                 @NonNull final Handler connectivityServiceInternalHandler) {
             return mSatelliteAccessController;
+        }
+
+        @Override
+        public SatelliteCoarseUsageMetricsCollector makeSatelliteCoarseUsageMetricsCollector(
+                @NonNull final Context context) {
+            return mSatelliteCoarseUsageMetricsCollector;
         }
 
         @Override

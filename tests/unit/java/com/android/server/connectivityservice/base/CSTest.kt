@@ -61,12 +61,16 @@ import android.permission.PermissionManager.PermissionResult
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.testing.TestableContext
+import android.util.Range
 import android.util.SparseArray
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.internal.app.IBatteryStats
 import com.android.internal.util.test.BroadcastInterceptingContext
+import com.android.metrics.SatelliteCoarseUsageMetricsCollector
 import com.android.modules.utils.build.SdkLevel
 import com.android.net.module.util.ArrayTrackRecord
+import com.android.net.module.util.SharedLog
+import com.android.net.module.util.netlink.NetlinkMessage
 import com.android.networkstack.apishim.common.UnsupportedApiLevelException
 import com.android.server.connectivity.AutomaticOnOffKeepaliveTracker
 import com.android.server.connectivity.CarrierPrivilegeAuthenticator
@@ -84,10 +88,12 @@ import com.android.server.connectivity.QuicConnectionCloser
 import com.android.server.connectivity.SatelliteAccessController
 import com.android.testutils.visibleOnHandlerThread
 import com.android.testutils.waitForIdle
+import java.net.InetAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.function.BiConsumer
+import java.util.function.Consumer
 import kotlin.annotation.AnnotationRetention.RUNTIME
 import kotlin.annotation.AnnotationTarget.FUNCTION
 import kotlin.test.assertNotNull
@@ -228,6 +234,7 @@ open class CSTest {
 
     val multicastRoutingCoordinatorService = mock<MulticastRoutingCoordinatorService>()
     val satelliteAccessController = mock<SatelliteAccessController>()
+    val satelliteCoarseUsageMetricsCollector = mock<SatelliteCoarseUsageMetricsCollector>()
     val quicConnectionCloser = mock<QuicConnectionCloser>()
     val destroySocketsWrapper = mock<DestroySocketsWrapper>()
     val dnsResolver = mock<IDnsResolver>()
@@ -288,8 +295,22 @@ open class CSTest {
     }
 
     // Class to be mocked and used to verify destroy sockets methods call
+    // TODO: Move to use TestableCallback-style object with a TrackRecord inside to check.
     open inner class DestroySocketsWrapper {
         open fun destroyLiveTcpSocketsByOwnerUids(ownerUids: Set<Int>) {}
+        open fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            netIdRange: Set<Range<Int>>?,
+            uidRanges: Set<Range<Int>>?
+        ) {}
+        open fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress?,
+            interfaceId: Int
+        ) {}
+        open fun destroyLiveTcpSocketsLackingPermission(
+            netId: Int,
+            permission: Int
+        ) {}
     }
 
     inner class CSDeps : ConnectivityService.Dependencies() {
@@ -316,7 +337,6 @@ open class CSTest {
                 listener: BiConsumer<Int, Int>,
                 handler: Handler
         ) = if (SdkLevel.isAtLeastT()) mock<CarrierPrivilegeAuthenticator>() else null
-
         var satelliteNetworkFallbackUidUpdate = BiConsumer<Set<Int>, Set<Int>> {_, _ -> }
         override fun makeSatelliteAccessController(
             context: Context,
@@ -326,6 +346,10 @@ open class CSTest {
             satelliteNetworkFallbackUidUpdate = updateSatelliteNetworkFallackUid
             return satelliteAccessController
         }
+
+        override fun makeSatelliteCoarseUsageMetricsCollector(
+                context: Context
+        ) = satelliteCoarseUsageMetricsCollector
 
         private inner class AOOKTDeps(c: Context) : AutomaticOnOffKeepaliveTracker.Dependencies(c) {
             override fun isTetheringFeatureNotChickenedOut(name: String): Boolean {
@@ -428,6 +452,55 @@ open class CSTest {
                 networkForNetId: SparseArray<NetworkAgentInfo>,
                 handler: Handler
         ): QuicConnectionCloser = quicConnectionCloser
+
+        override fun flagConnectivityServiceDestroySocket() = true
+
+        override fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            netIdRange: Set<Range<Int>>?,
+            uidRanges: Set<Range<Int>>?
+        ) {
+            // Call mocked destroyLiveTcpSocketsByLocalAddress so that test can verify this method
+            // call
+            destroySocketsWrapper.destroyLiveTcpSocketsByLocalAddress(
+                address,
+                netIdRange,
+                uidRanges
+            )
+        }
+
+        override fun destroyLiveTcpSocketsByLocalAddress(
+            address: InetAddress,
+            interfaceId: Int
+        ) {
+            // Call mocked destroyLiveTcpSocketsByLocalAddress so that test can verify this method
+            // call
+            destroySocketsWrapper.destroyLiveTcpSocketsByLocalAddress(
+                address,
+                interfaceId
+            )
+        }
+
+        override fun destroyLiveTcpSocketsLackingPermission(
+            netId: Int,
+            permission: Int
+        ) {
+            destroySocketsWrapper.destroyLiveTcpSocketsLackingPermission(
+                netId,
+                permission
+            )
+        }
+
+        var netlinkMessageUpdate = Consumer<NetlinkMessage> {_ -> }
+        override fun makeAddressUpdateMonitor(
+            h: Handler,
+            log: SharedLog,
+            tag: String,
+            consumer: Consumer<NetlinkMessage>
+        ): ConnectivityService.AddressUpdateMonitor {
+            netlinkMessageUpdate = consumer
+            return ConnectivityService.AddressUpdateMonitor(h, log, tag, consumer)
+        }
     }
 
     inner class PermDeps : PermissionMonitor.Dependencies() {
