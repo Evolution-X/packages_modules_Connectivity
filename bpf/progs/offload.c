@@ -246,14 +246,28 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
     return bpf_redirect(v->oif, 0 /* this is effectively BPF_F_EGRESS */);
 }
 
-DEFINE_BPF_PROG("schedcls/tether_downstream6_ether", AID_ROOT, AID_NETWORK_STACK,
-                sched_cls_tether_downstream6_ether)
+// implementation for 5.4+ (can use skb->gso_{segs,size})
+DEFINE_BPF_PROG_KVER("schedcls/tether_downstream6_ether$5_4", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_downstream6_ether_5_4, KVER_5_4)
+(struct __sk_buff* skb) {
+    return do_forward6(skb, ETHER, DOWNSTREAM, KVER_5_4);
+}
+
+DEFINE_BPF_PROG_KVER("schedcls/tether_upstream6_ether$5_4", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_upstream6_ether_5_4, KVER_5_4)
+(struct __sk_buff* skb) {
+    return do_forward6(skb, ETHER, UPSTREAM, KVER_5_4);
+}
+
+// implementation for 4.9/4.14/4.19
+DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_downstream6_ether", AID_ROOT, AID_NETWORK_STACK,
+                           sched_cls_tether_downstream6_ether, KVER_NONE, KVER_5_4)
 (struct __sk_buff* skb) {
     return do_forward6(skb, ETHER, DOWNSTREAM, KVER_NONE);
 }
 
-DEFINE_BPF_PROG("schedcls/tether_upstream6_ether", AID_ROOT, AID_NETWORK_STACK,
-                sched_cls_tether_upstream6_ether)
+DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream6_ether", AID_ROOT, AID_NETWORK_STACK,
+                           sched_cls_tether_upstream6_ether, KVER_NONE, KVER_5_4)
 (struct __sk_buff* skb) {
     return do_forward6(skb, ETHER, UPSTREAM, KVER_NONE);
 }
@@ -271,15 +285,28 @@ DEFINE_BPF_PROG("schedcls/tether_upstream6_ether", AID_ROOT, AID_NETWORK_STACK,
 // and there is a test in kernel/tests/net/test/bpf_test.py testSkbChangeHead()
 // and in system/netd/tests/binder_test.cpp NetdBinderTest TetherOffloadForwarding.
 //
-// Hence, these mandatory (must load successfully) implementations for 4.14+ kernels:
-DEFINE_BPF_PROG_KVER("schedcls/tether_downstream6_rawip$4_14", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_downstream6_rawip_4_14, KVER_4_14)
+// Hence, these mandatory (must load successfully) implementations for 5.4+ kernels:
+DEFINE_BPF_PROG_KVER("schedcls/tether_downstream6_rawip$5_4", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_downstream6_rawip_5_4, KVER_5_4)
+(struct __sk_buff* skb) {
+    return do_forward6(skb, RAWIP, DOWNSTREAM, KVER_5_4);
+}
+
+DEFINE_BPF_PROG_KVER("schedcls/tether_upstream6_rawip$5_4", AID_ROOT, AID_NETWORK_STACK,
+                     sched_cls_tether_upstream6_rawip_5_4, KVER_5_4)
+(struct __sk_buff* skb) {
+    return do_forward6(skb, RAWIP, UPSTREAM, KVER_5_4);
+}
+
+// and for 4.14/4.19 kernels
+DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_downstream6_rawip$4_14", AID_ROOT, AID_NETWORK_STACK,
+                           sched_cls_tether_downstream6_rawip_4_14, KVER_4_14, KVER_5_4)
 (struct __sk_buff* skb) {
     return do_forward6(skb, RAWIP, DOWNSTREAM, KVER_4_14);
 }
 
-DEFINE_BPF_PROG_KVER("schedcls/tether_upstream6_rawip$4_14", AID_ROOT, AID_NETWORK_STACK,
-                     sched_cls_tether_upstream6_rawip_4_14, KVER_4_14)
+DEFINE_BPF_PROG_KVER_RANGE("schedcls/tether_upstream6_rawip$4_14", AID_ROOT, AID_NETWORK_STACK,
+                           sched_cls_tether_upstream6_rawip_4_14, KVER_4_14, KVER_5_4)
 (struct __sk_buff* skb) {
     return do_forward6(skb, RAWIP, UPSTREAM, KVER_4_14);
 }
