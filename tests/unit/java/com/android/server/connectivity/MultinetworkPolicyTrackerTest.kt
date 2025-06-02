@@ -72,10 +72,13 @@ const val HANDLER_TIMEOUT_MS = 400
  * Build, install and run with:
  * atest FrameworksNetTest:MultinetworkPolicyTrackerTest
  */
+// This test class is initialized with 'supportCarrierConfigManager',
+// which indicates whether CarrierConfigManager is supported. This value
+// is 'false' if FEATURE_TELEPHONY_SUBSCRIPTION is not supported on the device.
 @RunWith(DevSdkIgnoreRunner::class)
 @SmallTest
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.R)
-class MultinetworkPolicyTrackerTest {
+class MultinetworkPolicyTrackerTest(private val supportCarrierConfigManager: Boolean) {
     companion object {
         @Parameterized.Parameters
         @JvmStatic
@@ -104,12 +107,6 @@ class MultinetworkPolicyTrackerTest {
     }
 
     private val featureFlags = HashSet<String>()
-
-    // Indicates where CarrierConfigManager is supported.
-    // It will be false if FEATURE_TELEPHONY_SUBSCRIPTION is not supported.
-    @Parameterized.Parameter(0)
-    @JvmField
-    var supportCarrierConfigManager: Boolean = false
 
     var carrierConfigManager: CarrierConfigManager? = null
 
