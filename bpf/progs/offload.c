@@ -176,6 +176,8 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
     // Handling of IPv6 overhead for incoming LRO/GRO packets
     uint64_t packets = 1;
     uint64_t L3_bytes = skb->len - l2_header_size;
+    // I don't trust v->pmtu to not be higher then it should be: it might just
+    // be device (instead of path/route/ipv6) mtu and that itself might be wrong...
     if (L3_bytes > v->pmtu) {
         if (gso_hdr_size == sizeof(struct ipv6hdr)) TC_PUNT(UNKNOWN_IPV6_GSO);
         const int mss = v->pmtu - gso_hdr_size;
@@ -423,6 +425,8 @@ static inline __always_inline int do_forward4_bottom(struct __sk_buff* skb,
     // Handling of IPv4 overhead for incoming LRO/GRO packets
     uint64_t packets = 1;
     uint64_t L3_bytes = skb->len - l2_header_size;
+    // I don't trust v->pmtu to not be higher then it should be: it might just
+    // be device (instead of path/route) mtu and that itself might be wrong...
     if (L3_bytes > v->pmtu) {
         // we know it is IPv4 without IP options, and either TCP or UDP
         const int hdr_sz = sizeof(struct iphdr) + (is_tcp ? tcph->doff * 4 : sizeof(struct udphdr));
