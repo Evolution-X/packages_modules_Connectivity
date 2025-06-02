@@ -39,6 +39,11 @@ class ApfTestBase(multi_devices_test_base.MultiDevicesTestBase):
         'NetworkStack is too old to support send raw packet, skip test.',
     )
 
+    asserts.abort_class_if(
+        self.client.hasAutomotiveFeature(),
+        'APF GMS-VSR requirements do not apply to automotive devices, skip'
+        ' test.',
+    )
     # Fetch device properties and storing them locally for later use.
     # TODO: refactor to separate instances to store client and server device
     self.server_iface_name, client_network = (
