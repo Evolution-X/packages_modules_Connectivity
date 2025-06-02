@@ -631,11 +631,18 @@ DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/ingress/stats$5_10_u",
     return bpf_traffic_account(skb, INGRESS, KVER_5_10, SDK_LEVEL_U);
 }
 
-// Android T/U/V 4.19 & T/U/V/25Q2 5.4 & T 5.10/5.15
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19",
-                                bpf_cgroup_ingress_4_19, KVER_4_19, KVER_INF)
+// Android T/U/V/25Q2 5.4 & T 5.10/5.15
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$5_4",
+                                bpf_cgroup_ingress_5_4, KVER_5_4, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, INGRESS, KVER_4_19, SDK_LEVEL_T);
+    return bpf_traffic_account(skb, INGRESS, KVER_5_4, SDK_LEVEL_T);
+}
+
+// Android T/U/V 4.19
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/ingress/stats$4_19",
+                               bpf_cgroup_ingress_4_19, KVER_4_19, KVER_5_4)
+(struct __sk_buff* skb) {
+return bpf_traffic_account(skb, INGRESS, KVER_4_19, SDK_LEVEL_T);
 }
 
 // Android T 4.9 & T/U 4.14
@@ -671,11 +678,18 @@ DEFINE_NETD_BPF_PROG_RANGES("cgroupskb/egress/stats$5_10_u",
     return bpf_traffic_account(skb, EGRESS, KVER_5_10, SDK_LEVEL_U);
 }
 
-// Android T/U/V 4.19 & T/U/V/25Q2 5.4 & T 5.10/5.15
-DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19",
-                                bpf_cgroup_egress_4_19, KVER_4_19, KVER_INF)
+// Android T/U/V/25Q2 5.4 & T 5.10/5.15
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$5_4",
+                                bpf_cgroup_egress_5_4, KVER_5_4, KVER_INF)
 (struct __sk_buff* skb) {
-    return bpf_traffic_account(skb, EGRESS, KVER_4_19, SDK_LEVEL_T);
+    return bpf_traffic_account(skb, EGRESS, KVER_5_4, SDK_LEVEL_T);
+}
+
+// Android T/U/V 4.19
+DEFINE_NETD_BPF_PROG_KVER_RANGE("cgroupskb/egress/stats$4_19",
+                                bpf_cgroup_egress_4_19, KVER_4_19, KVER_5_4)
+(struct __sk_buff* skb) {
+return bpf_traffic_account(skb, EGRESS, KVER_4_19, SDK_LEVEL_T);
 }
 
 // Android T 4.9 & T/U 4.14
