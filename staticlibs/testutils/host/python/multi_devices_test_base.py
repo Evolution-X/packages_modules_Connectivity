@@ -28,7 +28,7 @@ from mobly import base_test
 from mobly import utils
 from mobly.controllers import android_device
 
-CONNECTIVITY_MULTI_DEVICES_SNIPPET_PACKAGE = "com.google.snippet.connectivity"
+CONNECTIVITY_MULTI_DEVICES_SNIPPET_PACKAGE = 'com.google.snippet.connectivity'
 
 
 class MultiDevicesTestBase(base_test.BaseTestClass):
@@ -41,7 +41,7 @@ class MultiDevicesTestBase(base_test.BaseTestClass):
 
     def setup_device(device):
       device.load_snippet(
-          "connectivity_multi_devices_snippet",
+          'connectivity_multi_devices_snippet',
           CONNECTIVITY_MULTI_DEVICES_SNIPPET_PACKAGE,
       )
 
