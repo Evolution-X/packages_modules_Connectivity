@@ -98,6 +98,7 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
     // Let the kernel's stack handle these cases and generate appropriate ICMP errors.
     if (ip6->hop_limit <= 1) TC_PUNT(LOW_TTL);
 
+    int gso_hdr_size = sizeof(struct ipv6hdr);
     // If hardware offload is running and programming flows based on conntrack entries,
     // try not to interfere with it.
     if (ip6->nexthdr == IPPROTO_TCP) {
@@ -117,6 +118,10 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
 
         // Do not offload TCP packets with any one of the SYN/FIN/RST flags
         if (tcph->syn || tcph->fin || tcph->rst) TC_PUNT(TCPV6_CONTROL_PACKET);
+
+        gso_hdr_size += tcph->doff * 4;
+    } else if (ip6->nexthdr == IPPROTO_UDP) {
+        gso_hdr_size += sizeof(struct udphdr);
     }
 
     // Protect against forwarding packets sourced from ::1 or fe80::/64 or other weirdness.
@@ -168,24 +173,22 @@ static inline __always_inline int do_forward6(struct __sk_buff* skb,
     // Required IPv6 minimum mtu is 1280, below that not clear what we should do, abort...
     if (v->pmtu < IPV6_MIN_MTU) TC_PUNT(BELOW_IPV6_MTU);
 
-    // Approximate handling of TCP/IPv6 overhead for incoming LRO/GRO packets: default
-    // outbound path mtu of 1500 is not necessarily correct, but worst case we simply
-    // undercount, which is still better then not accounting for this overhead at all.
-    // Note: this really shouldn't be device/path mtu at all, but rather should be
-    // derived from this particular connection's mss (ie. from gro segment size).
-    // This would require a much newer kernel with newer ebpf accessors.
-    // (This is also blindly assuming 12 bytes of tcp timestamp option in tcp header)
+    // Handling of IPv6 overhead for incoming LRO/GRO packets
     uint64_t packets = 1;
     uint64_t L3_bytes = skb->len - l2_header_size;
     if (L3_bytes > v->pmtu) {
+        if (gso_hdr_size == sizeof(struct ipv6hdr)) TC_PUNT(UNKNOWN_IPV6_GSO);
+        const int mss = v->pmtu - gso_hdr_size;
+        const uint64_t payload = L3_bytes - gso_hdr_size;
         if (KVER_IS_AT_LEAST(kver, 5, 4, 0)) {
             if (skb->gso_segs <= 1) TC_PUNT(ABOVE_IPV6_PMTU);
+            // ?udp gso frags: gso_size is variable (thus 0), could this fail to trigger?
+            if (gso_hdr_size + skb->gso_size > v->pmtu) TC_PUNT(ABOVE_IPV6_PMTU_GSO);
+            packets = skb->gso_segs;
+        } else {
+            packets = (payload + mss - 1) / mss;
         }
-        const int tcp6_overhead = sizeof(struct ipv6hdr) + sizeof(struct tcphdr) + 12;
-        const int mss = v->pmtu - tcp6_overhead;
-        const uint64_t payload = L3_bytes - tcp6_overhead;
-        packets = (payload + mss - 1) / mss;
-        L3_bytes = tcp6_overhead * packets + payload;
+        L3_bytes = gso_hdr_size * packets + payload;
     }
 
     // Are we past the limit?  If so, then abort...
