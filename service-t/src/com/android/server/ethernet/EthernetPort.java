@@ -70,8 +70,8 @@ public class EthernetPort {
 
     @Override
     public String toString() {
-        return "Interface name: " + mInterfaceName + ", MAC address: " + mMacAddress
-                + ", Interface index: " + mInterfaceIndex;
+        return "EthernetPort(" + mInterfaceName + ", ifindex=" + mInterfaceIndex
+                + ", MAC=" + mMacAddress + ")";
     }
 
     @Override
