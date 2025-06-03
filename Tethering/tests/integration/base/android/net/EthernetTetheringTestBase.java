@@ -296,7 +296,7 @@ public abstract class EthernetTetheringTestBase {
         final long deadline = SystemClock.uptimeMillis() + timeoutMs;
         do {
             byte[] pkt = reader.popPacket(timeoutMs);
-            if (isExpectedIcmpPacket(pkt, true /* hasEth */, false /* isIpv4 */,
+            if (pkt != null && isExpectedIcmpPacket(pkt, true /* hasEth */, false /* isIpv4 */,
                     ICMPV6_ROUTER_ADVERTISEMENT)) {
                 return;
             }

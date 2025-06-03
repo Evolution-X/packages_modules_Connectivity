@@ -35,6 +35,7 @@ import com.android.server.connectivity.mdns.util.MdnsUtils;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.InetAddress;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetSocketAddress;
@@ -458,8 +459,14 @@ public class MdnsSocketClient implements MdnsSocketClientBase {
 
                 if (!shouldStopSocketLoop) {
                     String responseType = socket == multicastSocket ? MULTICAST_TYPE : UNICAST_TYPE;
-                    final SocketKey key = mdnsFeatureFlags.mIsSocketClientNetworkGuessingEnabled
-                            ? interfaceProvider.guessNetworkOfRemoteHost(packet.getAddress())
+                    // packet.getAddress() can return:
+                    // an IP address of the machine to which this datagram is being sent or
+                    // from which the datagram was received
+                    // or {@code null} if not set.
+                    final InetAddress packetAddress = packet.getAddress();
+                    final SocketKey key =
+                        (mdnsFeatureFlags.mIsSocketClientNetworkGuessingEnabled && packetAddress != null)
+                            ? interfaceProvider.guessNetworkOfRemoteHost(packetAddress)
                             : null;
                     final int interfaceIndex;
                     if (socket == null || !propagateInterfaceIndex) {
