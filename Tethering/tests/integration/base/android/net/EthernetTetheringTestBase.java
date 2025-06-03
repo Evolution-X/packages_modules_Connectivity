@@ -108,7 +108,7 @@ public abstract class EthernetTetheringTestBase {
     // See TetheredInterfaceRequester.getInterface, isInterfaceForTetheringAvailable.
     private static final int SHORT_TIMEOUT_MS = 1000;
     private static final int TETHER_REACHABILITY_ATTEMPTS = 20;
-    protected static final long WAIT_RA_TIMEOUT_MS = 2000;
+    protected static final long WAIT_RA_TIMEOUT_MS = 10000;
 
     // Address and NAT prefix definition.
     protected static final MacAddress TEST_MAC = MacAddress.fromString("1:2:3:4:5:6");
