@@ -26,6 +26,7 @@ import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.net.module.util.netlink.NetlinkConstants.IFF_UP;
+import static com.android.net.module.util.netlink.NetlinkConstants.RTM_GETLINK;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -64,12 +65,15 @@ import com.android.net.module.util.netlink.NetlinkMessage;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.RtNetlinkLinkMessage;
 import com.android.net.module.util.netlink.StructIfinfoMsg;
+import com.android.net.module.util.netlink.StructNlMsgHdr;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.FileDescriptor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -763,10 +767,25 @@ public class EthernetTracker {
     }
 
     private void trackAvailableInterfaces() {
-        final List<String> ifaces = getEthernetInterfaceList();
-        for (String iface : ifaces) {
-            maybeTrackInterface(iface);
-        }
+        // TODO: Clean up NetlinkMessage classes and add support for building a generic GETLINK
+        // message.
+        // Allocate enough space for struct nlmsghdr + struct rtgenmsg
+        final ByteBuffer buf = ByteBuffer.allocate(StructNlMsgHdr.STRUCT_SIZE + 1);
+        buf.order(ByteOrder.nativeOrder());
+
+        final StructNlMsgHdr nlmsghdr = new StructNlMsgHdr();
+        nlmsghdr.nlmsg_len = buf.capacity();
+        nlmsghdr.nlmsg_type = RTM_GETLINK;
+        nlmsghdr.nlmsg_flags = StructNlMsgHdr.NLM_F_DUMP | StructNlMsgHdr.NLM_F_REQUEST;
+        nlmsghdr.pack(buf);
+
+        // struct rtgenmsg {
+        //   unsigned char rtgen_family;
+        // }
+        buf.put((byte) OsConstants.AF_UNSPEC);
+        buf.flip();
+
+        mNetlinkMonitor.sendNetlinkMessage(buf);
     }
 
     private static class ListenerInfo {
