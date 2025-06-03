@@ -447,6 +447,14 @@ open class CSTest {
         override fun getCallingUid() =
                 if (callingUid == CALLING_UID_UNMOCKED) super.getCallingUid() else callingUid
 
+        private var mockedElapsedTime = 0L
+
+        override fun getElapsedRealtime() = mockedElapsedTime
+
+        fun setElapsedRealtime(time: Long) {
+            visibleOnHandlerThread(csHandler) { mockedElapsedTime = time }
+        }
+
         override fun destroyLiveTcpSocketsByOwnerUids(ownerUids: Set<Int>) {
             // Call mocked destroyLiveTcpSocketsByOwnerUids so that test can verify this method call
             destroySocketsWrapper.destroyLiveTcpSocketsByOwnerUids(ownerUids)

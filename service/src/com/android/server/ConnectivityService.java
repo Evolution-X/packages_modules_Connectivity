@@ -1549,6 +1549,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return SdkLevel.isAtLeastB();
         }
 
+        /** Get SystemClock.elapsedRealtime() */
+        public long getElapsedRealtime() {
+            return SystemClock.elapsedRealtime();
+        }
+
         /**
          * Get system properties to use in ConnectivityService.
          */
@@ -8121,7 +8126,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 @Nullable final NetworkRequest activeRequest) {
             mSatisfier = satisfier;
             mActiveRequest = activeRequest;
-            mSatisfiedTime = SystemClock.elapsedRealtime();
+            mSatisfiedTime = mDeps.getElapsedRealtime();
         }
 
         // The network currently satisfying this NRI. Only one request in an NRI can have a
@@ -8132,10 +8137,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return mSatisfier;
         }
 
-        private long mSatisfiedTime = 0;
+        private long mSatisfiedTime = mDeps.getElapsedRealtime();
 
         /**
-         * Get timestamp (SystemClock.elapsedRealtime()) when the satisfier is set for this NRI.
+         * Get timestamp (SystemClock.elapsedRealtime()) when is set or removed.
          * Resets when the satisfier changes.
          */
         public long getSatisfiedTime() {
@@ -8318,6 +8323,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 }
                 setSatisfier(satisfier, activeRequest);
             }
+            mSatisfiedTime = nri.mSatisfiedTime;
             mMatchedNetIdWhenFrozen = nri.mMatchedNetIdWhenFrozen;
             mQueuedCallbacks = nri.mQueuedCallbacks;
             mMessenger = nri.mMessenger;
