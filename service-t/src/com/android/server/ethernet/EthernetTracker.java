@@ -149,7 +149,7 @@ public class EthernetTracker {
     private final Handler mHandler;
     private final EthernetNetworkFactory mFactory;
     private final EthernetConfigStore mConfigStore;
-    private final NetlinkMonitor mNetlinkMonitor;
+    private final EthernetNetlinkMonitor mNetlinkMonitor;
     private final Dependencies mDeps;
 
     private final RemoteCallbackList<IEthernetServiceListener> mListeners =
@@ -201,6 +201,29 @@ public class EthernetTracker {
         EthernetNetlinkMonitor(Handler handler) {
             super(handler, sLog, EthernetNetlinkMonitor.class.getSimpleName(),
                     OsConstants.NETLINK_ROUTE, NetlinkConstants.RTMGRP_LINK);
+        }
+
+        /** Request RTM_GETLINK dump. Resulting callbacks are handled by #processNetlinkMessage. */
+        public void requestLinkDump() {
+            // TODO(b/422484024): Clean up NetlinkMessage classes and add support for building a
+            // generic GETLINK message.
+            // Allocate enough space for struct nlmsghdr + struct rtgenmsg
+            final ByteBuffer buf = ByteBuffer.allocate(StructNlMsgHdr.STRUCT_SIZE + 1);
+            buf.order(ByteOrder.nativeOrder());
+
+            final StructNlMsgHdr nlmsghdr = new StructNlMsgHdr();
+            nlmsghdr.nlmsg_len = buf.capacity();
+            nlmsghdr.nlmsg_type = RTM_GETLINK;
+            nlmsghdr.nlmsg_flags = StructNlMsgHdr.NLM_F_DUMP | StructNlMsgHdr.NLM_F_REQUEST;
+            nlmsghdr.pack(buf);
+
+            // struct rtgenmsg {
+            //   unsigned char rtgen_family;
+            // }
+            buf.put((byte) OsConstants.AF_UNSPEC);
+            buf.flip();
+
+            sendNetlinkMessage(buf);
         }
 
         private void onNewLink(EthernetPort port, boolean linkUp) {
@@ -314,7 +337,7 @@ public class EthernetTracker {
 
         mHandler.post(() -> {
             mNetlinkMonitor.start();
-            trackAvailableInterfaces();
+            mNetlinkMonitor.requestLinkDump();
         });
     }
 
@@ -507,7 +530,7 @@ public class EthernetTracker {
         mHandler.post(() -> {
             mIncludeTestInterfaces = include;
             if (include) {
-                trackAvailableInterfaces();
+                mNetlinkMonitor.requestLinkDump();
             } else {
                 removeTestData();
                 // remove all test interfaces
@@ -764,28 +787,6 @@ public class EthernetTracker {
         addInterface(iface);
 
         broadcastInterfaceStateChange(iface);
-    }
-
-    private void trackAvailableInterfaces() {
-        // TODO: Clean up NetlinkMessage classes and add support for building a generic GETLINK
-        // message.
-        // Allocate enough space for struct nlmsghdr + struct rtgenmsg
-        final ByteBuffer buf = ByteBuffer.allocate(StructNlMsgHdr.STRUCT_SIZE + 1);
-        buf.order(ByteOrder.nativeOrder());
-
-        final StructNlMsgHdr nlmsghdr = new StructNlMsgHdr();
-        nlmsghdr.nlmsg_len = buf.capacity();
-        nlmsghdr.nlmsg_type = RTM_GETLINK;
-        nlmsghdr.nlmsg_flags = StructNlMsgHdr.NLM_F_DUMP | StructNlMsgHdr.NLM_F_REQUEST;
-        nlmsghdr.pack(buf);
-
-        // struct rtgenmsg {
-        //   unsigned char rtgen_family;
-        // }
-        buf.put((byte) OsConstants.AF_UNSPEC);
-        buf.flip();
-
-        mNetlinkMonitor.sendNetlinkMessage(buf);
     }
 
     private static class ListenerInfo {
