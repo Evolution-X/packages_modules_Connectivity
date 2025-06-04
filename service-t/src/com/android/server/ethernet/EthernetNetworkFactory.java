@@ -144,9 +144,11 @@ public class EthernetNetworkFactory {
     }
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected void addInterface(@NonNull final String ifaceName, @NonNull final String hwAddress,
-            @NonNull final IpConfiguration ipConfig,
-            @NonNull final NetworkCapabilities capabilities) {
+    protected void addInterface(EthernetPort port, IpConfiguration ipConfig,
+            NetworkCapabilities capabilities) {
+        final String ifaceName = port.getInterfaceName();
+        final String hwAddress = port.getMacAddress().toString();
+
         if (mTrackingInterfaces.containsKey(ifaceName)) {
             Log.e(TAG, "Interface with name " + ifaceName + " already exists.");
             return;

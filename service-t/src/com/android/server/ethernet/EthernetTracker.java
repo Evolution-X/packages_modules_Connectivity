@@ -703,7 +703,7 @@ public class EthernetTracker {
 
         IpConfiguration ipConfiguration = getOrCreateIpConfiguration(iface);
         Log.d(TAG, "Tracking interface in client mode: " + iface);
-        mFactory.addInterface(iface, hwAddress, ipConfiguration, nc);
+        mFactory.addInterface(port, ipConfiguration, nc);
 
         // Note: if the interface already has link (e.g., if we crashed and got
         // restarted while it was running), we need to fake a link up notification so we

@@ -40,6 +40,7 @@ import android.net.EthernetNetworkSpecifier;
 import android.net.IpConfiguration;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
+import android.net.MacAddress;
 import android.net.Network;
 import android.net.NetworkAgentConfig;
 import android.net.NetworkCapabilities;
@@ -75,10 +76,11 @@ import java.util.Objects;
 @DevSdkIgnoreRule.IgnoreUpTo(Build.VERSION_CODES.S_V2)
 public class EthernetNetworkFactoryTest {
     private static final int TIMEOUT_MS = 2_000;
-    private static final String TEST_IFACE = "test123";
+    private static final String HW_ADDR = "01:02:03:04:05:06";
+    private static final EthernetPort TEST_IFACE =
+            new EthernetPort("test123", MacAddress.fromString(HW_ADDR), 42);
     private static final String IP_ADDR = "192.0.2.2/25";
     private static final LinkAddress LINK_ADDR = new LinkAddress(IP_ADDR);
-    private static final String HW_ADDR = "01:02:03:04:05:06";
     private TestLooper mLooper;
     private Handler mHandler;
     private EthernetNetworkFactory mNetFactory = null;
@@ -222,17 +224,17 @@ public class EthernetNetworkFactoryTest {
 
     // creates an interface with provisioning in progress (since updating the interface link state
     // automatically starts the provisioning process)
-    private void createInterfaceUndergoingProvisioning(String iface) {
+    private void createInterfaceUndergoingProvisioning(EthernetPort port) {
         // Default to the ethernet transport type.
-        createInterfaceUndergoingProvisioning(iface, NetworkCapabilities.TRANSPORT_ETHERNET);
+        createInterfaceUndergoingProvisioning(port, NetworkCapabilities.TRANSPORT_ETHERNET);
     }
 
     private void createInterfaceUndergoingProvisioning(
-            @NonNull final String iface, final int transportType) {
+            EthernetPort port, final int transportType) {
         final IpConfiguration ipConfig = createDefaultIpConfig();
-        mNetFactory.addInterface(iface, HW_ADDR, ipConfig,
+        mNetFactory.addInterface(port, ipConfig,
                 createInterfaceCapsBuilder(transportType).build());
-        assertTrue(mNetFactory.updateInterfaceLinkState(iface, true));
+        assertTrue(mNetFactory.updateInterfaceLinkState(port.getInterfaceName(), true));
 
         ArgumentCaptor<NetworkOfferCallback> captor = ArgumentCaptor.forClass(
                 NetworkOfferCallback.class);
@@ -248,9 +250,9 @@ public class EthernetNetworkFactoryTest {
     }
 
     // creates a provisioned interface
-    private void createAndVerifyProvisionedInterface(String iface) throws Exception {
+    private void createAndVerifyProvisionedInterface(EthernetPort port) throws Exception {
         // Default to the ethernet transport type.
-        createAndVerifyProvisionedInterface(iface, NetworkCapabilities.TRANSPORT_ETHERNET,
+        createAndVerifyProvisionedInterface(port, NetworkCapabilities.TRANSPORT_ETHERNET,
                 ConnectivityManager.TYPE_ETHERNET);
     }
 
@@ -258,13 +260,13 @@ public class EthernetNetworkFactoryTest {
             final int expectedLegacyType) throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE, transportType,
                 expectedLegacyType);
-        mNetFactory.removeInterface(TEST_IFACE);
+        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
     }
 
     private void createAndVerifyProvisionedInterface(
-            @NonNull final String iface, final int transportType, final int expectedLegacyType)
+            EthernetPort port, final int transportType, final int expectedLegacyType)
             throws Exception {
-        createInterfaceUndergoingProvisioning(iface, transportType);
+        createInterfaceUndergoingProvisioning(port, transportType);
         triggerOnProvisioningSuccess();
         // provisioning succeeded, verify that the network agent is created, registered, marked
         // as connected and legacy type are correctly set.
@@ -272,23 +274,10 @@ public class EthernetNetworkFactoryTest {
                 NetworkCapabilities.class);
         verify(mDeps).makeEthernetNetworkAgent(any(), any(), ncCaptor.capture(), any(),
                 argThat(x -> x.getLegacyType() == expectedLegacyType), any(), any());
-        assertEquals(
-                new EthernetNetworkSpecifier(iface), ncCaptor.getValue().getNetworkSpecifier());
+        assertEquals(new EthernetNetworkSpecifier(port.getInterfaceName()),
+                ncCaptor.getValue().getNetworkSpecifier());
         verifyNetworkAgentRegistersAndConnects();
         clearInvocations(mDeps);
-        clearInvocations(mNetworkAgent);
-    }
-
-    // creates an unprovisioned interface
-    private void createUnprovisionedInterface(String iface) throws Exception {
-        // To create an unprovisioned interface, provision and then "stop" it, i.e. stop its
-        // NetworkAgent and IpClient. One way this can be done is by provisioning an interface and
-        // then calling onNetworkUnwanted.
-        mNetFactory.addInterface(iface, HW_ADDR, createDefaultIpConfig(),
-                createInterfaceCapsBuilder(NetworkCapabilities.TRANSPORT_ETHERNET).build());
-        assertTrue(mNetFactory.updateInterfaceLinkState(iface, true));
-
-        clearInvocations(mIpClient);
         clearInvocations(mNetworkAgent);
     }
 
@@ -298,7 +287,8 @@ public class EthernetNetworkFactoryTest {
         createInterfaceUndergoingProvisioning(TEST_IFACE);
 
         // verify that the IpClient gets shut down when interface state changes to down.
-        final boolean ret = mNetFactory.updateInterfaceLinkState(TEST_IFACE, false /* up */);
+        final boolean ret =
+                mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), false /* up */);
 
         assertTrue(ret);
         verify(mIpClient).shutdown();
@@ -309,7 +299,8 @@ public class EthernetNetworkFactoryTest {
         initEthernetNetworkFactory();
 
         // if interface was never added, link state cannot be updated.
-        final boolean ret = mNetFactory.updateInterfaceLinkState(TEST_IFACE, true /* up */);
+        final boolean ret =
+                mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), true /* up */);
 
         assertFalse(ret);
         verifyNoStopOrStart();
@@ -318,7 +309,8 @@ public class EthernetNetworkFactoryTest {
     @Test
     public void testProvisioningLoss() throws Exception {
         initEthernetNetworkFactory();
-        when(mDeps.getNetworkInterfaceByName(TEST_IFACE)).thenReturn(mInterfaceParams);
+        when(mDeps.getNetworkInterfaceByName(TEST_IFACE.getInterfaceName()))
+                .thenReturn(mInterfaceParams);
         createAndVerifyProvisionedInterface(TEST_IFACE);
 
         triggerOnProvisioningFailure();
@@ -331,7 +323,7 @@ public class EthernetNetworkFactoryTest {
     public void testProvisioningLossForDisappearedInterface() throws Exception {
         initEthernetNetworkFactory();
         // mocked method returns null by default, but just to be explicit in the test:
-        when(mDeps.getNetworkInterfaceByName(eq(TEST_IFACE))).thenReturn(null);
+        when(mDeps.getNetworkInterfaceByName(eq(TEST_IFACE.getInterfaceName()))).thenReturn(null);
 
         createAndVerifyProvisionedInterface(TEST_IFACE);
         triggerOnProvisioningFailure();
@@ -362,7 +354,8 @@ public class EthernetNetworkFactoryTest {
     public void testNetworkUnwantedWithStaleNetworkAgent() throws Exception {
         initEthernetNetworkFactory();
         // ensures provisioning is restarted after provisioning loss
-        when(mDeps.getNetworkInterfaceByName(TEST_IFACE)).thenReturn(mInterfaceParams);
+        when(mDeps.getNetworkInterfaceByName(TEST_IFACE.getInterfaceName()))
+                .thenReturn(mInterfaceParams);
         createAndVerifyProvisionedInterface(TEST_IFACE);
 
         EthernetNetworkAgent.Callbacks oldCbs = mNetworkAgent.getCallbacks();
@@ -417,7 +410,7 @@ public class EthernetNetworkFactoryTest {
     private IpClientCallbacks getStaleIpClientCallbacks() throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE);
         final IpClientCallbacks staleIpClientCallbacks = mIpClientCallbacks;
-        mNetFactory.removeInterface(TEST_IFACE);
+        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
         verifyStop();
         assertNotSame(mIpClientCallbacks, staleIpClientCallbacks);
         return staleIpClientCallbacks;
@@ -438,7 +431,8 @@ public class EthernetNetworkFactoryTest {
     @Test
     public void testIgnoreOnIpLayerStoppedCallbackForStaleCallback() throws Exception {
         initEthernetNetworkFactory();
-        when(mDeps.getNetworkInterfaceByName(TEST_IFACE)).thenReturn(mInterfaceParams);
+        when(mDeps.getNetworkInterfaceByName(TEST_IFACE.getInterfaceName()))
+                .thenReturn(mInterfaceParams);
         final IpClientCallbacks staleIpClientCallbacks = getStaleIpClientCallbacks();
 
         staleIpClientCallbacks.onProvisioningFailure(new LinkProperties());
@@ -500,7 +494,7 @@ public class EthernetNetworkFactoryTest {
         final NetworkCapabilities capabilities = createDefaultFilterCaps();
         final IpConfiguration ipConfiguration = createStaticIpConfig();
 
-        mNetFactory.updateInterface(TEST_IFACE, ipConfiguration, capabilities);
+        mNetFactory.updateInterface(TEST_IFACE.getInterfaceName(), ipConfiguration, capabilities);
         triggerOnProvisioningSuccess();
 
         verify(mDeps).makeEthernetNetworkAgent(any(), any(),
@@ -515,7 +509,7 @@ public class EthernetNetworkFactoryTest {
         final NetworkCapabilities capabilities = createDefaultFilterCaps();
         final IpConfiguration ipConfiguration = createStaticIpConfig();
 
-        mNetFactory.updateInterface(TEST_IFACE, ipConfiguration, capabilities);
+        mNetFactory.updateInterface(TEST_IFACE.getInterfaceName(), ipConfiguration, capabilities);
 
         verifyNoStopOrStart();
     }
@@ -526,7 +520,8 @@ public class EthernetNetworkFactoryTest {
         createAndVerifyProvisionedInterface(TEST_IFACE);
 
         final IpConfiguration initialIpConfig = createStaticIpConfig();
-        mNetFactory.updateInterface(TEST_IFACE, initialIpConfig, null /*capabilities*/);
+        mNetFactory.updateInterface(TEST_IFACE.getInterfaceName(), initialIpConfig,
+                null /*capabilities*/);
 
         triggerOnProvisioningSuccess();
         verifyRestart(initialIpConfig);
@@ -538,7 +533,8 @@ public class EthernetNetworkFactoryTest {
 
 
         // verify that sending a null ipConfig does not update the current ipConfig.
-        mNetFactory.updateInterface(TEST_IFACE, null /*ipConfig*/, null /*capabilities*/);
+        mNetFactory.updateInterface(TEST_IFACE.getInterfaceName(), null /*ipConfig*/,
+                null /*capabilities*/);
         triggerOnProvisioningSuccess();
         verifyRestart(initialIpConfig);
     }
@@ -547,7 +543,7 @@ public class EthernetNetworkFactoryTest {
     public void testOnNetworkNeededOnStaleNetworkOffer() throws Exception {
         initEthernetNetworkFactory();
         createAndVerifyProvisionedInterface(TEST_IFACE);
-        mNetFactory.updateInterfaceLinkState(TEST_IFACE, false);
+        mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), false);
         verify(mNetworkProvider).unregisterNetworkOffer(mNetworkOfferCallback);
         // It is possible that even after a network offer is unregistered, CS still sends it
         // onNetworkNeeded() callbacks.
@@ -560,7 +556,7 @@ public class EthernetNetworkFactoryTest {
         initEthernetNetworkFactory();
         createAndVerifyProvisionedInterface(TEST_IFACE);
 
-        final String result = mNetFactory.getHwAddress(TEST_IFACE);
+        final String result = mNetFactory.getHwAddress(TEST_IFACE.getInterfaceName());
         assertEquals(HW_ADDR, result);
     }
 
@@ -568,7 +564,7 @@ public class EthernetNetworkFactoryTest {
     public void testGetMacAddressForNonExistingInterface() {
         initEthernetNetworkFactory();
 
-        final String result = mNetFactory.getHwAddress(TEST_IFACE);
+        final String result = mNetFactory.getHwAddress(TEST_IFACE.getInterfaceName());
         // No interface exists due to not calling createAndVerifyProvisionedInterface(...).
         assertNull(result);
     }
