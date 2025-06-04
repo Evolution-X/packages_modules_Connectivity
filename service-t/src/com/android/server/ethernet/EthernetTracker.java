@@ -26,6 +26,7 @@ import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.net.module.util.netlink.NetlinkConstants.IFF_UP;
+import static com.android.net.module.util.netlink.NetlinkConstants.RTM_GETLINK;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -64,12 +65,15 @@ import com.android.net.module.util.netlink.NetlinkMessage;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.RtNetlinkLinkMessage;
 import com.android.net.module.util.netlink.StructIfinfoMsg;
+import com.android.net.module.util.netlink.StructNlMsgHdr;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.FileDescriptor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -145,7 +149,7 @@ public class EthernetTracker {
     private final Handler mHandler;
     private final EthernetNetworkFactory mFactory;
     private final EthernetConfigStore mConfigStore;
-    private final NetlinkMonitor mNetlinkMonitor;
+    private final EthernetNetlinkMonitor mNetlinkMonitor;
     private final Dependencies mDeps;
 
     private final RemoteCallbackList<IEthernetServiceListener> mListeners =
@@ -199,11 +203,34 @@ public class EthernetTracker {
                     OsConstants.NETLINK_ROUTE, NetlinkConstants.RTMGRP_LINK);
         }
 
+        /** Request RTM_GETLINK dump. Resulting callbacks are handled by #processNetlinkMessage. */
+        public void requestLinkDump() {
+            // TODO(b/422484024): Clean up NetlinkMessage classes and add support for building a
+            // generic GETLINK message.
+            // Allocate enough space for struct nlmsghdr + struct rtgenmsg
+            final ByteBuffer buf = ByteBuffer.allocate(StructNlMsgHdr.STRUCT_SIZE + 1);
+            buf.order(ByteOrder.nativeOrder());
+
+            final StructNlMsgHdr nlmsghdr = new StructNlMsgHdr();
+            nlmsghdr.nlmsg_len = buf.capacity();
+            nlmsghdr.nlmsg_type = RTM_GETLINK;
+            nlmsghdr.nlmsg_flags = StructNlMsgHdr.NLM_F_DUMP | StructNlMsgHdr.NLM_F_REQUEST;
+            nlmsghdr.pack(buf);
+
+            // struct rtgenmsg {
+            //   unsigned char rtgen_family;
+            // }
+            buf.put((byte) OsConstants.AF_UNSPEC);
+            buf.flip();
+
+            sendNetlinkMessage(buf);
+        }
+
         private void onNewLink(EthernetPort port, boolean linkUp) {
             final String ifname = port.getInterfaceName();
             if (!mFactory.hasInterface(ifname) && !ifname.equals(mTetheringInterface)) {
                 Log.i(TAG, "onInterfaceAdded: " + port);
-                maybeTrackInterface(ifname);
+                maybeTrackInterface(port);
             }
             Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
             updateInterfaceState(ifname, linkUp);
@@ -310,7 +337,7 @@ public class EthernetTracker {
 
         mHandler.post(() -> {
             mNetlinkMonitor.start();
-            trackAvailableInterfaces();
+            mNetlinkMonitor.requestLinkDump();
         });
     }
 
@@ -503,7 +530,7 @@ public class EthernetTracker {
         mHandler.post(() -> {
             mIncludeTestInterfaces = include;
             if (include) {
-                trackAvailableInterfaces();
+                mNetlinkMonitor.requestLinkDump();
             } else {
                 removeTestData();
                 // remove all test interfaces
@@ -743,14 +770,15 @@ public class EthernetTracker {
         mTetheredInterfaceWasAvailable = available;
     }
 
-    private void maybeTrackInterface(String iface) {
+    private void maybeTrackInterface(EthernetPort port) {
+        final String iface = port.getInterfaceName();
         // If we don't already track this interface, and if this interface matches
         // our regex, start tracking it.
         if (mFactory.hasInterface(iface) || iface.equals(mTetheringInterface)) {
-            if (DBG) Log.w(TAG, "Ignoring already-tracked interface " + iface);
+            if (DBG) Log.w(TAG, "Ignoring already-tracked " + port);
             return;
         }
-        if (DBG) Log.i(TAG, "maybeTrackInterface: " + iface);
+        if (DBG) Log.i(TAG, "maybeTrackInterface: " + port);
 
         // Do not use an interface for tethering if it has configured NetworkCapabilities.
         if (mTetheringInterface == null && !mNetworkCapabilities.containsKey(iface)) {
@@ -760,13 +788,6 @@ public class EthernetTracker {
         addInterface(iface);
 
         broadcastInterfaceStateChange(iface);
-    }
-
-    private void trackAvailableInterfaces() {
-        final List<String> ifaces = getEthernetInterfaceList();
-        for (String iface : ifaces) {
-            maybeTrackInterface(iface);
-        }
     }
 
     private static class ListenerInfo {

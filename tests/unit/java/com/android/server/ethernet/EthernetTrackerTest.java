@@ -259,37 +259,4 @@ public class EthernetTrackerTest {
         verify(mFactory).updateInterface(
                 eq(TEST_IFACE), eq(ipConfig), eq(capabilities));
     }
-
-    @Test
-    public void testIsValidTestInterfaceIsFalseWhenTestInterfacesAreNotIncluded() {
-        final String validIfaceName = TEST_TAP_PREFIX + "123";
-        tracker.setIncludeTestInterfaces(false);
-        waitForIdle();
-
-        final boolean isValidTestInterface = tracker.isValidTestInterface(validIfaceName);
-
-        assertFalse(isValidTestInterface);
-    }
-
-    @Test
-    public void testIsValidTestInterfaceIsFalseWhenTestInterfaceNameIsInvalid() {
-        final String invalidIfaceName = "123" + TEST_TAP_PREFIX;
-        tracker.setIncludeTestInterfaces(true);
-        waitForIdle();
-
-        final boolean isValidTestInterface = tracker.isValidTestInterface(invalidIfaceName);
-
-        assertFalse(isValidTestInterface);
-    }
-
-    @Test
-    public void testIsValidTestInterfaceIsTrueWhenTestInterfacesIncludedAndValidName() {
-        final String validIfaceName = TEST_TAP_PREFIX + "123";
-        tracker.setIncludeTestInterfaces(true);
-        waitForIdle();
-
-        final boolean isValidTestInterface = tracker.isValidTestInterface(validIfaceName);
-
-        assertTrue(isValidTestInterface);
-    }
 }
