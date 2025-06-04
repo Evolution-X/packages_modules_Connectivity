@@ -30,7 +30,6 @@ import static com.android.server.ConnectivityStatsLog.DEFAULT_NETWORK_REMATCH__R
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.net.NetworkCapabilities;
-import android.os.SystemClock;
 import android.stats.connectivity.MeteredState;
 import android.stats.connectivity.ValidatedState;
 
@@ -73,13 +72,6 @@ public class DefaultNetworkRematchMetrics {
             ConnectivityStatsLog.write(DEFAULT_NETWORK_REMATCH, sessionId, rematchReason,
                     list.toByteArray());
         }
-
-        /**
-         * Returns SystemClock.elapsedRealtime()
-         */
-        public long getElapsedRealtime() {
-            return SystemClock.elapsedRealtime();
-        }
     }
 
     /**
@@ -91,7 +83,8 @@ public class DefaultNetworkRematchMetrics {
      */
     public void addEvent(@NonNull ConnectivityService.NetworkRequestInfo nri,
             @Nullable NetworkAgentInfo oldNetwork,
-            @Nullable NetworkAgentInfo newNetwork) {
+            @Nullable NetworkAgentInfo newNetwork,
+            long satisfiedDurationMs) {
         // TODO: Record event for network other than satellite after figuring out
         //  how to deal with the amount of data single device reports.
         // Only logs for satellite multilayer requests.
@@ -103,7 +96,7 @@ public class DefaultNetworkRematchMetrics {
             return;
         }
         mBuilder.addDefaultNetworkRematchInfo(
-                getDefaultNetworkRematchInfo(nri, oldNetwork, newNetwork));
+                getDefaultNetworkRematchInfo(nri, oldNetwork, newNetwork, satisfiedDurationMs));
     }
 
     /**
@@ -125,13 +118,14 @@ public class DefaultNetworkRematchMetrics {
     @NonNull
     private DefaultNetworkRematchInfo getDefaultNetworkRematchInfo(
             @NonNull ConnectivityService.NetworkRequestInfo nri,
-            @Nullable NetworkAgentInfo oldNetwork, @Nullable NetworkAgentInfo newNetwork) {
+            @Nullable NetworkAgentInfo oldNetwork, @Nullable NetworkAgentInfo newNetwork,
+            long satisfiedDurationMs) {
         final DefaultNetworkRematchInfo.Builder infoBuilder =
                 DefaultNetworkRematchInfo.newBuilder();
         if (oldNetwork != null) {
             infoBuilder.setOldNetwork(getNetworkDescription(oldNetwork));
             infoBuilder.setTimeDurationOnOldNetworkSec(
-                    (int) ((mDeps.getElapsedRealtime() - nri.getSatisfiedTime()) / 1000));
+                    (int) (satisfiedDurationMs / 1000));
         }
         if (newNetwork != null) {
             infoBuilder.setNewNetwork(getNetworkDescription(newNetwork));

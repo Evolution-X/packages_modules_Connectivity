@@ -5821,7 +5821,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 if (mConstrainedDataSatelliteMetrics && mDefaultNetworkRequests.contains(nri)) {
                     // Must be called before satisfier changes to get satisfied time.
                     // See NRI#getSatisfiedTime().
-                    mDefaultNetworkRematchMetrics.addEvent(nri, currentNetwork, null);
+                    mDefaultNetworkRematchMetrics.addEvent(nri, currentNetwork, null,
+                            mDeps.getElapsedRealtime() - nri.getSatisfiedTime());
                 }
                 nri.setSatisfier(null, null);
 
@@ -11703,7 +11704,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 continue;
             }
             mDefaultNetworkRematchMetrics.addEvent(defaultRequestInfo,
-                    reassignment.mOldNetwork, reassignment.mNewNetwork);
+                    reassignment.mOldNetwork, reassignment.mNewNetwork,
+                    mDeps.getElapsedRealtime() - defaultRequestInfo.getSatisfiedTime());
         }
         // TODO: fill rematch reason.
         mDefaultNetworkRematchMetrics.writeStatsAndClear();
