@@ -193,13 +193,16 @@ DEFINE_BPF_MAP_EXT(local_net_blocked_uid_map, HASH, uint32_t, bool, -1000,
             uint64_t packets = 1;                                                                \
             uint64_t bytes = skb->len;                                                           \
             if (bytes > mtu) {                                                                   \
+                const bool is5_4 = KVER_IS_AT_LEAST(kver, 5, 4, 0);                              \
                 const bool is_ipv6 = (skb->protocol == htons(ETH_P_IPV6));                       \
                 const int ip_overhead = is_ipv6 ? sizeof(struct ipv6hdr) : sizeof(struct iphdr); \
-                const int overhead = ip_overhead + sizeof(struct tcphdr) + 12;                   \
+                struct bpf_sock * const sk = is5_4 && skb->sk ? bpf_sk_fullsock(skb->sk) : NULL; \
+                const bool is_tcp = !sk || sk->protocol == IPPROTO_TCP;                          \
+                const int L4_size = is_tcp ? sizeof(struct tcphdr) + 12 : sizeof(struct udphdr); \
+                const int overhead = ip_overhead + L4_size;                                      \
                 const int mss = mtu - overhead;                                                  \
                 const uint64_t payload = bytes - overhead;                                       \
-                const bool is_5_4 = KVER_IS_AT_LEAST(kver, 5, 4, 0);                             \
-                packets = is_5_4 ? skb->gso_segs : (payload + mss - 1) / mss;                    \
+                packets = is5_4 ? skb->gso_segs : (payload + mss - 1) / mss;                     \
                 bytes = overhead * packets + payload;                                            \
             }                                                                                    \
             if (egress.egress) {                                                                 \
