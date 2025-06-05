@@ -467,7 +467,7 @@ public class EthernetTracker {
         return interfaces;
     }
 
-    String[] getClientModeInterfaces(boolean includeRestricted) {
+    String[] getClientModeInterfacesSorted(boolean includeRestricted) {
         return mFactory.getInterfacesSorted(includeRestricted);
     }
 
@@ -511,7 +511,7 @@ public class EthernetTracker {
                 // Remote process has already died
                 return;
             }
-            for (String iface : getClientModeInterfaces(canUseRestrictedNetworks)) {
+            for (String iface : getClientModeInterfacesSorted(canUseRestrictedNetworks)) {
                 unicastInterfaceStateChange(listener, iface);
             }
             if (mTetheringInterface != null && mTetheringInterfaceMode == INTERFACE_MODE_SERVER) {
