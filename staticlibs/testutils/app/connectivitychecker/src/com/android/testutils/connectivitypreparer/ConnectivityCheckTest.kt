@@ -81,7 +81,7 @@ class ConnectivityCheckTest {
                     .addCapability(NET_CAPABILITY_INTERNET)
                     .build()
             )
-            val capChanged = cb.eventuallyExpect<CapabilitiesChanged>()
+            val capChanged = cb.eventuallyExpect<CapabilitiesChanged>(from = 0)
             val network = capChanged.network
             val ssid = capChanged.caps.ssid
             assertFalse(ssid.isNullOrEmpty(), "No SSID for wifi network $network")
