@@ -610,7 +610,7 @@ public class EthernetTracker {
         Log.d(TAG, "Setting tethering interface mode to " + mode);
         mTetheringInterfaceMode = mode;
         if (mTetheringInterface != null) {
-            removeInterface(mTetheringInterface.getInterfaceName());
+            removeInterface(mTetheringInterface);
             addInterface(mTetheringInterface);
             // when this broadcast is sent, any calls to notifyTetheredInterfaceAvailable or
             // notifyTetheredInterfaceUnavailable have already happened
@@ -649,14 +649,15 @@ public class EthernetTracker {
         return INTERFACE_MODE_CLIENT;
     }
 
-    private void removeInterface(String iface) {
+    private void removeInterface(EthernetPort port) {
+        final String iface = port.getInterfaceName();
         mFactory.removeInterface(iface);
         maybeUpdateServerModeInterfaceState(iface, false);
     }
 
     private void stopTrackingInterface(EthernetPort port) {
+        removeInterface(port);
         final String iface = port.getInterfaceName();
-        removeInterface(iface);
         if (mTetheringInterface != null && iface.equals(mTetheringInterface.getInterfaceName())) {
             mTetheringInterface = null;
             mTetheringInterfaceHwAddr = null;
