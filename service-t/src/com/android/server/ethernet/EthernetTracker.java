@@ -650,9 +650,8 @@ public class EthernetTracker {
     }
 
     private void removeInterface(EthernetPort port) {
-        final String iface = port.getInterfaceName();
-        mFactory.removeInterface(iface);
-        maybeUpdateServerModeInterfaceState(iface, false);
+        mFactory.removeInterface(port);
+        maybeUpdateServerModeInterfaceState(port.getInterfaceName(), false);
     }
 
     private void stopTrackingInterface(EthernetPort port) {

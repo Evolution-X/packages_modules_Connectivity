@@ -260,7 +260,7 @@ public class EthernetNetworkFactoryTest {
             final int expectedLegacyType) throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE, transportType,
                 expectedLegacyType);
-        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
+        mNetFactory.removeInterface(TEST_IFACE);
     }
 
     private void createAndVerifyProvisionedInterface(
@@ -410,7 +410,7 @@ public class EthernetNetworkFactoryTest {
     private IpClientCallbacks getStaleIpClientCallbacks() throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE);
         final IpClientCallbacks staleIpClientCallbacks = mIpClientCallbacks;
-        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
+        mNetFactory.removeInterface(TEST_IFACE);
         verifyStop();
         assertNotSame(mIpClientCallbacks, staleIpClientCallbacks);
         return staleIpClientCallbacks;

@@ -218,9 +218,9 @@ public class EthernetNetworkFactory {
         return;
     }
 
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected boolean removeInterface(String interfaceName) {
-        NetworkInterfaceState iface = mTrackingInterfaces.remove(interfaceName);
+    /** Removes the interface from the factory and returns whether the interface was tracked */
+    public boolean removeInterface(EthernetPort port) {
+        NetworkInterfaceState iface = mTrackingInterfaces.remove(port.getInterfaceName());
         if (iface != null) {
             iface.unregisterNetworkOfferAndStop();
             return true;
@@ -228,7 +228,7 @@ public class EthernetNetworkFactory {
         // TODO(b/236892130): if an interface is currently in server mode, it may not be properly
         // removed.
         // TODO: when false is returned, do not send a STATE_ABSENT callback.
-        Log.w(TAG, interfaceName + " is not tracked and cannot be removed");
+        Log.w(TAG, "removeInterface() failed because port is not tracked " + port);
         return false;
     }
 
