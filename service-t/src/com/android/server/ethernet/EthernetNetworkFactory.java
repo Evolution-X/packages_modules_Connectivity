@@ -157,8 +157,8 @@ public class EthernetNetworkFactory {
                 .toArray(String[]::new);
     }
 
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected void addInterface(EthernetPort port, IpConfiguration ipConfig,
+    /** Add an interface to the factory. */
+    public void addInterface(EthernetPort port, IpConfiguration ipConfig,
             NetworkCapabilities capabilities) {
         final String ifaceName = port.getInterfaceName();
         final String hwAddress = port.getMacAddress().toString();
