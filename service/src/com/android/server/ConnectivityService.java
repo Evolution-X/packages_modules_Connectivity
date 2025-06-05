@@ -103,7 +103,6 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PAID;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_PARTIAL_CONNECTIVITY;
-import static android.net.NetworkCapabilities.NET_CAPABILITY_TEMPORARILY_NOT_METERED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_1;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_5;
@@ -134,6 +133,7 @@ import static android.system.OsConstants.ETH_P_ALL;
 import static android.system.OsConstants.IPPROTO_TCP;
 import static android.system.OsConstants.IPPROTO_UDP;
 
+import static com.android.metrics.DefaultNetworkRematchMetrics.getNetworkDescription;
 import static com.android.net.module.util.BpfUtils.BPF_CGROUP_GETSOCKOPT;
 import static com.android.net.module.util.BpfUtils.BPF_CGROUP_INET4_BIND;
 import static com.android.net.module.util.BpfUtils.BPF_CGROUP_INET4_CONNECT;
@@ -156,6 +156,7 @@ import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPer
 import static com.android.net.module.util.PermissionUtils.enforceNetworkStackPermissionOr;
 import static com.android.net.module.util.PermissionUtils.hasAnyPermissionOf;
 import static com.android.server.ConnectivityStatsLog.CONNECTIVITY_STATE_SAMPLE;
+import static com.android.server.ConnectivityStatsLog.DEFAULT_NETWORK_REMATCH__REMATCH_REASON__RMR_NETWORK_DISCONNECTED;
 import static com.android.server.NetIdManager.MAX_NET_ID;
 import static com.android.server.NetIdManager.MIN_NET_ID;
 import static com.android.server.connectivity.ConnectivityFlags.CELLULAR_DATA_INACTIVITY_TIMEOUT;
@@ -309,9 +310,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
-import android.stats.connectivity.MeteredState;
 import android.stats.connectivity.RequestType;
-import android.stats.connectivity.ValidatedState;
 import android.sysprop.NetworkProperties;
 import android.system.ErrnoException;
 import android.system.OsConstants;
@@ -337,9 +336,9 @@ import com.android.metrics.ConnectionDurationForTransports;
 import com.android.metrics.ConnectionDurationPerTransports;
 import com.android.metrics.ConnectivitySampleMetricsHelper;
 import com.android.metrics.ConnectivityStateSample;
+import com.android.metrics.DefaultNetworkRematchMetrics;
 import com.android.metrics.NetworkCountForTransports;
 import com.android.metrics.NetworkCountPerTransports;
-import com.android.metrics.NetworkDescription;
 import com.android.metrics.NetworkList;
 import com.android.metrics.NetworkRequestCount;
 import com.android.metrics.RequestCountForType;
@@ -670,7 +669,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
      * The default request uses PREFERENCE_ORDER_DEFAULT.
      */
     // Used when sending to netd to code for "no order".
-    static final int PREFERENCE_ORDER_NONE = 0;
+    @VisibleForTesting
+    public static final int PREFERENCE_ORDER_NONE = 0;
     // Order for requests that don't code for a per-app preference. As it is
     // out of the valid range, the corresponding order should be
     // PREFERENCE_ORDER_NONE when sending to netd.
@@ -695,8 +695,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     static final int PREFERENCE_ORDER_MOBILE_DATA_PREFERERRED = 30;
     // Order of setting satellite network preference fallback when default message application
     // with role_sms role and android.permission.SATELLITE_COMMUNICATION permission detected
-    @VisibleForTesting
-    static final int PREFERENCE_ORDER_SATELLITE_FALLBACK = 40;
+    public static final int PREFERENCE_ORDER_SATELLITE_FALLBACK = 40;
     // Preference order that signifies the network shouldn't be set as a default network for
     // the UIDs, only give them access to it. TODO : replace this with a boolean
     // in NativeUidRangeConfig
@@ -1095,6 +1094,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private long mLastWakeLockAcquireTimestamp = 0;
 
     private final IpConnectivityLog mMetricsLog;
+    private final DefaultNetworkRematchMetrics mDefaultNetworkRematchMetrics;
 
     @Nullable private final NetworkRequestStateStatsMetrics mNetworkRequestStateStatsMetrics;
 
@@ -1718,6 +1718,14 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return new SatelliteCoarseUsageMetricsCollector(context);
         }
 
+        /**
+         * @see DefaultNetworkRematchMetrics
+         */
+        @Nullable
+        public DefaultNetworkRematchMetrics makeDefaultNetworkRematchMetrics() {
+            return new DefaultNetworkRematchMetrics();
+        }
+
         /** Creates an L2capNetworkProvider */
         public L2capNetworkProvider makeL2capNetworkProvider(Context context) {
             return new L2capNetworkProvider(context);
@@ -2104,8 +2112,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
         if (mConstrainedDataSatelliteMetrics) {
             mSatelliteCoarseUsageMetricsCollector =
                     mDeps.makeSatelliteCoarseUsageMetricsCollector(mContext);
+            mDefaultNetworkRematchMetrics = mDeps.makeDefaultNetworkRematchMetrics();
         } else {
             mSatelliteCoarseUsageMetricsCollector = null;
+            mDefaultNetworkRematchMetrics = null;
         }
 
         if (mDeps.flagConnectivityServiceDestroySocket()) {
@@ -2955,33 +2965,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private static NetworkList sampleNetworks(@NonNull final ArraySet<NetworkAgentInfo> nais) {
         final NetworkList.Builder builder = NetworkList.newBuilder();
         for (final NetworkAgentInfo nai : nais) {
-            final NetworkCapabilities nc = nai.networkCapabilities;
-            final NetworkDescription.Builder d = NetworkDescription.newBuilder();
-            d.setTransportTypes((int) nc.getTransportTypesInternal());
-            final MeteredState meteredState;
-            if (nc.hasCapability(NET_CAPABILITY_TEMPORARILY_NOT_METERED)) {
-                meteredState = MeteredState.METERED_TEMPORARILY_UNMETERED;
-            } else if (nc.hasCapability(NET_CAPABILITY_NOT_METERED)) {
-                meteredState = MeteredState.METERED_NO;
-            } else {
-                meteredState = MeteredState.METERED_YES;
-            }
-            d.setMeteredState(meteredState);
-            final ValidatedState validatedState;
-            if (nc.hasCapability(NET_CAPABILITY_CAPTIVE_PORTAL)) {
-                validatedState = ValidatedState.VS_PORTAL;
-            } else if (nc.hasCapability(NET_CAPABILITY_PARTIAL_CONNECTIVITY)) {
-                validatedState = ValidatedState.VS_PARTIAL;
-            } else if (nc.hasCapability(NET_CAPABILITY_VALIDATED)) {
-                validatedState = ValidatedState.VS_VALID;
-            } else {
-                validatedState = ValidatedState.VS_INVALID;
-            }
-            d.setValidatedState(validatedState);
-            d.setScorePolicies(nai.getScore().getPoliciesInternal());
-            d.setCapabilities(nc.getCapabilitiesInternal());
-            d.setEnterpriseId(nc.getEnterpriseIdsInternal());
-            builder.addNetworkDescription(d);
+            builder.addNetworkDescription(getNetworkDescription(nai));
         }
         return builder.build();
     }
@@ -5829,7 +5813,13 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 // TODO : setting the satisfier is in fact the job of the rematch. Teach the
                 // rematch not to keep disconnected agents instead of setting it here ; this
                 // will also allow removing updating the offers below.
+                if (mConstrainedDataSatelliteMetrics && mDefaultNetworkRequests.contains(nri)) {
+                    // Must be called before satisfier changes to get satisfied time.
+                    // See NRI#getSatisfiedTime().
+                    mDefaultNetworkRematchMetrics.addEvent(nri, currentNetwork, null);
+                }
                 nri.setSatisfier(null, null);
+
                 for (final NetworkOfferInfo noi : mNetworkOffers) {
                     informOffer(nri, noi.offer, mNetworkRanker);
                 }
@@ -5840,6 +5830,19 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     ensureNetworkTransitionWakelock(nai.toShortString());
                 }
             }
+        }
+        // This has to be called before rematch because rematch collects and builds
+        // another event. When a default network(1) disconnects, this call reports a
+        // network1->null reassignment for default network requests. A subsequent
+        // rematch (rematchAllNetworksAndRequests) will then report a null->network2
+        // event if a new network(2) takes over as default.
+        // This two-step reporting (network1->null, then null->network2) instead of
+        // a direct network1->network2 is a result of current architectural within
+        // ConnectivityService. This can be resolved if the TODO before setSatisfier
+        // above is fixed.
+        if (mConstrainedDataSatelliteMetrics) {
+            mDefaultNetworkRematchMetrics.writeStatsAndClear(
+                    DEFAULT_NETWORK_REMATCH__REMATCH_REASON__RMR_NETWORK_DISCONNECTED);
         }
         nai.clearInactivityState();
         // TODO: mLegacyTypeTracker.remove seems redundant given there's a full rematch right after.
@@ -8084,8 +8087,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
      * Tracks info about the requester.
      * Also used to notice when the calling process dies so as to self-expire
      */
-    @VisibleForTesting
-    protected class NetworkRequestInfo implements IBinder.DeathRecipient {
+    public class NetworkRequestInfo implements IBinder.DeathRecipient {
         // The requests to be satisfied in priority order. Non-multilayer requests will only have a
         // single NetworkRequest in mRequests.
         final List<NetworkRequest> mRequests;
@@ -8119,6 +8121,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 @Nullable final NetworkRequest activeRequest) {
             mSatisfier = satisfier;
             mActiveRequest = activeRequest;
+            mSatisfiedTime = SystemClock.elapsedRealtime();
         }
 
         // The network currently satisfying this NRI. Only one request in an NRI can have a
@@ -8127,6 +8130,16 @@ public class ConnectivityService extends IConnectivityManager.Stub
         private NetworkAgentInfo mSatisfier;
         NetworkAgentInfo getSatisfier() {
             return mSatisfier;
+        }
+
+        private long mSatisfiedTime = 0;
+
+        /**
+         * Get timestamp (SystemClock.elapsedRealtime()) when the satisfier is set for this NRI.
+         * Resets when the satisfier changes.
+         */
+        public long getSatisfiedTime() {
+            return mSatisfiedTime;
         }
 
         // The request in mRequests assigned to a network agent. This is null if none of the
@@ -8213,7 +8226,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
          * Get the list of UIDs this nri applies to.
          */
         @NonNull
-        Set<UidRange> getUids() {
+        public Set<UidRange> getUids() {
             // networkCapabilities.getUids() returns a defensive copy.
             // multilayer requests will all have the same uids so return the first one.
             final Set<UidRange> uids = mRequests.get(0).networkCapabilities.getUidRanges();
@@ -8550,7 +8563,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
             return mPreferenceOrder < target.mPreferenceOrder;
         }
 
-        int getPreferenceOrderForNetd() {
+        /** Return the preference order. */
+        public int getPreferenceOrderForNetd() {
             if (mPreferenceOrder >= PREFERENCE_ORDER_NONE
                     && mPreferenceOrder <= PREFERENCE_ORDER_LOWEST) {
                 return mPreferenceOrder;
@@ -11674,6 +11688,21 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     }
 
+    private void writeStatsForDefaultNetworkChanges(@NonNull final NetworkReassignment changes) {
+        if (!mConstrainedDataSatelliteMetrics) return;
+        for (final NetworkRequestInfo defaultRequestInfo : mDefaultNetworkRequests) {
+            final NetworkReassignment.RequestReassignment reassignment =
+                    changes.getReassignment(defaultRequestInfo);
+            if (null == reassignment) {
+                continue;
+            }
+            mDefaultNetworkRematchMetrics.addEvent(defaultRequestInfo,
+                    reassignment.mOldNetwork, reassignment.mNewNetwork);
+        }
+        // TODO: fill rematch reason.
+        mDefaultNetworkRematchMetrics.writeStatsAndClear();
+    }
+
     private void resetHttpProxyForNonDefaultNetwork(NetworkAgentInfo oldDefaultNetwork) {
         if (null == oldDefaultNetwork) return;
         // The network stopped being the default. If it was using a PAC proxy, then the
@@ -12112,7 +12141,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
             if (nai.isBackgroundNetwork()) oldBgNetworks.add(nai);
         }
 
-        // First, update the lists of satisfied requests in the network agents. This is necessary
+        // This needs to be called before NRI#setSatisfier() because the NRI#getSatisfiedTime()
+        // will be reset when that happens.
+        writeStatsForDefaultNetworkChanges(changes);
+
+        // Update the lists of satisfied requests in the network agents. This is necessary
         // because some code later depends on this state to be correct, most prominently computing
         // the linger status.
         for (final NetworkReassignment.RequestReassignment event :

@@ -66,6 +66,7 @@ import android.util.SparseArray
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.internal.app.IBatteryStats
 import com.android.internal.util.test.BroadcastInterceptingContext
+import com.android.metrics.DefaultNetworkRematchMetrics
 import com.android.metrics.SatelliteCoarseUsageMetricsCollector
 import com.android.modules.utils.build.SdkLevel
 import com.android.net.module.util.ArrayTrackRecord
@@ -235,6 +236,7 @@ open class CSTest {
     val multicastRoutingCoordinatorService = mock<MulticastRoutingCoordinatorService>()
     val satelliteAccessController = mock<SatelliteAccessController>()
     val satelliteCoarseUsageMetricsCollector = mock<SatelliteCoarseUsageMetricsCollector>()
+    val defaultNetworkRematchMetrics = mock<DefaultNetworkRematchMetrics>()
     val quicConnectionCloser = mock<QuicConnectionCloser>()
     val destroySocketsWrapper = mock<DestroySocketsWrapper>()
     val dnsResolver = mock<IDnsResolver>()
@@ -350,6 +352,10 @@ open class CSTest {
         override fun makeSatelliteCoarseUsageMetricsCollector(
                 context: Context
         ) = satelliteCoarseUsageMetricsCollector
+
+        override fun makeDefaultNetworkRematchMetrics(): DefaultNetworkRematchMetrics? {
+            return defaultNetworkRematchMetrics
+        }
 
         private inner class AOOKTDeps(c: Context) : AutomaticOnOffKeepaliveTracker.Dependencies(c) {
             override fun isTetheringFeatureNotChickenedOut(name: String): Boolean {
