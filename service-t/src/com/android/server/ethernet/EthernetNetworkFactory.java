@@ -130,8 +130,7 @@ public class EthernetNetworkFactory {
      * Returns an array of available interface names. The array is sorted: unrestricted interfaces
      * goes first, then sorted by name.
      */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected String[] getAvailableInterfaces(boolean includeRestricted) {
+    public String[] getInterfacesSorted(boolean includeRestricted) {
         return mTrackingInterfaces.values()
                 .stream()
                 .filter(iface -> !iface.isRestricted() || includeRestricted)

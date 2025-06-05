@@ -459,7 +459,7 @@ public class EthernetTracker {
 
     private List<String> getAllInterfaces() {
         final ArrayList<String> interfaces = new ArrayList<>(
-                List.of(mFactory.getAvailableInterfaces(/* includeRestricted */ true)));
+                List.of(mFactory.getInterfacesSorted(/* includeRestricted */ true)));
 
         if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
             interfaces.add(mTetheringInterface.getInterfaceName());
@@ -468,7 +468,7 @@ public class EthernetTracker {
     }
 
     String[] getClientModeInterfaces(boolean includeRestricted) {
-        return mFactory.getAvailableInterfaces(includeRestricted);
+        return mFactory.getInterfacesSorted(includeRestricted);
     }
 
     List<String> getEthernetInterfaceList() {
