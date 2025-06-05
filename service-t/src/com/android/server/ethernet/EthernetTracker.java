@@ -457,12 +457,11 @@ public class EthernetTracker {
         return mFactory.hasInterface(iface);
     }
 
-    private List<String> getAllInterfaces() {
-        final ArrayList<String> interfaces = new ArrayList<>(
-                List.of(mFactory.getInterfacesSorted(/* includeRestricted */ true)));
-
+    /** Returns an unordered(!) list of tracked EthernetPort objects. */
+    private List<EthernetPort> getAllInterfaces() {
+        final List<EthernetPort> interfaces = new ArrayList<>(mFactory.getEthernetPorts());
         if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
-            interfaces.add(mTetheringInterface.getInterfaceName());
+            interfaces.add(mTetheringInterface);
         }
         return interfaces;
     }
@@ -534,7 +533,8 @@ public class EthernetTracker {
             } else {
                 removeTestData();
                 // remove all test interfaces
-                for (String iface : getAllInterfaces()) {
+                for (EthernetPort port : getAllInterfaces()) {
+                    final String iface = port.getInterfaceName();
                     if (shouldTrackInterface(iface)) continue;
                     stopTrackingInterface(iface);
                 }
@@ -864,8 +864,8 @@ public class EthernetTracker {
             if (mIsEthernetEnabled == enabled) return;
 
             mIsEthernetEnabled = enabled;
-            for (String iface : getAllInterfaces()) {
-                setInterfaceUpState(iface, enabled);
+            for (EthernetPort port : getAllInterfaces()) {
+                setInterfaceUpState(port.getInterfaceName(), enabled);
             }
             broadcastEthernetStateChange(mIsEthernetEnabled);
         });

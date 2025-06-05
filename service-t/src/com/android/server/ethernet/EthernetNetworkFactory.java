@@ -52,6 +52,8 @@ import com.android.net.module.util.InterfaceParams;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.FileDescriptor;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -124,6 +126,17 @@ public class EthernetNetworkFactory {
      */
     public void register() {
         mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
+    }
+
+    /** Returns an unordered(!) list of EthernetPort objects tracked by this factory. */
+    public List<EthernetPort> getEthernetPorts() {
+        // Note that while mTrackingInterfaces is a ConcurrentHashMap, it is only ever modified on
+        // the handler thread.
+        final List<EthernetPort> ports = new ArrayList<>(mTrackingInterfaces.size());
+        for (NetworkInterfaceState iface : mTrackingInterfaces.values()) {
+            ports.add(iface.getPort());
+        }
+        return ports;
     }
 
     /**
