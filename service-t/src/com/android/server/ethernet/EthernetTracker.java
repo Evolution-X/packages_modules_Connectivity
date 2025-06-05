@@ -238,7 +238,7 @@ public class EthernetTracker {
 
         private void onDelLink(EthernetPort port) {
             Log.i(TAG, "onInterfaceRemoved: " + port);
-            stopTrackingInterface(port.getInterfaceName());
+            stopTrackingInterface(port);
         }
 
         private void processRtNetlinkLinkMessage(RtNetlinkLinkMessage msg) {
@@ -536,7 +536,7 @@ public class EthernetTracker {
                 for (EthernetPort port : getAllInterfaces()) {
                     final String iface = port.getInterfaceName();
                     if (shouldTrackInterface(iface)) continue;
-                    stopTrackingInterface(iface);
+                    stopTrackingInterface(port);
                 }
             }
         });
@@ -654,7 +654,8 @@ public class EthernetTracker {
         maybeUpdateServerModeInterfaceState(iface, false);
     }
 
-    private void stopTrackingInterface(String iface) {
+    private void stopTrackingInterface(EthernetPort port) {
+        final String iface = port.getInterfaceName();
         removeInterface(iface);
         if (mTetheringInterface != null && iface.equals(mTetheringInterface.getInterfaceName())) {
             mTetheringInterface = null;
