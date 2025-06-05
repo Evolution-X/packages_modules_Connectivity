@@ -233,8 +233,8 @@ public class EthernetNetworkFactory {
     }
 
     /** Returns true if state has been modified */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected boolean updateInterfaceLinkState(@NonNull final String ifaceName, final boolean up) {
+    public boolean updateInterfaceLinkState(EthernetPort port, boolean up) {
+        final String ifaceName = port.getInterfaceName();
         if (!hasInterface(ifaceName)) {
             return false;
         }

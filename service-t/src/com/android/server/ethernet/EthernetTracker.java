@@ -713,7 +713,7 @@ public class EthernetTracker {
             // no need to send an interface state change as this is not a true "state change". The
             // callers (maybeTrackInterface() and setTetheringInterfaceMode()) already broadcast the
             // state change.
-            mFactory.updateInterfaceLinkState(iface, true);
+            mFactory.updateInterfaceLinkState(port, true);
         }
     }
 
@@ -745,7 +745,7 @@ public class EthernetTracker {
         }
 
         // If updateInterfaceLinkState returns false, the interface is already in the correct state.
-        if (mFactory.updateInterfaceLinkState(iface, up)) {
+        if (mFactory.updateInterfaceLinkState(port, up)) {
             broadcastInterfaceStateChange(iface);
         }
     }
