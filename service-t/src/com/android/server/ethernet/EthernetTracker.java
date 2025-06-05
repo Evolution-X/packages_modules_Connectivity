@@ -233,7 +233,7 @@ public class EthernetTracker {
                 maybeTrackInterface(port);
             }
             Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
-            updateInterfaceState(ifname, linkUp);
+            updateInterfaceState(port, linkUp);
         }
 
         private void onDelLink(EthernetPort port) {
@@ -736,7 +736,8 @@ public class EthernetTracker {
         cb.onResult(iface);
     }
 
-    private void updateInterfaceState(String iface, boolean up) {
+    private void updateInterfaceState(EthernetPort port, boolean up) {
+        final String iface = port.getInterfaceName();
         final int mode = getInterfaceMode(iface);
         if (mode == INTERFACE_MODE_SERVER) {
             // TODO: support tracking link state for interfaces in server mode.
