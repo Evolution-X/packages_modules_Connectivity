@@ -318,7 +318,7 @@ public class ConnectivityManagerTest {
     private static final int MAX_KEEPALIVE_RETRY_COUNT = 3;
     private static final int MIN_KEEPALIVE_INTERVAL = 10;
 
-    private static final long NETWORK_CALLBACK_TIMEOUT_MS = 30_000;
+    private static final int NETWORK_CALLBACK_TIMEOUT_MS = 30_000;
     // Timeout for waiting network to be validated.
     private static final int LISTEN_ACTIVITY_TIMEOUT_MS = 30_000;
     private static final int NO_CALLBACK_TIMEOUT_MS = 100;
@@ -481,9 +481,11 @@ public class ConnectivityManagerTest {
             // networkCallbackRule is the outer rule and will be cleaned up after this method.
             final TestableNetworkCallback callback =
                     networkCallbackRule.registerDefaultNetworkCallback();
-            callback.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
-                    NETWORK_CALLBACK_TIMEOUT_MS,
-                    entry -> entry.getCaps().hasCapability(NET_CAPABILITY_VALIDATED));
+            assertNotNull("Couldn't restore Internet connectivity",
+                    callback.eventuallyExpect(Event.NETWORK_CAPS_UPDATED,
+                            NETWORK_CALLBACK_TIMEOUT_MS,
+                            entry -> ((Event.CapabilitiesChanged) entry)
+                                    .getCaps().hasCapability(NET_CAPABILITY_VALIDATED)));
         });
     }
 
