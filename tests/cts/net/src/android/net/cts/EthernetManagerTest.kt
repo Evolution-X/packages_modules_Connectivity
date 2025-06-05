@@ -668,6 +668,36 @@ class EthernetManagerTest {
     }
 
     @Test
+    fun testCallbacks_withRunningInterfaces() {
+        // Do not run this test when unrestricted interfaces are present. Refer to testCallbacks.
+        assumeNoInterfaceForTetheringAvailable()
+
+        // The interfaces must be created before setIncludeTestInterfaces is set to false, so the
+        // test can ensure that the RTM_NEWLINK has been processed before proceeding.
+        val iface1 = createInterface()
+        val iface2 = createInterface()
+        val iface3 = createInterface()
+
+        // Prevent test interfaces from being tracked and wait for the call to be processed by
+        // calling setEthernetEnabled() which waits on a completion callback.
+        setIncludeTestInterfaces(false)
+        setEthernetEnabled(true)
+
+        val listener = EthernetStateListener()
+        addInterfaceStateListener(listener)
+        listener.assertNoCallback()
+
+        // Include test interfaces again, and ensure that they are tracked properly.
+        setIncludeTestInterfaces(true)
+        setEthernetEnabled(true)
+
+        listener.expectCallback(iface1, STATE_LINK_UP, ROLE_CLIENT)
+        listener.expectCallback(iface2, STATE_LINK_UP, ROLE_CLIENT)
+        listener.expectCallback(iface3, STATE_LINK_UP, ROLE_CLIENT)
+        listener.assertNoCallback()
+    }
+
+    @Test
     fun testGetInterfaceList() {
         // Create two test interfaces and check the return list contains the interface names.
         val iface1 = createInterface()

@@ -391,6 +391,7 @@ import com.android.internal.net.VpnConfig;
 import com.android.internal.util.WakeupMessage;
 import com.android.internal.util.test.BroadcastInterceptingContext;
 import com.android.internal.util.test.FakeSettingsProvider;
+import com.android.metrics.DefaultNetworkRematchMetrics;
 import com.android.metrics.SatelliteCoarseUsageMetricsCollector;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.ArrayTrackRecord;
@@ -652,6 +653,7 @@ public class ConnectivityServiceTest {
     @Mock KeepaliveTracker.Dependencies mMockKeepaliveTrackerDependencies;
     @Mock SatelliteAccessController mSatelliteAccessController;
     @Mock SatelliteCoarseUsageMetricsCollector mSatelliteCoarseUsageMetricsCollector;
+    @Mock DefaultNetworkRematchMetrics mDefaultNetworkRematchMetrics;
 
     // BatteryStatsManager is final and cannot be mocked with regular mockito, so just mock the
     // underlying binder calls.
@@ -2099,6 +2101,11 @@ public class ConnectivityServiceTest {
         public SatelliteCoarseUsageMetricsCollector makeSatelliteCoarseUsageMetricsCollector(
                 @NonNull final Context context) {
             return mSatelliteCoarseUsageMetricsCollector;
+        }
+
+        @Override
+        public DefaultNetworkRematchMetrics makeDefaultNetworkRematchMetrics() {
+            return mDefaultNetworkRematchMetrics;
         }
 
         @Override
