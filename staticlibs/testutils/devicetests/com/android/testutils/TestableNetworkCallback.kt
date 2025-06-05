@@ -23,7 +23,12 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
 import android.util.Log
-import com.android.net.module.util.ArrayTrackRecord
+import com.android.net.module.util.Expectable
+import com.android.net.module.util.TestableCallback
+import com.android.net.module.util.assertNo
+import com.android.net.module.util.eventuallyExpect
+import com.android.net.module.util.expect
+import com.android.testutils.TestableNetworkCallback.Event
 import com.android.testutils.TestableNetworkCallback.Event.Available
 import com.android.testutils.TestableNetworkCallback.Event.BlockedStatus
 import com.android.testutils.TestableNetworkCallback.Event.BlockedStatusInt
@@ -38,12 +43,11 @@ import com.android.testutils.TestableNetworkCallback.Event.Suspended
 import com.android.testutils.TestableNetworkCallback.Event.Unavailable
 import kotlin.reflect.KClass
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.fail
 
-object NULL_NETWORK : Network(-1)
-object ANY_NETWORK : Network(-2)
-fun anyNetwork() = ANY_NETWORK
+object NullNetwork : Network(-1)
+object AnyNetwork : Network(-2)
+fun AnyNetwork() = AnyNetwork
 
 private val DEFAULT_TAG = TestableNetworkCallback::class.simpleName
     ?: fail("Could not determine class name")
@@ -56,15 +60,15 @@ private val NOOP = Runnable {}
  * See comments on the public constructor below for a description of the arguments.
  */
 open class TestableNetworkCallback private constructor(
-    src: TestableNetworkCallback?,
-    val defaultTimeoutMs: Long,
-    private val defaultNoCallbackTimeoutMs: Long,
+    defaultCallbackTimeoutMs: Long,
+    defaultCallbackNoEventTimeoutMs: Long,
     private val waiterFunc: Runnable,
-    private val logTag: String
-) : NetworkCallback() {
-    private val backingRecord: ArrayTrackRecord<Event> =
-        src?.backingRecord ?: ArrayTrackRecord()
-    val history: ArrayTrackRecord<Event>.ReadHead = backingRecord.newReadHead()
+    private val logTag: String,
+    val callbackTracker: TestableCallback<Event> = TestableCallback(
+        defaultCallbackTimeoutMs,
+        defaultCallbackNoEventTimeoutMs
+    )
+) : NetworkCallback(), Expectable<Event> by callbackTracker {
     val mark get() = history.mark
 
     sealed class Event {
@@ -80,7 +84,7 @@ open class TestableNetworkCallback private constructor(
             override val network: Network,
             val caps: NetworkCapabilities
         ) : Event() {
-            constructor(caps: NetworkCapabilities) : this(NULL_NETWORK, caps)
+            constructor(caps: NetworkCapabilities) : this(NullNetwork, caps)
         }
         data class Available(override val network: Network) : Event()
         data class CapabilitiesChanged(
@@ -102,7 +106,7 @@ open class TestableNetworkCallback private constructor(
         data class Unavailable(
             override val network: Network
         ) : Event() {
-            constructor() : this(NULL_NETWORK)
+            constructor() : this(NullNetwork)
         }
         data class BlockedStatus(
             override val network: Network,
@@ -226,18 +230,25 @@ open class TestableNetworkCallback private constructor(
         noCallbackTimeoutMs: Long = DEFAULT_NO_CALLBACK_TIMEOUT,
         waiterFunc: Runnable = NOOP, // "() -> Unit" would forbid calling with a void func from Java
         logTag: String = DEFAULT_TAG
-    ) : this(null, timeoutMs, noCallbackTimeoutMs, waiterFunc, logTag)
+    ) : this(
+        timeoutMs,
+        noCallbackTimeoutMs,
+        waiterFunc,
+        logTag,
+        TestableCallback(timeoutMs, noCallbackTimeoutMs)
+    )
 
     fun createLinkedCopy() = TestableNetworkCallback(
-        this,
         defaultTimeoutMs,
-        defaultNoCallbackTimeoutMs,
+        defaultNoEventTimeoutMs,
         waiterFunc,
-        logTag
+        logTag,
+        callbackTracker
     )
 
     // The last available network, or null if any network was lost since the last call to
     // onAvailable. TODO : fix this by fixing the tests that rely on this behavior
+    // DO NOT ADD CALLS TO THIS METHOD. USE THE RETURN VALUE OF expect<> INSTEAD.
     val lastAvailableNetwork: Network?
         get() = when (val it = history.lastOrNull { it is Available || it is Lost }) {
             is Available -> it.network
@@ -254,25 +265,56 @@ open class TestableNetworkCallback private constructor(
     fun poll(timeoutMs: Long = defaultTimeoutMs, predicate: (Event) -> Boolean = { true }) =
             history.poll(timeoutMs, predicate)
 
+    // Proxy methods to avoid having to write expect<_, T>, see TestableCallback.kt
+    inline fun <reified T : Event> expect(
+        timeoutMs: Long = defaultTimeoutMs,
+        errorMsg: String? = null,
+        noinline predicate: (T) -> Boolean = { true }
+    ) = expect<_, T>(timeoutMs, errorMsg, predicate)
+
+    inline fun <reified T : Event> eventuallyExpect(
+        timeoutMs: Long = defaultTimeoutMs,
+        errorMsg: String? = null,
+        noinline predicate: (T) -> Boolean = { true }
+    ) = eventuallyExpect<_, T>(timeoutMs, errorMsg, predicate)
+
+    inline fun <reified T : Event> assertNo(
+        timeoutMs: Long = defaultTimeoutMs,
+        errorMsg: String? = null,
+        noinline predicate: (T) -> Boolean = { true }
+    ) = assertNo<_, T>(timeoutMs, errorMsg, predicate)
+
     /*****
-     * expect family of methods.
-     * These methods fetch the next callback and assert it matches the conditions : type,
-     * passed predicate. If no callback is received within the timeout, these methods fail.
+     * expect family of methods, to support Java code
+     *
+     * See Expectable#expect
      */
+    @Suppress("SuspiciousEqualsCombination") // === and == combination is legit here
     @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
-        network: Network = ANY_NETWORK,
+        network: Network = AnyNetwork,
         timeoutMs: Long = defaultTimeoutMs,
         errorMsg: String? = null,
         test: (T) -> Boolean = { true }
-    ) = expect<Event>(network, timeoutMs, errorMsg) {
-        if (type.isInstance(it)) {
-            test(it as T) // Cast can't fail since type.isInstance(it) and type: KClass<T>
-        } else {
-            fail("Expected callback ${type.simpleName}, got $it")
-        }
-    } as T
+    ): T = callbackTracker.expect(type, timeoutMs, errorMsg) {
+        (network === AnyNetwork || it.network == network) && test(it)
+    }
+
+    // Add a version of the standard expect method that takes a network.
+    inline fun <reified T : Event> expect(
+        network: Network = AnyNetwork,
+        timeoutMs: Long = defaultTimeoutMs,
+        errorMsg: String? = null,
+        noinline test: (T) -> Boolean = { true }
+    ) = expect(T::class, network, timeoutMs, errorMsg, test)
+
+    inline fun <reified T : Event> expect(
+        network: HasNetwork,
+        timeoutMs: Long = defaultTimeoutMs,
+        errorMsg: String? = null,
+        noinline test: (T) -> Boolean = { true }
+    ) = expect(T::class, network.network, timeoutMs, errorMsg, test)
 
     @JvmOverloads
     fun <T : Event> expect(
@@ -287,13 +329,11 @@ open class TestableNetworkCallback private constructor(
     // here. Note that @JvmOverloads give us the versions without the last arguments too, so
     // there is no need to explicitly define versions without the test predicate.
     // Without |network|
-    @JvmOverloads
     fun <T : Event> expect(
         type: KClass<T>,
         timeoutMs: Long,
         errorMsg: String?,
-        test: (T) -> Boolean = { true }
-    ) = expect(type, ANY_NETWORK, timeoutMs, errorMsg, test)
+    ) = expect(type, AnyNetwork, timeoutMs, errorMsg)
 
     // Without |timeout|, in Network and HasNetwork versions
     @JvmOverloads
@@ -333,7 +373,7 @@ open class TestableNetworkCallback private constructor(
         type: KClass<T>,
         errorMsg: String?,
         test: (T) -> Boolean = { true }
-    ) = expect(type, ANY_NETWORK, defaultTimeoutMs, errorMsg, test)
+    ) = expect(type, AnyNetwork, defaultTimeoutMs, errorMsg, test)
 
     // Without |network| or |errorMsg|
     @JvmOverloads
@@ -341,7 +381,7 @@ open class TestableNetworkCallback private constructor(
         type: KClass<T>,
         timeoutMs: Long,
         test: (T) -> Boolean = { true }
-    ) = expect(type, ANY_NETWORK, timeoutMs, null, test)
+    ) = expect(type, AnyNetwork, timeoutMs, null, test)
 
     // Without |timeout| or |errorMsg|, in Network and HasNetwork versions
     fun <T : Event> expect(
@@ -360,37 +400,54 @@ open class TestableNetworkCallback private constructor(
     fun <T : Event> expect(
         type: KClass<T>,
         test: (T) -> Boolean
-    ) = expect(type, ANY_NETWORK, defaultTimeoutMs, null, test)
+    ) = expect(type, AnyNetwork, defaultTimeoutMs, null, test)
 
-    // Kotlin reified versions. Don't call methods above, or the predicate would need to be noinline
-    inline fun <reified T : Event> expect(
-        network: Network = ANY_NETWORK,
+    /*****
+     * eventuallyExpect family of methods, to support Java code
+     *
+     * See Expectable#eventuallyExpect
+     */
+    @JvmOverloads
+    fun <T : Event> eventuallyExpect(
+        type: KClass<T>,
         timeoutMs: Long = defaultTimeoutMs,
-        errorMsg: String? = null,
-        test: (T) -> Boolean = { true }
-    ) = (poll(timeoutMs) ?: failWithErrorReason(errorMsg,
-        "Did not receive ${T::class.simpleName} after ${timeoutMs}ms"))
-            .also {
-                if (it !is T) {
-                    failWithErrorReason(
-                        errorMsg,
-                        "Expected callback ${T::class.simpleName}, got $it"
-                    )
-                }
-                if (ANY_NETWORK !== network && it.network != network) {
-                    failWithErrorReason(errorMsg, "Expected network $network for callback : $it")
-                }
-                if (!test(it)) {
-                    failWithErrorReason(errorMsg, "Callback doesn't match predicate : $it")
-                }
-            } as T
+        predicate: (cb: T) -> Boolean = { true }
+    ) = callbackTracker.eventuallyExpect(type, timeoutMs, errorMsg = null, predicate)
 
-    inline fun <reified T : Event> expect(
-        network: HasNetwork,
+    // eventuallyExpect with a starting point.
+    // TODO : remove these method, their interface is not easy to use ; instead, use an
+    // explicit out-of-order checking mechanism.
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Event> eventuallyExpect(
+        type: KClass<T>,
+        timeoutMs: Long,
+        from: Int,
+        predicate: (T) -> Boolean
+    ): T {
+        val event = history.poll(timeoutMs, pos = from) {
+            type.isInstance(it) && predicate(it as T)
+        }
+        if (null == event) {
+            failWithErrorReason(
+                null,
+                "Callback ${type.simpleName} not received within ${timeoutMs}ms. " +
+                        "Got ${history.backtrace()}"
+            )
+        }
+        return event as T
+    }
+
+    fun <T : Event> eventuallyExpect(
+        type: KClass<T>,
+        from: Int,
+        predicate: (T) -> Boolean
+    ): T = eventuallyExpect(type, timeoutMs = defaultTimeoutMs, from, predicate)
+
+    inline fun <reified T : Event> eventuallyExpect(
         timeoutMs: Long = defaultTimeoutMs,
-        errorMsg: String? = null,
-        test: (T) -> Boolean = { true }
-    ) = expect(network.network, timeoutMs, errorMsg, test)
+        from: Int,
+        noinline predicate: (T) -> Boolean = { true }
+    ) = eventuallyExpect(T::class, timeoutMs, from, predicate)
 
     /*****
      * assertNoCallback family of methods.
@@ -400,59 +457,15 @@ open class TestableNetworkCallback private constructor(
      */
     @JvmOverloads
     fun assertNoCallback(
-        timeoutMs: Long = defaultNoCallbackTimeoutMs,
+        timeoutMs: Long = defaultNoEventTimeoutMs,
         valid: (Event) -> Boolean = { true }
     ) {
         waiterFunc.run()
-        history.poll(timeoutMs) { valid(it) }?.let { fail("Expected no callback but got $it") }
+        callbackTracker.assertNoCallback(timeoutMs, errorMsg = null, valid)
     }
 
     fun assertNoCallback(valid: (Event) -> Boolean) =
-            assertNoCallback(defaultNoCallbackTimeoutMs, valid)
-
-    /*****
-     * eventuallyExpect family of methods.
-     * These methods make sure a callback that matches the type/predicate is received eventually.
-     * Any callback of the wrong type, or doesn't match the optional predicate, is ignored.
-     * They fail if no callback matching the predicate is received within the timeout.
-     */
-    inline fun <reified T : Event> eventuallyExpect(
-        timeoutMs: Long = defaultTimeoutMs,
-        from: Int = mark,
-        crossinline predicate: (T) -> Boolean = { true }
-    ): T = history.poll(timeoutMs, from) { it is T && predicate(it) }.also {
-        assertNotNull(
-            it,
-            "Callback ${T::class} not received within ${timeoutMs}ms. " +
-                "Got ${history.backtrace()}"
-        )
-    } as T
-
-    @JvmOverloads
-    fun <T : Event> eventuallyExpect(
-        type: KClass<T>,
-        timeoutMs: Long = defaultTimeoutMs,
-        predicate: (cb: T) -> Boolean = { true }
-    ) = history.poll(timeoutMs) { type.java.isInstance(it) && predicate(it as T) }.also {
-        assertNotNull(
-            it,
-            "Callback ${type.java} not received within ${timeoutMs}ms. " +
-                "Got ${history.backtrace()}"
-        )
-    } as T
-
-    fun <T : Event> eventuallyExpect(
-        type: KClass<T>,
-        timeoutMs: Long = defaultTimeoutMs,
-        from: Int = mark,
-        predicate: (cb: T) -> Boolean = { true }
-    ) = history.poll(timeoutMs, from) { type.java.isInstance(it) && predicate(it as T) }.also {
-        assertNotNull(
-            it,
-            "Callback ${type.java} not received within ${timeoutMs}ms. " +
-                "Got ${history.backtrace()}"
-        )
-    } as T
+            assertNoCallback(defaultNoEventTimeoutMs, valid)
 
     // Expects onAvailable and the callbacks that follow it. These are:
     // - onSuspended, iff the network was suspended when the callbacks fire.
@@ -639,5 +652,5 @@ open class TestableNetworkCallback private constructor(
     fun expectCaps(
         tmt: Long,
         valid: (NetworkCapabilities) -> Boolean
-    ) = expect<CapabilitiesChanged>(ANY_NETWORK, tmt) { valid(it.caps) }.caps
+    ) = expect<CapabilitiesChanged>(AnyNetwork, tmt) { valid(it.caps) }.caps
 }
