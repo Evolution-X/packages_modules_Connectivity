@@ -459,7 +459,7 @@ public class EthernetTracker {
 
     private List<String> getAllInterfaces() {
         final ArrayList<String> interfaces = new ArrayList<>(
-                List.of(mFactory.getAvailableInterfaces(/* includeRestricted */ true)));
+                List.of(mFactory.getInterfacesSorted(/* includeRestricted */ true)));
 
         if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
             interfaces.add(mTetheringInterface.getInterfaceName());
@@ -467,8 +467,8 @@ public class EthernetTracker {
         return interfaces;
     }
 
-    String[] getClientModeInterfaces(boolean includeRestricted) {
-        return mFactory.getAvailableInterfaces(includeRestricted);
+    String[] getClientModeInterfacesSorted(boolean includeRestricted) {
+        return mFactory.getInterfacesSorted(includeRestricted);
     }
 
     List<String> getEthernetInterfaceList() {
@@ -511,7 +511,7 @@ public class EthernetTracker {
                 // Remote process has already died
                 return;
             }
-            for (String iface : getClientModeInterfaces(canUseRestrictedNetworks)) {
+            for (String iface : getClientModeInterfacesSorted(canUseRestrictedNetworks)) {
                 unicastInterfaceStateChange(listener, iface);
             }
             if (mTetheringInterface != null && mTetheringInterfaceMode == INTERFACE_MODE_SERVER) {
@@ -703,7 +703,7 @@ public class EthernetTracker {
 
         IpConfiguration ipConfiguration = getOrCreateIpConfiguration(iface);
         Log.d(TAG, "Tracking interface in client mode: " + iface);
-        mFactory.addInterface(iface, hwAddress, ipConfiguration, nc);
+        mFactory.addInterface(port, ipConfiguration, nc);
 
         // Note: if the interface already has link (e.g., if we crashed and got
         // restarted while it was running), we need to fake a link up notification so we
