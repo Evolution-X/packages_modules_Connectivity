@@ -234,7 +234,7 @@ public class EthernetNetworkFactoryTest {
         final IpConfiguration ipConfig = createDefaultIpConfig();
         mNetFactory.addInterface(port, ipConfig,
                 createInterfaceCapsBuilder(transportType).build());
-        assertTrue(mNetFactory.updateInterfaceLinkState(port.getInterfaceName(), true));
+        assertTrue(mNetFactory.updateInterfaceLinkState(port, true));
 
         ArgumentCaptor<NetworkOfferCallback> captor = ArgumentCaptor.forClass(
                 NetworkOfferCallback.class);
@@ -260,7 +260,7 @@ public class EthernetNetworkFactoryTest {
             final int expectedLegacyType) throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE, transportType,
                 expectedLegacyType);
-        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
+        mNetFactory.removeInterface(TEST_IFACE);
     }
 
     private void createAndVerifyProvisionedInterface(
@@ -287,8 +287,7 @@ public class EthernetNetworkFactoryTest {
         createInterfaceUndergoingProvisioning(TEST_IFACE);
 
         // verify that the IpClient gets shut down when interface state changes to down.
-        final boolean ret =
-                mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), false /* up */);
+        final boolean ret = mNetFactory.updateInterfaceLinkState(TEST_IFACE, false /* up */);
 
         assertTrue(ret);
         verify(mIpClient).shutdown();
@@ -299,8 +298,7 @@ public class EthernetNetworkFactoryTest {
         initEthernetNetworkFactory();
 
         // if interface was never added, link state cannot be updated.
-        final boolean ret =
-                mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), true /* up */);
+        final boolean ret = mNetFactory.updateInterfaceLinkState(TEST_IFACE, true /* up */);
 
         assertFalse(ret);
         verifyNoStopOrStart();
@@ -410,7 +408,7 @@ public class EthernetNetworkFactoryTest {
     private IpClientCallbacks getStaleIpClientCallbacks() throws Exception {
         createAndVerifyProvisionedInterface(TEST_IFACE);
         final IpClientCallbacks staleIpClientCallbacks = mIpClientCallbacks;
-        mNetFactory.removeInterface(TEST_IFACE.getInterfaceName());
+        mNetFactory.removeInterface(TEST_IFACE);
         verifyStop();
         assertNotSame(mIpClientCallbacks, staleIpClientCallbacks);
         return staleIpClientCallbacks;
@@ -543,7 +541,7 @@ public class EthernetNetworkFactoryTest {
     public void testOnNetworkNeededOnStaleNetworkOffer() throws Exception {
         initEthernetNetworkFactory();
         createAndVerifyProvisionedInterface(TEST_IFACE);
-        mNetFactory.updateInterfaceLinkState(TEST_IFACE.getInterfaceName(), false);
+        mNetFactory.updateInterfaceLinkState(TEST_IFACE, false);
         verify(mNetworkProvider).unregisterNetworkOffer(mNetworkOfferCallback);
         // It is possible that even after a network offer is unregistered, CS still sends it
         // onNetworkNeeded() callbacks.

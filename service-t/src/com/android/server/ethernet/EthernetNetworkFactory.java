@@ -52,6 +52,8 @@ import com.android.net.module.util.InterfaceParams;
 import com.android.server.connectivity.ConnectivityResources;
 
 import java.io.FileDescriptor;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -126,6 +128,17 @@ public class EthernetNetworkFactory {
         mContext.getSystemService(ConnectivityManager.class).registerNetworkProvider(mProvider);
     }
 
+    /** Returns an unordered(!) list of EthernetPort objects tracked by this factory. */
+    public List<EthernetPort> getEthernetPorts() {
+        // Note that while mTrackingInterfaces is a ConcurrentHashMap, it is only ever modified on
+        // the handler thread.
+        final List<EthernetPort> ports = new ArrayList<>(mTrackingInterfaces.size());
+        for (NetworkInterfaceState iface : mTrackingInterfaces.values()) {
+            ports.add(iface.getPort());
+        }
+        return ports;
+    }
+
     /**
      * Returns an array of available interface names. The array is sorted: unrestricted interfaces
      * goes first, then sorted by name.
@@ -144,8 +157,8 @@ public class EthernetNetworkFactory {
                 .toArray(String[]::new);
     }
 
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected void addInterface(EthernetPort port, IpConfiguration ipConfig,
+    /** Add an interface to the factory. */
+    public void addInterface(EthernetPort port, IpConfiguration ipConfig,
             NetworkCapabilities capabilities) {
         final String ifaceName = port.getInterfaceName();
         final String hwAddress = port.getMacAddress().toString();
@@ -205,9 +218,9 @@ public class EthernetNetworkFactory {
         return;
     }
 
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected boolean removeInterface(String interfaceName) {
-        NetworkInterfaceState iface = mTrackingInterfaces.remove(interfaceName);
+    /** Removes the interface from the factory and returns whether the interface was tracked */
+    public boolean removeInterface(EthernetPort port) {
+        NetworkInterfaceState iface = mTrackingInterfaces.remove(port.getInterfaceName());
         if (iface != null) {
             iface.unregisterNetworkOfferAndStop();
             return true;
@@ -215,13 +228,13 @@ public class EthernetNetworkFactory {
         // TODO(b/236892130): if an interface is currently in server mode, it may not be properly
         // removed.
         // TODO: when false is returned, do not send a STATE_ABSENT callback.
-        Log.w(TAG, interfaceName + " is not tracked and cannot be removed");
+        Log.w(TAG, "removeInterface() failed because port is not tracked " + port);
         return false;
     }
 
     /** Returns true if state has been modified */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    protected boolean updateInterfaceLinkState(@NonNull final String ifaceName, final boolean up) {
+    public boolean updateInterfaceLinkState(EthernetPort port, boolean up) {
+        final String ifaceName = port.getInterfaceName();
         if (!hasInterface(ifaceName)) {
             return false;
         }

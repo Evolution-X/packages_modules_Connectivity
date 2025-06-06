@@ -233,12 +233,12 @@ public class EthernetTracker {
                 maybeTrackInterface(port);
             }
             Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
-            updateInterfaceState(ifname, linkUp);
+            updateInterfaceState(port, linkUp);
         }
 
         private void onDelLink(EthernetPort port) {
             Log.i(TAG, "onInterfaceRemoved: " + port);
-            stopTrackingInterface(port.getInterfaceName());
+            stopTrackingInterface(port);
         }
 
         private void processRtNetlinkLinkMessage(RtNetlinkLinkMessage msg) {
@@ -457,12 +457,11 @@ public class EthernetTracker {
         return mFactory.hasInterface(iface);
     }
 
-    private List<String> getAllInterfaces() {
-        final ArrayList<String> interfaces = new ArrayList<>(
-                List.of(mFactory.getInterfacesSorted(/* includeRestricted */ true)));
-
+    /** Returns an unordered(!) list of tracked EthernetPort objects. */
+    private List<EthernetPort> getAllInterfaces() {
+        final List<EthernetPort> interfaces = new ArrayList<>(mFactory.getEthernetPorts());
         if (mTetheringInterfaceMode == INTERFACE_MODE_SERVER && mTetheringInterface != null) {
-            interfaces.add(mTetheringInterface.getInterfaceName());
+            interfaces.add(mTetheringInterface);
         }
         return interfaces;
     }
@@ -534,9 +533,10 @@ public class EthernetTracker {
             } else {
                 removeTestData();
                 // remove all test interfaces
-                for (String iface : getAllInterfaces()) {
+                for (EthernetPort port : getAllInterfaces()) {
+                    final String iface = port.getInterfaceName();
                     if (shouldTrackInterface(iface)) continue;
-                    stopTrackingInterface(iface);
+                    stopTrackingInterface(port);
                 }
             }
         });
@@ -610,7 +610,7 @@ public class EthernetTracker {
         Log.d(TAG, "Setting tethering interface mode to " + mode);
         mTetheringInterfaceMode = mode;
         if (mTetheringInterface != null) {
-            removeInterface(mTetheringInterface.getInterfaceName());
+            removeInterface(mTetheringInterface);
             addInterface(mTetheringInterface);
             // when this broadcast is sent, any calls to notifyTetheredInterfaceAvailable or
             // notifyTetheredInterfaceUnavailable have already happened
@@ -649,13 +649,14 @@ public class EthernetTracker {
         return INTERFACE_MODE_CLIENT;
     }
 
-    private void removeInterface(String iface) {
-        mFactory.removeInterface(iface);
-        maybeUpdateServerModeInterfaceState(iface, false);
+    private void removeInterface(EthernetPort port) {
+        mFactory.removeInterface(port);
+        maybeUpdateServerModeInterfaceState(port.getInterfaceName(), false);
     }
 
-    private void stopTrackingInterface(String iface) {
-        removeInterface(iface);
+    private void stopTrackingInterface(EthernetPort port) {
+        removeInterface(port);
+        final String iface = port.getInterfaceName();
         if (mTetheringInterface != null && iface.equals(mTetheringInterface.getInterfaceName())) {
             mTetheringInterface = null;
             mTetheringInterfaceHwAddr = null;
@@ -712,7 +713,7 @@ public class EthernetTracker {
             // no need to send an interface state change as this is not a true "state change". The
             // callers (maybeTrackInterface() and setTetheringInterfaceMode()) already broadcast the
             // state change.
-            mFactory.updateInterfaceLinkState(iface, true);
+            mFactory.updateInterfaceLinkState(port, true);
         }
     }
 
@@ -735,7 +736,8 @@ public class EthernetTracker {
         cb.onResult(iface);
     }
 
-    private void updateInterfaceState(String iface, boolean up) {
+    private void updateInterfaceState(EthernetPort port, boolean up) {
+        final String iface = port.getInterfaceName();
         final int mode = getInterfaceMode(iface);
         if (mode == INTERFACE_MODE_SERVER) {
             // TODO: support tracking link state for interfaces in server mode.
@@ -743,7 +745,7 @@ public class EthernetTracker {
         }
 
         // If updateInterfaceLinkState returns false, the interface is already in the correct state.
-        if (mFactory.updateInterfaceLinkState(iface, up)) {
+        if (mFactory.updateInterfaceLinkState(port, up)) {
             broadcastInterfaceStateChange(iface);
         }
     }
@@ -864,8 +866,8 @@ public class EthernetTracker {
             if (mIsEthernetEnabled == enabled) return;
 
             mIsEthernetEnabled = enabled;
-            for (String iface : getAllInterfaces()) {
-                setInterfaceUpState(iface, enabled);
+            for (EthernetPort port : getAllInterfaces()) {
+                setInterfaceUpState(port.getInterfaceName(), enabled);
             }
             broadcastEthernetStateChange(mIsEthernetEnabled);
         });
