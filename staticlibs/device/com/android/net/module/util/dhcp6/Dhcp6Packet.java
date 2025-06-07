@@ -473,6 +473,7 @@ public class Dhcp6Packet {
     private static Dhcp6Packet decode(@NonNull final ByteBuffer packet) throws ParseException {
         int elapsedTime = 0;
         byte[] iapd = null;
+        byte[] iaAddress = null;
         byte[] serverDuid = null;
         byte[] clientDuid = null;
         short statusCode = STATUS_SUCCESS;
@@ -544,6 +545,20 @@ public class Dhcp6Packet {
                             skipOption(packet, optionLen - 2);
                         }
                         break;
+                    case DHCP6_IA_ADDR:
+                        expectedLen = optionLen;
+                        final byte[] iaAddressBytes = new byte[16];
+                        packet.get(iaAddressBytes, 0 /* offset */, 16);
+                        iaAddress = iaAddressBytes;
+                        // TODO: support parsing preferred and valid lifetime.
+                        packet.getInt(); // preferred lifetime
+                        packet.getInt(); // valid lifetime
+                        // IAaddr-options are currently unsupported, skip over them.
+                        final int remainingBytesLength = optionLen - 16 - 8;
+                        if (remainingBytesLength > 0) {
+                            skipOption(packet, remainingBytesLength);
+                        }
+                        break;
                     case DHCP6_SOL_MAX_RT:
                         expectedLen = 4;
                         solMaxRt = packet.getInt();
@@ -592,6 +607,10 @@ public class Dhcp6Packet {
                 break;
             case DHCP6_MESSAGE_TYPE_REBIND:
                 newPacket = new Dhcp6RebindPacket(transId, elapsedTime, clientDuid, iapd);
+                break;
+            case DHCP6_MESSAGE_TYPE_ADDR_REG_INFORM:
+                newPacket = new Dhcp6AddrRegInformPacket(transId, elapsedTime, clientDuid,
+                        iaAddress);
                 break;
             default:
                 throw new ParseException("Unimplemented DHCP6 message type %d" + messageType);

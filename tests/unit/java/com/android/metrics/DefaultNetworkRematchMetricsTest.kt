@@ -94,7 +94,7 @@ class DefaultNetworkRematchMetricsTest {
     fun testAddEvent_wrongPreference_isIgnored() {
         doReturn(PREFERENCE_ORDER_NONE).`when`(nri).preferenceOrderForNetd
 
-        metrics.addEvent(nri, oldNai, newNai)
+        metrics.addEvent(nri, oldNai, newNai, 0L)
         metrics.writeStatsAndClear()
 
         verify(deps, never()).writeStats(anyLong(), anyInt(), any())
@@ -109,7 +109,7 @@ class DefaultNetworkRematchMetricsTest {
         doReturn(nonSatelliteCaps).`when`(oldNai).capsNoCopy
 
         // Action: Attempt to add the event and write stats.
-        metrics.addEvent(nri, oldNai, newNai)
+        metrics.addEvent(nri, oldNai, newNai, 0L)
         metrics.writeStatsAndClear()
 
         // Verification: The event should be ignored, so writeStats should never be called.
@@ -118,7 +118,7 @@ class DefaultNetworkRematchMetricsTest {
 
     @Test
     fun testAddEvent_validRequest_isAdded() {
-        metrics.addEvent(nri, oldNai, newNai)
+        metrics.addEvent(nri, oldNai, newNai, 0L)
         metrics.writeStatsAndClear()
 
         verify(deps, times(1)).writeStats(anyLong(), anyInt(), any())
@@ -133,26 +133,17 @@ class DefaultNetworkRematchMetricsTest {
     @Test
     fun testWriteStats_withEvents_writesAndClears() {
         // Setup: Define the time the network satisfied time and the current time.
-        val satisfiedTimeMs = 100_000L
-        val currentTimeMs = 220_000L // 120 seconds after satisfied
-        val expectedDurationSec = ((currentTimeMs - satisfiedTimeMs) / 1000).toInt()
-
-        // Mock the dependencies to return the defined times.
-        doReturn(satisfiedTimeMs).`when`(oldNai).connectedTime
-        doReturn(currentTimeMs).`when`(deps).elapsedRealtime
-
-        // Mock the dependencies to return the defined times.
-        doReturn(satisfiedTimeMs).`when`(nri).satisfiedTime
+        val satisfiedDurationMs = 120_000L
 
         // First call: Add event and write
-        metrics.addEvent(nri, oldNai, newNai)
+        metrics.addEvent(nri, oldNai, newNai, satisfiedDurationMs)
         metrics.writeStatsAndClear()
 
         verify(deps, times(1)).writeStats(anyLong(), anyInt(), infoListCaptor.capture())
         val capturedList = infoListCaptor.value
         assertEquals(1, capturedList.defaultNetworkRematchInfoList.size)
         val info = capturedList.defaultNetworkRematchInfoList[0]
-        assertEquals(expectedDurationSec, info.timeDurationOnOldNetworkSec)
+        assertEquals((satisfiedDurationMs / 1000).toInt(), info.timeDurationOnOldNetworkSec)
 
         // Second call: Should do nothing as events are cleared
         clearInvocations(deps)
@@ -214,7 +205,7 @@ class DefaultNetworkRematchMetricsTest {
         val uids = setOf(UidRange(1000, 1000), UidRange(2000, 3000))
         doReturn(uids).`when`(nri).uids
 
-        metrics.addEvent(nri, oldNai, null)
+        metrics.addEvent(nri, oldNai, null, 0L)
         metrics.writeStatsAndClear()
 
         verify(deps).writeStats(anyLong(), anyInt(), infoListCaptor.capture())

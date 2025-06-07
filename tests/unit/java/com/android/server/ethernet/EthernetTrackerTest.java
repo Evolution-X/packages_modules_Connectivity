@@ -24,6 +24,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -77,9 +78,9 @@ public class EthernetTrackerTest {
     public void setUp() throws RemoteException {
         MockitoAnnotations.initMocks(this);
         initMockResources();
-        doReturn(false).when(mFactory).updateInterfaceLinkState(anyString(), anyBoolean());
+        doReturn(false).when(mFactory).updateInterfaceLinkState(any(), anyBoolean());
         doReturn(new String[0]).when(mNetd).interfaceGetList();
-        doReturn(new String[0]).when(mFactory).getAvailableInterfaces(anyBoolean());
+        doReturn(new String[0]).when(mFactory).getInterfacesSorted(anyBoolean());
         mHandlerThread = new HandlerThread(THREAD_NAME);
         mHandlerThread.start();
         tracker = new EthernetTracker(mContext, mHandlerThread.getThreadHandler(), mFactory, mNetd,
