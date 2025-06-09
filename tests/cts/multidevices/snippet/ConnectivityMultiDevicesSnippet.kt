@@ -47,6 +47,10 @@ import com.android.testutils.TestableNetworkCallback.Event.CapabilitiesChanged
 import com.android.testutils.runAsShell
 import com.google.android.mobly.snippet.Snippet
 import com.google.android.mobly.snippet.rpc.Rpc
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.MulticastSocket
+import java.net.NetworkInterface
 import org.junit.Rule
 
 class ConnectivityMultiDevicesSnippet : Snippet {
@@ -60,6 +64,7 @@ class ConnectivityMultiDevicesSnippet : Snippet {
     private val cbHelper = NetworkCallbackHelper()
     private val ctsTetheringUtils = CtsTetheringUtils(context)
     private var oldSoftApConfig: SoftApConfiguration? = null
+    private var multicastSocket: MulticastSocket? = null
 
     override fun shutdown() {
         cbHelper.unregisterAll()
@@ -214,5 +219,51 @@ class ConnectivityMultiDevicesSnippet : Snippet {
                 wifiManager.setSoftApConfiguration(it)
             }
         }
+    }
+
+    @Rpc(description = "Create multicast socket")
+    fun createMulticastSocket(ifname: String) {
+        if (multicastSocket != null) {
+            throw IllegalStateException("multicast socket is not null")
+        }
+
+        multicastSocket = MulticastSocket()
+        multicastSocket?.networkInterface = NetworkInterface.getByName(ifname)
+    }
+
+    @Rpc(description = "Destroy multicast socket")
+    fun destroyMulticastSocket() {
+        if (multicastSocket == null) {
+            throw IllegalStateException("multicast socket is null")
+        }
+
+        multicastSocket?.close()
+        multicastSocket = null
+    }
+
+    @Rpc(description = "Join multicast group")
+    fun joinMulticastGroup(multicastGroup: String) {
+        if (multicastSocket == null) {
+            throw IllegalStateException("multicast socket is null")
+        }
+
+        val groupToJoin = InetAddress.getByName(multicastGroup)
+        multicastSocket?.joinGroup(
+            InetSocketAddress(groupToJoin, 0),
+            multicastSocket?.networkInterface
+        )
+    }
+
+    @Rpc(description = "Leave multicast group")
+    fun leaveMulticastGroup(multicastGroup: String) {
+        if (multicastSocket == null) {
+            throw IllegalStateException("multicast socket is null")
+        }
+
+        val groupToLeave = InetAddress.getByName(multicastGroup)
+        multicastSocket?.leaveGroup(
+            InetSocketAddress(groupToLeave, 0),
+            multicastSocket?.networkInterface
+        )
     }
 }
