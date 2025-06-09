@@ -147,14 +147,8 @@ class ApfV6Test(apf_test_base.ApfTestBase):
         expected_echo_reply,
     )
 
-  def is_running_as_root(self):
-    uid = adb_utils.adb_shell(self.clientDevice, 'id -u')
-    return uid == '0'
-
   @apf_utils.at_least_B()
   def test_igmpv3_general_query_offload(self):
-    if not self.is_running_as_root():
-      return
     # use unicast to replace multicast ether dst to prevent flaky due to DTIM skip
     ether = Ether(src=self.server_mac_address, dst=self.client_mac_address)
     ip = IP(
@@ -167,11 +161,9 @@ class ApfV6Test(apf_test_base.ApfTestBase):
 
     mcast_addrs = ['239.0.0.1', '239.0.0.2', '239.0.0.3']
 
+    self.client.createMulticastSocket(self.client_iface_name)
     for addr in mcast_addrs:
-      adb_utils.adb_shell(
-          self.clientDevice,
-          f'ip addr add {addr}/32 dev {self.client_iface_name} autojoin',
-      )
+      self.client.joinMulticastGroup(addr)
 
     ether = Ether(src=self.client_mac_address, dst='01:00:5e:00:00:16')
     ip = IP(
@@ -196,10 +188,8 @@ class ApfV6Test(apf_test_base.ApfTestBase):
       )
     finally:
       for addr in mcast_addrs:
-        adb_utils.adb_shell(
-            self.clientDevice,
-            f'ip addr del {addr}/32 dev {self.client_iface_name}',
-        )
+        self.client.leaveMulticastGroup(addr)
+      self.client.destroyMulticastSocket()
 
   @apf_utils.at_least_B()
   @apf_utils.apf_ram_at_least(3000)
