@@ -1654,15 +1654,13 @@ static int doLoad(char** argv, char * const envp[]) {
     // 25Q2 bumps the kernel requirement up to 5.4
     // see also: //system/netd/tests/kernel_test.cpp TestKernel54
     if (isAtLeast25Q2 && !isAtLeastKernelVersion(5, 4, 0)) {
-        ALOGE("Android 25Q2 requires kernel 5.4.");
-        return 1;
+        ALOGW("Android 25Q2 requires kernel 5.4.");
     }
 
     // 25Q4 bumps the kernel requirement up to 5.10
     // see also: //system/netd/tests/kernel_test.cpp TestKernel510
     if (isAtLeast25Q4 && !isAtLeastKernelVersion(5, 10, 0)) {
-        ALOGE("Android 25Q4 requires kernel 5.10.");
-        return 1;
+        ALOGW("Android 25Q4 requires kernel 5.10.");
     }
 
     // Technically already required by U, but only enforce on V+
