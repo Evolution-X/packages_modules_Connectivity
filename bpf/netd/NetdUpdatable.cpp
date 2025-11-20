@@ -31,8 +31,7 @@ int libnetd_updatable_init(const char* cg2_path) {
 
     android::netdutils::Status ret = sBpfHandler.init(cg2_path);
     if (!android::netdutils::isOk(ret)) {
-        LOG(ERROR) << __func__ << ": Failed: (" << ret.code() << ") " << ret.msg();
-        abort();
+        LOG(INFO) << __func__ << ": Failed: (" << ret.code() << ") " << ret.msg();
     }
     return 0;
 }
