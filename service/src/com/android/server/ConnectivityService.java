@@ -1550,7 +1550,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private final boolean mIngressToVpnAddressFiltering;
 
     // Flag to close QUIC connection for registered sockets when apps lose network access.
-    private final boolean mCloseQuicConnection;
+    private final boolean mCloseQuicConnection = false;
 
     // This is null if mCloseQuicConnection is false
     @Nullable
@@ -2895,10 +2895,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
         mL2capNetworkProvider = mDeps.makeL2capNetworkProvider(mContext);
 
-        // QUIC connection close is triggered by freezer (U+) or background firewall chain (V+).
-        // TODO: Allow other firewall chains to close QUIC connection and enable this flag on T+
-        mCloseQuicConnection = mDeps.isAtLeastU()
-                && mDeps.isFeatureEnabled(context, CLOSE_QUIC_CONNECTION);
         if (mCloseQuicConnection) {
             mQuicConnectionCloser = mDeps.makeQuicConnectionCloser(mNetworkForNetId, mHandler);
         } else {
